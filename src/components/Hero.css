@@ -54,7 +54,7 @@
   color: #64748B;
   padding: 8px 18px;
   border-radius: 100px;
-  font-weight: 800;
+  font-weight: 600;
   font-size: 0.8rem;
   display: flex; align-items: center; gap: 8px;
 }
@@ -136,7 +136,7 @@
   align-items: center;
   gap: 12px;
   font-size: 0.95rem;
-  font-weight: 800;
+  font-weight: 600;
   color: #181C2E;
 }
 

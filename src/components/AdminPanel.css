@@ -32,7 +32,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 900;
+  font-weight: 700;
   font-size: 1.3rem;
   box-shadow: 0 4px 15px rgba(255, 118, 34, 0.3);
 }
@@ -150,7 +150,7 @@
   padding: 5px 12px;
   border-radius: 20px;
   font-size: 0.7rem;
-  font-weight: 800;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
@@ -163,7 +163,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 900;
+  font-weight: 700;
   border: 2px solid white;
   box-shadow: 0 4px 10px rgba(0,0,0,0.05);
 }
@@ -245,7 +245,7 @@
 }
 
 .trend-item strong { display: block; font-size: 0.85rem; color: #94a3b8; }
-.trend-item span { font-size: 1.1rem; font-weight: 800; color: var(--secondary); }
+.trend-item span { font-size: 1.1rem; font-weight: 600; color: var(--secondary); }
 
 /* Unified Table Section */
 .table-header-row {
@@ -257,7 +257,7 @@
 
 .table-title {
   font-size: 1.8rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .count-chip {
@@ -265,7 +265,7 @@
   padding: 6px 14px;
   border-radius: 20px;
   font-size: 0.8rem;
-  font-weight: 800;
+  font-weight: 600;
   border: 1.5px solid #f1f5f9;
 }
 
@@ -299,7 +299,7 @@
   color: white;
   padding: 0.8rem 1.8rem;
   border-radius: 14px;
-  font-weight: 800;
+  font-weight: 600;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -322,7 +322,7 @@
   padding: 1.2rem 1.5rem;
   text-align: left;
   font-size: 0.75rem;
-  font-weight: 900;
+  font-weight: 700;
   text-transform: uppercase;
   color: #94a3b8;
   border-bottom: 1.5px solid #f8fafc;
@@ -347,7 +347,7 @@
   padding: 6px 14px;
   border-radius: 20px;
   font-size: 0.75rem;
-  font-weight: 800;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
@@ -415,7 +415,7 @@
 }
 
 .form-field { display: flex; flex-direction: column; gap: 8px; }
-.form-field label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #94a3b8; }
+.form-field label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #94a3b8; }
 .form-field input { padding: 1rem; border: 1.5px solid #f1f5f9; border-radius: 12px; font-weight: 700; outline: none; }
 
 .submit-form-btn {
@@ -425,7 +425,7 @@
   color: white;
   padding: 1.2rem;
   border-radius: 16px;
-  font-weight: 900;
+  font-weight: 700;
   font-size: 1.1rem;
   box-shadow: 0 10px 30px rgba(255,118,34,0.3);
 }
@@ -434,7 +434,7 @@
   padding: 10rem;
   text-align: center;
   font-size: 1.2rem;
-  font-weight: 800;
+  font-weight: 600;
   color: #94a3b8;
   display: flex;
   align-items: center;

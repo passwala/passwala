@@ -172,7 +172,7 @@
   font-size: 0.95rem;
   color: #555;
 }
-.cart-total strong { font-size: 1.2rem; color: #1a1a2e; font-weight: 800; }
+.cart-total strong { font-size: 1.2rem; color: #1a1a2e; font-weight: 600; }
 
 .cart-checkout-btn {
   display: flex;

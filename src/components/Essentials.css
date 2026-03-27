@@ -66,7 +66,7 @@
 
 .banner-content strong {
   font-size: 1.5rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .banner-content span {
@@ -120,7 +120,7 @@
 .price {
   display: block;
   font-size: 1.25rem;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--text-primary);
 }
 

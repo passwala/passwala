@@ -51,7 +51,7 @@
 
 .modal-header h3 {
   font-size: 1.8rem;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--secondary);
   line-height: 1.2;
 }
@@ -137,7 +137,7 @@
   padding: 1.1rem;
   padding-right: 1.2rem;
   border-right: 1.5px solid var(--glass-border);
-  font-weight: 800;
+  font-weight: 600;
   color: var(--secondary);
   background: #f8f9fa;
   min-width: 65px;
@@ -183,7 +183,7 @@
 .summary-item strong {
   font-size: 1rem;
   color: var(--primary);
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .submit-reg-btn {
@@ -193,7 +193,7 @@
   color: white;
   padding: 1.2rem;
   border-radius: 18px;
-  font-weight: 800;
+  font-weight: 600;
   font-size: 1.1rem;
   display: flex;
   align-items: center;
@@ -221,7 +221,7 @@
 
 .success-screen h2 {
   font-size: 2.2rem;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--secondary);
   margin-bottom: 1rem;
 }
@@ -267,7 +267,7 @@
   color: white;
   padding: 1.2rem;
   border-radius: 18px;
-  font-weight: 800;
+  font-weight: 600;
   font-size: 1.1rem;
 }
 
