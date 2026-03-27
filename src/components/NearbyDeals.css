@@ -1,0 +1,119 @@
+.nearby-deals {
+  padding: 6rem 0;
+  background: #fbfcfd;
+  position: relative;
+}
+
+.nearby-deals::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: radial-gradient(circle at 10% 20%, rgba(255, 118, 34, 0.03) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.deals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2.5rem;
+  margin-top: 3.5rem;
+}
+
+/* Coupon Style Card */
+.deal-card {
+  padding: 2.5rem;
+  border-radius: 24px;
+  background: white;
+  border: 2px dashed #e2e8f0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+}
+
+/* Side cutouts for coupon look */
+.deal-card::before, .deal-card::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 20px;
+  height: 20px;
+  background: #fbfcfd;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  border: 2px dashed #e2e8f0;
+  z-index: 5;
+}
+
+.deal-card::before { left: -12px; }
+.deal-card::after { right: -12px; }
+
+.deal-card:hover {
+  transform: translateY(-10px);
+  border-color: var(--primary);
+  box-shadow: 0 25px 50px -12px rgba(255, 118, 34, 0.15);
+}
+
+.offer-tag {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  background: #FFF5EE;
+  color: var(--primary);
+  padding: 6px 14px;
+  border-radius: 100px;
+  font-weight: 800;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1.5px solid rgba(255, 118, 34, 0.1);
+}
+
+.deal-content {
+  display: flex;
+  flex-direction: column;
+  margin-top: 1rem;
+}
+
+.deal-content strong {
+  display: block;
+  font-size: 1.4rem;
+  color: var(--secondary);
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.deal-content span {
+  display: block;
+  font-size: 1rem;
+  color: #64748b;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.claim-btn {
+  background: var(--secondary);
+  color: white;
+  padding: 1rem;
+  border-radius: 16px;
+  font-weight: 800;
+  font-size: 1rem;
+  width: 100%;
+  transition: 0.2s;
+  text-align: center;
+  margin-top: auto;
+}
+
+.deal-card:hover .claim-btn {
+  background: var(--primary);
+  box-shadow: 0 10px 20px rgba(255, 118, 34, 0.3);
+}
+
+@media (max-width: 600px) {
+  .deals-grid {
+    grid-template-columns: 1fr;
+  }
+}

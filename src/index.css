@@ -1,0 +1,100 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Premium Orange & White Theme */
+  --primary: #FF7622;      
+  --primary-hover: #E86A1D;
+  --secondary: #181C2E;    
+  --accent: #FFD700;       
+  --bg-main: #FFFFFF;      
+  --bg-card: #FFFFFF;
+  --glass-border: rgba(24, 28, 46, 0.05);
+  --text-primary: #181C2E;
+  --text-secondary: #5E6278;
+  --shadow-sm: 0 4px 12px rgba(24, 28, 46, 0.05);
+  --shadow-md: 0 10px 40px -10px rgba(24, 28, 46, 0.12);
+  --shadow-lg: 0 20px 60px -12px rgba(24, 28, 46, 0.18);
+  --radius-md: 16px;       
+  --radius-lg: 28px;
+  --font-main: 'Poppins', sans-serif;
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-main);
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  transition: var(--transition);
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+/* Glassmorphism Effect */
+.glass {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-md);
+}
+
+/* Premium Card Styles */
+.card-hover {
+  transition: var(--transition);
+}
+
+.card-hover:hover {
+  transform: translateY(-8px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Gradient Text - Modern & Standard Compliant */
+.gradient-text {
+  background: linear-gradient(135deg, #FF7622 0%, #FF9F66 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+
+/* Base Layout */
+main {
+  padding-top: 85px; /* Aligned with Navbar height */
+}
+
+section {
+  padding: 6rem 0;
+}
+
+h1,h2,h3 {
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.8s ease-out forwards;
+}

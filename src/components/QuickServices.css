@@ -1,0 +1,52 @@
+.quick-services {
+  padding: 4rem 0;
+  background: white;
+}
+
+.services-grid-icon {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.service-icon-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  border-radius: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+}
+
+.icon-box {
+  width: 60px;
+  height: 60px;
+  background: #F3F4F6;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  transition: var(--transition);
+}
+
+.service-icon-card:hover .icon-box {
+  background: var(--primary);
+  color: white;
+  transform: translateY(-5px);
+}
+
+.service-icon-card span {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+@media (max-width: 768px) {
+  .services-grid-icon {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
