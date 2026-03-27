@@ -1,16 +1,78 @@
-# React + Vite
+# Passwala - Smart Local Economy Platform 🏙️🌌
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Passwala is a high-fidelity, community-driven marketplace designed for modern urban neighborhoods (Starting with Satellite, Ahmedabad). It connects neighbors with verified experts, daily essentials, and exclusive local deals through an AI-powered, premium Orange & White interface.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🚀 Getting Started
 
-## React Compiler
+Follow these steps to download, install, and run the Passwala platform on your local machine.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 1. Prerequisites
+Ensure you have the following installed:
+- [Node.js](https://nodejs.org/) (v16+ recommended)
+- [Git](https://git-scm.com/)
+- [npm](https://www.npmjs.com/) (included with Node.js)
 
-## Expanding the ESLint configuration
+### 2. Clone the Repository
+```bash
+git clone https://github.com/passwala/passwala.git
+cd passwala
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 3. Install Dependencies
+Install all required frontend and backend packages:
+```bash
+npm install
+```
+
+### 4. Environment Configuration
+Create a `.env` file in the root directory and add your Supabase credentials:
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### 5. Database Setup (Supabase)
+To synchronize with the cloud architecture:
+1. Go to your [Supabase Dashboard](https://supabase.com/).
+2. Open the **SQL Editor**.
+3. Copy the contents of `supabase_full_migration.sql` from this project.
+4. Run the SQL to initialize tables (Services, Essentials, Bookings, etc.) and Seed Data.
+
+### 6. Run the Application
+You need to run **two separate processes** for full functionality:
+
+#### Option A: One-Click Execution (If configured)
+```bash
+npm start
+```
+
+#### Option B: Manual Execution (Recommended)
+**Terminal 1 (Frontend):**
+```bash
+npm run dev
+```
+
+**Terminal 2 (Server/AI Engine):**
+```bash
+npm run server
+```
+
+---
+
+## 💎 Features & Tech Stack
+
+- **Core**: React 18 + Vite (Fast Refreshes)
+- **Styling**: Vanilla CSS (Premium Orange & White "Clean Elegant" Design)
+- **Backend**: Supabase (PostgreSQL + RLS + Authentication)
+- **AI Engine**: Seasonality-aware recommendations & smart assistant
+- **Admin OS 2.0**: Real-time cloud-synced dashboard for inventory & order management
+
+---
+
+## 🏙️ Neighborhood Context
+Passwala is specifically optimized for localized contexts, currently featuring high-fidelity data and services for the **Satellite / Ahmedabad** region.
+
+## 📄 License
+Custom proprietary license - for community development use only.
