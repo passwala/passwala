@@ -283,10 +283,28 @@
 }
 
 @media (max-width: 768px) {
+  .auth-page {
+    padding: 1rem;
+  }
   .auth-container {
     grid-template-columns: 1fr;
+    border-radius: 20px;
   }
   .auth-illustration {
     display: none;
+  }
+  .auth-content {
+    padding: 2rem 1.5rem;
+  }
+  .auth-content h2 {
+    font-size: 1.8rem;
+  }
+  .otp-input-container {
+    gap: 0.5rem;
+  }
+  .otp-field {
+    width: 38px;
+    height: 48px;
+    font-size: 1.2rem;
   }
 }

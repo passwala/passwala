@@ -170,8 +170,17 @@
 }
 
 @media (max-width: 1024px) {
-  .hero-grid { grid-template-columns: 1fr; gap: 4rem; text-align: center; }
-  .hero-description, .hero-search-box { margin-left: auto; margin-right: auto; }
+  .hero { padding: 5rem 0 4rem; }
+  .hero-grid { grid-template-columns: 1fr; gap: 3rem; text-align: center; }
+  .hero-description { font-size: 1.1rem; margin-bottom: 2rem; padding: 0 1rem; }
+  .hero-search-box { 
+    margin: 0 1rem 3.5rem; 
+    padding-left: 1.2rem;
+    height: 54px;
+  }
+  .hero-search-box input { font-size: 1rem; }
+  .hero-search-btn { padding: 0.8rem 1.8rem; font-size: 0.9rem; }
   .hero-badge-container, .hero-benefits { justify-content: center; }
-  .hero-main-container { transform: none !important; }
+  .hero-main-container { transform: none !important; padding: 0.5rem; border-radius: 24px; }
+  .hero-proper-img { border-radius: 20px; }
 }

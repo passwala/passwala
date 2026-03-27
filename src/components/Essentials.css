@@ -149,3 +149,9 @@
   text-decoration: underline;
   text-align: center;
 }
+@media (max-width: 1024px) {
+  .essentials { padding: 4rem 0; }
+  .essentials-grid-main { grid-template-columns: 1fr; gap: 2rem; }
+  .description { max-width: 100%; text-align: center; }
+  .header-content { text-align: center; }
+}
