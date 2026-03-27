@@ -61,6 +61,25 @@ npm run server
 
 ---
 
+## 🚀 Deployment (Render.com)
+
+To deploy Passwala to production on Render, follow these settings:
+
+### 1. Backend (Web Service) 🛠️
+Connect your GitHub repo and use these settings in the Render Dashboard:
+- **Runtime**: `Node`
+- **Build Command**: `npm install`
+- **Start Command**: `npm run server`
+- **Environment Variables**: Add your `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
+
+### 2. Frontend (Static Site) 🌐
+Create a new **Static Site** on Render:
+- **Build Command**: `npm run build`
+- **Publish Directory**: `dist`
+- **Environment Variables**: Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+
+---
+
 ## 💎 Features & Tech Stack
 
 - **Core**: React 18 + Vite (Fast Refreshes)
