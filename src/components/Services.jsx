@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { Star, Shield, TrendingUp } from 'lucide-react';
+import { Star, Shield, TrendingUp, MapPin, Users } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useSearch } from '../context/SearchContext';
 import { supabase } from '../supabase';
@@ -59,31 +59,45 @@ const Services = () => {
         
         <div className="services-grid">
           {filteredServices.map(service => (
-            <div key={service.id} className="service-card card-hover glass">
-              {service.premium && <div className="premium-badge"><TrendingUp size={12} /> Featured</div>}
-              <div className="card-image-stub" style={{ 
-                backgroundImage: `url('${service.image}')`, 
-                backgroundSize: 'cover' 
-              }}></div>
-              <div className="card-body">
-                <div className="provider-info">
-                  <span className="provider-name">{service.provider}</span>
-                  <div className="rating">
-                    <Star size={14} fill="currentColor" />
-                    <span>{service.rating} ({service.reviews})</span>
+            <div key={service.id} className="service-card-v2">
+              <div className="service-card-image">
+                <img src={service.image} alt={service.name} />
+                {service.premium && <span className="service-badge-trending">TRENDING</span>}
+                <div className="service-card-overlay">
+                  <span className="service-badge-location"><MapPin size={10} /> Satellite</span>
+                </div>
+              </div>
+              
+              <div className="service-card-content">
+                <div className="service-provider-meta">
+                  <span className="provider-label">{service.provider}</span>
+                  <div className="service-rating-v2">
+                    <Star size={12} fill="currentColor" />
+                    <span>{service.rating}</span>
                   </div>
                 </div>
-                <h4 className="service-name">{service.name}</h4>
-                <div className="neighbor-trust">
-                  <Shield size={14} />
-                  <span>{service.neighbors} Neighbors used this lately</span>
+                
+                <h4 className="service-title-v2">{service.name}</h4>
+                
+                <div className="service-trust-bar">
+                  <Users size={12} />
+                  <span>{service.neighbors} Neighbors booked</span>
                 </div>
-                <div className="card-footer">
-                  <div className="price-tag">
-                    <span className="from">From</span>
-                    <span className="price">₹{service.price}</span>
+                
+                <div className="service-card-footer">
+                  <div className="service-price-v2">
+                    <span className="price-label">Starts from</span>
+                    <span className="price-value">₹{service.price}</span>
                   </div>
-                  <button className="book-btn" onClick={() => { addToCart({ id: service.id, name: service.name, price: service.price, provider: service.provider, type: 'service' }); toast.success(`${service.name} added to cart!`, { icon: '🛒' }); }}>Add to Cart</button>
+                  <button 
+                    className="service-action-btn"
+                    onClick={() => { 
+                      addToCart({ id: service.id, name: service.name, price: service.price, provider: service.provider, type: 'service' }); 
+                      toast.success(`${service.name} added to cart!`, { icon: '🛒' }); 
+                    }}
+                  >
+                    Add to Cart
+                  </button>
                 </div>
               </div>
             </div>

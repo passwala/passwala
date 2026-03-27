@@ -51,35 +51,38 @@
 
 .ai-assistant {
   position: fixed;
-  bottom: 90px;
-  right: 1.5rem;
-  width: 60px;
-  height: 60px;
-  background: var(--accent-orange);
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  background: var(--primary);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 1001;
-  box-shadow: 0 10px 20px rgba(255, 107, 0, 0.4);
+  box-shadow: 0 10px 20px rgba(249, 115, 22, 0.3);
+  color: white;
+  transition: var(--transition);
 }
 
 .ai-assistant:hover {
   transform: scale(1.1) rotate(5deg);
+  background: var(--secondary);
 }
 
 .ai-assistant .tooltip {
   position: absolute;
   right: 110%;
   background: white;
-  color: var(--accent-orange);
-  padding: 0.5rem 1rem;
+  color: var(--secondary);
+  padding: 0.6rem 1.2rem;
   border-radius: 12px;
-  font-weight: 700;
+  font-weight: 800;
   font-size: 0.85rem;
   white-space: nowrap;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-md);
   pointer-events: none;
   opacity: 0;
   transition: var(--transition);

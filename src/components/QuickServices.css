@@ -1,6 +1,6 @@
 .quick-services {
   padding: 4rem 0;
-  background: white;
+  background: transparent;
 }
 
 .services-grid-icon {
@@ -14,39 +14,52 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
-  padding: 1.5rem;
-  border-radius: 20px;
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  gap: 1.2rem;
+  padding: 2rem 1rem;
+  background: white;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
   cursor: pointer;
+  transition: var(--transition);
+}
+
+.service-icon-card:hover {
+  transform: translateY(-8px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--primary);
 }
 
 .icon-box {
-  width: 60px;
-  height: 60px;
-  background: #F3F4F6;
-  border-radius: 16px;
+  width: 56px;
+  height: 56px;
+  background: #f1f5f9;
+  border-radius: 100px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--primary);
+  color: var(--secondary);
   transition: var(--transition);
 }
 
 .service-icon-card:hover .icon-box {
   background: var(--primary);
   color: white;
-  transform: translateY(-5px);
 }
 
 .service-icon-card span {
-  font-weight: 700;
-  font-size: 0.9rem;
-  color: var(--text-primary);
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--secondary);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .services-grid-icon {
     grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .services-grid-icon {
+    grid-template-columns: repeat(2, 1fr);
   }
 }

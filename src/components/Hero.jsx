@@ -22,52 +22,59 @@ const Hero = () => {
 
   return (
     <section className="hero">
-      <div className="container hero-grid">
-        <div className="hero-content animate-fade-in">
+      <div className="container hero-container animate-fade-in">
+        <div className="hero-top">
           <div className="hero-badge-container">
-            <span className="badge-ai"><Sparkles size={12} /> Neighborhood Trust</span>
-            <span className="badge-location"><MapPin size={12} /> Live in Satellite, Ahmedabad</span>
+            <span className="badge-exclusive"><Sparkles size={14} /> Ahmedabad's #1 Platform</span>
+            <span className="badge-status">Live Auctions & Services</span>
           </div>
           
-          <h2 className="hero-title">
-            Your Neighborhood <br />
-            <span className="gradient-text">At Your Fingertips.</span>
-          </h2>
+          <h1 className="hero-heading">
+            Discover Value in <br />
+            <span className="text-primary-gradient">Local Excellence.</span>
+          </h1>
           
-          <p className="hero-description">
-            Experience the future of local commerce. Verified experts, daily essentials, and exclusive community rewards—all in one place.
+          <p className="hero-subtext">
+            The most trusted marketplace for verified neighborhood services, daily essentials, and exclusive community tenders in Ahmedabad.
           </p>
-
-          <form className="hero-search-box glass" onSubmit={handleHeroSearch}>
-             <Search size={22} className="search-icon-hero" />
-             <input 
-               type="text" 
-               placeholder="Need help today? Search for anything..."
-               value={heroSearch}
-               onChange={(e) => setHeroSearch(e.target.value)}
-             />
-             <button type="submit" className="hero-search-btn">Find Now</button>
-          </form>
-
-          <div className="hero-benefits">
-             <div className="benefit-item">
-                <CheckCircle2 size={18} />
-                <span>100% Background Verified</span>
-             </div>
-             <div className="benefit-item">
-                <CheckCircle2 size={18} />
-                <span>Zero Hidden Commissions</span>
-             </div>
-             <div className="benefit-item">
-                <CheckCircle2 size={18} />
-                <span>Trusted by 500+ Neighbors</span>
-             </div>
-          </div>
         </div>
-        
-        <div className="hero-visual">
-          <div className="hero-main-container glass shadow-2xl">
-             <img src="/hero_main.png" alt="Passwala Services" className="hero-proper-img" />
+
+        <div className="hero-search-wrapper">
+          <form className="hero-search-box-v2" onSubmit={handleHeroSearch}>
+            <div className="search-category-select">
+              <select defaultValue="all">
+                <option value="all">All Categories</option>
+                <option value="services">Services</option>
+                <option value="essentials">Essentials</option>
+                <option value="tenders">Tenders</option>
+              </select>
+            </div>
+            <div className="search-divider"></div>
+            <div className="search-input-group">
+              <Search size={20} className="search-icon-v2" />
+              <input 
+                type="text" 
+                placeholder="Search for services, products or tenders..."
+                value={heroSearch}
+                onChange={(e) => setHeroSearch(e.target.value)}
+              />
+            </div>
+            <button type="submit" className="hero-submit-btn">Search Now</button>
+          </form>
+          
+          <div className="hero-quick-stats">
+            <div className="stat-item">
+              <CheckCircle2 size={16} />
+              <span>5,000+ Users</span>
+            </div>
+            <div className="stat-item">
+              <ShieldCheck size={16} />
+              <span>Verified Experts</span>
+            </div>
+            <div className="stat-item">
+               <TrendingUp size={16} />
+               <span>Lowest Commission</span>
+            </div>
           </div>
         </div>
       </div>

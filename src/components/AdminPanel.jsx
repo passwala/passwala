@@ -107,7 +107,7 @@ const AdminPanel = ({ onLogout }) => {
       const { data: result, error } = await supabase
         .from(currentTab.table)
         .select('*')
-        .order('id', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       setData(result || []);
@@ -126,16 +126,17 @@ const AdminPanel = ({ onLogout }) => {
 
   const handleDelete = async (id) => {
     const currentTab = tabs.find(t => t.id === activeTab);
+    const pkName = currentTab.table === 'users' ? 'uid' : 'id';
     if (!window.confirm(`Permanently delete this ${currentTab.label}?`)) return;
 
     try {
       const { error } = await supabase
         .from(currentTab.table)
         .delete()
-        .eq('id', id);
+        .eq(pkName, id);
 
       if (error) throw error;
-      setData(data.filter(item => item.id !== id));
+      setData(data.filter(item => (item.id || item.uid) !== id));
       toast.success('Removed successfully');
       fetchStats();
     } catch (err) {
@@ -158,6 +159,7 @@ const AdminPanel = ({ onLogout }) => {
       fetchData();
       fetchStats();
     } catch (err) {
+      console.error(err);
       toast.error('Save failed');
     }
   };
@@ -167,8 +169,22 @@ const AdminPanel = ({ onLogout }) => {
     if (item) {
       setFormData(item);
     } else {
-      // Default blank based on first item keys
-      const blank = data.length > 0 ? Object.keys(data[0]).reduce((acc, k) => ({ ...acc, [k]: '' }), {}) : {};
+      // Default blank based on first item keys OR a defined schema
+      const currentTab = tabs.find(t => t.id === activeTab);
+      const defaultSchemas = {
+        services: { name: '', provider: '', category: 'home', price: 0, rating: 5.0, reviews: 0, images: '/default.png' },
+        essentials: { name: '', store: '', category: 'grocery', price: 0, delivery_time: '15 min' },
+        deals: { name: '', offer: '', store: '', price: 0 },
+        recommendations: { name: '', reason: '', price: 0, provider: '', image: '/default.png' },
+        bookings: { user_id: '', item_name: '', item_type: 'service', price: 0, status: 'pending' },
+        vendor_applications: { business_name: '', category: '', phone: '', address: '', plan: 'Basic', status: 'pending' },
+        users: { uid: '', email: '', display_name: '', auth_provider: 'google', role: 'customer' }
+      };
+
+      const blank = data.length > 0 ? 
+        Object.keys(data[0]).reduce((acc, k) => ({ ...acc, [k]: (typeof data[0][k] === 'number' ? 0 : '') }), {}) : 
+        (defaultSchemas[currentTab.table] || {});
+
       delete blank.id;
       delete blank.created_at;
       setFormData(blank);
@@ -226,27 +242,30 @@ const AdminPanel = ({ onLogout }) => {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((item) => (
-                <tr key={item.id}>
-                  <td className="id-col">#{item.id}</td>
-                  {Object.entries(item).filter(([k]) => k !== 'id' && k !== 'created_at').map(([k, v]) => (
-                    <td key={k}>
-                      {k === 'status' ? (
-                        <span className={`status-badge ${v}`}>{v}</span>
-                      ) : typeof v === 'boolean' ? (v ? '✅' : '❌') : (
-                        <span className="truncate-cell">{String(v)}</span>
+              {filtered.map((item) => {
+                const pk = item.uid || item.id;
+                return (
+                  <tr key={pk}>
+                    <td className="id-col">#{pk}</td>
+                    {Object.entries(item).filter(([k]) => k !== 'id' && k !== 'uid' && k !== 'created_at').map(([k, v]) => (
+                      <td key={k}>
+                        {k === 'status' ? (
+                          <span className={`status-badge ${v}`}>{v}</span>
+                        ) : typeof v === 'boolean' ? (v ? '✅' : '❌') : (
+                          <span className="truncate-cell">{String(v)}</span>
+                        )}
+                      </td>
+                    ))}
+                    <td className="actions-cell">
+                      {activeTab === 'vendor_applications' && item.status === 'pending' && (
+                        <button className="approve-btn" onClick={() => handleApproveVendor(item)}><CheckCircle size={18} /></button>
                       )}
+                      <button className="edit-btn" onClick={() => openModal(item)}><Edit2 size={16} /></button>
+                      <button className="delete-btn" onClick={() => handleDelete(pk)}><Trash2 size={16} /></button>
                     </td>
-                  ))}
-                  <td className="actions-cell">
-                    {activeTab === 'vendor_applications' && item.status === 'pending' && (
-                      <button className="approve-btn" onClick={() => handleApproveVendor(item)}><CheckCircle size={18} /></button>
-                    )}
-                    <button className="edit-btn" onClick={() => openModal(item)}><Edit2 size={16} /></button>
-                    <button className="delete-btn" onClick={() => handleDelete(item.id)}><Trash2 size={16} /></button>
-                  </td>
-                </tr>
-              ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -1,30 +1,32 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
 :root {
-  /* Premium Orange & White Theme */
-  --primary: #FF7622;      
-  --primary-hover: #E86A1D;
-  --secondary: #181C2E;    
-  --accent: #FFD700;       
-  --bg-main: #FFFFFF;      
-  --bg-card: #FFFFFF;
-  --glass-border: rgba(24, 28, 46, 0.05);
-  --text-primary: #181C2E;
-  --text-secondary: #5E6278;
-  --shadow-sm: 0 4px 12px rgba(24, 28, 46, 0.05);
-  --shadow-md: 0 10px 40px -10px rgba(24, 28, 46, 0.12);
-  --shadow-lg: 0 20px 60px -12px rgba(24, 28, 46, 0.18);
-  --radius-md: 16px;       
-  --radius-lg: 28px;
-  --font-main: 'Poppins', sans-serif;
-  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Trademax Inspired - High Contrast Premium Palette */
+  --primary: #f97316;      
+  --primary-hover: #ea580c;
+  --secondary: #0f172a;    
+  --accent: #3b82f6;       
+  --bg-main: #f8fafc;      
+  --bg-card: #ffffff;
+  --glass-border: rgba(15, 23, 42, 0.08);
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --radius-md: 12px;       
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --font-main: 'Plus Jakarta Sans', sans-serif;
+  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: 'Poppins', sans-serif !important;
+  font-family: inherit;
 }
 
 body {
@@ -33,9 +35,12 @@ body {
   line-height: 1.6;
   color: var(--text-primary);
   background: var(--bg-main);
+  background-image: 
+    linear-gradient(rgba(15, 23, 42, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
-  font-weight: 400;
 }
 
 button {
