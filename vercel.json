@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" },
+    { "source": "/api/(.*)", "destination": "https://passwala.onrender.com/api/$1" }
+  ]
+}
