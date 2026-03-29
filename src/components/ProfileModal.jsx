@@ -32,28 +32,36 @@ const ProfileModal = ({ user, onClose, onLogout }) => {
   const handleSaveName = async () => {
     if (!newName.trim()) return;
     try {
-      // 1. Update Firebase Auth (triggers UI re-render)
+      // 1. Update Firebase Auth (Updates UI immediately)
       await updateProfile(user, { displayName: newName });
       
-      // 2. Sync to Supabase directly
-      const { error } = await supabase
-        .from('users')
-        .upsert({ 
-          uid: user.uid, 
-          display_name: newName,
-          email: user.email,
-          phone_number: user.phoneNumber,
-          photo_url: user.photoURL,
-          last_login: new Date().toISOString()
-        }, { onConflict: 'uid' });
-      
-      if (error) throw error;
+      // 2. Sync to Supabase (Optional/Warn-only due to RLS)
+      try {
+        const { error } = await supabase
+          .from('users')
+          .upsert({ 
+            uid: user.uid, 
+            display_name: newName,
+            email: user.email,
+            phone_number: user.phoneNumber,
+            photo_url: user.photoURL,
+            last_login: new Date().toISOString()
+          }, { onConflict: 'uid' });
+        
+        if (error) {
+          console.warn('Supabase sync blocked (RLS):', error.message);
+        } else {
+          toast.success('Profile synced to cloud!');
+        }
+      } catch (syncErr) {
+        console.warn('Supabase sync failed:', syncErr);
+      }
       
       setIsEditing(false);
-      toast.success('Profile synced to cloud!');
+      toast.success('Local profile updated! 👤');
     } catch (err) { 
       console.error(err);
-      toast.error('Failed to sync profile.');
+      toast.error('Failed to update local profile.');
     }
   };
 

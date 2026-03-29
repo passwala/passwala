@@ -5,7 +5,7 @@ import './Community.css';
 
 const Community = () => {
   return (
-    <section className="community">
+    <section className="community" id="community">
       <div className="container">
         <div className="section-header">
            <span className="badge-primary">Community Voice</span>

@@ -12,12 +12,12 @@ const Hero = () => {
 
   const handleHeroSearch = (e) => {
     e.preventDefault();
+    updateSearch(heroSearch);
     if (heroSearch.trim()) {
-      updateSearch(heroSearch);
       toast.success(`Locating ${heroSearch}...`, { icon: '🔍' });
-      const servicesEl = document.getElementById('services');
-      if (servicesEl) servicesEl.scrollIntoView({ behavior: 'smooth' });
     }
+    const servicesEl = document.getElementById('services');
+    if (servicesEl) servicesEl.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
@@ -56,7 +56,10 @@ const Hero = () => {
                 type="text" 
                 placeholder="Search for services, products or tenders..."
                 value={heroSearch}
-                onChange={(e) => setHeroSearch(e.target.value)}
+                onChange={(e) => {
+                  setHeroSearch(e.target.value);
+                  updateSearch(e.target.value);
+                }}
               />
             </div>
             <button type="submit" className="hero-submit-btn">Search Now</button>
