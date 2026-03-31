@@ -1,0 +1,391 @@
+.near-shops-page {
+  width: 100%;
+  min-height: 100vh;
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.near-shops-header {
+  margin-bottom: 2rem;
+}
+
+.header-top {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.back-btn-near {
+  background: var(--bg-surface);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.header-top h1 {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.search-box-near {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 0 1.25rem;
+  border: 1.5px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.search-icon-near { color: var(--text-secondary); }
+.filter-icon-near { color: var(--text-secondary); cursor: pointer; }
+
+.search-box-near input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  outline: none;
+  color: var(--text-primary);
+}
+
+/* Map Styling */
+.map-view-container {
+  margin-bottom: 2rem;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  position: relative;
+  box-shadow: var(--shadow-md);
+  background: var(--bg-surface);
+}
+
+.category-scroll-near {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 0.5rem 0;
+  margin-top: 1.5rem;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.category-scroll-near::-webkit-scrollbar {
+  display: none;
+}
+
+.cat-tab-near {
+  background: var(--bg-card);
+  border: 1.5px solid var(--glass-border);
+  padding: 0.6rem 1.4rem;
+  border-radius: 100px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-sm);
+}
+
+.cat-tab-near:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+}
+
+.cat-tab-near.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  box-shadow: 0 4px 15px rgba(255,118,34,0.3);
+}
+
+.title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.neighbor-trust-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--text-secondary);
+  letter-spacing: 0.01em;
+}
+
+.neighbor-trust-badge span {
+  opacity: 0.85;
+}
+
+.map-wrapper {
+  position: relative;
+  height: 350px;
+}
+
+.mock-map {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.6;
+}
+
+.shop-marker {
+  position: absolute;
+  color: var(--primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 10;
+  cursor: pointer;
+}
+
+.marker-label {
+  background: var(--secondary);
+  color: var(--primary);
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  box-shadow: var(--shadow-md);
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+/* Scanning Effect */
+.scan-overlay {
+  position: absolute;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  width: 90%;
+}
+
+.scanning-bar {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--glass-border);
+}
+
+.scanning-bar span {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: 0.05em;
+}
+
+.scan-pulse {
+  width: 10px;
+  height: 10px;
+  background: var(--primary);
+  border-radius: 50%;
+  position: relative;
+}
+
+.scan-pulse::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: var(--primary);
+  border-radius: 50%;
+  animation: scan-pulse-anim 2s infinite;
+}
+
+@keyframes scan-pulse-anim {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
+.scan-active-dot {
+  width: 12px;
+  height: 12px;
+  background: #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(16,185,129,0.3);
+}
+
+/* Shop Cards List */
+.shops-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.shop-card-near {
+  background: var(--bg-card);
+  border-radius: 18px;
+  padding: 1.5rem 1.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  cursor: pointer;
+}
+
+.shop-card-near:hover {
+  transform: translateY(-4px);
+  border-color: var(--primary);
+  box-shadow: var(--shadow-md);
+}
+
+.shop-card-header h3 {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 0.2rem;
+}
+
+.shop-card-header {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+}
+
+.rating-badge-near {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.shop-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.shop-category-near {
+  color: var(--primary);
+  background: rgba(255, 118, 34, 0.1);
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.shop-distance-near {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.visit-shop-btn {
+  background: transparent;
+  border: 1.5px solid var(--glass-border);
+  padding: 0.75rem 1.5rem;
+  border-radius: 100px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.visit-shop-btn:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.shop-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.neighborhood-check-badge {
+  background: white;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border: 1.5px solid white;
+}
+
+.neighbor-trust-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trust-main {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--primary);
+  opacity: 0.9;
+  letter-spacing: 0.01em;
+}
+
+.seconded-meta {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+@media (max-width: 650px) {
+  .near-shops-page { padding: 0.75rem; }
+  .map-wrapper { height: 280px; }
+  .scanning-bar { padding: 0.75rem 1rem; }
+  .shop-card-near {
+    padding: 1.25rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.25rem;
+  }
+  .shop-card-header { gap: 0.75rem; width: 100%; justify-content: space-between; }
+  .shop-card-header h3 { font-size: 1.15rem; }
+  .visit-shop-btn { width: 100%; text-align: center; }
+  .shop-card-meta { gap: 8px; flex-wrap: wrap; }
+}
+
+@media (max-width: 400px) {
+  .map-wrapper { height: 240px; }
+  .shop-card-header h3 { font-size: 1.05rem; }
+  .shop-category-near { font-size: 0.7rem; }
+}
+
+/* --- PROPER ORANGE DARK MODE OVERRIDES (Minified) --- */
+.dark-mode .neighborhood-check-badge { background: #1e293b; border-color: #334155; }
+.dark-mode .marker-label {
+  background: #1e293b;
+  color: white;
+}
+
+.dark-mode .mock-map {
+  filter: grayscale(1) invert(0.9) contrast(1.2);
+  opacity: 0.3;
+}

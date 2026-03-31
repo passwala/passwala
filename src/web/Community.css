@@ -1,0 +1,134 @@
+.community {
+  background: radial-gradient(circle at bottom left, rgba(16, 185, 129, 0.05), transparent);
+}
+
+.badge-primary {
+  display: inline-block;
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--secondary);
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.community-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.community-card {
+  padding: 2rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.focus {
+  border: 1px solid rgba(0, 98, 255, 0.1);
+  box-shadow: 0 10px 30px rgba(0, 98, 255, 0.05);
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.user-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 1rem;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.user-details strong {
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.user-details span {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.recommendation-text {
+  font-size: 1.1rem;
+  font-style: italic;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+.recommendation-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.actions button {
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.actions button:hover {
+  color: var(--primary);
+}
+
+.time {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Responsiveness */
+@media (max-width: 900px) {
+  .community-grid {
+    grid-template-columns: 1fr;
+  }
+  .community-card {
+    padding: 1.5rem;
+  }
+  .recommendation-text {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .user-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 0.9rem;
+  }
+  .user-details strong {
+    font-size: 0.9rem;
+  }
+  .user-details span {
+    font-size: 0.75rem;
+  }
+}
+

@@ -166,3 +166,27 @@ CREATE POLICY "Users can view and edit their own profile" ON users
 DROP POLICY IF EXISTS "Service role can view vendor apps" ON vendor_applications;
 CREATE POLICY "Anyone can submit vendor apps" ON vendor_applications FOR INSERT WITH CHECK (true);
 CREATE POLICY "Public Read Vendor Apps" ON vendor_applications FOR SELECT USING (true); -- Optional: make it private later
+
+-- 9. Community Posts Table
+CREATE TABLE IF NOT EXISTS community_posts (
+  id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  user_name TEXT NOT NULL,
+  user_avatar TEXT NOT NULL,
+  location TEXT NOT NULL,
+  text TEXT NOT NULL UNIQUE,
+  likes INTEGER DEFAULT 0,
+  comments INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- SEED COMMUNITY DATA
+INSERT INTO community_posts (user_name, user_avatar, location, text, likes, comments) VALUES
+('Jane Doe', 'JD', 'Satellite Resident', 'I just got my AC fixed by Vikas Tech and the experience was amazing. Transparent pricing and local trust! Highly recommend for anyone in Ahmedabad.', 12, 3),
+('Priya K.', 'PK', 'Vastrapur Resident', 'The milk delivery from Local Fresh is consistently early. Best quality in the neighborhood so far! 🥛', 45, 8),
+('Rohan Shah', 'RS', 'Ambawadi Resident', 'WoodWorks turned my old table into a masterpiece. Authentic carpentry still exists in Ahmedabad! 🪚', 89, 15)
+ON CONFLICT DO NOTHING;
+
+ALTER TABLE community_posts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public Read Community" ON community_posts;
+CREATE POLICY "Public Read Community" ON community_posts FOR SELECT USING (true);
+

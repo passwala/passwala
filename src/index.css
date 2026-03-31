@@ -8,6 +8,7 @@
   --accent: #3b82f6;       
   --bg-main: #f8fafc;      
   --bg-card: #ffffff;
+  --bg-surface: #ffffff;
   --glass-border: rgba(15, 23, 42, 0.08);
   --text-primary: #1e293b;
   --text-secondary: #64748b;
@@ -20,6 +21,20 @@
   --radius-xl: 32px;
   --font-main: 'Plus Jakarta Sans', sans-serif;
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark-mode {
+  --bg-main: #0a0a0c;     /* Deep Onyx Black */
+  --bg-card: rgba(24, 24, 33, 0.7); /* Deep Slate/Indigo Card */
+  --bg-surface: #12121e;   /* Solid Card Background */
+  --primary: #ff7622;     /* Signature Passwala Orange */
+  --primary-hover: #f97316;
+  --secondary: #ffffff;   /* Pure White Text */
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.5);
+  --accent: #ff9f66;
 }
 
 *, *::before, *::after {
@@ -41,6 +56,16 @@ body {
   background-size: 40px 40px;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  transition: background 0.4s ease, color 0.4s ease;
+}
+
+.dark-mode body {
+  background: linear-gradient(180deg, #0a0a0c 0%, #11111a 100%);
+  background-image: 
+    radial-gradient(at 100% 0%, rgba(255, 118, 34, 0.08) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(255, 118, 34, 0.05) 0px, transparent 50%),
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
 }
 
 button {

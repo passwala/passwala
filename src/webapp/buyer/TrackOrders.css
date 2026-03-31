@@ -1,0 +1,275 @@
+.track-orders-page {
+  padding: 2.5rem 1rem 6rem;
+}
+
+.track-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.track-header h2 {
+  font-size: 1.6rem;
+  color: var(--text-main);
+  font-weight: 800;
+}
+
+.live-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+  padding: 6px 14px;
+  border-radius: 30px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.live-pulse {
+  width: 8px;
+  height: 8px;
+  background: #22c55e;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.6);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.9); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.6; }
+  100% { transform: scale(0.9); opacity: 1; }
+}
+
+.orders-list-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.tracking-card {
+  padding: 1.5rem;
+  border-radius: 20px;
+  border: 1.5px solid var(--glass-border);
+  position: relative;
+  overflow: hidden;
+}
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+}
+
+.shop-info {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.shop-logo-box {
+  width: 44px;
+  height: 44px;
+  background: var(--bg-card);
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--primary);
+  border: 1px solid var(--glass-border);
+}
+
+.shop-info h4 {
+  font-size: 1rem;
+  color: var(--text-main);
+  margin-bottom: 2px;
+}
+
+.shop-info p {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.order-id-v2 {
+  font-size: 0.75rem;
+  font-family: 'Inter', monospace;
+  background: #f1f5f9;
+  padding: 4px 10px;
+  border-radius: 6px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.tracking-timeline {
+  margin-bottom: 1.5rem;
+}
+
+.timeline-progress-bg {
+  height: 6px;
+  background: #f1f5f9;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.timeline-progress-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(255, 118, 34, 0.4);
+}
+
+.timeline-labels {
+  display: flex;
+  justify-content: space-between;
+}
+
+.label-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.65rem;
+  color: #cbd5e1;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.label-item.active {
+  color: var(--primary);
+}
+
+.eta-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 16px;
+  margin-bottom: 1rem;
+}
+
+.eta-big {
+  display: flex;
+  flex-direction: column;
+}
+
+.eta-big span {
+  font-size: 0.7rem;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.eta-big strong {
+  font-size: 1.3rem;
+  color: #1e293b;
+  font-weight: 800;
+}
+
+.chat-agent-btn {
+  background: white;
+  border: 1px solid var(--glass-border);
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chat-agent-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.agent-small-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.agent-small-info img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid white;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.agent-small-info p {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.past-orders-shortcut {
+  margin-top: 3rem;
+}
+
+.past-orders-shortcut h4 {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 1.2rem;
+}
+
+.past-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: white;
+  border: 1px solid #f1f5f9;
+  border-radius: 16px;
+  margin-bottom: 0.8rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.past-item-row:hover {
+  border-color: var(--primary);
+  background: rgba(255, 118, 34, 0.02);
+}
+
+.past-meta span {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.past-meta p {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.fulfilled-pill-small {
+  font-size: 0.65rem;
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+  padding: 2px 10px;
+  border-radius: 6px;
+  font-weight: 800;
+  margin-left: auto;
+  margin-right: 12px;
+  text-transform: uppercase;
+}
+
+.no-past-p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 2rem;
+  background: rgba(0,0,0,0.02);
+  border-radius: 20px;
+  border: 1px dashed var(--glass-border);
+}
