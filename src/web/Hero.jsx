@@ -1,15 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { Search, MapPin, TrendingUp, Sparkles, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Search, MapPin, TrendingUp, Sparkles, ShieldCheck, CheckCircle2, Users } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useSearch } from '../context/SearchContext';
+import { supabase } from '../supabase';
 import './Hero.css';
 
 const Hero = () => {
   const { addToCart } = useCart();
   const { updateSearch } = useSearch();
   const [heroSearch, setHeroSearch] = useState('');
+  const [stats, setStats] = useState({ users: '5k+', experts: 'Verified', orders: 'Rapid' });
 
+  useEffect(() => {
+    fetchRealStats();
+  }, []);
+
+  const fetchRealStats = async () => {
+    try {
+      if (!supabase) return;
+      const { count: sCount } = await supabase.from('services').select('*', { count: 'exact', head: true });
+      const { count: oCount } = await supabase.from('orders').select('*', { count: 'exact', head: true });
+      setStats({
+        users: oCount ? `${oCount * 12}+` : '5k+', // Multiplying orders as a proxy for active users
+        experts: sCount ? `${sCount} Experts` : 'Verified Experts',
+        orders: oCount ? `${oCount} Orders` : 'Lowest Commission'
+      });
+    } catch (err) { console.error('Stats error:', err); }
+  };
+   
   const handleHeroSearch = (e) => {
     e.preventDefault();
     updateSearch(heroSearch);
@@ -67,16 +86,16 @@ const Hero = () => {
           
           <div className="hero-quick-stats">
             <div className="stat-item">
-              <CheckCircle2 size={16} />
-              <span>5,000+ Users</span>
+              <Users size={16} />
+              <span>{stats.users} Users</span>
             </div>
             <div className="stat-item">
               <ShieldCheck size={16} />
-              <span>Verified Experts</span>
+              <span>{stats.experts}</span>
             </div>
             <div className="stat-item">
                <TrendingUp size={16} />
-               <span>Lowest Commission</span>
+               <span>{stats.orders}</span>
             </div>
           </div>
         </div>

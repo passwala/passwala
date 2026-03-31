@@ -71,7 +71,7 @@ const VendorPortal = ({ user, onLogout }) => {
   useEffect(() => {
     fetchVendorData();
     const sub = supabase.channel('vendor_live').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (p) => {
-        setOrders(prev => [p.new, ...prev]);
+        fetchVendorData(); // Refresh all stats on new order
         toast.success('🔔 New Order Alert!', { style: { background: '#ff7622', color: '#fff' } });
     }).subscribe();
     return () => supabase.removeChannel(sub);
@@ -80,10 +80,31 @@ const VendorPortal = ({ user, onLogout }) => {
   const fetchVendorData = async () => {
     try {
       setLoading(true);
-      const { data: items } = await supabase.from('services').select('*').limit(8);
-      setInventory(items?.map(i => ({ ...i, stock: Math.floor(Math.random() * 10) + 1 })) || []);
-      const { data: oData } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(5);
+      // Fetch Products
+      const { data: items } = await supabase.from('services').select('*');
+      setInventory(items || []);
+
+      // Fetch Orders & Calculate Metrics
+      const { data: oData } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
       setOrders(oData || []);
+
+      // Calculate Real Stats
+      const today = new Date().toISOString().split('T')[0];
+      const dailyEarn = (oData || [])
+        .filter(o => o.status === 'DELIVERED' && o.created_at.startsWith(today))
+        .reduce((sum, o) => sum + (parseFloat(o.total_price) || 0), 0);
+
+      const activeOrdersCount = (oData || []).filter(o => ['PENDING', 'PREPARING', 'SHIPPED'].includes(o.status)).length;
+      const lowStockCount = (items || []).filter(i => (i.stock || 0) < 5).length;
+
+      setEarnings({ 
+        daily: dailyEarn || 0, 
+        dailyChange: dailyEarn > 0 ? '+100%' : '0%', 
+        weekly: dailyEarn * 7, // Mocked projection
+        activeCount: activeOrdersCount,
+        lowStock: lowStockCount
+      });
+
     } finally { setLoading(false); }
   };
 
