@@ -77,15 +77,16 @@ const AdminPanel = ({ onLogout }) => {
     { id: 'deals', label: 'Deals', icon: Tag, table: 'deals' },
     { id: 'recommendations', label: 'AI Recs', icon: Sparkles, table: 'recommendations' },
     { id: 'bookings', label: 'Orders', icon: Package, table: 'bookings' },
-    { id: 'vendor_applications', label: 'Vendor Apps', icon: FileText, table: 'vendor_applications' },
+    { id: 'vendors', label: 'Vendors', icon: FileText, table: 'vendors' },
     { id: 'users', label: 'Users', icon: Users, table: 'users' },
   ];
 
   const fetchStats = async () => {
     try {
+      if (!supabase) return; // 🔥 Safety check
       const { count: uCount } = await supabase.from('users').select('*', { count: 'exact', head: true });
       const { count: sCount } = await supabase.from('services').select('*', { count: 'exact', head: true });
-      const { count: aCount } = await supabase.from('vendor_applications').select('*', { count: 'exact', head: true });
+      const { count: aCount } = await supabase.from('vendors').select('*', { count: 'exact', head: true }).eq('profile_completed', true);
       const { count: bCount } = await supabase.from('bookings').select('*', { count: 'exact', head: true });
       setStats({
         users: uCount || 0,
@@ -150,9 +151,16 @@ const AdminPanel = ({ onLogout }) => {
     e.preventDefault();
     const currentTab = tabs.find(t => t.id === activeTab);
     try {
+      // 🛡️ Sanitize data: Remove read-only columns that Supabase will reject
+      const payload = { ...formData };
+      delete payload.created_at;
+      
+      // If we are adding new user, keep uid. If editing existing item, keep id.
+      // But if it's an auto-gen id, sometimes it's better to keep it for upsert.
+
       const { error } = await supabase
         .from(currentTab.table)
-        .upsert([formData]);
+        .upsert([payload]);
 
       if (error) throw error;
       toast.success(editingItem ? 'Updated!' : 'Added New!');
@@ -160,8 +168,8 @@ const AdminPanel = ({ onLogout }) => {
       fetchData();
       fetchStats();
     } catch (err) {
-      console.error(err);
-      toast.error('Save failed');
+      console.error('Upsert Error:', err);
+      toast.error(`Save failed: ${err.message || 'Unknown error'}`);
     }
   };
 
@@ -178,7 +186,7 @@ const AdminPanel = ({ onLogout }) => {
         deals: { name: '', offer: '', store: '', price: 0 },
         recommendations: { name: '', reason: '', price: 0, provider: '', image: '/default.png' },
         bookings: { user_id: '', item_name: '', item_type: 'service', price: 0, status: 'pending' },
-        vendor_applications: { business_name: '', category: '', phone: '', address: '', plan: 'Basic', status: 'pending' },
+        vendors: { business_name: '', category: '', phone_number: '', name: '', address: '', profile_completed: false },
         users: { uid: '', email: '', display_name: '', auth_provider: 'google', role: 'customer' }
       };
 
@@ -195,21 +203,63 @@ const AdminPanel = ({ onLogout }) => {
 
   const handleApproveVendor = async (app) => {
     try {
-      const { error: sError } = await supabase
-        .from('services')
-        .insert([{
-          name: app.business_name,
-          provider: app.business_name,
-          category: app.category,
-          price: app.plan === 'Pro' ? 1999 : app.plan === 'Growth' ? 999 : 499,
-          rating: 5.0,
-          image: '/default_service.png'
-        }]);
-      if (sError) throw sError;
-      await supabase.from('vendor_applications').update({ status: 'approved' }).eq('id', app.id);
-      toast.success('Vendor Approved & Service Live!');
-      fetchData();
-    } catch (err) { toast.error('Approval failed'); }
+      setLoading(true);
+      console.log('🧪 Attempting Secure Approval for ID:', app.id);
+      
+      // 🚀 STRATEGY 1: Secure Node.js Backend (Primary)
+      try {
+        const response = await fetch(`http://localhost:5000/api/vendor/approve/${app.id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appData: app })
+        });
+
+        const contentType = response.headers.get("content-type");
+        if (response.ok && contentType && contentType.includes("application/json")) {
+           const result = await response.json();
+           toast.success(`Success: ${app.business_name} approved via Node!`);
+           fetchData();
+           fetchStats();
+           return;
+        }
+        
+        throw new Error('Server Node responded with non-JSON or error page. Falling back...');
+      } catch (nodeErr) {
+        console.warn('⚠️ Node Server Fallback Triggered:', nodeErr.message);
+        
+        // 🛡️ STRATEGY 2: Direct Supabase Injector (Emergency Fallback)
+        const isShop = app.category === 'shop';
+        const targetTable = isShop ? 'essentials' : 'services';
+        
+        const { error: insertError } = await supabase
+          .from(targetTable)
+          .insert([{
+            name: app.business_name,
+            [isShop ? 'store' : 'provider']: app.business_name,
+            category: isShop ? 'grocery' : 'home',
+            price: 799,
+            ...(isShop ? { delivery_time: '20 min' } : { rating: 5.0, image: '/default_service.png' })
+          }]);
+
+        if (insertError) throw insertError;
+        
+        const { error: updateError } = await supabase
+          .from('vendors')
+          .update({ profile_completed: true })
+          .eq('id', app.id);
+          
+        if (updateError) throw updateError;
+          
+        toast.success(`Direct Sync: ${app.business_name} is now LIVE!`);
+        fetchData();
+        fetchStats();
+      }
+    } catch (err) {
+      console.error('Final Approval Failure:', err);
+      toast.error(`Approval failed: ${err.message || 'System error'}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderTable = () => {
@@ -258,11 +308,13 @@ const AdminPanel = ({ onLogout }) => {
                       </td>
                     ))}
                     <td className="actions-cell">
-                      {activeTab === 'vendor_applications' && item.status === 'pending' && (
-                        <button className="approve-btn" onClick={() => handleApproveVendor(item)}><CheckCircle size={18} /></button>
+                      {activeTab === 'vendors' && item.profile_completed === false && (
+                        <button className="approve-btn" onClick={() => handleApproveVendor(item)} title="Approve Vendor"><CheckCircle size={18} /></button>
                       )}
-                      <button className="edit-btn" onClick={() => openModal(item)}><Edit2 size={16} /></button>
-                      <button className="delete-btn" onClick={() => handleDelete(pk)}><Trash2 size={16} /></button>
+                      <button className="edit-btn" onClick={() => openModal(item)} title="Edit"><Edit2 size={16} /></button>
+                      {activeTab !== 'vendors' && (
+                        <button className="delete-btn" onClick={() => handleDelete(pk)} title="Remove Entry"><Trash2 size={16} /></button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -378,6 +430,11 @@ const AdminPanel = ({ onLogout }) => {
             </div>
           </div>
           <div className="admin-profile-pill">
+            {stats.apps > 0 && (
+              <span className="pending-alert-badge" onClick={() => setActiveTab('vendors')}>
+                {stats.apps} ACTIVE VENDORS
+              </span>
+            )}
             <span className="badge-live">System Online</span>
             <div className="avatar">AD</div>
           </div>

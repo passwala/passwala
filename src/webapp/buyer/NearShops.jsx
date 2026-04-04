@@ -160,8 +160,8 @@ const NearShops = ({ onBack, location }) => {
                              )}
                            </div>
                            <div className="neighbor-trust-row">
-                              <span className="trust-main">Trusted by {shop.recommendations || 4} residents within 2km</span>
-                              <span className="seconded-meta">Seconded by {Math.floor(Math.random() * 5) + 1} neighbors today</span>
+                              <span className="trust-main">Recommended locally</span>
+                              <span className="seconded-meta">Neighborhood endorsed</span>
                            </div>
                          </div>
                        <div className="rating-badge-near">

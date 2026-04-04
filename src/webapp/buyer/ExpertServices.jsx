@@ -146,8 +146,8 @@ const ExpertServices = ({ onBack, location }) => {
                   <span className="expert-type">{expert.category} • {expert.experience || '5 yr+'} exp</span>
                   
                   <div className="expert-features">
-                    <span className="feature"><Timer size={12} /> Live ETA: 25 min</span>
-                    <span className="feature seconded"><CheckCircle size={12} /> Seconded by {Math.floor(Math.random() * 10) + 2} neighbors</span>
+                    <span className="feature"><Timer size={12} /> Live ETA: -- min</span>
+                    <span className="feature seconded"><CheckCircle size={12} /> Recommended locally</span>
                   </div>
                </div>
             </div>

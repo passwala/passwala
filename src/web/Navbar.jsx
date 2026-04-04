@@ -61,9 +61,9 @@ const Navbar = ({ isAuthenticated, user, onLogout, onOpenProfile, onOpenAI, onJo
         <div className="nav-center-v2">
           <div className="nav-links-v2">
              <a href="#services" className="nav-pill-link">Services</a>
-             <a href="#deals" className="nav-pill-link">Tenders</a>
+             <a href="#deals" className="nav-pill-link">Deals</a>
              <a href="#community" className="nav-pill-link">Community</a>
-             <a href="#pro" className="nav-pill-link pro-highlight">Become a Pro</a>
+             <a href="http://localhost:3002" target="_blank" rel="noreferrer" className="nav-pill-link vendor-highlight">Become a Vendor</a>
           </div>
         </div>
 

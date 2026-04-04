@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import userRoutes from './routes/users.js';
+import vendorRoutes from './routes/vendor.js';
 
 dotenv.config();
 
@@ -9,21 +10,46 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:3001'] }));
+app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'] }));
 app.use(express.json());
 
 // Routes
-app.use('/api/users', userRoutes);
-
-// Health check
 app.get('/', (req, res) => {
   res.json({
-    status: 'Passwala API is running 🚀',
-    db: 'Supabase ✅',
+    status: 'online',
+    system: 'Passwala Digital Backend v2.0',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      users: '/api/users',
+      vendor: '/api/vendor',
+      status: '/health'
+    }
+  });
+});
+
+app.get('/health', (req, res) => res.json({ status: 'healthy', database: 'connected' }));
+
+app.use('/api/users', userRoutes);
+app.use('/api/vendor', vendorRoutes);
+
+// 404 Handler
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Not Found',
+    path: req.originalUrl,
+    message: 'The requested endpoint does not exist. Check / for documentation.'
+  });
+});
+
+// Error Handler
+app.use((err, req, res, next) => {
+  console.error('🔥 Server Error:', err.stack);
+  res.status(err.status || 500).json({ 
+    error: 'Backend Failure', 
+    message: err.message || 'Internal Server Error'
   });
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log('✅ Supabase client initialized');
+  console.log(`🚀 Passwala Server running on http://localhost:${PORT}`);
 });

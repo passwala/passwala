@@ -1,0 +1,162 @@
+[
+  {
+    "id": 5,
+    "business_name": "k",
+    "category": "shop",
+    "phone": "1234567890",
+    "address": "cg road",
+    "plan": "Free",
+    "status": "approved",
+    "created_at": "2026-04-02T05:24:22.668931+00:00"
+  },
+  {
+    "id": 6,
+    "business_name": "kkk",
+    "category": "shop",
+    "phone": "1234567890",
+    "address": "cd",
+    "plan": "Free",
+    "status": "approved",
+    "created_at": "2026-04-02T05:35:14.906571+00:00"
+  },
+  {
+    "id": 7,
+    "business_name": "kkk",
+    "category": "shop",
+    "phone": "1234567890",
+    "address": "cd",
+    "plan": "Free",
+    "status": "approved",
+    "created_at": "2026-04-02T05:37:35.380807+00:00"
+  },
+  {
+    "id": 8,
+    "business_name": "kk",
+    "category": "shop",
+    "phone": "6351396239",
+    "address": "cd road",
+    "plan": "Free",
+    "status": "approved",
+    "created_at": "2026-04-02T11:46:56.515095+00:00"
+  },
+  {
+    "id": 9,
+    "business_name": "kk",
+    "category": "shop",
+    "phone": "6351396239",
+    "address": "cd road",
+    "plan": "Free",
+    "status": "approved",
+    "created_at": "2026-04-02T11:47:53.387825+00:00"
+  },
+  {
+    "id": 10,
+    "business_name": "kk",
+    "category": "shop",
+    "phone": "6351396239",
+    "address": "cd road",
+    "plan": "Free",
+    "status": "approved",
+    "created_at": "2026-04-02T11:50:03.410602+00:00"
+  },
+  {
+    "id": 11,
+    "business_name": "k12",
+    "category": "service",
+    "phone": "8765434567",
+    "address": "qk",
+    "plan": "Free",
+    "status": "approved",
+    "created_at": "2026-04-02T11:54:18.393767+00:00"
+  },
+  {
+    "id": 12,
+    "business_name": "ghjgghj",
+    "category": "shop",
+    "phone": "8765434567",
+    "address": "hcgjkhvbh",
+    "plan": "Free",
+    "status": "approved",
+    "created_at": "2026-04-02T12:33:51.566859+00:00"
+  },
+  {
+    "id": 13,
+    "business_name": "tryjhkgfxfgjh",
+    "category": "service",
+    "phone": "8765434567",
+    "address": "paldi",
+    "plan": "Free",
+    "status": "approved",
+    "created_at": "2026-04-02T12:35:09.627765+00:00"
+  },
+  {
+    "id": 4,
+    "business_name": "k",
+    "category": "shop",
+    "phone": "1234567890",
+    "address": "cg road",
+    "plan": "Free",
+    "status": "approved",
+    "created_at": "2026-04-02T05:18:04.276282+00:00"
+  },
+  {
+    "id": 3,
+    "business_name": "karan",
+    "category": "shop",
+    "phone": "1234567890",
+    "address": "cg road",
+    "plan": "Free",
+    "status": "approved",
+    "created_at": "2026-04-02T05:15:48.595009+00:00"
+  },
+  {
+    "id": 2,
+    "business_name": "karan",
+    "category": "shop",
+    "phone": "1234567890",
+    "address": "cg road",
+    "plan": "Free",
+    "status": "approved",
+    "created_at": "2026-04-02T05:14:11.270855+00:00"
+  },
+  {
+    "id": 14,
+    "business_name": "Doe Groceries",
+    "category": "shop",
+    "phone": "",
+    "address": "Satellite, Ahmedabad",
+    "plan": "Free",
+    "status": "approved",
+    "created_at": "2026-04-03T07:16:17.094733+00:00"
+  },
+  {
+    "id": 15,
+    "business_name": "Doe Groceries",
+    "category": "shop",
+    "phone": "",
+    "address": "Satellite, Ahmedabad",
+    "plan": "Free",
+    "status": "pending",
+    "created_at": "2026-04-03T07:25:40.385568+00:00"
+  },
+  {
+    "id": 16,
+    "business_name": "jwjjwjw",
+    "category": "service",
+    "phone": "",
+    "address": "774757dhcdjhf",
+    "plan": "Free",
+    "status": "approved",
+    "created_at": "2026-04-03T07:43:49.349618+00:00"
+  },
+  {
+    "id": 17,
+    "business_name": "dave dery",
+    "category": "shop",
+    "phone": "",
+    "address": "vandan heights",
+    "plan": "Free",
+    "status": "approved",
+    "created_at": "2026-04-03T09:07:27.557412+00:00"
+  }
+]

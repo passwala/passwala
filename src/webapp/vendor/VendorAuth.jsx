@@ -1,227 +1,228 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Fingerprint, ArrowRight, ArrowLeft } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { Phone, ArrowLeft, RefreshCw, User, ShoppingBag, Store, ShieldCheck } from 'lucide-react';
-import {
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
-  GoogleAuthProvider,
-  signInWithPopup,
-  updateProfile
-} from 'firebase/auth';
 import { auth } from '../../firebase';
-import './VendorAuth.css';
+import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import './VendorPortal.css';
 
 const VendorAuth = ({ onLogin }) => {
-  const [step, setStep] = useState('PHONE');
+  const [step, setStep] = useState(1);
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [userName, setUserName] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [timer, setTimer] = useState(30);
-  const [confirmationResult, setConfirmationResult] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [tempCred, setTempCred] = useState(null);
-  const role = 'vendor';
-
+  const [confirmationResult, setConfirmationResult] = useState(null);
+  const [timer, setTimer] = useState(0);
+  
   useEffect(() => {
-    if (step !== 'OTP' || timer <= 0) return;
-    const interval = setInterval(() => setTimer((prev) => prev - 1), 1000);
+    let interval;
+    if (timer > 0) {
+      interval = setInterval(() => setTimer(t => t - 1), 1000);
+    }
     return () => clearInterval(interval);
-  }, [step, timer]);
-
-  const handleOtpChange = (element, index) => {
-    if (element.value !== '' && !/^\d$/.test(element.value)) return;
-    const newOtp = [...otp];
-    newOtp[index] = element.value;
-    setOtp(newOtp);
-    if (element.nextSibling && element.value !== '') element.nextSibling.focus();
-  };
-
+  }, [timer]);
   const setupRecaptcha = () => {
     try {
-      if (window.recaptchaVerifier) return;
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        'size': 'invisible',
-        'callback': () => console.log("Recaptcha verified")
+      if (window.recaptchaVerifier) {
+        window.recaptchaVerifier.clear();
+      }
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-wrapper', {
+        size: 'invisible',
+        'callback': (response) => {
+          console.log("reCAPTCHA solved");
+        },
+        'expired-callback': () => {
+          window.recaptchaVerifier.clear();
+          window.recaptchaVerifier = null;
+        }
       });
-    } catch (error) {
-      console.error("Recaptcha Error:", error);
-      toast.error("Recaptcha initialization failed");
+    } catch (e) {
+      console.error("Recaptcha Setup error:", e);
     }
   };
 
-  const handleSendOTP = async () => {
-    if (phoneNumber.length !== 10) { toast.error('Enter 10-digit number'); return; }
+  const handleSendOTP = async (e) => {
+    e.preventDefault();
+    const cleanPhone = phoneNumber.replace(/\D/g, '');
+    
+    if (cleanPhone.length !== 10) {
+      toast.error('Enter a valid 10-digit number');
+      return;
+    }
+
+    // Passwala Mock Testing By-pass
+    if (cleanPhone === '9999999999' || cleanPhone === '8888888888') {
+      toast.success('Mock OTP sent (123456)');
+      setStep(2);
+      return;
+    }
+
+    setLoading(true);
     try {
-      setLoading(true);
       setupRecaptcha();
-      const formatPhone = `+91${phoneNumber}`;
-      const result = await signInWithPhoneNumber(auth, formatPhone, window.recaptchaVerifier);
-      setConfirmationResult(result);
-      setStep('OTP');
-      setTimer(30);
-      toast.success('OTP Sent to Vendor!');
+      const appVerifier = window.recaptchaVerifier;
+      const formattedPhone = `+91${cleanPhone}`;
+      const confirmation = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
+      setConfirmationResult(confirmation);
+      setTimer(30); 
+      toast.success('OTP sent successfully');
+      setStep(2);
     } catch (error) {
-      console.error(error);
-      toast.error('Failed to send OTP');
-    } finally { setLoading(false); }
-  };
-
-  const saveUserToDatabase = async (userData) => {
-    try {
-      const res = await fetch('http://localhost:5000/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...userData, role }),
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
-      console.log('✅ Vendor saved:', data.user);
-    } catch (err) {
-      console.error('❌ Supabase save error:', err);
+      console.error("Firebase Login Error:", error);
+      const errorMessage = error.code === 'auth/captcha-check-failed' 
+        ? 'reCAPTCHA failed. Check domain settings.'
+        : 'Failed to send OTP. Try mock number 9999999999 for local testing.';
+      
+      toast.error(errorMessage);
+      if (window.recaptchaVerifier) {
+        window.recaptchaVerifier.clear();
+        window.recaptchaVerifier = null;
+      }
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const handleGoogleLogin = async () => {
-    try {
-      setLoading(true);
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      await saveUserToDatabase({
-        uid: result.user.uid,
-        email: result.user.email,
-        displayName: result.user.displayName,
-        photoURL: result.user.photoURL,
-        authProvider: 'google',
-        role: 'vendor'
-      });
-      toast.success('Vendor Portal Access Granted!');
-      onLogin();
-    } catch (error) {
-      toast.error('Sign-In failed');
-    } finally { setLoading(false); }
   };
 
   const handleVerifyOTP = async () => {
     const otpValue = otp.join('');
-    if (otpValue.length !== 6) { toast.error('Enter 6-digit OTP'); return; }
+    if (otpValue.length !== 6) { 
+      toast.error('Please enter the 6-digit OTP'); 
+      return; 
+    }
+
     try {
       setLoading(true);
+      toast('Checking your account...', { icon: '🔄', duration: 2000 });
+      
       if (confirmationResult) {
-        const cred = await confirmationResult.confirm(otpValue);
-        setTempCred(cred);
-        setStep('NAME');
-      } else if (otpValue === '123123') {
-        setStep('NAME');
-      } else { toast.error('Wrong code'); }
+        await confirmationResult.confirm(otpValue);
+      } else if (otpValue !== '123456') {
+        throw new Error('Invalid OTP');
+      }
+      
+      const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+
+      // Finalize login flow and hand over to VendorPortal
+      if (confirmationResult) {
+        onLogin(false);
+      } else {
+        onLogin(true, cleanPhone); // Pass phone back for mock
+      }
+      
     } catch (error) {
-      toast.error('Invalid OTP');
-    } finally { setLoading(false); }
+      toast.error('Invalid OTP. Please try again.');
+    } finally { 
+      setLoading(false); 
+    }
   };
 
-  const handleSaveName = async () => {
-    if (!userName.trim()) { toast.error('Please enter your business name'); return; }
-    try {
-      setLoading(true);
-      const userData = tempCred
-        ? { uid: tempCred.user.uid, displayName: userName, phoneNumber: tempCred.user.phoneNumber, authProvider: 'phone', role: 'vendor' }
-        : { uid: 'vendor-' + Math.random().toString(36).substr(2, 9), displayName: userName, phoneNumber: '+91' + phoneNumber, authProvider: 'phone', role: 'vendor' };
+  const handleOtpChange = (index, value) => {
+    if (!/^\d*$/.test(value)) return;
+    const newOtp = [...otp];
+    newOtp[index] = value;
+    setOtp(newOtp);
+    if (value && index < 5) {
+      const nextInput = document.getElementById(`otp-${index + 1}`);
+      if (nextInput) nextInput.focus();
+    }
+  };
 
-      if (tempCred) await updateProfile(tempCred.user, { displayName: userName });
-      await saveUserToDatabase(userData);
-      toast.success('Welcome to Passwala Vendor!');
-      onLogin();
-    } catch (err) {
-      toast.error('Failed to save business profile');
-    } finally { setLoading(false); }
+  const handleKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      const prevInput = document.getElementById(`otp-${index - 1}`);
+      if (prevInput) prevInput.focus();
+    }
   };
 
   return (
-    <div className="v-auth-page">
-      <div className="v-auth-container glass">
-        <div className="v-auth-illustration">
-          <img 
-            src="https://nwduaxtgisvjybefndfg.supabase.co/storage/v1/object/public/images/1768131668420_Passwala%20Brand%20LDC%20(2).gif" 
-            alt="Vendor Portal" 
-            className="v-auth-img" 
-          />
-        </div>
-
-        <div className="v-auth-content">
-          {step === 'PHONE' ? (
-            <>
-              <h2>Welcome to Passwala</h2>
-              <p>Neighborhood trust by community AI</p>
-
-              <div className="v-social-login">
-                <button className="v-social-btn" onClick={handleGoogleLogin} disabled={loading}>
-                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width="20" height="20" />
-                  Continue with Google
-                </button>
+    <div className="auth-container">
+      <div className="auth-box glass slide-up">
+        {/* Step 1: Phone */}
+        <AnimatePresence mode="wait">
+          {step === 1 && (
+            <motion.div key="step1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <div className="auth-header">
+                <div className="brand-logo-square" style={{ margin: '0 auto 1.5rem auto' }}>P</div>
+                <h2 className="auth-title">Pasawala Vendor</h2>
+                <p className="auth-subtitle">Partner portal for vendors & service providers</p>
               </div>
 
-              <div className="v-divider">
-                <span>OR USE PHONE</span>
-              </div>
-
-              <div className="v-phone-login">
-                <div className="v-input-group">
-                  <div className="v-country-code">+91</div>
+              <form onSubmit={handleSendOTP} className="auth-form mt-6">
+                <div className="input-group">
+                  <span className="country-code">+91</span>
                   <input
                     type="tel"
-                    placeholder="Phone number"
+                    placeholder="Enter number"
                     maxLength={10}
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                    className="auth-input phone-input"
                   />
                 </div>
-                <button className="v-submit-btn" onClick={handleSendOTP} disabled={loading}>
-                  {loading ? 'Sending...' : 'Send OTP'}
+                
+                <button type="submit" className="auth-submit-btn" disabled={loading || phoneNumber.length !== 10}>
+                  {loading ? <span className="loader-ring"></span> : 'Get OTP'}
                 </button>
+              </form>
+
+              <div className="divider" style={{ margin: '1.5rem 0', display: 'flex', alignItems: 'center', color: '#94a3b8', fontSize: '0.75rem', fontWeight: 700 }}>
+                <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
+                <span style={{ padding: '0 10px' }}>DEV ONLY</span>
+                <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
               </div>
-            </>
-          ) : step === 'OTP' ? (
-            <div className="v-otp-flow">
-              <button className="v-back-btn" onClick={() => setStep('PHONE')}><ArrowLeft size={20} /></button>
-              <h2>Verify Account</h2>
-              <p>Enter code sent to +91{phoneNumber}</p>
-              <div className="v-otp-input-container">
-                {otp.map((data, index) => (
+
+              <button 
+                className="auth-submit-btn" 
+                style={{ background: 'white', color: '#ff7622', border: '2px dashed #ff7622', boxShadow: 'none' }}
+                onClick={() => {
+                  toast.success('Universal Vendor Mock Access');
+                  onLogin({ phoneNumber: '9999999999' });
+                }}
+              >
+                Simulate Vendor Login
+              </button>
+              <div id="recaptcha-wrapper"></div>
+            </motion.div>
+          )}
+
+          {/* Step 2: OTP */}
+          {step === 2 && (
+            <motion.div key="step2" initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }}>
+              <button className="back-btn-ghost" style={{ marginBottom: '1.5rem' }} onClick={() => setStep(1)}><ArrowLeft size={20} /></button>
+              
+              <div className="auth-header">
+                <div className="icon-circle">
+                  <Fingerprint size={28} />
+                </div>
+                <h2 className="auth-title">Verify OTP</h2>
+                <p className="auth-subtitle">OTP sent to +91 {phoneNumber}</p>
+              </div>
+
+              <div className="otp-container">
+                {otp.map((digit, i) => (
                   <input
-                    key={index}
-                    className="v-otp-field"
-                    type="text"
-                    maxLength="1"
-                    value={data}
-                    onChange={(e) => handleOtpChange(e.target, index)}
+                    key={i} id={`otp-${i}`} type="text" maxLength={1} value={digit}
+                    onChange={(e) => handleOtpChange(i, e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(i, e)}
+                    className="otp-box"
                   />
                 ))}
               </div>
-              <button className="v-submit-btn" onClick={handleVerifyOTP} disabled={loading}>
-                {loading ? 'Verifying...' : 'Verify & Enter'}
+
+              <button className="auth-submit-btn" style={{ marginTop: '1.5rem' }} onClick={handleVerifyOTP} disabled={loading || otp.join('').length !== 6}>
+                {loading ? <span className="loader-ring"></span> : 'Verify & Continue'}
               </button>
-            </div>
-          ) : (
-            <div className="v-name-flow">
-              <h2>Register Business</h2>
-              <p>Setup your neighborhood vendor profile</p>
-              <div className="v-input-group">
-                <Store size={18} color="var(--primary)" />
-                <input
-                  className="v-name-input"
-                  type="text"
-                  placeholder="Business / Shop Name"
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  autoFocus
-                />
-              </div>
-              <button className="v-submit-btn" onClick={handleSaveName} disabled={loading}>
-                {loading ? 'Saving...' : 'Launch Portal'}
-              </button>
-            </div>
+
+              {timer > 0 ? (
+                <p className="auth-subtitle" style={{ textAlign: 'center', marginTop: '1rem' }}>
+                  Resend OTP in <span style={{ color: 'var(--primary-color)', fontWeight: 700 }}>{timer}s</span>
+                </p>
+              ) : (
+                <button className="back-btn-ghost" style={{ width: '100%', marginTop: '1rem', background: 'transparent', fontSize: '0.9rem', fontWeight: 700 }} onClick={handleSendOTP}>Resend OTP</button>
+              )}
+            </motion.div>
           )}
-        </div>
-        <div id="recaptcha-container"></div>
+        </AnimatePresence>
       </div>
     </div>
   );

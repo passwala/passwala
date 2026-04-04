@@ -1,4 +1,4 @@
-import React from 'react';
+import { Link } from 'react-router-dom';
 import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone, MapPin, ShieldCheck, Heart } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import './Footer.css';
@@ -35,12 +35,12 @@ const Footer = () => {
           <div className="footer-col">
             <h4>Platform</h4>
             <ul className="footer-links-list">
-              <li>Auctions & Tenders</li>
-              <li>Verified Services</li>
-              <li>Daily Essentials</li>
-              <li>Community Hub</li>
-              <li>Vendor Portal</li>
-              <li><a href="/admin-portal" className="footer-admin-link">Admin Portal</a></li>
+              <li><Link to="/track-orders">Auctions & Tenders</Link></li>
+              <li><Link to="/expert-services">Verified Services</Link></li>
+              <li><Link to="/near-shops">Daily Essentials</Link></li>
+              <li><Link to="/neighbors">Community Hub</Link></li>
+              <li><Link to="/vendor">Vendor Portal</Link></li>
+              <li><Link to="/admin">Admin Portal</Link></li>
             </ul>
           </div>
 

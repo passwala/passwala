@@ -161,15 +161,29 @@
   color: var(--text-primary);
 }
 
+.become-vendor-nav-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+  margin-right: 12px;
+  box-shadow: 0 4px 10px rgba(255, 118, 34, 0.2);
+  white-space: nowrap;
+}
+
 .notif-dot {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 6px;
+  right: 6px;
   width: 8px;
   height: 8px;
-  background: var(--primary);
-  border: 2px solid var(--bg-card);
+  background: #ff4d4f;
   border-radius: 50%;
+  border: 2px solid white;
 }
 
 .theme-toggle-v2:hover,

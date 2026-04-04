@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, Plus, Sparkles, Sunrise, Users, ShoppingBasket } from 'lucide-react';
 import { useTranslation } from '../LanguageContext';
 import { toast } from 'react-hot-toast';
+import { supabase } from '../../supabase';
 import './NeighborhoodHub.css';
 
 const NeighborhoodHub = ({ onNavigate }) => {
@@ -55,6 +56,7 @@ const NeighborhoodHub = ({ onNavigate }) => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
+        if (!supabase) return; // 🔥 Fix: Prevent crash if Supabase is not configured
         const { count: sCount } = await supabase.from('services').select('*', { count: 'exact', head: true });
         setLiveStats({ shops: sCount || 0, pro: Math.floor(sCount * 0.8) || 0 });
       } catch (err) { }

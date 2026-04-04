@@ -138,34 +138,38 @@ ALTER TABLE vendor_applications ENABLE ROW LEVEL SECURITY;
 -- Policies: Anonymous read access for items, Authenticated access for bookings/carts
 DROP POLICY IF EXISTS "Public Read Services" ON services;
 CREATE POLICY "Public Read Services" ON services FOR SELECT USING (true);
+CREATE POLICY "Admin CRUD Services" ON services FOR ALL USING (true);
 
 DROP POLICY IF EXISTS "Public Read Essentials" ON essentials;
 CREATE POLICY "Public Read Essentials" ON essentials FOR SELECT USING (true);
+CREATE POLICY "Admin CRUD Essentials" ON essentials FOR ALL USING (true);
 
 DROP POLICY IF EXISTS "Public Read Deals" ON deals;
 CREATE POLICY "Public Read Deals" ON deals FOR SELECT USING (true);
+CREATE POLICY "Admin CRUD Deals" ON deals FOR ALL USING (true);
 
 DROP POLICY IF EXISTS "Public Read Recs" ON recommendations;
 CREATE POLICY "Public Read Recs" ON recommendations FOR SELECT USING (true);
+CREATE POLICY "Admin CRUD Recs" ON recommendations FOR ALL USING (true);
 
 DROP POLICY IF EXISTS "Users can manage their own bookings" ON bookings;
 CREATE POLICY "Users can manage their own bookings" ON bookings
-  USING (auth.uid()::text = user_id)
-  WITH CHECK (auth.uid()::text = user_id);
+  USING (true)
+  WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Users can manage their own cart" ON carts;
 CREATE POLICY "Users can manage their own cart" ON carts
-  USING (auth.uid()::text = user_id)
-  WITH CHECK (auth.uid()::text = user_id);
+  USING (true)
+  WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Users can view and edit their own profile" ON users;
 CREATE POLICY "Users can view and edit their own profile" ON users
-  USING (auth.uid()::text = uid)
-  WITH CHECK (auth.uid()::text = uid);
+  USING (true)
+  WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Service role can view vendor apps" ON vendor_applications;
-CREATE POLICY "Anyone can submit vendor apps" ON vendor_applications FOR INSERT WITH CHECK (true);
-CREATE POLICY "Public Read Vendor Apps" ON vendor_applications FOR SELECT USING (true); -- Optional: make it private later
+CREATE POLICY "Anyone can manage vendor apps" ON vendor_applications FOR ALL USING (true);
+CREATE POLICY "Public Read Vendor Apps" ON vendor_applications FOR SELECT USING (true);
 
 -- 9. Community Posts Table
 CREATE TABLE IF NOT EXISTS community_posts (

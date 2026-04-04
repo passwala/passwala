@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { Search, MapPin, TrendingUp, Sparkles, ShieldCheck, CheckCircle2, Users } from 'lucide-react';
+import { Search, MapPin, TrendingUp, Sparkles, ShieldCheck, CheckCircle2, Users, ArrowRight } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useSearch } from '../context/SearchContext';
 import { supabase } from '../supabase';
@@ -22,9 +22,9 @@ const Hero = () => {
       const { count: sCount } = await supabase.from('services').select('*', { count: 'exact', head: true });
       const { count: oCount } = await supabase.from('orders').select('*', { count: 'exact', head: true });
       setStats({
-        users: oCount ? `${oCount * 12}+` : '5k+', // Multiplying orders as a proxy for active users
+        users: oCount || '0',
         experts: sCount ? `${sCount} Experts` : 'Verified Experts',
-        orders: oCount ? `${oCount} Orders` : 'Lowest Commission'
+        orders: oCount || '0'
       });
     } catch (err) { console.error('Stats error:', err); }
   };
@@ -97,6 +97,16 @@ const Hero = () => {
                <TrendingUp size={16} />
                <span>{stats.orders}</span>
             </div>
+          </div>
+
+          <div className="hero-vendor-cta">
+            <span>Own a shop or offer expert services? </span>
+            <button 
+              className="vendor-cta-btn" 
+              onClick={() => window.open('http://localhost:3002', '_blank')}
+            >
+              Earn with Passwala <ArrowRight size={14} />
+            </button>
           </div>
         </div>
       </div>

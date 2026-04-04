@@ -363,6 +363,39 @@
   to { transform: rotate(360deg); }
 }
 
+.vendor-promo-item {
+  background: linear-gradient(to right, rgba(255, 118, 34, 0.05), transparent) !important;
+  border-bottom: 2px solid var(--primary-light) !important;
+  padding: 1.5rem 1.25rem !important;
+}
+
+.vendor-promo-bg {
+  background: var(--primary) !important;
+  color: white !important;
+  box-shadow: 0 4px 12px rgba(255, 118, 34, 0.3);
+}
+
+.vendor-upsell-text {
+  color: var(--primary) !important;
+  font-weight: 700 !important;
+  font-size: 0.85rem !important;
+  margin-top: 2px;
+}
+
+.vendor-join-btn {
+  background: var(--primary);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  box-shadow: 0 4px 10px rgba(255, 118, 34, 0.2);
+}
+
+.profile-menu-item:hover .vendor-join-btn {
+  transform: scale(1.05);
+}
+
 @media (max-width: 450px) {
   .lang-pill-item {
     padding: 0.8rem 1.25rem;

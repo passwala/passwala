@@ -49,16 +49,7 @@ const Essentials = () => {
             <span className="badge-secondary">{searchQuery ? 'Search Results' : 'Local Delivery'}</span>
             <h3 className="section-title">Home <span className="highlight-green">Essentials</span></h3>
             <p className="description">Get your daily needs from neighborhood stores within minutes. No minimum delivery for Prime neighbors!</p>
-            {!searchQuery && (
-              <div className="featured-banner glass card-hover">
-                <img src="https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80" alt="Essentials delivery" />
-                <div className="banner-content">
-                  <strong>Morning Boost Pack</strong>
-                  <span>Milk + Bread + Eggs @ ₹180</span>
-                  <button className="add-btn" onClick={() => { addToCart({ id: 99, name: 'Morning Boost Pack', price: 180, store: 'Local Store', type: 'essential' }); toast.success('Morning Boost Pack added!', { icon: '🛒' }); }}>Add to Cart</button>
-                </div>
-              </div>
-            )}
+            {/* Featured banner removed */}
           </div>
           
           <div className="essentials-items">
