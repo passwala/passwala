@@ -27,7 +27,7 @@ npm install
 ```
 
 ### 4. Environment Configuration
-Create a `.env` file in the root directory and add your Supabase credentials:
+Create a `.env` file in the root directory and add your Supabase & Firebase credentials:
 ```env
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
@@ -37,27 +37,31 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 To synchronize with the cloud architecture:
 1. Go to your [Supabase Dashboard](https://supabase.com/).
 2. Open the **SQL Editor**.
-3. Copy the contents of `supabase_full_migration.sql` from this project.
-4. Run the SQL to initialize tables (Services, Essentials, Bookings, etc.) and Seed Data.
+3. Copy and run the contents of `supabase_schema.sql` to initialize tables.
+4. Copy and run the contents of `supabase_security_fix.sql` to apply the latest Row Level Security (RLS) policies.
 
-### 6. Run the Application
-You need to run **two separate processes** for full functionality:
+---
 
-#### Option A: One-Click Execution (If configured)
+## 🖥️ Running the Application
+
+Passwala is highly modular and split into 4 independent micro-frontends.
+
+### Run Everything at Once
+The easiest way to start developing is to launch all portals simultaneously:
 ```bash
-npm start
+npm run dev:all
+# or
+npm run dev:headless # Runs all apps without force-opening browser tabs
 ```
 
-#### Option B: Manual Execution (Recommended)
-**Terminal 1 (Frontend):**
-```bash
-npm run dev
-```
+### Run Individual Portals
+You can run specific portals individually on their dedicated ports:
+- **Customer Web Site** (`http://localhost:3000`): `npm run dev:web`
+- **SuperAdmin Webapp** (`http://localhost:3001`): `npm run dev:webapp`
+- **Vendor Portal** (`http://localhost:3002`): `npm run dev:vendor`
+- **Rider Portal** (`http://localhost:3003`): `npm run dev:rider`
 
-**Terminal 2 (Server/AI Engine):**
-```bash
-npm run server
-```
+**Backend Service:** `npm run server`
 
 ---
 
@@ -72,9 +76,9 @@ Connect your GitHub repo and use these settings in the Render Dashboard:
 - **Start Command**: `npm run server`
 - **Environment Variables**: Add your `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
 
-### 2. Frontend (Static Site) 🌐
-Create a new **Static Site** on Render:
-- **Build Command**: `npm run build`
+### 2. Frontends (Static Sites) 🌐
+Create separate **Static Sites** on Render for each portal, substituting the specific config file needed:
+- **Build Command**: e.g., `npm run build` (Ensure `vite.config.js` directs to the correct build config for that site, or modify the build script)
 - **Publish Directory**: `dist`
 - **Environment Variables**: Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
 
@@ -82,11 +86,14 @@ Create a new **Static Site** on Render:
 
 ## 💎 Features & Tech Stack
 
-- **Core**: React 18 + Vite (Fast Refreshes)
+- **Core**: React 19 + Vite (Fast Refreshes, Multi-App Config)
 - **Styling**: Vanilla CSS (Premium Orange & White "Clean Elegant" Design)
-- **Backend**: Supabase (PostgreSQL + RLS + Authentication)
-- **AI Engine**: Seasonality-aware recommendations & smart assistant
-- **Admin OS 2.0**: Real-time cloud-synced dashboard for inventory & order management
+- **Backend / DB**: Supabase (PostgreSQL + RLS) + Firebase Auth Integration
+- **State App Suites**: 
+   - **Customer Web:** Neighborhood product & service discovery native UI.
+   - **Vendor Portal:** Real-time dashboard for merchants, seamless onboarding pipelines, and digital profile management.
+   - **Rider Portal:** Navigation, earnings dashboard, and delivery flow optimizations for logistic partners.
+   - **Admin Webapp:** Core administrative CRM, data review, and full ecosystem management.
 
 ---
 
