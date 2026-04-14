@@ -1,0 +1,25 @@
+{
+  "name": "Passwala Rider & Community",
+  "short_name": "Passwala",
+  "description": "Local Trust, Neighborhood Services, Essentials & Community Connections powered by AI.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f97316",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/vite.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["lifestyle", "shopping", "delivery"]
+}

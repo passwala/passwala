@@ -25,7 +25,7 @@ const WebappNavbar = ({ user, onOpenProfile, onBack, title, location, isDarkMode
           
           {!title ? (
             <div className="webapp-brand-group-v3">
-              <div className="brand-logo-square">P</div>
+              <img src="/logo.png" alt="Passwala" className="navbar-logo-v3" style={{ width: '40px', height: '40px' }} />
               <div className="brand-text-stack">
                  <span className="brand-name-navy mobile-hide-text">Passwala</span>
                  <div 

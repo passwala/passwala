@@ -129,7 +129,11 @@ const Auth = ({ onLogin, onAdminLogin }) => {
             <b>Auth Error:</b> IP not whitelisted in Firebase Console. 
             <button onClick={() => {
               toast.dismiss(t.id);
-              onLogin(); // Direct bypass for local testing
+              onLogin({
+                uid: 'demo-google-' + Math.random().toString(36).substr(2, 9),
+                displayName: 'Demo External User',
+                role: 'buyer'
+              }); // Direct bypass for local testing
             }} style={{ marginLeft: '10px', background: 'var(--primary)', color:'white', border:'none', padding:'4px 8px', borderRadius:'4px' }}>
               Simulate Login
             </button>
@@ -189,7 +193,7 @@ const Auth = ({ onLogin, onAdminLogin }) => {
       }
       await saveUserToDatabase(userData);
       toast.success('Welcome to Passwala!');
-      onLogin();
+      onLogin(userData);
     } catch (err) {
       toast.error('Failed to save profile');
     } finally { setLoading(false); }
@@ -318,27 +322,6 @@ const Auth = ({ onLogin, onAdminLogin }) => {
                 />
               </div>
 
-              <div className="role-selection">
-                <p className="role-label">I am a:</p>
-                <div className="role-grid">
-                  <div 
-                    className={`role-card ${role === 'buyer' ? 'active' : ''}`}
-                    onClick={() => setRole('buyer')}
-                  >
-                    <div className="role-icon-box">🛍️</div>
-                    <strong>Customer</strong>
-                    <span>I want to find help & shops</span>
-                  </div>
-                  <div 
-                    className={`role-card ${role === 'vendor' ? 'active' : ''}`}
-                    onClick={() => setRole('vendor')}
-                  >
-                    <div className="role-icon-box">🏬</div>
-                    <strong>Vendor</strong>
-                    <span>I want to list my shop/service</span>
-                  </div>
-                </div>
-              </div>
 
               <button className="auth-submit-btn" onClick={handleSaveName} disabled={loading}>
                 {loading ? 'Saving...' : 'Start Exploring'}

@@ -23,6 +23,8 @@ import LocationSelector from './webapp/LocationSelector'
 import AdminAuth from './webapp/AdminAuth'
 import VendorPortal from './webapp/vendor/VendorPortal'
 import VendorAuth from './webapp/vendor/VendorAuth'
+import RiderPortal from './rider/RiderPortal'
+import RiderAuth from './rider/RiderAuth'
 import TrackOrders from './webapp/buyer/TrackOrders'
 import OrderHistory from './webapp/profile_pages/OrderHistory'
 import Wallet from './webapp/profile_pages/Wallet'
@@ -66,6 +68,7 @@ const AppContent = ({ user }) => {
   const isWebMode = import.meta.env.MODE === 'web' || window.location.port === '3000';
   const isWebappMode = import.meta.env.MODE === 'webapp' || window.location.port === '3001';
   const isVendorMode = import.meta.env.MODE === 'vendor' || window.location.port === '3002';
+  const isRiderMode = import.meta.env.MODE === 'rider' || window.location.port === '3003';
 
   const [demoUser, setDemoUser] = useState(() => {
     const saved = localStorage.getItem('v_demo_session');
@@ -146,7 +149,7 @@ const AppContent = ({ user }) => {
   if (isAdmin) return <AdminPanel onLogout={() => { setIsAdmin(false); localStorage.removeItem('admin_session'); }} />;
   
   return (
-    <div className="app-main-layout" style={(isVendorMode || locationPath === '/vendor') ? { width: '100%', margin: 0, padding: 0 } : {}}>
+    <div className="app-main-layout" style={(isVendorMode || locationPath === '/vendor' || isRiderMode || locationPath === '/rider') ? { width: '100%', margin: 0, padding: 0 } : {}}>
       {/* 1. Vendor Mode (Port 3002) - High level takeover */}
       {(isVendorMode || locationPath === '/vendor') ? (
         (!effectiveUser) ? (
@@ -156,19 +159,35 @@ const AppContent = ({ user }) => {
         ) : (
           <VendorPortal user={effectiveUser} onLogout={handleLogout} />
         )
+      ) : (isRiderMode || locationPath === '/rider') ? (
+        /* Rider Mode (Port 3003) */
+        (!effectiveUser) ? (
+          <RiderAuth onLogin={(isDemo, num, mockUser) => {
+             updateDemoUser({ 
+               phoneNumber: `+91${num || '8888888888'}`, 
+               displayName: mockUser?.name || 'Demo Rider',
+               photoURL: mockUser?.photo || null,
+               vehicleNo: mockUser?.vehicleNo || 'Bajaj Pulsar (GJ-01-AB-1234)',
+               licenseNo: mockUser?.licenseNo || 'Driving License',
+               idProof: mockUser?.idProof || 'Aadhar Card'
+             });
+          }} />
+        ) : (
+          <RiderPortal user={effectiveUser} onLogout={handleLogout} />
+        )
       ) : (
         <>
           {/* Global Navbar Logic */}
           {isWebMode ? (
             <Navbar 
-              isAuthenticated={!!user} user={user} onLogout={handleLogout}
+              isAuthenticated={!!effectiveUser} user={effectiveUser} onLogout={handleLogout}
               onOpenProfile={() => setShowProfile(true)} onOpenAI={() => navigate('/')}
               onSwitchToVendor={() => setIsVendor(true)} onJoin={() => setShowAuthModal(true)}
             />
           ) : (
-            user && (
+            effectiveUser && (
               <WebappNavbar 
-                user={user} location={location} onLocationChange={setLocation}
+                user={effectiveUser} location={location} onLocationChange={setLocation}
                 isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)}
                 onOpenProfile={() => navigate('/profile')} 
                 onBack={locationPath !== '/' ? () => navigate(-1) : null}
@@ -191,11 +210,11 @@ const AppContent = ({ user }) => {
                  <>
                    {/* Webapp Logic (Auth or Hub) */}
                    {isWebappMode ? (
-                     !user ? <Auth onLogin={() => navigate('/')} /> : <NeighborhoodHub onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')} />
+                     !effectiveUser ? <Auth onLogin={(mockData) => { if (mockData) updateDemoUser(mockData); navigate('/'); }} /> : <NeighborhoodHub onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')} />
                    ) : (
                      /* Marketing Logic (Hub on top if logged in, then standard homepage) */
                      <>
-                        {user && (
+                        {effectiveUser && (
                           <NeighborhoodHub onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')} />
                         )}
                         <Hero />
@@ -213,22 +232,22 @@ const AppContent = ({ user }) => {
 
               {/* Common Application Routes */}
               <Route path="/admin" element={!isAdmin ? <AdminAuth onAdminLogin={() => setIsAdmin(true)} /> : <Navigate to="/" />} />
-              <Route path="/near-shops" element={user ? <NearShops onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
-              <Route path="/expert-services" element={user ? <ExpertServices onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
-              <Route path="/neighbors" element={user ? <NeighborsCommunity onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
-              <Route path="/track-orders" element={user ? <TrackOrders onBack={() => navigate('/')} /> : <Navigate to="/" />} />
-              <Route path="/profile" element={user ? <WebappProfile user={user} onLogout={handleLogout} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/" />} />
-              <Route path="/order-history" element={user ? <OrderHistory /> : <Navigate to="/" />} />
-              <Route path="/wallet" element={user ? <Wallet /> : <Navigate to="/" />} />
-              <Route path="/privacy-security" element={user ? <PrivacySecurity /> : <Navigate to="/" />} />
-              <Route path="/help-support" element={user ? <HelpSupport /> : <Navigate to="/" />} />
-              <Route path="/settings" element={user ? <AppSettings isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/" />} />
-              <Route path="/select-location" element={user ? <LocationSelector currentLocation={location} onLocationChange={setLocation} /> : <Navigate to="/" />} />
+              <Route path="/near-shops" element={effectiveUser ? <NearShops onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
+              <Route path="/expert-services" element={effectiveUser ? <ExpertServices onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
+              <Route path="/neighbors" element={effectiveUser ? <NeighborsCommunity onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
+              <Route path="/track-orders" element={effectiveUser ? <TrackOrders onBack={() => navigate('/')} /> : <Navigate to="/" />} />
+              <Route path="/profile" element={effectiveUser ? <WebappProfile user={effectiveUser} onLogout={handleLogout} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/" />} />
+              <Route path="/order-history" element={effectiveUser ? <OrderHistory /> : <Navigate to="/" />} />
+              <Route path="/wallet" element={effectiveUser ? <Wallet /> : <Navigate to="/" />} />
+              <Route path="/privacy-security" element={effectiveUser ? <PrivacySecurity /> : <Navigate to="/" />} />
+              <Route path="/help-support" element={effectiveUser ? <HelpSupport /> : <Navigate to="/" />} />
+              <Route path="/settings" element={effectiveUser ? <AppSettings isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/" />} />
+              <Route path="/select-location" element={effectiveUser ? <LocationSelector currentLocation={location} onLocationChange={setLocation} /> : <Navigate to="/" />} />
             </Routes>
           </main>
 
           {/* 4. Global Footers/Navs */}
-          {isWebappMode && user && (
+          {isWebappMode && effectiveUser && (
             <BottomNav activeTab={currentView} onTabChange={(v) => navigate(v === 'DASHBOARD' ? '/' : v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'TRACKING' ? '/track-orders' : v === 'NEIGHBORS' ? '/neighbors' : v === 'PROFILE' ? '/profile' : '/')} />
           )}
 

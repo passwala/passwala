@@ -135,16 +135,18 @@ const VendorAuth = ({ onLogin }) => {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-box glass slide-up">
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fdfdfd', padding: '20px' }}>
+      <div className="glass slide-up" style={{ width: '100%', maxWidth: '450px', padding: '3rem 2.5rem', margin: '0 auto', textAlign: 'center', backgroundColor: 'white', borderRadius: '32px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.08)', border: '1px solid #f1f5f9' }}>
         {/* Step 1: Phone */}
         <AnimatePresence mode="wait">
           {step === 1 && (
-            <motion.div key="step1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div key="step1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ width: '100%' }}>
               <div className="auth-header">
-                <div className="brand-logo-square" style={{ margin: '0 auto 1.5rem auto' }}>P</div>
-                <h2 className="auth-title">Pasawala Vendor</h2>
-                <p className="auth-subtitle">Partner portal for vendors & service providers</p>
+                <div className="auth-logo-wrapper">
+                  <img src="/logo.png" alt="Passwala Logo" className="auth-logo" />
+                </div>
+                <h2 className="auth-title">Passwala Partner</h2>
+                <p className="auth-subtitle">Professional portal for vendors & experts</p>
               </div>
 
               <form onSubmit={handleSendOTP} className="auth-form mt-6">
@@ -187,29 +189,43 @@ const VendorAuth = ({ onLogin }) => {
 
           {/* Step 2: OTP */}
           {step === 2 && (
-            <motion.div key="step2" initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }}>
-              <button className="back-btn-ghost" style={{ marginBottom: '1.5rem' }} onClick={() => setStep(1)}><ArrowLeft size={20} /></button>
+            <motion.div key="step2" initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} style={{ width: '100%', position: 'relative' }}>
+              <button className="back-btn-ghost" style={{ position: 'absolute', left: '-10px', top: '-10px' }} onClick={() => setStep(1)}><ArrowLeft size={20} /></button>
               
               <div className="auth-header">
-                <div className="icon-circle">
-                  <Fingerprint size={28} />
+                <div className="auth-logo-wrapper">
+                  <img src="/logo.png" alt="Passwala Logo" className="auth-logo" />
                 </div>
-                <h2 className="auth-title">Verify OTP</h2>
-                <p className="auth-subtitle">OTP sent to +91 {phoneNumber}</p>
+                <h2 className="auth-title">Passwala Partner</h2>
+                <p className="auth-subtitle">Enter OTP sent to +91 {phoneNumber}</p>
               </div>
 
-              <div className="otp-container">
+              <div className="otp-container" style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '2rem' }}>
                 {otp.map((digit, i) => (
                   <input
                     key={i} id={`otp-${i}`} type="text" maxLength={1} value={digit}
                     onChange={(e) => handleOtpChange(i, e.target.value)}
                     onKeyDown={(e) => handleKeyDown(i, e)}
                     className="otp-box"
+                    style={{ 
+                      width: '45px', 
+                      height: '55px', 
+                      textAlign: 'center', 
+                      fontSize: '1.5rem', 
+                      fontWeight: 800, 
+                      borderRadius: '12px', 
+                      border: '2px solid #e2e8f0',
+                      outline: 'none',
+                      color: '#0f172a',
+                      transition: 'all 0.2s'
+                    }}
+                    onFocus={(e) => { e.target.style.borderColor = '#f97316'; e.target.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.1)'; }}
+                    onBlur={(e) => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none'; }}
                   />
                 ))}
               </div>
 
-              <button className="auth-submit-btn" style={{ marginTop: '1.5rem' }} onClick={handleVerifyOTP} disabled={loading || otp.join('').length !== 6}>
+              <button className="auth-submit-btn" style={{ width: '100%', marginTop: '2rem' }} onClick={handleVerifyOTP} disabled={loading || otp.join('').length !== 6}>
                 {loading ? <span className="loader-ring"></span> : 'Verify & Continue'}
               </button>
 

@@ -41,7 +41,7 @@
 
 .footer-brand-desc {
   font-size: 0.95rem;
-  color: #94a3b8;
+  color: rgba(255, 255, 255, 0.9);
   line-height: 1.6;
   margin-bottom: 2rem;
 }
@@ -49,7 +49,7 @@
 .footer-socials-v2 {
   display: flex;
   gap: 15px;
-  color: #94a3b8;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .footer-socials-v2 svg {
@@ -58,7 +58,7 @@
 }
 
 .footer-socials-v2 svg:hover {
-  color: var(--primary);
+  color: white;
   transform: translateY(-3px);
 }
 
@@ -66,15 +66,17 @@
   list-style: none;
 }
 
-.footer-links-list li {
+.footer-links-list li, .footer-links-list a {
   font-size: 0.95rem;
-  color: #94a3b8;
+  color: rgba(255, 255, 255, 0.85);
   margin-bottom: 0.8rem;
   cursor: pointer;
   transition: var(--transition);
+  text-decoration: none;
+  display: block;
 }
 
-.footer-links-list li:hover {
+.footer-links-list li:hover, .footer-links-list a:hover {
   color: white;
   padding-left: 5px;
 }
@@ -83,7 +85,7 @@
   text-decoration: none;
   color: inherit;
   font-size: 0.85rem;
-  opacity: 0.6;
+  opacity: 0.8;
   transition: var(--transition);
 }
 
@@ -93,15 +95,15 @@
 }
 
 .footer-address-box {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.1);
   padding: 1.5rem;
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .footer-address-box p {
   font-size: 0.9rem;
-  color: #cbd5e1;
+  color: white;
   margin-bottom: 0.4rem;
 }
 
@@ -118,16 +120,16 @@
   gap: 8px;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #cbd5e1;
+  color: white;
 }
 
 .contact-pill svg {
-  color: var(--primary);
+  color: white;
 }
 
 .footer-bottom-v2 {
   padding-top: 2rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -135,7 +137,7 @@
 
 .copyright-info p {
   font-size: 0.85rem;
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .trust-logos {
@@ -143,14 +145,14 @@
   align-items: center;
   gap: 10px;
   font-size: 0.8rem;
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.9);
   font-weight: 600;
 }
 
 .divider-v {
   width: 1px;
   height: 14px;
-  background: #334155;
+  background: rgba(255, 255, 255, 0.3);
 }
 
 @media (max-width: 1024px) {

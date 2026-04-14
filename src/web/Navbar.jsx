@@ -49,10 +49,12 @@ const Navbar = ({ isAuthenticated, user, onLogout, onOpenProfile, onOpenAI, onJo
         {/* Left: Brand */}
         <div className="nav-left">
           <div className="brand-logo" onClick={handleLogoClick}>
-            <div className="logo-icon">P</div>
+            <div className="logo-wrapper">
+              <img src="/logo.png" alt="Passwala Logo" className="navbar-main-logo" />
+            </div>
             <div className="logo-text">
               <div className="logo-text-main">Passwala</div>
-              <div className="tagline">Smart Ahmedabad</div>
+              <div className="tagline">SMART ECONOMY</div>
             </div>
           </div>
         </div>
@@ -63,13 +65,15 @@ const Navbar = ({ isAuthenticated, user, onLogout, onOpenProfile, onOpenAI, onJo
              <a href="#services" className="nav-pill-link">Services</a>
              <a href="#deals" className="nav-pill-link">Deals</a>
              <a href="#community" className="nav-pill-link">Community</a>
-             <a href="http://localhost:3002" target="_blank" rel="noreferrer" className="nav-pill-link vendor-highlight">Become a Vendor</a>
           </div>
         </div>
 
         {/* Right: Actions */}
         <div className="nav-right">
           <div className="nav-tools">
+            <a href="http://localhost:3002" target="_blank" rel="noreferrer" className="vendor-cta-btn">
+              Partner with Us
+            </a>
             <button className="nav-icon-btn highlight-hover" onClick={onOpenAI} title="AI Assistant">
               <Bot size={20} />
             </button>
