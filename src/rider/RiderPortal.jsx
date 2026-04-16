@@ -24,8 +24,8 @@ function RiderPortal({ user, onLogout }) {
       {/* Top Header */}
       <header className="rider-header">
         <div className="rider-header-profile">
-          <div className="rider-header-avatar">
-             <Bike size={24} />
+          <div className="rider-header-avatar" style={{background: 'transparent'}}>
+             <img src="/logo.png" alt="P" style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
           </div>
           <div>
             <h1 style={{ fontSize: '1.125rem', fontWeight: 700, margin: 0, color: 'var(--rider-text)' }}>Passwala Rider</h1>

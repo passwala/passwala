@@ -19,6 +19,46 @@ function RiderDashboard() {
   const [activeOrder, setActiveOrder] = useState(null);
   const [incomingOrder, setIncomingOrder] = useState(null);
   const [deliveryStep, setDeliveryStep] = useState(0); 
+  const [riderLocation, setRiderLocation] = useState('Location Not Set');
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const requestLiveLocation = () => {
+    setIsDetecting(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.coords.latitude}&lon=${position.coords.longitude}`);
+          if (!res.ok) throw new Error('Geocoding failed');
+          const data = await res.json();
+          const city = data.address.city || data.address.town || data.address.village || data.address.state_district || '';
+          const state = data.address.state || '';
+          const full = `${city}, ${state}`.trim().replace(/^,|,$/g, '');
+          setRiderLocation(full || 'Live GPS Active');
+          setIsDetecting(false);
+          toast.success('Live GPS Synchronized!', { icon: '🛰️' });
+        } catch(e) {
+          setRiderLocation('GPS Acquired (Coordinates Only)');
+          setIsDetecting(false);
+          toast.success('GPS Coordinates Linked', { icon: '📍' });
+        }
+      }, () => {
+         setRiderLocation('GPS Permission Denied');
+         setIsDetecting(false);
+         toast.error('Location Permission Denied');
+      });
+    } else {
+      setRiderLocation('GPS Unsupported by Browser');
+      setIsDetecting(false);
+    }
+  };
 
   const steps = ['Accepted', 'Reached Store', 'Order Picked', 'Out for Delivery', 'Delivered'];
 
@@ -52,16 +92,82 @@ function RiderDashboard() {
   return (
     <div className="rider-screen relative" style={{ minHeight: '100%', paddingBottom: '2rem' }}>
       {/* Map Area */}
-      <div className="rider-map" style={{ height: activeOrder ? '180px' : '220px' }}>
-         <MapPin size={48} className="rider-map-marker" color="var(--rider-text-secondary)" />
-         <div className="rider-map-overlay">
-            GPS Connecting...
-         </div>
-         {isOnline && !activeOrder && (
-            <div style={{ position: 'absolute', top: '1rem', left: '50%', transform: 'translateX(-50%)', background: 'white', padding: '0.5rem 1rem', borderRadius: '999px', boxShadow: 'var(--rider-shadow)', fontSize: '0.875rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }}>
-              <span className="rider-pulse-dot"></span>
-              Looking for orders near you...
-            </div>
+      <div className="rider-map" style={{ 
+          height: activeOrder ? '260px' : '220px', 
+          backgroundColor: '#e5eadd',
+          backgroundImage: activeOrder ? 'url("https://www.transparenttextures.com/patterns/cubes.png")' : 'none',
+          position: 'relative'
+      }}>
+         {!activeOrder ? (
+           <>
+             <MapPin size={48} className="rider-map-marker" color="var(--rider-text-secondary)" />
+             <div className="rider-map-overlay" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div>
+                   <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600 }}>{currentTime}</p>
+                   {riderLocation}
+                </div>
+                {riderLocation === 'Location Not Set' && isOnline && (
+                  <button 
+                    onClick={requestLiveLocation} 
+                    style={{ background: 'var(--rider-primary)', color: 'white', padding: '0.5rem 1rem', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 700, border: 'none', cursor: 'pointer', boxShadow: 'var(--rider-shadow)', marginTop: '0.5rem' }}
+                    disabled={isDetecting}
+                  >
+                    {isDetecting ? 'Detecting...' : 'Start GPS Tracking'}
+                  </button>
+                )}
+             </div>
+             {isOnline && (
+                <div style={{ position: 'absolute', top: '1rem', left: '50%', transform: 'translateX(-50%)', background: 'white', padding: '0.5rem 1rem', borderRadius: '999px', boxShadow: 'var(--rider-shadow)', fontSize: '0.875rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }}>
+                  <span className="rider-pulse-dot"></span>
+                  Looking for orders near you...
+                </div>
+             )}
+           </>
+         ) : (
+           <>
+             {/* Map Mock Background Streets */}
+             <div style={{position: 'absolute', width: '100%', height: '100%', top: 0, left: 0, opacity: 0.4}}>
+                 <div style={{position: 'absolute', top: '30%', left: 0, width: '100%', height: '12px', background: 'white', transform: 'rotate(-5deg)'}}></div>
+                 <div style={{position: 'absolute', top: '70%', left: 0, width: '100%', height: '12px', background: 'white', transform: 'rotate(15deg)'}}></div>
+                 <div style={{position: 'absolute', left: '40%', top: 0, width: '12px', height: '100%', background: 'white', transform: 'rotate(10deg)'}}></div>
+                 <div style={{position: 'absolute', left: '70%', top: 0, width: '12px', height: '100%', background: 'white', transform: 'rotate(-20deg)'}}></div>
+             </div>
+
+             {/* Route Line SVG */}
+             <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 5 }}>
+                <path d={deliveryStep < 2 ? "M 80 180 Q 150 150 250 80" : "M 80 180 Q 180 200 280 100"} stroke="var(--rider-primary)" strokeWidth="5" strokeDasharray="8 6" fill="none" strokeLinecap="round" />
+             </svg>
+
+             {/* ETA Floating Card */}
+             <div style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'white', padding: '0.5rem 1rem', borderRadius: '12px', boxShadow: 'var(--rider-shadow-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 10 }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--rider-text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>
+                  ETA to {deliveryStep < 2 ? 'Store' : 'Customer'}
+                </span>
+                <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--rider-primary)' }}>
+                  {deliveryStep === 0 ? (() => { let d = new Date(); d.setMinutes(d.getMinutes() + 5); return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); })() 
+                   : deliveryStep === 1 ? 'Arrived' 
+                   : deliveryStep === 2 ? (() => { let d = new Date(); d.setMinutes(d.getMinutes() + 15); return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); })()
+                   : deliveryStep === 3 ? (() => { let d = new Date(); d.setMinutes(d.getMinutes() + 4); return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); })()
+                   : 'Delivered'}
+                </span>
+             </div>
+
+             {/* Destination Pin */}
+             <div style={{ position: 'absolute', top: deliveryStep < 2 ? '80px' : '100px', left: deliveryStep < 2 ? '250px' : '280px', transform: 'translate(-50%, -100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 10 }}>
+                <div style={{ background: deliveryStep < 2 ? 'var(--rider-text)' : 'var(--rider-primary)', color: 'white', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 'bold', marginBottom: '4px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                  {deliveryStep < 2 ? activeOrder.store : activeOrder.dropAddress}
+                </div>
+                <MapPin size={36} color={deliveryStep < 2 ? "var(--rider-text)" : "var(--rider-primary)"} fill="white" />
+             </div>
+
+             {/* Rider Current Pin */}
+             <div style={{ position: 'absolute', top: '180px', left: '80px', transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 10 }}>
+                <div style={{ background: '#10b981', color: 'white', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 4px rgba(16,185,129,0.3)', marginBottom: '8px' }}>
+                  <Navigation size={12} style={{transform: 'rotate(45deg)'}} />
+                </div>
+                <div style={{ background: 'white', color: 'var(--rider-text)', padding: '2px 8px', borderRadius: '999px', fontSize: '10px', fontWeight: 700, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>You</div>
+             </div>
+           </>
          )}
       </div>
 

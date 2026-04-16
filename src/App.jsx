@@ -95,6 +95,24 @@ const AppContent = ({ user }) => {
   const [location, setLocation] = useState('Ahmedabad, Gujarat'); 
 
   useEffect(() => {
+    // Silently fetch IP-based location to avoid native prompt on load
+    const fetchIPLocation = async () => {
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        if (!res.ok) throw new Error('IP Fetch failed');
+        const data = await res.json();
+        if (data && data.city && data.region) {
+          setLocation(`${data.city}, ${data.region}`);
+        }
+      } catch (e) {
+        // Silently fallback to default, user can manually trigger GPS if needed
+        console.warn('Silent location fetch failed.');
+      }
+    };
+    fetchIPLocation();
+  }, []);
+
+  useEffect(() => {
     if (isDarkMode) {
       document.body.classList.add('dark-mode');
       localStorage.setItem('theme', 'dark');

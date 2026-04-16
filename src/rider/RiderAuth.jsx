@@ -48,8 +48,8 @@ function RiderAuth({ onLogin }) {
       <div className="rider-auth-card" style={{ maxWidth: step === 'PROFILE_SETUP' ? '450px' : '400px', transition: 'all 0.3s ease' }}>
         <div className="rider-auth-banner" style={{ padding: step === 'PROFILE_SETUP' ? '1.5rem' : '2rem' }}>
           {step !== 'PROFILE_SETUP' && (
-              <div className="rider-auth-banner-icon">
-                <Bike size={40} color="white" />
+              <div className="rider-auth-banner-icon" style={{ background: 'white', padding: '10px' }}>
+                <img src="/logo.png" alt="Passwala Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               </div>
           )}
           <h2 className="rider-auth-banner-title">Passwala Rider</h2>

@@ -32,6 +32,15 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../supabase';
 import './VendorPortal.css';
+import { 
+  VendorInventory, 
+  VendorOrders, 
+  VendorEarnings, 
+  VendorWallet, 
+  VendorReviews, 
+  VendorNotifications, 
+  VendorSupport 
+} from './VendorSubPages';
 
 const VendorPortal = ({ user, onLogout }) => {
   const [appStatus, setAppStatus] = useState('loading'); // loading, onboarding, dashboard, pending
@@ -81,6 +90,8 @@ const VendorPortal = ({ user, onLogout }) => {
           ? user.phoneNumber.replace(/\D/g, '').slice(-10) 
           : (typeof user === 'string' ? user : '9999999999');
 
+      const isLocallyCompleted = localStorage.getItem('vProfileCompleted') === 'true';
+
       if (supabase) {
         const { data, error } = await supabase
           .from('vendors')
@@ -88,23 +99,25 @@ const VendorPortal = ({ user, onLogout }) => {
           .eq('phone_number', phone)
           .maybeSingle();
 
-        if (error) throw error;
+        if (error && !isLocallyCompleted) throw error;
 
         if (data) {
           setVendorData(data);
-          setBusinessType(data.category || 'shop');
-          if (data.profile_completed) {
+          setBusinessType(data.category || localStorage.getItem('vBusinessType') || 'shop');
+          if (data.profile_completed || isLocallyCompleted) {
             setAppStatus('dashboard');
           } else {
             setAppStatus('onboarding');
           }
         } else {
-          setAppStatus('onboarding');
+          setAppStatus(isLocallyCompleted ? 'dashboard' : 'onboarding');
         }
+      } else {
+         setAppStatus(isLocallyCompleted ? 'dashboard' : 'onboarding');
       }
     } catch (error) {
       console.error(error);
-      setAppStatus('onboarding');
+      setAppStatus(localStorage.getItem('vProfileCompleted') === 'true' ? 'dashboard' : 'onboarding');
     }
   };
 
@@ -232,7 +245,16 @@ const VendorPortal = ({ user, onLogout }) => {
             <div className="v-form-group">
               <label>License / Registration No</label>
               {isEditingProfile ? 
-                <input type="text" className="v-input" value={currentData?.license_no || ''} onChange={e => setEditFormData({...editFormData, license_no: e.target.value})} /> :
+                <input 
+                  type="text" 
+                  maxLength={16}
+                  className="v-input" 
+                  value={currentData?.license_no || ''} 
+                  onChange={e => {
+                    const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                    setEditFormData({...editFormData, license_no: val});
+                  }} 
+                /> :
                 <div className="v-input" style={{ background: '#f8fafc', color: '#64748b' }}>{currentData?.license_no || 'Not applicable'}</div>
               }
             </div>
@@ -259,22 +281,6 @@ const VendorPortal = ({ user, onLogout }) => {
               <button className="auth-submit-btn" style={{ width: 'auto', padding: '12px 32px' }} onClick={() => { setEditFormData(vendorData || formData); setIsEditingProfile(true); }}>Edit Information</button>
             )}
           </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderPlaceholder = (title, icon) => {
-    const Icon = icon;
-    return (
-      <div className="v-container">
-        <div className="v-empty-state">
-           <div style={{width: '64px', height: '64px', background: '#f8fafc', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto'}}>
-             <Icon size={32} color="#94a3b8" />
-           </div>
-           <h3>{title}</h3>
-           <p>This module is currently syncing with the main database. Please check back in a few minutes.</p>
-           <button className="v-nav-item active" style={{width: 'auto', margin: '0 auto'}}>Refresh Data</button>
         </div>
       </div>
     );
@@ -336,10 +342,35 @@ const VendorPortal = ({ user, onLogout }) => {
 
           <div className="v-form-group">
             <label>{businessType === 'shop' ? 'Shop License No' : 'Registration No (Optional)'}</label>
-            <input type="text" placeholder="Enter license number" className="v-input" value={formData.license_no} onChange={e => setFormData({...formData, license_no: e.target.value})} />
+            <input 
+              type="text" 
+              maxLength={16} 
+              placeholder="Enter 14-16 digit license number" 
+              className="v-input" 
+              value={formData.license_no} 
+              onChange={e => {
+                const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                setFormData({...formData, license_no: val});
+              }} 
+            />
+            {formData.license_no && (formData.license_no.length < 14) && (
+              <p style={{color: '#ef4444', fontSize: '0.75rem', marginTop: '4px'}}>Must be 14 to 16 alphanumeric characters</p>
+            )}
           </div>
 
-          <button className="auth-submit-btn" style={{marginTop: '1.5rem', width: '100%', padding: '14px', borderRadius: '12px', background: 'var(--v-primary)', color: 'white', fontWeight: 800, fontSize: '1rem'}} onClick={() => setOnboardingSubStep(3)} disabled={!formData.name || formData.aadhar_no.length !== 12 || !formData.business_name || !formData.license_no}>
+          <button 
+             className="auth-submit-btn" 
+             style={{marginTop: '1.5rem', width: '100%', padding: '14px', borderRadius: '12px', background: 'var(--v-primary)', color: 'white', fontWeight: 800, fontSize: '1rem'}} 
+             onClick={() => setOnboardingSubStep(3)} 
+             disabled={
+               !formData.name || 
+               formData.aadhar_no.length !== 12 || 
+               !formData.business_name || 
+               (businessType === 'shop' 
+                 ? !(formData.license_no.length >= 14 && formData.license_no.length <= 16) 
+                 : (formData.license_no.length > 0 && !(formData.license_no.length >= 14 && formData.license_no.length <= 16)))
+             }
+          >
             Continue
           </button>
         </motion.div>
@@ -367,6 +398,8 @@ const VendorPortal = ({ user, onLogout }) => {
               localStorage.removeItem('vOnboardingStep');
               localStorage.removeItem('vBusinessType');
               localStorage.removeItem('vFormData');
+              
+              localStorage.setItem('vProfileCompleted', 'true');
               
               setAppStatus('dashboard');
            }} style={{marginTop: '2rem', padding: '12px 24px', background: '#0f172a', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 800}}>Continue to Dashboard</button>
@@ -455,13 +488,13 @@ const VendorPortal = ({ user, onLogout }) => {
               {appStatus === 'onboarding' ? renderOnboarding() : (
                 activeTab === 'dashboard' ? renderDashboard() :
                 activeTab === 'profile' ? renderProfile() : 
-                activeTab === 'inventory' ? renderPlaceholder(businessType === 'shop' ? 'Product Catalog' : 'My Services', Package) :
-                activeTab === 'orders' ? renderPlaceholder(businessType === 'shop' ? 'Recent Orders' : 'Work Bookings', FileText) :
-                activeTab === 'earnings' ? renderPlaceholder('Revenue Stream', IndianRupee) :
-                activeTab === 'wallet' ? renderPlaceholder('Merchant Wallet', Wallet) :
-                activeTab === 'reviews' ? renderPlaceholder('Customer Feedback', Star) :
-                activeTab === 'notifications' ? renderPlaceholder('Alerts Center', Bell) :
-                renderPlaceholder('Support Inquiry', HelpCircle)
+                activeTab === 'inventory' ? <VendorInventory businessType={businessType} /> :
+                activeTab === 'orders' ? <VendorOrders businessType={businessType} /> :
+                activeTab === 'earnings' ? <VendorEarnings /> :
+                activeTab === 'wallet' ? <VendorWallet /> :
+                activeTab === 'reviews' ? <VendorReviews /> :
+                activeTab === 'notifications' ? <VendorNotifications /> :
+                <VendorSupport />
               )}
             </motion.div>
           </AnimatePresence>
