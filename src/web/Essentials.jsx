@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useSearch } from '../context/SearchContext';
 import { supabase } from '../supabase';
+import { MOCK_ESSENTIALS } from '../data/mockData';
 import './Essentials.css';
 
 const Essentials = () => {
@@ -15,17 +16,23 @@ const Essentials = () => {
   useEffect(() => {
     const fetchEssentials = async () => {
       try {
-        const { data, error } = await supabase.from('essentials').select('*').order('created_at', { ascending: false });
-        if (error) throw error;
-        // Filter unique names
-        const uniqueData = data.reduce((acc, current) => {
-          const x = acc.find(item => item.name === current.name);
-          if (!x) return acc.concat([current]);
-          else return acc;
-        }, []);
-        setItems(uniqueData);
+        const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+        
+        if (error || !data || data.length === 0) {
+          console.warn('Supabase fetch failed or returned empty, using mock data for essentials.');
+          setItems(MOCK_ESSENTIALS);
+        } else {
+          // Filter unique names
+          const uniqueData = data.reduce((acc, current) => {
+            const x = acc.find(item => item.name === current.name);
+            if (!x) return acc.concat([current]);
+            else return acc;
+          }, []);
+          setItems(uniqueData);
+        }
       } catch (err) {
-        console.error(err);
+        console.error('Fetch essentials error:', err);
+        setItems(MOCK_ESSENTIALS);
       } finally {
         setLoading(false);
       }

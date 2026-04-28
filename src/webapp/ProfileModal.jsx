@@ -6,6 +6,10 @@ import { toast } from 'react-hot-toast';
 import './ProfileModal.css';
 
 const ProfileModal = ({ user, onClose, onLogout }) => {
+  const [copied, setCopied] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [newName, setNewName] = useState(user?.displayName || '');
+
   if (!user) return null;
 
   const joinDate = user.metadata?.creationTime
@@ -19,10 +23,6 @@ const ProfileModal = ({ user, onClose, onLogout }) => {
     : user.providerData?.[0]?.providerId === 'phone'
     ? 'Phone (OTP)'
     : 'Unknown';
-
-  const [copied, setCopied] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [newName, setNewName] = useState(user.displayName || '');
 
   const handleLogout = () => {
     onClose();
@@ -40,13 +40,12 @@ const ProfileModal = ({ user, onClose, onLogout }) => {
         const { error } = await supabase
           .from('users')
           .upsert({ 
-            uid: user.uid, 
-            display_name: newName,
+            id: user.uid, 
+            full_name: newName,
             email: user.email,
-            phone_number: user.phoneNumber,
-            photo_url: user.photoURL,
-            last_login: new Date().toISOString()
-          }, { onConflict: 'uid' });
+            phone: user.phoneNumber,
+            photo_url: user.photoURL
+          }, { onConflict: 'id' });
         
         if (error) {
           console.warn('Supabase sync blocked (RLS):', error.message);

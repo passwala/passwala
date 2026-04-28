@@ -1,3 +1,4 @@
+ 
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import dotenv from 'dotenv';

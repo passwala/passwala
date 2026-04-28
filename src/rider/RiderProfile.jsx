@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Bike, FileText, Star, LogOut, Info, CheckCircle, XCircle, Bell, Headset, ChevronRight, ArrowLeft, CheckCircle2, ShieldCheck, Image as ImageIcon } from 'lucide-react';
+import { supabase } from '../supabase.js';
+import { toast } from 'react-hot-toast';
+import { Bike, FileText, Star, LogOut, Info, CheckCircle, XCircle, Bell, Headset, ChevronRight, ArrowLeft, CheckCircle2, ShieldCheck, Image as ImageIcon, Trash2 } from 'lucide-react';
 import './RiderPortal.css'; // Import custom styles
 
 function DocumentsSubpage({ user, onBack }) {
@@ -165,8 +167,32 @@ function AboutSubpage({ onBack }) {
   );
 }
 
-function RiderProfile({ user, onLogout }) {
+function RiderProfile({ user, onLogout, stats }) {
   const [activeSubpage, setActiveSubpage] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    setShowDeleteModal(false);
+    try {
+      setIsDeleting(true);
+      
+      if (supabase && user?.uid) {
+        const { error } = await supabase.from('riders').delete().eq('user_id', user.uid);
+        if (error) throw error;
+      }
+      
+      toast.success('Rider Account deleted successfully.');
+      localStorage.removeItem('rOnboardingStep');
+      localStorage.removeItem('rProfileCompleted');
+      if (onLogout) onLogout(true);
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to delete account.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   if (activeSubpage === 'documents') return <DocumentsSubpage user={user} onBack={() => setActiveSubpage(null)} />;
   if (activeSubpage === 'vehicle') return <VehicleSubpage user={user} onBack={() => setActiveSubpage(null)} />;
@@ -200,7 +226,7 @@ function RiderProfile({ user, onLogout }) {
          <div className="rider-card" style={{ padding: '1rem' }}>
             <p style={{ fontSize: '0.75rem', color: 'var(--rider-text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 0.25rem 0' }}>Deliveries</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '1.5rem', fontWeight: 900 }}>
-               0
+               {stats?.deliveries || 0}
             </div>
          </div>
          <div className="rider-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -230,13 +256,27 @@ function RiderProfile({ user, onLogout }) {
         <button 
           onClick={onLogout}
           className="rider-menu-btn"
+          style={{ color: 'var(--rider-text)' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div className="rider-menu-icon" style={{ background: '#f3f4f6', color: 'var(--rider-text)' }}>
+              <LogOut size={20} />
+            </div>
+            <span style={{ fontWeight: 700 }}>Log Out</span>
+          </div>
+        </button>
+
+        <button 
+          onClick={() => setShowDeleteModal(true)}
+          disabled={isDeleting}
+          className="rider-menu-btn"
           style={{ color: 'var(--rider-danger)' }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div className="rider-menu-icon" style={{ background: 'var(--rider-danger-light)', color: 'var(--rider-danger)' }}>
-              <LogOut size={20} />
+              <Trash2 size={20} />
             </div>
-            <span style={{ fontWeight: 700 }}>Log Out</span>
+            <span style={{ fontWeight: 700 }}>{isDeleting ? 'Deleting...' : 'Delete Account'}</span>
           </div>
         </button>
       </div>
@@ -244,6 +284,36 @@ function RiderProfile({ user, onLogout }) {
       <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#9ca3af', padding: '1rem 0' }}>
          Passwala Rider App v1.0.0
       </div>
+
+      {showDeleteModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem', backdropFilter: 'blur(4px)' }} onClick={() => setShowDeleteModal(false)}>
+          <div 
+            style={{ background: 'white', borderRadius: '16px', padding: '2rem', maxWidth: '400px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', textAlign: 'center', animation: 'scaleIn 0.2s ease-out' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--rider-danger-light)', color: 'var(--rider-danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto' }}>
+              <Trash2 size={32} />
+            </div>
+            <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.5rem', fontWeight: 800, color: 'var(--rider-text)' }}>Delete Account?</h3>
+            <p style={{ margin: '0 0 2rem 0', color: 'var(--rider-text-secondary)', fontSize: '0.95rem', lineHeight: 1.5 }}>This will permanently remove your rider profile, vehicle details, and earning history. This action cannot be undone.</p>
+            
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button 
+                style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', background: '#f3f4f6', color: 'var(--rider-text)', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                onClick={() => setShowDeleteModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', background: 'var(--rider-danger)', color: 'white', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                onClick={handleDeleteAccount}
+              >
+                Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

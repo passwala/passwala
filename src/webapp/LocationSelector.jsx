@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Search, MapPin, Navigation, ChevronLeft, CheckCircle2 } from 'lucide-react';

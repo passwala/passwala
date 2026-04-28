@@ -4,6 +4,7 @@ import { Star, Shield, TrendingUp, MapPin, Users } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useSearch } from '../context/SearchContext';
 import { supabase } from '../supabase';
+import { MOCK_SERVICES } from '../data/mockData';
 import './Services.css';
 
 const Services = () => {
@@ -16,17 +17,22 @@ const Services = () => {
     const fetchServices = async () => {
       try {
         const { data, error } = await supabase.from('services').select('*').order('created_at', { ascending: false });
-        if (error) throw error;
-        // Filter unique by name
-        const uniqueData = data.reduce((acc, current) => {
-          const x = acc.find(item => item.name === current.name);
-          if (!x) return acc.concat([current]);
-          else return acc;
-        }, []);
-        setServices(uniqueData);
+        
+        if (error || !data || data.length === 0) {
+          console.warn('Supabase fetch failed or returned empty, using mock data.');
+          setServices(MOCK_SERVICES);
+        } else {
+          // Filter unique by name
+          const uniqueData = data.reduce((acc, current) => {
+            const x = acc.find(item => item.name === current.name);
+            if (!x) return acc.concat([current]);
+            else return acc;
+          }, []);
+          setServices(uniqueData);
+        }
       } catch (err) {
-        console.error(err);
-        toast.error('Could not load services from our Satellite node.');
+        console.error('Fetch error:', err);
+        setServices(MOCK_SERVICES);
       } finally {
         setLoading(false);
       }

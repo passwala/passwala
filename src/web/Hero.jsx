@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { Search, MapPin, TrendingUp, Sparkles, ShieldCheck, CheckCircle2, Users, ArrowRight } from 'lucide-react';

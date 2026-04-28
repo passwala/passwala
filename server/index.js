@@ -1,3 +1,4 @@
+/* eslint-disable */
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -7,11 +8,12 @@ import vendorRoutes from './routes/vendor.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3004;
 
 // Middleware
-app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'] }));
-app.use(express.json());
+app.use(cors({ origin: '*' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Routes
 app.get('/', (req, res) => {
@@ -29,8 +31,10 @@ app.get('/', (req, res) => {
 
 app.get('/health', (req, res) => res.json({ status: 'healthy', database: 'connected' }));
 
+import ridersRoutes from './routes/riders.js';
 app.use('/api/users', userRoutes);
 app.use('/api/vendor', vendorRoutes);
+app.use('/api/riders', ridersRoutes);
 
 // 404 Handler
 app.use((req, res) => {

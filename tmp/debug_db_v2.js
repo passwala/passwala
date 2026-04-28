@@ -1,3 +1,4 @@
+ 
 const { createClient } = require('@supabase/supabase-js')
 const fs = require('fs');
 const env = fs.readFileSync('.env', 'utf8').split('\n').reduce((acc, line) => {

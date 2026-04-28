@@ -1,3 +1,4 @@
+ 
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -15,32 +16,20 @@ async function seed() {
   
   const posts = [
     {
-      user_name: 'Jane Doe',
-      user_avatar: 'JD',
-      location: 'Satellite Resident',
-      text: 'I just got my AC fixed by Vikas Tech and the experience was amazing. Transparent pricing and local trust! Highly recommend for anyone in Ahmedabad.',
-      likes: 12,
-      comments: 3
+      content: 'I just got my AC fixed by Vikas Tech and the experience was amazing. Transparent pricing and local trust! Highly recommend for anyone in Ahmedabad.',
+      likes_count: 12
     },
     {
-      user_name: 'Priya K.',
-      user_avatar: 'PK',
-      location: 'Vastrapur Resident',
-      text: 'The milk delivery from Local Fresh is consistently early. Best quality in the neighborhood so far! 🥛',
-      likes: 45,
-      comments: 8
+      content: 'The milk delivery from Local Fresh is consistently early. Best quality in the neighborhood so far! 🥛',
+      likes_count: 45
     },
     {
-      user_name: 'Rohan Shah',
-      user_avatar: 'RS',
-      location: 'Ambawadi Resident',
-      text: 'WoodWorks turned my old table into a masterpiece. Authentic carpentry still exists in Ahmedabad! 🪚',
-      likes: 89,
-      comments: 15
+      content: 'WoodWorks turned my old table into a masterpiece. Authentic carpentry still exists in Ahmedabad! 🪚',
+      likes_count: 89
     }
   ];
 
-  const { error } = await supabase.from('community_posts').upsert(posts, { onConflict: 'text' });
+  const { error } = await supabase.from('posts').upsert(posts, { onConflict: 'content' });
   if (error) {
     console.error('Error seeding:', error);
   } else {

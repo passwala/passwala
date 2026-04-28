@@ -3,7 +3,7 @@ import { IndianRupee, ArrowDownCircle, ArrowUpCircle, Wallet, History, Banknote 
 import { toast } from 'react-hot-toast';
 import './RiderPortal.css'; // Import custom styles
 
-function RiderWallet() {
+function RiderWallet({ stats }) {
   const transactions = [];
 
   const handlePayout = () => {
@@ -19,7 +19,7 @@ function RiderWallet() {
             <Wallet color="#bfdbfe" size={24} />
             <p style={{ color: '#dbeafe', fontWeight: 500, letterSpacing: '0.05em', margin: 0 }}>Available Balance</p>
          </div>
-         <h3 style={{ fontSize: '3rem', fontWeight: 900, marginBottom: '1.5rem', marginTop: 0 }}>₹0</h3>
+         <h3 style={{ fontSize: '3rem', fontWeight: 900, marginBottom: '1.5rem', marginTop: 0 }}>₹{stats?.earnings || 0}</h3>
          
          <div style={{ display: 'flex', gap: '0.75rem' }}>
              <button onClick={handlePayout} style={{ flex: 1, background: 'white', color: '#1d4ed8', padding: '0.75rem', borderRadius: '12px', fontWeight: 700, border: 'none', cursor: 'pointer', boxShadow: 'var(--rider-shadow)' }}>
@@ -42,7 +42,7 @@ function RiderWallet() {
                 <span style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Online</span>
                 <IndianRupee size={18} color="var(--rider-success)" />
             </div>
-            <p style={{ fontWeight: 700, fontSize: '1.5rem', margin: 0 }}>₹0</p>
+            <p style={{ fontWeight: 700, fontSize: '1.5rem', margin: 0 }}>₹{stats?.earnings || 0}</p>
             <p style={{ fontSize: '0.75rem', color: 'var(--rider-success)', marginTop: '0.5rem', fontWeight: 600, margin: '0.5rem 0 0 0' }}>Paid to wallet</p>
          </div>
       </div>
@@ -83,24 +83,6 @@ function RiderWallet() {
       </div>
     </div>
   );
-}
-
-function TransactionItem({ type, amount, title, subtitle, date }) {
-    const isCredit = type === 'credit';
-    return (
-        <div className="rider-list-item" style={{ padding: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ padding: '0.5rem', borderRadius: '50%', background: isCredit ? 'var(--rider-success-light)' : 'var(--rider-danger-light)', color: isCredit ? 'var(--rider-success)' : 'var(--rider-danger)' }}>
-                    {isCredit ? <ArrowDownCircle size={20} /> : <ArrowUpCircle size={20} />}
-                </div>
-                <div>
-                    <p style={{ fontWeight: 700, fontSize: '0.875rem', margin: '0 0 0.25rem 0' }}>{title}</p>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--rider-text-secondary)', margin: 0 }}>{subtitle} • {date}</p>
-                </div>
-            </div>
-            <div style={{ fontWeight: 700, fontSize: '1.125rem', color: isCredit ? 'var(--rider-success)' : 'var(--rider-text)' }}>{amount}</div>
-        </div>
-    )
 }
 
 export default RiderWallet;

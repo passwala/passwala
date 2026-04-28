@@ -21,7 +21,7 @@
   min-height: 100vh;
   background-color: var(--rider-bg);
   color: var(--rider-text);
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  font-family: 'Poppins', system-ui, -apple-system, sans-serif;
   display: flex;
   flex-direction: column;
 }

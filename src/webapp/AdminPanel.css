@@ -382,7 +382,12 @@
   border-radius: 16px;
   box-shadow: var(--card-shadow);
   border: 1px solid #e2e8f0;
-  overflow: hidden;
+}
+
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .table-actions {
@@ -433,6 +438,7 @@
 .admin-table {
   width: 100%;
   border-collapse: collapse;
+  white-space: nowrap;
 }
 
 .admin-table th {

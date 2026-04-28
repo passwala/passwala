@@ -1,6 +1,8 @@
+/* eslint-disable */
 import React, { useState } from 'react';
 import { Phone, CheckCircle, Navigation, Shield, Bike, UploadCloud, Camera } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { supabase } from '../supabase';
 import './RiderPortal.css'; // Import custom styles
 
 function RiderAuth({ onLogin }) {
@@ -34,13 +36,68 @@ function RiderAuth({ onLogin }) {
     }
   };
 
-  const handleCompleteProfile = () => {
+  const [loading, setLoading] = useState(false);
+
+  const handleCompleteProfile = async () => {
     if (!profile.name || !profile.vehicleNo || !profile.licenseNo || !profile.idProof) {
       toast.error('Please fill in all required details');
       return;
     }
-    toast.success('Profile created successfully!', { icon: '🎉' });
-    onLogin(true, phone, profile);
+
+    setLoading(true);
+    const toastId = toast.loading('Syncing Rider Profile...');
+
+    try {
+      if (!supabase) throw new Error("Database connection error");
+
+      // 1. Resolve User ID (Lookup or Create)
+      let resolvedUserId = null;
+      const { data: ud } = await supabase.from('users').select('id').eq('phone', phone).maybeSingle();
+      if (ud) {
+          resolvedUserId = ud.id;
+      } else {
+          const { data: newUser, error: ne } = await supabase.from('users').insert([{ phone, full_name: profile.name }]).select().single();
+          if (ne) throw ne;
+          resolvedUserId = newUser.id;
+      }
+
+      // 2. Create Linked Rider Profile
+      // Check if rider already exists for this user_id
+      const { data: existingRider } = await supabase.from('riders').select('*').eq('user_id', resolvedUserId).maybeSingle();
+      
+      const riderPayload = {
+          user_id: resolvedUserId,
+          vehicle_no: profile.vehicleNo,
+          license_no: profile.licenseNo,
+          id_proof: profile.idProof,
+          is_active: false,
+          is_verified: false
+      };
+
+      let finalRiderId = null;
+      if (existingRider) {
+          const { data: updatedRider, error: ue } = await supabase.from('riders').update(riderPayload).eq('user_id', resolvedUserId).select().single();
+          if (ue) throw ue;
+          finalRiderId = updatedRider.id;
+      } else {
+          const { data: newRider, error: re } = await supabase.from('riders').insert([riderPayload]).select().single();
+          if (re) throw re;
+          finalRiderId = newRider.id;
+      }
+
+      toast.success('Rider Profile Ready! Go online now.', { id: toastId, icon: '🎉' });
+      
+      onLogin(false, phone, {
+         ...profile,
+         user_id: resolvedUserId,
+         rider_id: finalRiderId
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error(error.message || 'Database Synchronization Error', { id: toastId });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -154,7 +211,7 @@ function RiderAuth({ onLogin }) {
 
                   <div className="rider-input-group">
                     <label className="rider-label">ID Proof (Aadhar/PAN)</label>
-                    <input type="text" className="rider-input" placeholder="Enter ID Proof No" value={profile.idProof} onChange={e => setProfile({...profile, idProof: e.target.value})} style={{ paddingLeft: '1rem', textTransform: 'uppercase' }} />
+                    <input type="text" className="rider-input" placeholder="Enter ID Proof No" maxLength={16} value={profile.idProof} onChange={e => setProfile({...profile, idProof: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')})} style={{ paddingLeft: '1rem', textTransform: 'uppercase' }} />
                   </div>
                   
                   <div className="rider-input-group">

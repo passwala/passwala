@@ -1,5 +1,5 @@
+ 
 import React from 'react';
-import { motion } from 'framer-motion';
 import { 
   ArrowLeft, 
   MapPin, 
@@ -11,7 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import './WebappNavbar.css';
 
-const WebappNavbar = ({ user, onOpenProfile, onBack, title, location, isDarkMode, onToggleTheme }) => {
+const WebappNavbar = ({ user, onOpenProfile, onBack, title, location }) => {
   const navigate = useNavigate();
   return (
     <nav className="webapp-navbar glass">

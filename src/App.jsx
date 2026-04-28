@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom'
 import Navbar from './web/Navbar'
@@ -21,8 +22,8 @@ import WebappNavbar from './webapp/WebappNavbar'
 import BottomNav from './webapp/BottomNav'
 import LocationSelector from './webapp/LocationSelector'
 import AdminAuth from './webapp/AdminAuth'
-import VendorPortal from './webapp/vendor/VendorPortal'
-import VendorAuth from './webapp/vendor/VendorAuth'
+import VendorPortal from './vendor/VendorPortal'
+import VendorAuth from './vendor/VendorAuth'
 import RiderPortal from './rider/RiderPortal'
 import RiderAuth from './rider/RiderAuth'
 import TrackOrders from './webapp/buyer/TrackOrders'
@@ -39,6 +40,7 @@ import './App.css'
 import { auth } from './firebase'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
 import AIAssistant from './webapp/AIAssistant'
+import CustomerDetails from './webapp/CustomerDetails'
 import { CartProvider } from './context/CartContext'
 import CartDrawer from './webapp/buyer/CartDrawer'
 import { NotificationProvider } from './context/NotificationContext'
@@ -55,9 +57,36 @@ const ScrollToTop = () => {
   return null;
 };
 
-const AppContent = ({ user }) => {
+// 🛡️ Security Guard Component for Role-Based Access
+const RoleGuard = ({ children, allowedRoles, user, loading }) => {
+  if (loading) return (
+    <div className="flex items-center justify-center h-screen bg-white">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#6366f1]"></div>
+    </div>
+  );
+  
+  if (!user) return <Navigate to="/" replace />;
+  
+  const userRole = user.role || 'BUYER';
+  if (!allowedRoles.includes(userRole)) {
+    console.warn(`🛡️ Access Denied: Role [${userRole}] cannot access these resources.`);
+    return <Navigate to="/" replace />;
+  }
+  
+  return children;
+};
+
+const AppContent = ({ user, demoUser, setDemoUser }) => {
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('admin_session') === 'true');
+  const [isAdmin, setIsAdmin] = useState(() => {
+    const isWebapp = window.location.port === '3001';
+    const hasAdminSession = localStorage.getItem('admin_session') === 'true';
+    const forceAdmin = new URLSearchParams(window.location.search).get('mode') === 'admin';
+    
+    // On port 3001, don't default to Admin unless explicitly in that session or mode
+    if (isWebapp && !forceAdmin && !sessionStorage.getItem('admin_active')) return false;
+    return hasAdminSession;
+  });
   const [isVendor, setIsVendor] = useState(false);
   const [showVendorModal, setShowVendorModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -65,20 +94,13 @@ const AppContent = ({ user }) => {
   
   const navigate = useNavigate();
   const locationPath = useLocation().pathname;
-  const isWebMode = import.meta.env.MODE === 'web' || window.location.port === '3000';
-  const isWebappMode = import.meta.env.MODE === 'webapp' || window.location.port === '3001';
-  const isVendorMode = import.meta.env.MODE === 'vendor' || window.location.port === '3002';
-  const isRiderMode = import.meta.env.MODE === 'rider' || window.location.port === '3003';
-
-  const [demoUser, setDemoUser] = useState(() => {
-    const saved = localStorage.getItem('v_demo_session');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const isWebMode = window.location.port === '3000';
+  const isWebappMode = window.location.port === '3001';
+  const isVendorMode = window.location.port === '3002';
+  const isRiderMode = window.location.port === '3003';
 
   const updateDemoUser = (val) => {
     setDemoUser(val);
-    if (val) localStorage.setItem('v_demo_session', JSON.stringify(val));
-    else localStorage.removeItem('v_demo_session');
   };
 
   const effectiveUser = user || demoUser;
@@ -86,6 +108,8 @@ const AppContent = ({ user }) => {
   // Admin Persistence
   useEffect(() => {
     localStorage.setItem('admin_session', isAdmin);
+    if (isAdmin) sessionStorage.setItem('admin_active', 'true');
+    else sessionStorage.removeItem('admin_active');
   }, [isAdmin]);
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -127,7 +151,7 @@ const AppContent = ({ user }) => {
     return () => clearTimeout(splashTimer);
   }, [isWebappMode]);
 
-  const handleLogout = async () => {
+  const handleLogout = async (skipToast = false) => {
     try {
       setDemoUser(null);
       // 1. Attempt Firebase Signout but don't let it block local reset
@@ -140,7 +164,7 @@ const AppContent = ({ user }) => {
       updateDemoUser(null); 
       localStorage.clear(); // Comprehensive reset for safety
       
-      toast.success('Signed Out.');
+      if (!skipToast) toast.success('Signed Out.');
       
       // 3. HARD REDIRECT
       if (window.location.host.includes('3002')) {
@@ -162,9 +186,11 @@ const AppContent = ({ user }) => {
     locationPath === '/track-orders' ? 'TRACKING' :
     locationPath === '/profile' ? 'PROFILE' : 'DASHBOARD';
 
-  console.log('[Passwala Debug] Mode:', import.meta.env.MODE, '| isWebapp:', isWebappMode, '| user:', effectiveUser?.uid || 'Guest');
+  console.log('[PASSWALA-IDENTITY] Mode:', isWebappMode ? 'BUYER-PORTAL' : isVendorMode ? 'VENDOR-PORTAL' : isRiderMode ? 'RIDER-PORTAL' : 'WEB-PORTAL', '| User:', effectiveUser?.uid || 'Guest');
 
-  if (isAdmin) return <AdminPanel onLogout={() => { setIsAdmin(false); localStorage.removeItem('admin_session'); }} />;
+  // 🛡️ Final Security Check for Admin
+  const isAuthorizedAdmin = isAdmin || (effectiveUser && effectiveUser.role === 'ADMIN');
+  if (isAuthorizedAdmin) return <AdminPanel onLogout={() => { setIsAdmin(false); localStorage.removeItem('admin_session'); sessionStorage.removeItem('admin_active'); }} />;
   
   return (
     <div className="app-main-layout" style={(isVendorMode || locationPath === '/vendor' || isRiderMode || locationPath === '/rider') ? { width: '100%', margin: 0, padding: 0 } : {}}>
@@ -187,7 +213,9 @@ const AppContent = ({ user }) => {
                photoURL: mockUser?.photo || null,
                vehicleNo: mockUser?.vehicleNo || 'Bajaj Pulsar (GJ-01-AB-1234)',
                licenseNo: mockUser?.licenseNo || 'Driving License',
-               idProof: mockUser?.idProof || 'Aadhar Card'
+               idProof: mockUser?.idProof || 'Aadhar Card',
+               id: mockUser?.user_id || 'demo-user-123',
+               rider_id: mockUser?.rider_id || 'demo-rider-123'
              });
           }} />
         ) : (
@@ -228,7 +256,7 @@ const AppContent = ({ user }) => {
                  <>
                    {/* Webapp Logic (Auth or Hub) */}
                    {isWebappMode ? (
-                     !effectiveUser ? <Auth onLogin={(mockData) => { if (mockData) updateDemoUser(mockData); navigate('/'); }} /> : <NeighborhoodHub onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')} />
+                     (!effectiveUser || !effectiveUser.displayName) ? <Auth onLogin={(mockData) => { if (mockData) updateDemoUser(mockData); navigate('/'); }} /> : <NeighborhoodHub onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')} />
                    ) : (
                      /* Marketing Logic (Hub on top if logged in, then standard homepage) */
                      <>
@@ -261,6 +289,7 @@ const AppContent = ({ user }) => {
               <Route path="/help-support" element={effectiveUser ? <HelpSupport /> : <Navigate to="/" />} />
               <Route path="/settings" element={effectiveUser ? <AppSettings isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/" />} />
               <Route path="/select-location" element={effectiveUser ? <LocationSelector currentLocation={location} onLocationChange={setLocation} /> : <Navigate to="/" />} />
+              <Route path="/complete-profile" element={effectiveUser ? <CustomerDetails user={effectiveUser} onComplete={() => navigate('/')} /> : <Navigate to="/" />} />
             </Routes>
           </main>
 
@@ -326,7 +355,27 @@ function App() {
     }, delay);
 
     // 2. Firebase Auth listener
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
+       if (u) {
+         try {
+           const userData = {
+              uid: u.uid,
+              email: u.email,
+              displayName: u.displayName,
+              photoURL: u.photoURL,
+              phoneNumber: u.phoneNumber,
+              authProvider: u.providerData?.[0]?.providerId || 'google',
+              role: 'buyer'
+           };
+           await fetch('http://localhost:3004/api/users', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(userData)
+           });
+         } catch (err) {
+           console.error("Auto Sync Failed", err);
+         }
+       }
        setUser(u);
        setAuthLoading(false);
     });
@@ -350,7 +399,7 @@ function App() {
                 <CartProvider user={user}>
                   <div className="app-container">
                     <Toaster position="bottom-center" toastOptions={{ duration: 3000 }} />
-                    <AppContent user={user} />
+                    <AppContent user={user} demoUser={demoUser} setDemoUser={setDemoUser} />
                   </div>
                 </CartProvider>
               </LanguageProvider>

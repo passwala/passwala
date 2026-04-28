@@ -1,3 +1,4 @@
+ 
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -14,12 +15,12 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 const tablesToTruncate = [
   'services',
-  'essentials',
+  'products',
   'deals',
-  'recommendations',
-  'community_posts',
-  'bookings',
-  'vendor_applications'
+  'ai_recommendations',
+  'posts',
+  'service_bookings',
+  'vendors'
 ];
 
 async function removeFakeData() {

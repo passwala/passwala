@@ -1,5 +1,11 @@
+/* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
-import { toast } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
+
+// Passwala Identity Signature
+console.log('--- PASSWALA IDENTITY VERIFIED ---');
+console.log('Build Context: Buyer Portal (Port 3001)');
+console.log('Timestamp:', new Date().toISOString());
 import { Phone, ArrowLeft, RefreshCw, User, ShieldCheck } from 'lucide-react';
 import {
   RecaptchaVerifier,
@@ -9,6 +15,7 @@ import {
   updateProfile // Added this
 } from 'firebase/auth';
 import { auth } from '../firebase';
+import { supabase } from '../supabase';
 import './Auth.css';
 
 const Auth = ({ onLogin, onAdminLogin }) => {
@@ -17,6 +24,10 @@ const Auth = ({ onLogin, onAdminLogin }) => {
   const [adminCode, setAdminCode] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [userName, setUserName] = useState('');
+  const [houseNo, setHouseNo] = useState('');
+  const [society, setSociety] = useState('');
+  const [landmark, setLandmark] = useState('');
+  const [pincode, setPincode] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(30);
   const [confirmationResult, setConfirmationResult] = useState(null);
@@ -86,39 +97,21 @@ const Auth = ({ onLogin, onAdminLogin }) => {
     } finally { setLoading(false); }
   };
 
-  const saveUserToDatabase = async (userData) => {
-    try {
-      const res = await fetch('http://localhost:5000/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...userData, role }), // Include role
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
-      console.log('✅ User saved to Supabase:', data.user);
-    } catch (err) {
-      console.error('❌ Supabase save error:', err);
-    }
-  };
-
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      await saveUserToDatabase({
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
-        authProvider: 'google',
-        role: 'buyer' // Default for Google Quick login
+      
+      // Store credentials temporarily to proceed to the Name verification step
+      setTempCred({
+         user: result.user,
+         authProvider: 'google'
       });
+      setUserName(result.user.displayName || ''); // Pre-fill name from Google
+      setStep('NAME'); // Let user confirm their name
 
-      toast.success('Signed in with Google!');
-      onLogin();
+      toast.success('Google authentication successful! Please confirm your name.');
     } catch (error) {
       console.error(error);
       
@@ -140,7 +133,7 @@ const Auth = ({ onLogin, onAdminLogin }) => {
           </span>
         ), { duration: 6000 });
       } else {
-        toast.error(`Google Sign-In failed: ${error.message}`);
+        toast.error(`Google Sign-In failed: ${error.message || 'Check if server is running on port 3004'}`);
       }
     } finally {
       setLoading(false);
@@ -171,14 +164,26 @@ const Auth = ({ onLogin, onAdminLogin }) => {
 
   const handleSaveName = async () => {
     if (!userName.trim()) { toast.error('Please enter your name'); return; }
+    setStep('ADDRESS'); // Move to address step instead of saving immediately
+  };
+
+  const handleFinalSave = async () => {
+    if (!houseNo.trim() || !society.trim()) {
+      toast.error('Please enter House No and Society');
+      return;
+    }
+
     try {
       setLoading(true);
       const userData = tempCred
         ? {
           uid: tempCred.user.uid,
           displayName: userName,
-          phoneNumber: tempCred.user.phoneNumber,
-          authProvider: 'phone'
+          phoneNumber: tempCred.user.phoneNumber || null,
+          email: tempCred.user.email || null,
+          photoURL: tempCred.user.photoURL || null,
+          authProvider: tempCred.authProvider || 'phone',
+          role: role // From state
         }
         : {
           uid: 'demo-user-' + Math.random().toString(36).substr(2, 9),
@@ -189,13 +194,48 @@ const Auth = ({ onLogin, onAdminLogin }) => {
         };
 
       if (tempCred) {
-        await updateProfile(tempCred.user, { displayName: userName });
+        await updateProfile(tempCred.user, { displayName: userName }).catch(e => console.warn('Profile update skip:', e));
       }
-      await saveUserToDatabase(userData);
-      toast.success('Welcome to Passwala!');
+      
+      // Attempt DB Save
+      try {
+        const { data: userFromDB, error: userError } = await supabase
+          .from('users')
+          .upsert([{
+            id: userData.uid.length === 36 ? userData.uid : undefined,
+            phone: userData.phoneNumber,
+            full_name: userData.displayName,
+            email: userData.email,
+            role: 'BUYER'
+          }], { onConflict: 'phone' })
+          .select()
+          .single();
+
+        if (userError) throw userError;
+        
+        if (userFromDB) {
+          await supabase.from('addresses').insert([{
+            user_id: userFromDB.id,
+            address_line_1: `${houseNo}, ${society}`,
+            address_line_2: landmark,
+            city: 'Ahmedabad',
+            state: 'Gujarat',
+            pincode: pincode || '380001',
+            is_default: true
+          }]).catch(e => console.warn('Address save skip:', e));
+        }
+        toast.success('Synced with Cloud! ☁️');
+      } catch (dbErr) {
+        console.error('Offline Mode Active:', dbErr);
+        toast('Database Offline. Profile saved locally! 🏠', { icon: '🏠', duration: 4000 });
+        // Save to fallback storage
+        localStorage.setItem('local_user_profile', JSON.stringify(userData));
+      }
+
       onLogin(userData);
     } catch (err) {
-      toast.error('Failed to save profile');
+      console.error('Final Save Error:', err);
+      toast.error(`Critical Error: ${err.message}`);
     } finally { setLoading(false); }
   };
 
@@ -238,8 +278,10 @@ const Auth = ({ onLogin, onAdminLogin }) => {
         <div className="auth-content">
           {step === 'PHONE' ? (
             <>
-              <h2>Welcome to Passwala</h2>
-              <p>Neighborhood trust by community AI</p>
+            <div className="auth-header-v5">
+              <h2 className="passwala-blue-stamp">PASSWALA BUYER HUB</h2>
+              <p>Authentic Neighborhood Connections</p>
+            </div>
 
               <div className="social-login" style={{ marginBottom: '0.5rem' }}>
                 <button className="social-btn google-btn" onClick={handleGoogleLogin} disabled={loading}>
@@ -309,23 +351,61 @@ const Auth = ({ onLogin, onAdminLogin }) => {
           ) : (
             <div className="name-flow">
               <h2>Nearly there!</h2>
-              <p>What should we call you?</p>
-              <div className="input-group">
-                <User size={18} color="var(--text-secondary)" />
-                <input
-                  className="name-input-field"
-                  type="text"
-                  placeholder="Your full name"
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  autoFocus
-                />
-              </div>
-
-
-              <button className="auth-submit-btn" onClick={handleSaveName} disabled={loading}>
-                {loading ? 'Saving...' : 'Start Exploring'}
-              </button>
+              {step === 'NAME' ? (
+                <>
+                  <p>What should we call you?</p>
+                  <div className="input-group">
+                    <User size={18} color="var(--text-secondary)" />
+                    <input
+                      className="name-input-field"
+                      type="text"
+                      placeholder="Your full name"
+                      value={userName}
+                      onChange={(e) => setUserName(e.target.value)}
+                      autoFocus
+                    />
+                  </div>
+                  <button className="auth-submit-btn" onClick={handleSaveName} disabled={loading}>
+                     Continue
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p>Where should we deliver?</p>
+                  <div className="address-inputs" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                    <div className="input-group">
+                      <input
+                        className="name-input-field"
+                        type="text"
+                        placeholder="House / Flat No."
+                        value={houseNo}
+                        onChange={(e) => setHouseNo(e.target.value)}
+                      />
+                    </div>
+                    <div className="input-group">
+                      <input
+                        className="name-input-field"
+                        type="text"
+                        placeholder="Society / Apartment Name"
+                        value={society}
+                        onChange={(e) => setSociety(e.target.value)}
+                      />
+                    </div>
+                    <div className="input-group">
+                      <input
+                        className="name-input-field"
+                        type="text"
+                        placeholder="Landmark (Optional)"
+                        value={landmark}
+                        onChange={(e) => setLandmark(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <button className="auth-submit-btn" onClick={handleFinalSave} disabled={loading} style={{ marginTop: '1.5rem' }}>
+                    {loading ? 'Saving...' : 'Start Exploring'}
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>

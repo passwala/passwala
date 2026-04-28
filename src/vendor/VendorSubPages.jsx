@@ -1,35 +1,83 @@
 import React from 'react';
-import { Package, FileText, IndianRupee, Wallet, Star, Bell, HelpCircle, CheckCircle, Clock, MapPin, Download, ArrowUpRight, ArrowDownRight, Tag } from 'lucide-react';
+import { Package, FileText, IndianRupee, Wallet, Star, Bell, HelpCircle, CheckCircle, Clock, MapPin, Download, ArrowUpRight, ArrowDownRight, Tag, Trash2 } from 'lucide-react';
+import { supabase } from '../supabase';
 
 export const VendorInventory = ({ businessType }) => {
-  const [items, setItems] = React.useState(() => {
-    const saved = localStorage.getItem('v_catalog_items');
-    return saved ? JSON.parse(saved) : [
-      { id: 4321, name: businessType === 'shop' ? 'Premium Product 1' : 'Expert Service Package 1', detail: 'Standard Offering', price: 150, image: null },
-      { id: 4322, name: businessType === 'shop' ? 'Premium Product 2' : 'Expert Service Package 2', detail: 'Luxury Variant', price: 300, image: null },
-      { id: 4323, name: businessType === 'shop' ? 'Premium Product 3' : 'Expert Service Package 3', detail: 'Bulk Option', price: 450, image: null }
-    ];
-  });
+  const [items, setItems] = React.useState([]);
 
   React.useEffect(() => {
-    localStorage.setItem('v_catalog_items', JSON.stringify(items));
-  }, [items]);
+    const fetchCatalog = async () => {
+       try {
+         const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+         if (!error && data) {
+            setItems(data.map(p => ({
+               id: p.id,
+               name: p.name,
+               detail: p.description,
+               price: p.price,
+               image: p.image_url
+            })));
+         }
+       } catch (err) {
+         console.error('Failed to load catalog:', err);
+       }
+    };
+    fetchCatalog();
+  }, []);
 
   const [showForm, setShowForm] = React.useState(false);
   const [newItem, setNewItem] = React.useState({ name: '', detail: '', price: '', image: null });
 
-  const handleAdd = (e) => {
+  const handleAdd = async (e) => {
     e.preventDefault();
     if (!newItem.name || !newItem.price) return;
-    setItems([{
-      id: 4300 + Math.floor(Math.random() * 100),
-      name: newItem.name,
-      detail: newItem.detail || 'Added Manually',
-      price: newItem.price,
-      image: newItem.image
-    }, ...items]);
-    setNewItem({ name: '', detail: '', price: '', image: null });
-    setShowForm(false);
+    
+    try {
+       const { data, error } = await supabase.from('products').insert([{
+         name: newItem.name,
+         description: newItem.detail || 'Added Manually',
+         price: parseFloat(newItem.price),
+         image_url: newItem.image,
+         is_active: true
+       }]).select();
+
+       if (error) {
+          alert('Error saving product: ' + error.message);
+          return;
+       }
+
+       if (data && data[0]) {
+           const dbItem = data[0];
+           setItems([{
+             id: dbItem.id,
+             name: dbItem.name,
+             detail: dbItem.description,
+             price: dbItem.price,
+             image: dbItem.image_url
+           }, ...items]);
+       }
+
+       setNewItem({ name: '', detail: '', price: '', image: null });
+       setShowForm(false);
+    } catch (err) {
+       console.error("Failed to sync to admin:", err);
+       alert("Network connection error while saving.");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this item?')) return;
+    try {
+      const { error } = await supabase.from('products').delete().eq('id', id);
+      if (error) {
+        alert('Error deleting product: ' + error.message);
+        return;
+      }
+      setItems(items.filter(item => item.id !== id));
+    } catch (err) {
+      console.error('Failed to delete item:', err);
+      alert('Network connection error while deleting.');
+    }
   };
 
   return (
@@ -102,9 +150,14 @@ export const VendorInventory = ({ businessType }) => {
                   <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>{item.detail} • ID: #{item.id}</p>
                 </div>
               </div>
-              <div style={{ textAlign: 'right' }}>
+              <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
                 <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1.1rem' }}>₹{item.price}</div>
-                <span style={{ fontSize: '0.75rem', background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>In Stock</span>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                   <span style={{ fontSize: '0.75rem', background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>In Stock</span>
+                   <button onClick={() => handleDelete(item.id)} style={{ background: '#fee2e2', color: '#dc2626', border: 'none', width: '28px', height: '28px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }} title="Delete Item">
+                     <Trash2 size={14} />
+                   </button>
+                </div>
               </div>
             </div>
           ))}

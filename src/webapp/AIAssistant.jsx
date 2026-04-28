@@ -4,7 +4,7 @@ import { Send, X, MessageSquare, Bot, User, Loader2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import './AIAssistant.css';
 
-const AIAssistant = ({ isOpen, onClose, onOpen, onRegisterVendor }) => {
+const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
   const [messages, setMessages] = useState([
     { id: 1, text: "Jai Shree Krishna! I'm your Ahmedabad Community AI. 🙏 How can I help you today? (I support Hindi, Gujarati & English)", sender: 'ai', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
   ]);
@@ -88,9 +88,7 @@ const AIAssistant = ({ isOpen, onClose, onOpen, onRegisterVendor }) => {
       }
 
       // --- LANGUAGE & GENERAL ---
-      else if (lowerInput.includes('kevu') || lowerInput.includes('kem cho')) {
-        aiResponse = "Maja ma! Badhu saru che. I can help you find nearby shops or book home services. Su madad karu?";
-      }
+
       else if (lowerInput.includes('kaise') || lowerInput.includes('baat')) {
         aiResponse = "Main aapki sahayata kar sakti hoon! Aapko plumber chahiye ya grocery ki dukaan? Mujhe batayein.";
       }

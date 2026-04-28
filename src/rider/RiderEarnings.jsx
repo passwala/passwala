@@ -2,8 +2,35 @@ import React from 'react';
 import { IndianRupee, Crown, Clock } from 'lucide-react';
 import './RiderPortal.css'; // Import custom styles
 
-function RiderEarnings() {
-  const deliveries = [];
+import { supabase } from '../supabase';
+
+function RiderEarnings({ user, riderId, stats }) {
+    const [deliveries, setDeliveries] = React.useState([]);
+    const [loading, setLoading] = React.useState(true);
+
+    React.useEffect(() => {
+        const fetchRecent = async () => {
+            if (riderId) {
+                const { data } = await supabase
+                    .from('rider_earnings')
+                    .select('*')
+                    .eq('rider_id', riderId)
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+                
+                if (data) {
+                    setDeliveries(data.map(d => ({
+                        id: `#ORD-${d.order_id.substring(0, 6).toUpperCase()}`,
+                        amount: d.amount,
+                        time: new Date(d.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        distance: '1.2 km'
+                    })));
+                }
+            }
+            setLoading(false);
+        };
+        fetchRecent();
+    }, [riderId]);
 
   return (
     <div className="rider-screen">
@@ -15,12 +42,12 @@ function RiderEarnings() {
             <IndianRupee size={120} />
          </div>
          <p style={{ fontWeight: 500, marginBottom: '0.25rem', color: 'rgba(255,255,255,0.8)' }}>Total Earnings (Today)</p>
-         <h3 style={{ fontSize: '3rem', fontWeight: 900, marginBottom: '1rem', display: 'flex', alignItems: 'center' }}>₹0</h3>
+         <h3 style={{ fontSize: '3rem', fontWeight: 900, marginBottom: '1rem', display: 'flex', alignItems: 'center' }}>₹{stats.earnings}</h3>
          
          <div className="rider-grid-2" style={{ borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '1rem' }}>
             <div>
                <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)' }}>Deliveries</p>
-               <p style={{ fontSize: '1.25rem', fontWeight: 700 }}>0</p>
+               <p style={{ fontSize: '1.25rem', fontWeight: 700 }}>{stats.deliveries}</p>
             </div>
             <div>
                <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)' }}>Online Time</p>

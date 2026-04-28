@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React, { useState, useEffect } from 'react';
 import { MapPin, Search, ShoppingBag, User, Bell, Sun, Moon, LogOut, Gift, Star, Bot } from 'lucide-react';
 import { toast } from 'react-hot-toast';

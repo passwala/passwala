@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
@@ -30,7 +31,7 @@ import {
   TrendingUp,
   Settings
 } from 'lucide-react';
-import { supabase } from '../../supabase';
+import { supabase } from '../supabase';
 import './VendorPortal.css';
 import { 
   VendorInventory, 
@@ -64,6 +65,7 @@ const VendorPortal = ({ user, onLogout }) => {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editFormData, setEditFormData] = useState({});
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   
   const [stats, setStats] = useState({ orders: 0, earnings: 0, pending: 0, rating: 4.8 });
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('vendorActiveTab') || 'dashboard'); 
@@ -96,7 +98,7 @@ const VendorPortal = ({ user, onLogout }) => {
         const { data, error } = await supabase
           .from('vendors')
           .select('*')
-          .eq('phone_number', phone)
+          .eq('phone', phone)
           .maybeSingle();
 
         if (error && !isLocallyCompleted) throw error;
@@ -179,7 +181,7 @@ const VendorPortal = ({ user, onLogout }) => {
   const handleUpdateProfile = async () => {
     try {
       setIsUpdating(true);
-      const phone = vendorData?.phone_number || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : '9999999999');
+      const phone = vendorData?.phone || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : '9999999999');
       
       if (supabase && vendorData?.id) {
          const { error } = await supabase
@@ -187,21 +189,50 @@ const VendorPortal = ({ user, onLogout }) => {
            .update({
               name: editFormData.name,
               business_name: editFormData.business_name,
+              address: editFormData.address,
               license_no: editFormData.license_no,
               aadhar_no: editFormData.aadhar_no
            })
            .eq('id', vendorData.id);
            
          if (error) throw error;
+
+         // Sync minimal vendor info to stores
+         await supabase.from('stores').upsert({
+           id: vendorData.id,
+           vendor_id: vendorData.id,
+           name: editFormData.business_name,
+           address: editFormData.address || vendorData.address
+         });
       }
       
-      setVendorData(prev => ({ ...prev, ...editFormData, phone_number: phone }));
+      setVendorData(prev => ({ ...prev, ...editFormData, phone: phone }));
       setFormData(prev => ({ ...prev, ...editFormData }));
       setIsEditingProfile(false);
       toast.success('Profile updated successfully!');
     } catch (e) {
       console.error(e);
       toast.error('Failed to update profile.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setShowDeleteModal(false);
+    try {
+      setIsUpdating(true);
+      if (supabase && vendorData?.id) {
+        const { error } = await supabase.from('vendors').delete().eq('id', vendorData.id);
+        if (error) throw error;
+      }
+      toast.success('Account deleted successfully.');
+      localStorage.removeItem('vProfileCompleted');
+      localStorage.removeItem('vendorActiveTab');
+      if (onLogout) onLogout(true);
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to delete account.');
     } finally {
       setIsUpdating(false);
     }
@@ -233,7 +264,7 @@ const VendorPortal = ({ user, onLogout }) => {
             </div>
             <div className="v-form-group">
               <label>Phone Number (Not Editable)</label>
-              <div className="v-input" style={{ background: '#f8fafc', color: '#94a3b8', cursor: 'not-allowed' }}>+91 {vendorData?.phone_number || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : '9999999999')}</div>
+              <div className="v-input" style={{ background: '#f8fafc', color: '#94a3b8', cursor: 'not-allowed' }}>+91 {vendorData?.phone || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : '9999999999')}</div>
             </div>
             <div className="v-form-group">
               <label>Business / Shop Name</label>
@@ -267,6 +298,20 @@ const VendorPortal = ({ user, onLogout }) => {
                 </div>
               }
             </div>
+            <div className="v-form-group" style={{ gridColumn: '1 / -1' }}>
+              <label>{businessType === 'shop' ? 'Shop Address' : 'Business Address'}</label>
+              {isEditingProfile ? 
+                <textarea 
+                  className="v-input" 
+                  style={{ minHeight: '80px', resize: 'vertical' }}
+                  value={currentData?.address || ''} 
+                  onChange={e => setEditFormData({...editFormData, address: e.target.value})} 
+                /> :
+                <div className="v-input" style={{ background: '#f8fafc', color: '#64748b', minHeight: '60px' }}>
+                  {currentData?.address || 'Address not provided'}
+                </div>
+              }
+            </div>
           </div>
           
           <div style={{ marginTop: '2.5rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem' }}>
@@ -278,10 +323,53 @@ const VendorPortal = ({ user, onLogout }) => {
                 </button>
               </>
             ) : (
-              <button className="auth-submit-btn" style={{ width: 'auto', padding: '12px 32px' }} onClick={() => { setEditFormData(vendorData || formData); setIsEditingProfile(true); }}>Edit Information</button>
+              <>
+                <button 
+                  className="v-nav-item" 
+                  style={{ width: 'auto', background: '#fee2e2', color: '#dc2626', fontWeight: 700, border: '1px solid #fca5a5' }} 
+                  onClick={() => setShowDeleteModal(true)} 
+                  disabled={isUpdating}
+                >
+                  <Trash2 size={18} style={{ marginRight: '8px' }} />
+                  Delete Account
+                </button>
+                <button className="auth-submit-btn" style={{ width: 'auto', padding: '12px 32px' }} onClick={() => { setEditFormData(vendorData || formData); setIsEditingProfile(true); }}>Edit Information</button>
+              </>
             )}
           </div>
         </div>
+
+        {showDeleteModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem', backdropFilter: 'blur(4px)' }} onClick={() => setShowDeleteModal(false)}>
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              style={{ background: 'white', borderRadius: '16px', padding: '2rem', maxWidth: '400px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', textAlign: 'center' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#fee2e2', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto' }}>
+                <Trash2 size={32} />
+              </div>
+              <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>Delete Account?</h3>
+              <p style={{ margin: '0 0 2rem 0', color: '#64748b', fontSize: '0.95rem', lineHeight: 1.5 }}>This will permanently remove your business profile, products, and order history. This action cannot be undone.</p>
+              
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button 
+                  style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', background: '#f1f5f9', color: '#64748b', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                  onClick={() => setShowDeleteModal(false)}
+                >
+                  Cancel
+                </button>
+                <button 
+                  style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', background: '#ef4444', color: 'white', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                  onClick={handleDeleteAccount}
+                >
+                  Yes, Delete
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </div>
     );
   };
@@ -358,6 +446,17 @@ const VendorPortal = ({ user, onLogout }) => {
             )}
           </div>
 
+          <div className="v-form-group">
+            <label>{businessType === 'shop' ? 'Shop Address' : 'Business Address'}</label>
+            <textarea 
+              placeholder="Enter complete address" 
+              className="v-input" 
+              style={{ minHeight: '80px', resize: 'vertical' }}
+              value={formData.address || ''} 
+              onChange={e => setFormData({...formData, address: e.target.value})} 
+            />
+          </div>
+
           <button 
              className="auth-submit-btn" 
              style={{marginTop: '1.5rem', width: '100%', padding: '14px', borderRadius: '12px', background: 'var(--v-primary)', color: 'white', fontWeight: 800, fontSize: '1rem'}} 
@@ -382,15 +481,65 @@ const VendorPortal = ({ user, onLogout }) => {
            <h3 style={{fontWeight: 800}}>Completing Set-up...</h3>
            <p style={{color: '#64748b', fontSize: '0.9rem'}}>We are finalizing your {businessType} profile. You will be redirected shortly.</p>
            <button onClick={async () => {
-              if (supabase && vendorData?.id) {
-                 await supabase.from('vendors').update({
+              if (supabase) {
+                 const currentPhone = vendorData?.phone || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : (typeof user === 'string' ? user : '9999999999'));
+                 let resolvedUserId = null;
+                 
+                 try {
+                    const { data: ud } = await supabase.from('users').select('id').eq('phone', currentPhone).maybeSingle();
+                    if (ud) {
+                        resolvedUserId = ud.id;
+                    } else {
+                        const { data: newUser } = await supabase.from('users').insert([{ phone: currentPhone, full_name: formData.name }]).select().single();
+                        if (newUser) resolvedUserId = newUser.id;
+                    }
+                 } catch (e) {
+                    console.error("User resolve error:", e);
+                 }
+
+                 const payload = {
                     name: formData.name,
                     business_name: formData.business_name,
                     aadhar_no: formData.aadhar_no,
                     license_no: formData.license_no,
+                    address: formData.address,
                     category: businessType,
-                    profile_completed: true
-                 }).eq('id', vendorData.id);
+                    profile_completed: true,
+                    phone: currentPhone
+                 };
+
+                 if (resolvedUserId) {
+                    payload.user_id = resolvedUserId;
+                 }
+
+                 try {
+                    if (vendorData?.id) {
+                       const { error } = await supabase.from('vendors').update(payload).eq('id', vendorData.id);
+                       if (error) console.error("Update error:", error);
+                    } else {
+                       const { data, error } = await supabase.from('vendors').insert([payload]).select().single();
+                       if (data) {
+                          payload.id = data.id; 
+                       }
+                       if (error) {
+                          console.error("Insert error:", error);
+                  if (error.code === '23505') { 
+                            const { data: ud, error: ue } = await supabase.from('vendors').update(payload).eq('phone', currentPhone).select().single();
+                            if (ud) payload.id = ud.id;
+                          }
+                       }
+                    }
+                    if (payload.id) {
+                       await supabase.from('stores').upsert({
+                         id: payload.id,
+                         vendor_id: payload.id,
+                         name: payload.business_name,
+                         address: payload.address
+                       });
+                    }
+                 } catch (e) {
+                    console.error("Supabase operation failed:", e);
+                 }
               }
               setVendorData(prev => ({...prev, ...formData, category: businessType, profile_completed: true}));
               

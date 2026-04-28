@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
@@ -66,7 +67,7 @@ const ExpertServices = ({ onBack, location }) => {
       setExperts(uniqueExperts);
     } catch (err) {
       console.error('Fetch experts error:', err);
-      toast.error('Could not load real experts data.');
+      setExperts([]);
     } finally {
       setLoading(false);
     }

@@ -396,9 +396,191 @@
   transform: scale(1.05);
 }
 
+.delete-account-btn {
+  width: 100%;
+  margin-top: 1rem;
+  padding: 1rem;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.delete-account-btn:hover {
+  opacity: 1;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.dark-mode .delete-account-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
 @media (max-width: 450px) {
   .lang-pill-item {
     padding: 0.8rem 1.25rem;
     font-size: 0.85rem;
   }
+}
+
+/* --- CUSTOM MODAL STYLES --- */
+.custom-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  z-index: 9999;
+}
+
+.custom-confirm-modal {
+  width: 100%;
+  max-width: 320px;
+  background: var(--bg-card);
+  border-radius: 32px;
+  padding: 2.5rem 1.5rem 1.5rem;
+  text-align: center;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  position: relative;
+}
+
+.modal-icon-header {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.5rem;
+}
+
+.delete-bg {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+.custom-confirm-modal h3 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+}
+
+.custom-confirm-modal p {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 2rem;
+}
+
+.modal-actions-row {
+  display: flex;
+  gap: 12px;
+}
+
+.modal-btn {
+  flex: 1;
+  padding: 1rem;
+  border-radius: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.modal-btn.secondary {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.modal-btn.delete {
+  background: #ef4444;
+  color: white;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.modal-btn:active {
+  transform: scale(0.95);
+}
+/* Profile Name Editor Styles */
+.name-display-container-webapp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.name-display-container-webapp:hover {
+  opacity: 0.8;
+}
+
+.edit-name-icon-btn-webapp {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.edit-name-container-webapp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 5px;
+}
+
+.edit-name-input-webapp {
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid #ff7a00;
+  color: white;
+  padding: 8px 15px;
+  border-radius: 12px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  width: 200px;
+  outline: none;
+}
+
+.save-name-btn-webapp {
+  background: linear-gradient(135deg, #ff7a00, #ff4d00);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cancel-name-btn-webapp {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
 }

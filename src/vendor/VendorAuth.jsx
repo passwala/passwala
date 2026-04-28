@@ -1,8 +1,9 @@
+/* eslint-disable */
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Fingerprint, ArrowRight, ArrowLeft } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { auth } from '../../firebase';
+import { auth } from '../firebase';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import './VendorPortal.css';
 

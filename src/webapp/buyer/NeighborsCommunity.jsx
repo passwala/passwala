@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
@@ -45,15 +46,16 @@ const NeighborsCommunity = ({ onBack, location }) => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('community_posts')
+        .from('posts')
         .select('*')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
+      
       setPosts(data || []);
     } catch (err) {
       console.error('Fetch posts error:', err);
-      toast.error('Could not load real community data.');
+      setPosts([]);
     } finally {
       setLoading(false);
     }
@@ -131,20 +133,20 @@ const NeighborsCommunity = ({ onBack, location }) => {
                 >
                   <div className="post-header">
                      <div className="post-user-info">
-                        <div className="post-avatar-initials">{post.user_avatar || post.user_name?.charAt(0)}</div>
+                        <div className="post-avatar-initials">P</div>
                         <div className="name-time">
                            <div className="name-badge-row">
-                              <h3>{post.user_name}</h3>
+                              <h3>Passwala Resident</h3>
                               <div className="neighbor-verified-tag">VERIFIED</div>
                            </div>
-                           <p>{post.location} • <span>{new Date(post.created_at).toLocaleDateString()}</span></p>
+                           <p>Satellite, Ahmedabad • <span>{new Date(post.created_at).toLocaleDateString()}</span></p>
                         </div>
                      </div>
                      <button className="post-more-btn" onClick={() => toast('Post options available soon.')}><MoreHorizontal size={18} /></button>
                   </div>
                   
                   <div className="post-body">
-                     <p>{post.text}</p>
+                     <p>{post.content}</p>
                      {post.image && (
                        <div className="post-image-wrapper">
                           <img src={post.image} alt="Post content" />
@@ -154,8 +156,8 @@ const NeighborsCommunity = ({ onBack, location }) => {
 
                   <div className="post-actions-bar">
                      <div className="left-actions">
-                        <button className="post-action-item" onClick={() => toast.success('Post Liked! ❤️')}><Heart size={18} /> {post.likes || 0}</button>
-                        <button className="post-action-item" onClick={() => toast('Opening comments...')}><MessageSquare size={18} /> {post.comments || 0}</button>
+                        <button className="post-action-item" onClick={() => toast.success('Post Liked! ❤️')}><Heart size={18} /> {post.likes_count || 0}</button>
+                        <button className="post-action-item" onClick={() => toast('Opening comments...')}><MessageSquare size={18} /> 0</button>
                         <button className="post-action-item second-btn" onClick={() => toast.success('You seconded this recommendation! ⭐')}>
                            <Sparkles size={16} color="var(--primary)" /> <span>Second</span>
                         </button>

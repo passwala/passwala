@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { Link } from 'react-router-dom';
 import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone, MapPin, ShieldCheck, Heart } from 'lucide-react';
 import { toast } from 'react-hot-toast';

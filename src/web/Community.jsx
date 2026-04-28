@@ -11,7 +11,7 @@ const Community = () => {
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        const { data, error } = await supabase.from('community_posts').select('*').order('created_at', { ascending: false });
+        const { data, error } = await supabase.from('posts').select('*').order('created_at', { ascending: false });
         if (error) {
            console.warn("Table not found, using fallback data.");
            setPosts([

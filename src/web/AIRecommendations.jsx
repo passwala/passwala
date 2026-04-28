@@ -14,7 +14,7 @@ const AIRecommendations = () => {
   useEffect(() => {
     const fetchRecs = async () => {
       try {
-        const { data, error } = await supabase.from('recommendations').select('*').order('created_at', { ascending: false });
+        const { data, error } = await supabase.from('ai_recommendations').select('*').order('created_at', { ascending: false });
         if (error) throw error;
         // Filter unique names
         const uniqueData = data.reduce((acc, current) => {

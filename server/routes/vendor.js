@@ -7,7 +7,7 @@ const router = express.Router();
 router.get('/apps', async (req, res) => {
   try {
     const { data, error } = await supabase
-      .from('vendor_applications')
+      .from('vendors')
       .select('*')
       .order('created_at', { ascending: false });
     if (error) throw error;
@@ -24,24 +24,23 @@ router.post('/approve/:id', async (req, res) => {
 
   try {
     const isShop = appData.category === 'shop';
-    const targetTable = isShop ? 'essentials' : 'services';
+    const targetTable = isShop ? 'products' : 'services';
 
     // 1. Insert into target table
     const { error: insertError } = await supabase
       .from(targetTable)
       .insert([{
-        name: appData.business_name,
-        [isShop ? 'store' : 'provider']: appData.business_name,
-        category: isShop ? 'grocery' : 'home',
+        title: appData.business_name,
         price: appData.plan === 'Pro' ? 1999 : appData.plan === 'Growth' ? 999 : 499,
-        ...(isShop ? { delivery_time: '20 min' } : { rating: 5.0, image: '/default_service.png' })
+        category: isShop ? 'grocery' : 'home',
+        ...(isShop ? {} : { rating: 5.0, image: '/default_service.png' })
       }]);
     
     if (insertError) throw insertError;
 
     // 2. Update status to approved
     const { error: updateError } = await supabase
-      .from('vendor_applications')
+      .from('vendors')
       .update({ status: 'approved' })
       .eq('id', id);
 
