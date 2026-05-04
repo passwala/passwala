@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import userRoutes from './routes/users.js';
 import vendorRoutes from './routes/vendor.js';
+import adminRoutes from './routes/admin.js';
 
 dotenv.config();
 
@@ -35,6 +36,7 @@ import ridersRoutes from './routes/riders.js';
 app.use('/api/users', userRoutes);
 app.use('/api/vendor', vendorRoutes);
 app.use('/api/riders', ridersRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 404 Handler
 app.use((req, res) => {

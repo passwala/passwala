@@ -271,14 +271,23 @@ const AdminPanel = ({ onLogout }) => {
         .delete()
         .eq(pkName, deleteConfirmId);
 
-      if (error) throw error;
-      setData(data.filter(item => item.id !== deleteConfirmId));
+      if (error && !error.message.includes('invalid input syntax for type uuid')) {
+          throw error;
+      }
+      
+      // Remove from local storage to clean up any stuck items
+      const localKey = `admin_local_${currentTab.table}`;
+      const localAdded = JSON.parse(localStorage.getItem(localKey) || '[]');
+      const newLocal = localAdded.filter(item => item.id !== deleteConfirmId && item.uid !== deleteConfirmId);
+      localStorage.setItem(localKey, JSON.stringify(newLocal));
+
+      setData(data.filter(item => item.id !== deleteConfirmId && item.uid !== deleteConfirmId));
       toast.success('Removed successfully');
       setDeleteConfirmId(null);
       fetchStats();
     } catch (err) {
       console.error(err);
-      toast.error('Operation failed');
+      toast.error('Operation failed: ' + err.message);
       setDeleteConfirmId(null);
     }
   };
@@ -289,8 +298,10 @@ const AdminPanel = ({ onLogout }) => {
       setSaving(true);
       // 1. Prepare payload and Update Local State (Optimistic)
       const payload = { ...formData };
+      if (!editingItem && !payload.id) {
+          payload.id = crypto.randomUUID();
+      }
       if (currentTab.table === 'users' && !editingItem) {
-          payload.id = payload.id || crypto.randomUUID();
           if (!payload.role) payload.role = 'BUYER';
       }
 
@@ -300,7 +311,7 @@ const AdminPanel = ({ onLogout }) => {
       if (editingItem) {
         setData(data.map(item => item.id === editingItem.id ? { ...item, ...payload } : item));
       } else {
-        const newRecord = { ...payload, id: payload.id || Date.now().toString(), created_at: new Date().toISOString() };
+        const newRecord = { ...payload, created_at: new Date().toISOString() };
         setData([newRecord, ...data]);
         localStorage.setItem(localKey, JSON.stringify([newRecord, ...localAdded]));
       }
@@ -409,18 +420,25 @@ const AdminPanel = ({ onLogout }) => {
             <tbody>
               {filtered.map((item) => {
                 const pk = item.uid || item.id;
+                const schema = TABLE_SCHEMAS[currentTab.table];
+                const keys = data.length > 0 
+                  ? Object.keys(data[0]).filter(k => k !== 'id' && k !== 'created_at' && k !== 'uid' && k !== 'users')
+                  : (schema ? Object.keys(schema) : ['PHONE', 'FULL_NAME']);
+                  
                 return (
                   <tr key={pk}>
                     <td className="id-col">#{String(pk).slice(-4)}</td>
-                    {Object.entries(item).filter(([k]) => k !== 'id' && k !== 'uid' && k !== 'created_at').map(([k, v]) => (
+                    {keys.map(k => {
+                      const v = item[k];
+                      return (
                       <td key={k}>
                         {k === 'status' || k === 'role' ? (
                           <span className={`status-badge ${v}`}>{v}</span>
                         ) : typeof v === 'boolean' ? (v ? '✅' : '❌') : (
-                          <span className="truncate-cell">{v === null ? 'N/A' : String(v)}</span>
+                          <span className="truncate-cell">{v === null || v === undefined ? 'N/A' : String(v)}</span>
                         )}
                       </td>
-                    ))}
+                    )})}
                     <td className="actions-cell">
                       <button className="edit-btn" onClick={() => openModal(item)}><Edit2 size={16} /></button>
                       <button className="delete-btn" onClick={() => setDeleteConfirmId(pk)}><Trash2 size={16} /></button>

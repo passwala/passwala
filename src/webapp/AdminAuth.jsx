@@ -10,16 +10,26 @@ const AdminAuth = ({ onAdminLogin }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleAdminAuth = () => {
+  const handleAdminAuth = async () => {
     setLoading(true);
-    if (adminCode === 'PASSWALA99') {
-      setTimeout(() => {
+    try {
+      const res = await fetch('http://localhost:3004/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessCode: adminCode })
+      });
+      const data = await res.json();
+      
+      if (data.success) {
         toast.success('Admin Authorized!');
         onAdminLogin();
-        setLoading(false);
-      }, 800);
-    } else {
-      toast.error('Invalid Credentials');
+      } else {
+        toast.error(data.error || 'Invalid Credentials');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Connection failed');
+    } finally {
       setLoading(false);
     }
   };

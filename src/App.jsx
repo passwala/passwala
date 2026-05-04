@@ -81,10 +81,8 @@ const AppContent = ({ user, demoUser, setDemoUser }) => {
   const [isAdmin, setIsAdmin] = useState(() => {
     const isWebapp = window.location.port === '3001';
     const hasAdminSession = localStorage.getItem('admin_session') === 'true';
-    const forceAdmin = new URLSearchParams(window.location.search).get('mode') === 'admin';
-    
     // On port 3001, don't default to Admin unless explicitly in that session or mode
-    if (isWebapp && !forceAdmin && !sessionStorage.getItem('admin_active')) return false;
+    if (isWebapp && !sessionStorage.getItem('admin_active')) return false;
     return hasAdminSession;
   });
   const [isVendor, setIsVendor] = useState(false);

@@ -172,3 +172,64 @@
     text-align: center;
   }
 }
+
+/* Footer App Downloads */
+.footer-app-downloads {
+  display: flex;
+  gap: 10px;
+  margin-top: 2rem;
+}
+
+.footer-download-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  color: var(--text-primary);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  min-width: 140px;
+}
+
+.footer-download-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+  background: #f8fafc;
+}
+
+.footer-download-btn svg {
+  flex-shrink: 0;
+}
+
+.footer-download-btn .btn-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.footer-download-btn .small-text {
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+  line-height: 1;
+}
+
+.footer-download-btn .big-text {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+@media (max-width: 480px) {
+  .footer-app-downloads {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
