@@ -3,9 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 
 // Passwala Identity Signature
-console.log('--- PASSWALA IDENTITY VERIFIED ---');
-console.log('Build Context: Buyer Portal (Port 3001)');
-console.log('Timestamp:', new Date().toISOString());
+
 import { Phone, ArrowLeft, RefreshCw, User, ShieldCheck } from 'lucide-react';
 import {
   RecaptchaVerifier,
@@ -65,7 +63,7 @@ const Auth = ({ onLogin, onAdminLogin }) => {
       if (window.recaptchaVerifier) return;
       window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         'size': 'invisible',
-        'callback': () => console.log("Recaptcha verified")
+        'callback': () => {}
       });
     } catch (error) {
       console.error("Recaptcha Error:", error);

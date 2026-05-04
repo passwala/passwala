@@ -34,7 +34,6 @@ import HelpSupport from './webapp/profile_pages/HelpSupport'
 import AppSettings from './webapp/profile_pages/AppSettings'
 import Footer from './web/Footer'
 import { Toaster, toast } from 'react-hot-toast'
-import { LayoutGroup } from 'framer-motion'
 import './App.css'
 
 import { auth } from './firebase'
@@ -82,10 +81,6 @@ const AppContent = ({
   isWebappMode, isAdmin, setIsAdmin, location, userCoords, setLocation 
 }) => {
   const [loading, setLoading] = useState(true);
-  const [isVendor, setIsVendor] = useState(false);
-  const [showVendorModal, setShowVendorModal] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
   
   const navigate = useNavigate();
   const locationPath = useLocation().pathname;
@@ -146,7 +141,6 @@ const AppContent = ({
     locationPath === '/track-orders' ? 'TRACKING' :
     locationPath === '/profile' ? 'PROFILE' : 'DASHBOARD';
 
-  console.log('[PASSWALA-IDENTITY] Mode:', isWebappMode ? 'BUYER-PORTAL' : isVendorMode ? 'VENDOR-PORTAL' : isRiderMode ? 'RIDER-PORTAL' : 'WEB-PORTAL', '| User:', effectiveUser?.uid || 'Guest');
 
   // 🛡️ Final Security Check for Admin
   const isAuthorizedAdmin = isAdmin || (effectiveUser && effectiveUser.role === 'ADMIN');
@@ -187,8 +181,8 @@ const AppContent = ({
           {isWebMode ? (
             <Navbar 
               isAuthenticated={!!effectiveUser} user={effectiveUser} onLogout={handleLogout}
-              onOpenProfile={() => setShowProfile(true)} onOpenAI={() => navigate('/')}
-              onSwitchToVendor={() => setIsVendor(true)} onJoin={() => setShowAuthModal(true)}
+              onOpenProfile={() => navigate('/profile')} onOpenAI={() => navigate('/')}
+              onJoin={() => navigate('/auth')}
             />
           ) : (
             effectiveUser && (

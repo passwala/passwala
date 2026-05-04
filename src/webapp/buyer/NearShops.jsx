@@ -10,7 +10,6 @@ import {
   Filter, 
   Navigation,
   CheckCircle2,
-  X,
   Plus,
   Package
 } from 'lucide-react';
@@ -184,7 +183,7 @@ const NearShops = ({ onBack, location, userCoords }) => {
                   whileHover={{ scale: 1.2 }}
                   className="shop-marker"
                   style={{ left: shop.coords.x, top: shop.coords.y }}
-                  onClick={() => toast(`📍 ${shop.name} is ${shop.distance} away.`)}
+                  onClick={() => {}}
                 >
                   <div className="marker-label">{shop.name}</div>
                   <div className="marker-pin"><MapPin size={18} fill="currentColor" /></div>
