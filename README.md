@@ -29,8 +29,14 @@ npm install
 ### 4. Environment Configuration
 Create a `.env` file in the root directory and add your Supabase & Firebase credentials:
 ```env
+# Frontend Variables
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# Backend Variables (Required for Node.js server)
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+ADMIN_ACCESS_CODE=your_secure_admin_password
 ```
 
 ### 5. Database Setup (Supabase)
