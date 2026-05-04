@@ -14,30 +14,42 @@ router.post('/', async (req, res) => {
   try {
     // Build the data object dynamically
     const userData = {
+      uid: uid,
       full_name: displayName ?? null,
       email: email ?? null,
       photo_url: photoURL ?? null,
     };
 
-    // 1. Check if user already exists
+    // 1. Check if user already exists by multiple identifiers
     let existingUser = null;
-    if (phoneNumber) {
-      const { data } = await supabase.from('users').select('*').eq('phone', phoneNumber).maybeSingle();
+    
+    // Check by UID
+    if (uid) {
+      const { data } = await supabase.from('users').select('*').eq('uid', uid).maybeSingle();
       existingUser = data;
     }
+    
+    // Check by Email
     if (!existingUser && email) {
       const { data } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
       existingUser = data;
     }
+    
+    // Check by Provided Phone
+    if (!existingUser && phoneNumber) {
+      const { data } = await supabase.from('users').select('*').eq('phone', phoneNumber).maybeSingle();
+      existingUser = data;
+    }
 
+    // Check by Generated Phone (last resort for ghost accounts)
     if (!existingUser) {
-      if (phoneNumber) {
-        userData.phone = phoneNumber;
-      } else {
-        // Needs a unique phone <= 20 chars
-        // Using 'np_' + first 16 chars of uid or email
-        const base = uid || email || String(Date.now());
-        userData.phone = "np_" + base.substring(0, 16);
+      const base = uid || email || String(Date.now());
+      const generatedPhone = "np_" + base.substring(0, 16);
+      const { data } = await supabase.from('users').select('*').eq('phone', generatedPhone).maybeSingle();
+      existingUser = data;
+      
+      if (!existingUser) {
+         userData.phone = phoneNumber || generatedPhone;
       }
     } else if (phoneNumber) {
       userData.phone = phoneNumber;
@@ -77,6 +89,24 @@ router.post('/', async (req, res) => {
         error: `Database Error (v3): ${resultError.message} [Code: ${resultError.code}]`,
         details: resultError.details 
       });
+    }
+
+    // 4. Handle Address if provided
+    const { address } = req.body;
+    if (address && resultData) {
+        const addressPayload = {
+            user_id: resultData.id,
+            address_line_1: address.address_line_1,
+            address_line_2: address.address_line_2 || null,
+            city: address.city || 'Ahmedabad',
+            state: address.state || 'Gujarat',
+            pincode: address.pincode || '380001',
+            is_default: true
+        };
+        
+        // Save address but don't fail the whole request if it fails
+        const { error: addrError } = await supabase.from('addresses').insert([addressPayload]);
+        if (addrError) console.warn('Backend address save skip:', addrError.message);
     }
 
     res.status(200).json({ success: true, user: resultData });
@@ -125,33 +155,56 @@ router.get('/', async (req, res) => {
 
 // DELETE /api/users/:uid — Delete account
 router.delete('/:uid', async (req, res) => {
+  const identifier = decodeURIComponent(req.params.uid);
+  console.log(`🗑️ Attempting deletion for user: ${identifier}`);
+
   try {
-    const rawId = decodeURIComponent(req.params.uid);
-    const cleanId = rawId.replace(/\s/g, ''); // No spaces
-    const numericOnly = rawId.replace(/\D/g, ''); // Numbers only
-    
-    // Search strategy: try all variations
-    const { data: users, error: findError } = await supabase
+    // 1. Try finding by ID (UUID) first
+    let { data: user, error: findError } = await supabase
       .from('users')
       .select('id')
-      .or(`phone.eq.${cleanId},phone.eq.${numericOnly},phone.ilike.%${numericOnly},email.eq.${rawId}`);
+      .eq('id', identifier)
+      .maybeSingle();
 
-    if (findError || !users?.length) {
-      console.error('Delete search failed for:', rawId);
+    // 2. Fallback to UID if not found by ID
+    if (!user && !findError) {
+      const { data: byUid } = await supabase
+        .from('users')
+        .select('id')
+        .eq('uid', identifier)
+        .maybeSingle();
+      user = byUid;
+    }
+
+    // 3. Fallback to Email if still not found
+    if (!user && !findError && identifier.includes('@')) {
+      const { data: byEmail } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', identifier)
+        .maybeSingle();
+      user = byEmail;
+    }
+
+    if (!user) {
+      console.warn(`⚠️ User not found for deletion: ${identifier}`);
       return res.status(404).json({ error: 'User account not found' });
     }
 
+    // Perform actual deletion
     const { error: deleteError } = await supabase
       .from('users')
       .delete()
-      .eq('id', users[0].id);
-    
+      .eq('id', user.id);
+
     if (deleteError) throw deleteError;
 
-    res.status(200).json({ success: true, message: 'Account deleted' });
+    console.log(`✅ Successfully deleted user: ${user.id}`);
+    res.json({ message: 'User deleted successfully' });
+
   } catch (error) {
-    console.error('Error deleting account:', error);
-    res.status(500).json({ error: 'Failed to delete account' });
+    console.error('❌ Deletion System Failure:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -207,10 +260,15 @@ router.put('/:uid/name', async (req, res) => {
     // Normalize variations
     const numericOnly = identifier.replace(/\D/g, '');
 
+    let orFilters = [`phone.eq.${identifier}`, `email.eq.${identifier}`, `uid.eq.${identifier}`];
+    if (numericOnly) {
+       orFilters.push(`phone.eq.${numericOnly}`);
+    }
+
     const { data: user } = await supabase
       .from('users')
       .select('id')
-      .or(`phone.eq.${identifier},phone.eq.${numericOnly},email.eq.${identifier}`)
+      .or(orFilters.join(','))
       .maybeSingle();
 
     if (!user) return res.status(404).json({ error: 'User not found' });

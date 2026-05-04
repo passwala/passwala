@@ -3,7 +3,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  padding: 1rem;
   background: radial-gradient(circle at top right, #fdfcfb, #e2d1c322), #fff;
 }
 
@@ -11,14 +11,14 @@
   width: 100%;
   max-width: 650px;
   background: rgba(255, 255, 255, 0.9);
-  padding: 2.5rem;
+  padding: 1.5rem 2rem;
   border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .details-header {
   text-align: center;
-  margin-bottom: 2.5rem;
+  margin-bottom: 1.5rem;
 }
 
 .sparkle-title {
@@ -39,7 +39,7 @@
 }
 
 .icon-sparkle {
-  color: #f59e0b;
+  color: #ff6b01;
 }
 
 .details-header p {
@@ -50,7 +50,7 @@
 .details-form {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.25rem;
 }
 
 .section-title {
@@ -60,7 +60,7 @@
   font-size: 1.1rem;
   font-weight: 600;
   color: #334155;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1rem;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid #f1f5f9;
 }
@@ -104,8 +104,8 @@
 
 .input-with-icon:focus-within {
   background: #fff;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  border-color: #ff6b01;
+  box-shadow: 0 0 0 4px rgba(255, 107, 1, 0.1);
 }
 
 .input-with-icon svg {
@@ -154,7 +154,7 @@
   justify-content: center;
   gap: 0.75rem;
   padding: 1rem;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  background: linear-gradient(135deg, #ff6b01, #ff8c00);
   color: white;
   border: none;
   border-radius: 12px;
@@ -162,12 +162,12 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+  box-shadow: 0 4px 12px rgba(255, 107, 1, 0.2);
 }
 
 .save-btn-v5:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 6px 20px rgba(255, 107, 1, 0.3);
 }
 
 .save-btn-v5:active {

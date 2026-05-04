@@ -1,14 +1,56 @@
 /* eslint-disable no-unused-vars, no-empty */
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Plus, Sparkles, Sunrise, Users, ShoppingBasket } from 'lucide-react';
+import { ArrowRight, Plus, Sparkles, Sunrise, Users, ShoppingBasket, MapPin } from 'lucide-react';
 import { useTranslation } from '../LanguageContext';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../supabase';
 import './NeighborhoodHub.css';
 
-const NeighborhoodHub = ({ onNavigate }) => {
+const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
   const { t } = useTranslation();
+  const [hasAddress, setHasAddress] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const checkAddress = async () => {
+      if (!user) return;
+      try {
+        setLoading(true);
+        // 1. Try Firebase UID first (fallback/legacy)
+        let { data: addr } = await supabase
+          .from('addresses')
+          .select('id')
+          .eq('user_id', user.uid || user.id)
+          .maybeSingle();
+        
+        // 2. Try Database UUID lookup via Email if not found
+        if (!addr && user.email) {
+          const { data: dbUser } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', user.email)
+            .maybeSingle();
+          
+          if (dbUser) {
+            const { data: addr2 } = await supabase
+              .from('addresses')
+              .select('id')
+              .eq('user_id', dbUser.id)
+              .maybeSingle();
+            addr = addr2;
+          }
+        }
+
+        setHasAddress(isProfileComplete || !!addr);
+      } catch (err) {
+        console.error('Address Check Error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkAddress();
+  }, [user]);
   
   const cards = [
     {
@@ -76,6 +118,23 @@ const NeighborhoodHub = ({ onNavigate }) => {
       className="neighborhood-hub"
     >
       <div className="hub-container">
+        {!hasAddress && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="completion-banner glass"
+            onClick={() => onNavigate('/complete-profile')}
+          >
+            <div className="banner-icon-box">
+              <MapPin size={24} color="var(--primary)" />
+            </div>
+            <div className="banner-text-content">
+               <h4>Add Your Delivery Address</h4>
+               <p>Complete your profile to start ordering from local shops!</p>
+            </div>
+            <button className="complete-now-btn">Add Now</button>
+          </motion.div>
+        )}
         <div className="hub-cards-grid">
           {cards.map((card, i) => (
             <motion.div 

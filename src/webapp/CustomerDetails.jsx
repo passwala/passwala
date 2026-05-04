@@ -31,7 +31,7 @@ const CustomerDetails = ({ user, onComplete }) => {
       const { data: profile } = await supabase
         .from('users')
         .select('*')
-        .eq('id', userId)
+        .eq('uid', userId)
         .or(`phone.eq.${user.phoneNumber}`)
         .single();
         
@@ -97,39 +97,35 @@ const CustomerDetails = ({ user, onComplete }) => {
         .select()
         .single();
 
-      if (userError) throw userError;
-
-      // 2. Insert/Update Address
-      const { error: addrError } = await supabase
-        .from('addresses')
-        .upsert([{
-          user_id: updatedUser.id,
-          address_line_1: `${formData.houseNo}, ${formData.floor ? 'Floor ' + formData.floor + ', ' : ''}${formData.society}`,
-          address_line_2: formData.landmark,
-          city: formData.city,
-          state: 'Gujarat',
-          pincode: formData.pincode,
-          is_default: true
-        }], { onConflict: 'user_id, is_default' });
-
-      if (addrError) {
-         // fallback if unique constraint not set up for user_id, is_default
-         await supabase.from('addresses').insert([{
-            user_id: updatedUser.id,
-            address_line_1: `${formData.houseNo}, ${formData.society}`,
+      // Attempt Sync through Backend
+      const response = await fetch('http://localhost:3004/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: user.uid,
+          email: formData.email,
+          displayName: formData.fullName,
+          authProvider: 'google', // Typically for CustomerDetails it's Google
+          address: {
+            address_line_1: `${formData.houseNo}, ${formData.floor ? 'Floor ' + formData.floor + ', ' : ''}${formData.society}`,
             address_line_2: formData.landmark,
             city: formData.city,
-            pincode: formData.pincode,
-            is_default: true
-         }]);
+            pincode: formData.pincode
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Backend sync failed');
       }
 
       toast.success('Profile & Address saved! ✨');
       if (onComplete) onComplete();
     } catch (error) {
       console.error('Update profile error:', error);
-      toast.error('Failed to update profile. Saved locally.');
-      if (onComplete) onComplete();
+      const errorMsg = error.response?.data?.error || error.message || 'Failed to update profile. Please try again.';
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -170,20 +166,20 @@ const CustomerDetails = ({ user, onComplete }) => {
               </div>
               <div className="input-group-v2">
                 <label>Email Address</label>
-                <div className="input-with-icon">
+                <div className={`input-with-icon ${user?.email ? 'disabled' : ''}`}>
                   <Mail size={18} />
                   <input 
                     name="email" 
                     type="email"
                     value={formData.email} 
                     onChange={handleChange} 
-                    placeholder="ramesh@gmail.com"
+                    placeholder="Enter your email address"
+                    disabled={user?.email} // Disable if already have verified email from Google/Firebase
                   />
                 </div>
               </div>
             </div>
           </section>
-
           {/* Location Section */}
           <section className="form-section">
             <h3 className="section-title"><MapPin size={18} /> Delivery Address</h3>
@@ -196,7 +192,7 @@ const CustomerDetails = ({ user, onComplete }) => {
                     name="houseNo" 
                     value={formData.houseNo} 
                     onChange={handleChange} 
-                    placeholder="B-402"
+                    placeholder="Flat No (e.g. B-402)"
                     required
                   />
                 </div>
@@ -209,7 +205,7 @@ const CustomerDetails = ({ user, onComplete }) => {
                     name="floor" 
                     value={formData.floor} 
                     onChange={handleChange} 
-                    placeholder="4th"
+                    placeholder="Floor No (e.g. 4th)"
                   />
                 </div>
               </div>
@@ -223,7 +219,7 @@ const CustomerDetails = ({ user, onComplete }) => {
                   name="society" 
                   value={formData.society} 
                   onChange={handleChange} 
-                  placeholder="Shivam Residency, Satellite"
+                  placeholder="Society / Apartment / Area Name"
                   required
                 />
               </div>
@@ -263,7 +259,7 @@ const CustomerDetails = ({ user, onComplete }) => {
                     name="pincode" 
                     value={formData.pincode} 
                     onChange={handleChange} 
-                    placeholder="380015"
+                    placeholder="Pincode (e.g. 380015)"
                   />
                 </div>
               </div>

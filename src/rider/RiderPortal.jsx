@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LayoutDashboard, Wallet, UserCircle, IndianRupee, Bike } from 'lucide-react';
 import RiderDashboard from './RiderDashboard';
 import RiderEarnings from './RiderEarnings';
@@ -13,6 +13,25 @@ function RiderPortal({ user, onLogout }) {
   const [riderId, setRiderId] = useState(user?.rider_id || 'demo-rider-123');
   const [stats, setStats] = useState({ earnings: 0, deliveries: 0 });
   const [loading, setLoading] = useState(true);
+  const mainScrollRef = useRef(null);
+  const [riderLocation, setRiderLocation] = useState('Location Not Set');
+  const [isDetecting, setIsDetecting] = useState(false);
+
+  useEffect(() => {
+    const resetScroll = () => {
+      window.scrollTo(0, 0);
+      if (mainScrollRef.current) {
+        mainScrollRef.current.scrollTo(0, 0);
+      }
+      // Fallback for some mobile browsers
+      document.body.scrollTop = 0;
+      document.documentElement.scrollTop = 0;
+    };
+    
+    resetScroll();
+    const timer = setTimeout(resetScroll, 50);
+    return () => clearTimeout(timer);
+  }, [activeTab]);
 
   useEffect(() => {
     const initRider = async () => {
@@ -97,11 +116,11 @@ function RiderPortal({ user, onLogout }) {
   const renderContent = () => {
     const commonProps = { user, riderId, stats, setStats };
     switch (activeTab) {
-      case 'DASHBOARD': return <RiderDashboard {...commonProps} isOnline={isOnline} setIsOnline={setIsOnline} />;
+      case 'DASHBOARD': return <RiderDashboard {...commonProps} isOnline={isOnline} setIsOnline={setIsOnline} riderLocation={riderLocation} setRiderLocation={setRiderLocation} isDetecting={isDetecting} setIsDetecting={setIsDetecting} />;
       case 'EARNINGS': return <RiderEarnings {...commonProps} />;
       case 'WALLET': return <RiderWallet {...commonProps} />;
       case 'PROFILE': return <RiderProfile {...commonProps} onLogout={onLogout} />;
-      default: return <RiderDashboard {...commonProps} isOnline={isOnline} setIsOnline={setIsOnline} />;
+      default: return <RiderDashboard {...commonProps} isOnline={isOnline} setIsOnline={setIsOnline} riderLocation={riderLocation} setRiderLocation={setRiderLocation} isDetecting={isDetecting} setIsDetecting={setIsDetecting} />;
     }
   };
 
@@ -132,7 +151,7 @@ function RiderPortal({ user, onLogout }) {
       </header>
 
       {/* Main Content Area */}
-      <main className="rider-main-scroll">
+      <main ref={mainScrollRef} className="rider-main-scroll">
         {renderContent()}
       </main>
 

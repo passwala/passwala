@@ -78,6 +78,7 @@ const AdminPanel = ({ onLogout }) => {
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [isSaving, setSaving] = useState(false);
 
   const TABLE_SCHEMAS = {
     users: { phone: '', full_name: '', email: '', role: 'BUYER', photo_url: '' },
@@ -169,7 +170,8 @@ const AdminPanel = ({ onLogout }) => {
     ]
   };
 
-  const currentTab = tabSections.flatMap(s => s.items).find(t => t.id === activeTab) || tabSections[0].items[0];
+  const TABS = tabSections.flatMap(s => s.items);
+  const currentTab = TABS.find(t => t.id === activeTab) || TABS[0];
 
   const fetchStats = async () => {
     try {
@@ -195,57 +197,40 @@ const AdminPanel = ({ onLogout }) => {
   };
 
   const fetchData = async () => {
-    if (!currentTab || !currentTab.table) {
+    if (activeTab === 'dashboard') {
       setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
+      const currentTable = TABS.find(t => t.id === activeTab)?.table || activeTab;
       
-      // 1. Get Base Data (Supabase)
-      let baseData = [];
-      try {
-        const tablesWithUsers = ['riders', 'vendors', 'service_providers', 'service_bookings', 'posts', 'notifications'];
-        let query = supabase.from(currentTab.table);
-        
-        let dataResult = [];
-        if (tablesWithUsers.includes(currentTab.table)) {
-          const { data } = await query.select('*, users(*)');
-          dataResult = data || [];
-        } else {
-          const { data } = await query.select('*');
-          dataResult = data || [];
-        }
-        
-        baseData = dataResult.map(row => {
-            if (row.users && !Array.isArray(row.users)) {
-                const u = row.users;
-                const newRow = { ...row };
-                delete newRow.users;
-                newRow.full_name = u.full_name || 'N/A';
-                newRow.phone = u.phone || 'N/A';
-                return newRow;
-            }
-            return row;
-        });
-      } catch (err) {
-        console.warn('Sync Offline: Using local data fallback.');
-        baseData = MOCK_DATA[currentTab.table] || [];
-      }
+      // Attempt Cloud Fetch
+      const { data, error } = await supabase
+        .from(currentTable)
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      // 2. Merge with locally added records
-      const localKey = `admin_local_${currentTab.table}`;
-      const localAdded = JSON.parse(localStorage.getItem(localKey) || '[]');
-      
-      const combined = [...localAdded, ...baseData];
-      
-      // Remove duplicates by ID or Phone
-      const unique = Array.from(new Map(combined.map(item => [item.id || item.phone, item])).values());
-      setData(unique);
+      if (error) throw error;
+
+      // Update State & Cache
+      setData(data || []);
+      localStorage.setItem(`admin_cache_${currentTable}`, JSON.stringify(data || []));
+      setSyncStatus('cloud');
     } catch (err) {
       console.error('Fetch Error:', err);
-      setData(MOCK_DATA[currentTab.table] || []);
+      setSyncStatus('offline');
+      
+      // Fallback to cache
+      const currentTable = TABS.find(t => t.id === activeTab)?.table || activeTab;
+      const cached = localStorage.getItem(`admin_cache_${currentTable}`);
+      if (cached) {
+        setData(JSON.parse(cached));
+        toast('Showing local cache', { icon: '📦' });
+      } else {
+        setData(MOCK_DATA[currentTable] || []);
+      }
     } finally {
       setLoading(false);
     }
@@ -261,30 +246,51 @@ const AdminPanel = ({ onLogout }) => {
     }
   }, [activeTab]);
 
+  const API_URL = 'http://localhost:3004';
+
   const handleExecuteDelete = async () => {
     if (!deleteConfirmId) return;
     const pkName = 'id';
 
     try {
-      const { error } = await supabase
-        .from(currentTab.table)
-        .delete()
-        .eq(pkName, deleteConfirmId);
+      if (currentTab.table === 'users') {
+          // Use Backend API for users to ensure we use the Service Role Key
+          const res = await fetch(`${API_URL}/api/users/${deleteConfirmId}`, { method: 'DELETE' });
+          if (!res.ok) {
+              const data = await res.json();
+              throw new Error(data.error || 'Failed to delete user');
+          }
+      } else {
+          const { error } = await supabase
+            .from(currentTab.table)
+            .delete()
+            .eq(pkName, deleteConfirmId);
 
-      if (error && !error.message.includes('invalid input syntax for type uuid')) {
-          throw error;
+          if (error && !error.message.includes('invalid input syntax for type uuid')) {
+              throw error;
+          }
       }
       
       // Remove from local storage to clean up any stuck items
       const localKey = `admin_local_${currentTab.table}`;
       const localAdded = JSON.parse(localStorage.getItem(localKey) || '[]');
-      const newLocal = localAdded.filter(item => item.id !== deleteConfirmId && item.uid !== deleteConfirmId);
+      const newLocal = localAdded.filter(item => 
+        (item.id && item.id !== deleteConfirmId) && 
+        (item.uid && item.uid !== deleteConfirmId) &&
+        (item.phone && item.phone !== deleteConfirmId)
+      );
       localStorage.setItem(localKey, JSON.stringify(newLocal));
 
-      setData(data.filter(item => item.id !== deleteConfirmId && item.uid !== deleteConfirmId));
+      setData(prev => prev.filter(item => 
+        (item.id && item.id !== deleteConfirmId) && 
+        (item.uid && item.uid !== deleteConfirmId) &&
+        (item.phone && item.phone !== deleteConfirmId)
+      ));
+      
       toast.success('Removed successfully');
       setDeleteConfirmId(null);
       fetchStats();
+      fetchData(); // Trigger fresh fetch to be absolutely sure
     } catch (err) {
       console.error(err);
       toast.error('Operation failed: ' + err.message);
@@ -295,6 +301,10 @@ const AdminPanel = ({ onLogout }) => {
   const handleUpsert = async (e) => {
     e.preventDefault();
     try {
+      if (formData.phone && formData.phone.length !== 10) {
+          toast.error('Phone number must be exactly 10 digits');
+          return;
+      }
       setSaving(true);
       // 1. Prepare payload and Update Local State (Optimistic)
       const payload = { ...formData };
@@ -318,8 +328,18 @@ const AdminPanel = ({ onLogout }) => {
 
       // 2. Attempt Background Cloud Sync
       try {
-        const { error } = await supabase.from(currentTab.table).upsert([payload]);
-        if (error) throw error;
+        const response = await fetch(`${API_URL}/api/admin/upsert`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            table: currentTab.table, 
+            payload: payload 
+          })
+        });
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Server Error');
+
         toast.success('Synced with Cloud! ☁️');
       } catch (syncErr) {
         console.warn('Sync failed, record kept in Local Storage:', syncErr);
@@ -426,8 +446,8 @@ const AdminPanel = ({ onLogout }) => {
                   : (schema ? Object.keys(schema) : ['PHONE', 'FULL_NAME']);
                   
                 return (
-                  <tr key={pk}>
-                    <td className="id-col">#{String(pk).slice(-4)}</td>
+                  <tr key={item.id}>
+                    <td className="id-col">#{String(item.id).slice(-4)}</td>
                     {keys.map(k => {
                       const v = item[k];
                       return (
@@ -440,8 +460,10 @@ const AdminPanel = ({ onLogout }) => {
                       </td>
                     )})}
                     <td className="actions-cell">
-                      <button className="edit-btn" onClick={() => openModal(item)}><Edit2 size={16} /></button>
-                      <button className="delete-btn" onClick={() => setDeleteConfirmId(pk)}><Trash2 size={16} /></button>
+                      <div className="control-cell">
+                        <button className="edit-btn" onClick={() => openModal(item)}><Edit2 size={16} /></button>
+                        <button className="delete-btn" onClick={() => setDeleteConfirmId(item.id)}><Trash2 size={16} /></button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -695,7 +717,13 @@ const AdminPanel = ({ onLogout }) => {
                         <input 
                           type={typeof formData[key] === 'number' ? 'number' : 'text'}
                           value={formData[key] || ''}
-                          onChange={(e) => setFormData({...formData, [key]: e.target.value})}
+                          onChange={(e) => {
+                            let val = e.target.value;
+                            if (key === 'phone') {
+                                val = val.replace(/\D/g, '').slice(0, 10);
+                            }
+                            setFormData({...formData, [key]: val});
+                          }}
                         />
                       )}
                     </div>

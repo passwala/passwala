@@ -16,12 +16,10 @@ const mockIncomingOrder = {
   items: 4
 };
 
-function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats }) {
+function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats, riderLocation, setRiderLocation, isDetecting, setIsDetecting }) {
   const [activeOrder, setActiveOrder] = useState(null);
   const [incomingOrder, setIncomingOrder] = useState(null);
-  const [deliveryStep, setDeliveryStep] = useState(0); 
-  const [riderLocation, setRiderLocation] = useState('Location Not Set');
-  const [isDetecting, setIsDetecting] = useState(false);
+  const [deliveryStep, setDeliveryStep] = useState(0);
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
   useEffect(() => {

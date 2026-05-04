@@ -11,6 +11,80 @@
   gap: 3rem;
 }
 
+.completion-banner {
+  background: linear-gradient(135deg, rgba(255, 118, 34, 0.1) 0%, var(--bg-surface) 100%);
+  border: 2px dashed var(--primary);
+  border-radius: 20px;
+  padding: 1.5rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+}
+
+.completion-banner:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, rgba(255, 118, 34, 0.15) 0%, var(--bg-surface) 100%);
+  box-shadow: 0 15px 30px rgba(255, 118, 34, 0.1);
+}
+
+.banner-icon-box {
+  width: 50px;
+  height: 50px;
+  background: white;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+.banner-text-content {
+  flex: 1;
+}
+
+.banner-text-content h4 {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 0.2rem;
+}
+
+.banner-text-content p {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.complete-now-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.complete-now-btn:hover {
+  background: var(--primary-hover);
+  transform: scale(1.05);
+}
+
+@media (max-width: 768px) {
+  .completion-banner {
+    flex-direction: column;
+    text-align: center;
+    padding: 1.5rem;
+    gap: 1rem;
+  }
+  .complete-now-btn {
+    width: 100%;
+  }
+}
+
 .hub-cards-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

@@ -44,6 +44,21 @@ function RiderAuth({ onLogin }) {
       return;
     }
 
+    // Aadhar / PAN Validation
+    const isAadhar = /^\d{12}$/.test(profile.idProof);
+    const isPan = /^[A-Z]{5}\d{4}[A-Z]{1}$/.test(profile.idProof);
+    
+    if (profile.idProof.length === 10 && !isPan) {
+      toast.error('Invalid PAN format. Should be 5 letters, 4 numbers, 1 letter.');
+      return;
+    } else if (profile.idProof.length === 12 && !isAadhar) {
+      toast.error('Invalid Aadhar format. Must be exactly 12 digits.');
+      return;
+    } else if (profile.idProof.length !== 10 && profile.idProof.length !== 12) {
+      toast.error('ID Proof must be 12-digit Aadhar or 10-digit PAN');
+      return;
+    }
+
     setLoading(true);
     const toastId = toast.loading('Syncing Rider Profile...');
 
@@ -211,7 +226,7 @@ function RiderAuth({ onLogin }) {
 
                   <div className="rider-input-group">
                     <label className="rider-label">ID Proof (Aadhar/PAN)</label>
-                    <input type="text" className="rider-input" placeholder="Enter ID Proof No" maxLength={16} value={profile.idProof} onChange={e => setProfile({...profile, idProof: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')})} style={{ paddingLeft: '1rem', textTransform: 'uppercase' }} />
+                    <input type="text" className="rider-input" placeholder="Enter 12-digit Aadhar or 10-digit PAN" maxLength={12} value={profile.idProof} onChange={e => setProfile({...profile, idProof: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')})} style={{ paddingLeft: '1rem', textTransform: 'uppercase' }} />
                   </div>
                   
                   <div className="rider-input-group">

@@ -18,7 +18,9 @@
 }
 
 .rider-app {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh; /* for mobile browsers */
+  overflow: hidden;
   background-color: var(--rider-bg);
   color: var(--rider-text);
   font-family: 'Poppins', system-ui, -apple-system, sans-serif;
@@ -280,6 +282,7 @@
 .rider-main-scroll {
   flex: 1;
   overflow-y: auto;
+  padding-top: 0 !important;
   padding-bottom: 6rem; /* space for bottom nav */
 }
 

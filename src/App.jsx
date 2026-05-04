@@ -39,6 +39,7 @@ import './App.css'
 
 import { auth } from './firebase'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
+import { supabase } from './supabase'
 import AIAssistant from './webapp/AIAssistant'
 import CustomerDetails from './webapp/CustomerDetails'
 import { CartProvider } from './context/CartContext'
@@ -76,15 +77,11 @@ const RoleGuard = ({ children, allowedRoles, user, loading }) => {
   return children;
 };
 
-const AppContent = ({ user, demoUser, setDemoUser }) => {
+const AppContent = ({ 
+  effectiveUser, isProfileComplete, setIsProfileComplete, updateDemoUser, 
+  isWebappMode, isAdmin, setIsAdmin, location, userCoords, setLocation 
+}) => {
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(() => {
-    const isWebapp = window.location.port === '3001';
-    const hasAdminSession = localStorage.getItem('admin_session') === 'true';
-    // On port 3001, don't default to Admin unless explicitly in that session or mode
-    if (isWebapp && !sessionStorage.getItem('admin_active')) return false;
-    return hasAdminSession;
-  });
   const [isVendor, setIsVendor] = useState(false);
   const [showVendorModal, setShowVendorModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -93,15 +90,8 @@ const AppContent = ({ user, demoUser, setDemoUser }) => {
   const navigate = useNavigate();
   const locationPath = useLocation().pathname;
   const isWebMode = window.location.port === '3000';
-  const isWebappMode = window.location.port === '3001';
   const isVendorMode = window.location.port === '3002';
   const isRiderMode = window.location.port === '3003';
-
-  const updateDemoUser = (val) => {
-    setDemoUser(val);
-  };
-
-  const effectiveUser = user || demoUser;
 
   // Admin Persistence
   useEffect(() => {
@@ -114,25 +104,6 @@ const AppContent = ({ user, demoUser, setDemoUser }) => {
     const saved = localStorage.getItem('theme');
     return saved === 'dark' || (saved === null && window.matchMedia('(prefers-color-scheme: dark)').matches);
   });
-  const [location, setLocation] = useState('Ahmedabad, Gujarat'); 
-
-  useEffect(() => {
-    // Silently fetch IP-based location to avoid native prompt on load
-    const fetchIPLocation = async () => {
-      try {
-        const res = await fetch('https://ipapi.co/json/');
-        if (!res.ok) throw new Error('IP Fetch failed');
-        const data = await res.json();
-        if (data && data.city && data.region) {
-          setLocation(`${data.city}, ${data.region}`);
-        }
-      } catch (e) {
-        // Silently fallback to default, user can manually trigger GPS if needed
-        console.warn('Silent location fetch failed.');
-      }
-    };
-    fetchIPLocation();
-  }, []);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -151,20 +122,12 @@ const AppContent = ({ user, demoUser, setDemoUser }) => {
 
   const handleLogout = async (skipToast = false) => {
     try {
-      setDemoUser(null);
-      // 1. Attempt Firebase Signout but don't let it block local reset
+      updateDemoUser(null);
       if (auth.currentUser) {
         await auth.signOut().catch(e => console.warn('Firebase Signout Skip:', e));
       }
-      
-      // 2. CLEAR ALL LOCAL STATE (CRITICAL)
-      // setUser(null); // Managed in App.jsx but effective here
-      updateDemoUser(null); 
-      localStorage.clear(); // Comprehensive reset for safety
-      
+      localStorage.clear();
       if (!skipToast) toast.success('Signed Out.');
-      
-      // 3. HARD REDIRECT
       if (window.location.host.includes('3002')) {
         window.location.href = '/'; 
       } else {
@@ -172,7 +135,6 @@ const AppContent = ({ user, demoUser, setDemoUser }) => {
       }
     } catch (error) {
       console.error('Logout error:', error);
-      // Even if everything fails, we must give control back to vendor entry
       window.location.href = '/';
     }
   };
@@ -254,12 +216,12 @@ const AppContent = ({ user, demoUser, setDemoUser }) => {
                  <>
                    {/* Webapp Logic (Auth or Hub) */}
                    {isWebappMode ? (
-                     (!effectiveUser || !effectiveUser.displayName) ? <Auth onLogin={(mockData) => { if (mockData) updateDemoUser(mockData); navigate('/'); }} /> : <NeighborhoodHub onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')} />
+                     (!effectiveUser || !effectiveUser.displayName || !isProfileComplete) ? <Auth onLogin={(mockData) => { if (mockData) updateDemoUser(mockData); setIsProfileComplete(true); navigate('/'); }} /> : <NeighborhoodHub user={effectiveUser} isProfileComplete={isProfileComplete} onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : v === '/complete-profile' ? '/complete-profile' : '/')} />
                    ) : (
                      /* Marketing Logic (Hub on top if logged in, then standard homepage) */
                      <>
                         {effectiveUser && (
-                          <NeighborhoodHub onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')} />
+                          <NeighborhoodHub user={effectiveUser} isProfileComplete={isProfileComplete} onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')} />
                         )}
                         <Hero />
                         <AIRecommendations />
@@ -276,7 +238,7 @@ const AppContent = ({ user, demoUser, setDemoUser }) => {
 
               {/* Common Application Routes */}
               <Route path="/admin" element={!isAdmin ? <AdminAuth onAdminLogin={() => setIsAdmin(true)} /> : <Navigate to="/" />} />
-              <Route path="/near-shops" element={effectiveUser ? <NearShops onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
+              <Route path="/near-shops" element={effectiveUser ? <NearShops onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/" />} />
               <Route path="/expert-services" element={effectiveUser ? <ExpertServices onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
               <Route path="/neighbors" element={effectiveUser ? <NeighborsCommunity onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
               <Route path="/track-orders" element={effectiveUser ? <TrackOrders onBack={() => navigate('/')} /> : <Navigate to="/" />} />
@@ -287,7 +249,7 @@ const AppContent = ({ user, demoUser, setDemoUser }) => {
               <Route path="/help-support" element={effectiveUser ? <HelpSupport /> : <Navigate to="/" />} />
               <Route path="/settings" element={effectiveUser ? <AppSettings isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/" />} />
               <Route path="/select-location" element={effectiveUser ? <LocationSelector currentLocation={location} onLocationChange={setLocation} /> : <Navigate to="/" />} />
-              <Route path="/complete-profile" element={effectiveUser ? <CustomerDetails user={effectiveUser} onComplete={() => navigate('/')} /> : <Navigate to="/" />} />
+              <Route path="/complete-profile" element={effectiveUser ? <CustomerDetails user={effectiveUser} onComplete={() => { setIsProfileComplete(true); navigate('/'); }} /> : <Navigate to="/" />} />
             </Routes>
           </main>
 
@@ -331,7 +293,17 @@ function App() {
     return saved ? JSON.parse(saved) : null;
   });
   const [authLoading, setAuthLoading] = useState(true);
+  const [isProfileComplete, setIsProfileComplete] = useState(true);
   const [minSplashDone, setMinSplashDone] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(() => {
+    const isWebapp = window.location.port === '3001';
+    const hasAdminSession = localStorage.getItem('admin_session') === 'true';
+    if (isWebapp && !sessionStorage.getItem('admin_active')) return false;
+    return hasAdminSession;
+  });
+  const [location, setLocation] = useState('Ahmedabad, Gujarat');
+  const [userCoords, setUserCoords] = useState({ lat: 23.0225, lng: 72.5714 });
+  const isWebappMode = window.location.port === '3001';
 
   // Sync demo session to local storage
   useEffect(() => {
@@ -343,36 +315,101 @@ function App() {
   }, [demoUser]);
 
   useEffect(() => {
-    // 1. Smart Splash Logic (Skip long delay on refresh)
-    const alreadyShown = sessionStorage.getItem('v_initial_splash_done');
-    const delay = alreadyShown ? 500 : 2000; // 0.5s on refresh, 2s on first visit
+    const autoDetectLocation = async () => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            try {
+              const { latitude, longitude } = position.coords;
+              setUserCoords({ lat: latitude, lng: longitude });
+              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`);
+              const data = await res.json();
+              if (data.address) {
+                const city = data.address.city || data.address.town || data.address.village || data.address.state_district;
+                const state = data.address.state;
+                if (city && state) {
+                  setLocation(`${city}, ${state}`);
+                  return;
+                }
+              }
+            } catch (err) {
+              console.warn('GPS Reverse Geocode failed, falling back to IP');
+              fetchIPLocation();
+            }
+          },
+          () => {
+            console.warn('GPS Access denied, falling back to IP');
+            fetchIPLocation();
+          }
+        );
+      } else {
+        fetchIPLocation();
+      }
+    };
 
+    const fetchIPLocation = async () => {
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        const data = await res.json();
+        if (data && data.city && data.region) {
+          setLocation(`${data.city}, ${data.region}`);
+          if (data.latitude && data.longitude) {
+            setUserCoords({ lat: parseFloat(data.latitude), lng: parseFloat(data.longitude) });
+          }
+        } else {
+          throw new Error('ipapi failed');
+        }
+      } catch (e) {
+        try {
+          const res2 = await fetch('http://ip-api.com/json/');
+          const data2 = await res2.json();
+          if (data2 && data2.status === 'success') {
+            setLocation(`${data2.city}, ${data2.regionName}`);
+            setUserCoords({ lat: data2.lat, lng: data2.lon });
+          }
+        } catch (err2) {
+          console.warn('All IP Location fallbacks failed');
+        }
+      }
+    };
+
+    autoDetectLocation();
+  }, []);
+
+  useEffect(() => {
+    const alreadyShown = sessionStorage.getItem('v_initial_splash_done');
+    const delay = alreadyShown ? 500 : 2000;
     const splashTimer = setTimeout(() => {
       setMinSplashDone(true);
       sessionStorage.setItem('v_initial_splash_done', 'true');
     }, delay);
 
-    // 2. Firebase Auth listener
     const unsub = onAuthStateChanged(auth, async (u) => {
        if (u) {
          try {
-           const userData = {
-              uid: u.uid,
-              email: u.email,
-              displayName: u.displayName,
-              photoURL: u.photoURL,
-              phoneNumber: u.phoneNumber,
-              authProvider: u.providerData?.[0]?.providerId || 'google',
-              role: 'buyer'
-           };
-           await fetch('http://localhost:3004/api/users', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(userData)
-           });
+           const { data: addr } = await supabase
+             .from('addresses')
+             .select('id')
+             .eq('user_id', u.uid)
+             .maybeSingle();
+           
+           if (!addr) {
+              const { data: usr } = await supabase.from('users').select('id').eq('email', u.email).maybeSingle();
+              if (usr) {
+                const { data: addr2 } = await supabase.from('addresses').select('id').eq('user_id', usr.id).maybeSingle();
+                setIsProfileComplete(!!addr2);
+              } else {
+                setIsProfileComplete(false);
+              }
+           } else {
+             setIsProfileComplete(true);
+           }
          } catch (err) {
            console.error("Auto Sync Failed", err);
+           setIsProfileComplete(true);
          }
+       } else {
+         setIsProfileComplete(true);
        }
        setUser(u);
        setAuthLoading(false);
@@ -397,7 +434,18 @@ function App() {
                 <CartProvider user={user}>
                   <div className="app-container">
                     <Toaster position="bottom-center" toastOptions={{ duration: 3000 }} />
-                    <AppContent user={user} demoUser={demoUser} setDemoUser={setDemoUser} />
+                    <AppContent 
+                      effectiveUser={user || demoUser} 
+                      isProfileComplete={isProfileComplete}
+                      setIsProfileComplete={setIsProfileComplete}
+                      updateDemoUser={setDemoUser}
+                      isWebappMode={isWebappMode}
+                      isAdmin={isAdmin}
+                      setIsAdmin={setIsAdmin}
+                      location={location}
+                      userCoords={userCoords}
+                      setLocation={setLocation}
+                    />
                   </div>
                 </CartProvider>
               </LanguageProvider>

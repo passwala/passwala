@@ -197,38 +197,27 @@ const Auth = ({ onLogin, onAdminLogin }) => {
         await updateProfile(tempCred.user, { displayName: userName }).catch(e => console.warn('Profile update skip:', e));
       }
       
-      // Attempt DB Save
+      // Attempt DB Save (Through Secure Backend)
       try {
-        const { data: userFromDB, error: userError } = await supabase
-          .from('users')
-          .upsert([{
-            id: userData.uid.length === 36 ? userData.uid : undefined,
-            phone: userData.phoneNumber,
-            full_name: userData.displayName,
-            email: userData.email,
-            role: 'BUYER'
-          }], { onConflict: 'phone' })
-          .select()
-          .single();
+        const response = await fetch('http://localhost:3004/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...userData,
+            address: {
+              address_line_1: `${houseNo}, ${society}`,
+              address_line_2: landmark,
+              pincode: pincode
+            }
+          })
+        });
 
-        if (userError) throw userError;
+        if (!response.ok) throw new Error('Backend sync failed');
         
-        if (userFromDB) {
-          await supabase.from('addresses').insert([{
-            user_id: userFromDB.id,
-            address_line_1: `${houseNo}, ${society}`,
-            address_line_2: landmark,
-            city: 'Ahmedabad',
-            state: 'Gujarat',
-            pincode: pincode || '380001',
-            is_default: true
-          }]).catch(e => console.warn('Address save skip:', e));
-        }
         toast.success('Synced with Cloud! ☁️');
       } catch (dbErr) {
-        console.error('Offline Mode Active:', dbErr);
+        console.error('Cloud Sync Failed:', dbErr);
         toast('Database Offline. Profile saved locally! 🏠', { icon: '🏠', duration: 4000 });
-        // Save to fallback storage
         localStorage.setItem('local_user_profile', JSON.stringify(userData));
       }
 

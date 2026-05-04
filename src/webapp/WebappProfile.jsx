@@ -95,24 +95,26 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onVendorMode
       const base64String = reader.result;
       
       try {
-        // 2. Update Backend
         const id = user?.phoneNumber || user?.email || user?.uid;
-        await fetch(`http://localhost:3004/api/users/${encodeURIComponent(id)}/photo`, {
+        const res = await fetch(`http://localhost:3004/api/users/${encodeURIComponent(id)}/photo`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ photoURL: base64String })
         });
 
-        // 3. Update Firebase Profile (Optional but good for sync)
-        if (auth.currentUser) {
-          await updateProfile(auth.currentUser, { photoURL: base64String });
+        if (!res.ok) {
+           const data = await res.json().catch(() => ({}));
+           throw new Error(data.error || 'Failed to update photo on server');
         }
+
+        // Skip Firebase updateProfile since Firebase auth rejects large base64 strings for photoURL.
+        // Database update is sufficient.
 
         setLocalPhoto(base64String);
         toast.success('Profile Picture Updated!', { id: 'upload' });
       } catch (err) {
-        console.error(err);
-        toast.error('Upload failed.', { id: 'upload' });
+        console.error('Upload Error:', err);
+        toast.error(err.message || 'Upload failed.', { id: 'upload' });
       }
     };
 
