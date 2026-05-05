@@ -1,20 +1,20 @@
 /* RiderPortal.css - Passwala Orange & White Theme */
 
 :root {
-  --rider-primary: #ff7622;
-  --rider-primary-dark: #ea580c;
-  --rider-primary-light: #fff1eb;
-  --rider-bg: #f9fafb;
-  --rider-card: #ffffff;
-  --rider-text: #111827;
-  --rider-text-secondary: #6b7280;
-  --rider-border: #f3f4f6;
+  --rider-primary: var(--primary);
+  --rider-primary-dark: var(--primary-hover);
+  --rider-primary-light: var(--bg-cream);
+  --rider-bg: var(--bg-surface);
+  --rider-card: var(--bg-card);
+  --rider-text: var(--text-primary);
+  --rider-text-secondary: var(--text-secondary);
+  --rider-border: var(--hairline);
   --rider-success: #10b981;
   --rider-success-light: #ecfdf5;
   --rider-danger: #ef4444;
   --rider-danger-light: #fef2f2;
-  --rider-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --rider-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --rider-shadow: var(--shadow-md);
+  --rider-shadow-lg: var(--shadow-lg);
 }
 
 .rider-app {
@@ -23,7 +23,7 @@
   overflow: hidden;
   background-color: var(--rider-bg);
   color: var(--rider-text);
-  font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-main);
   display: flex;
   flex-direction: column;
 }
@@ -616,6 +616,11 @@
   text-align: left;
 }
 
+.rider-menu-btn:active {
+  background-color: var(--rider-primary-light);
+  opacity: 0.8;
+}
+
 .rider-menu-icon {
   width: 40px;
   height: 40px;
@@ -640,8 +645,8 @@
 .rider-switch {
   position: relative;
   display: inline-block;
-  width: 50px;
-  height: 28px;
+  width: 60px;
+  height: 32px;
 }
 
 .rider-switch input {
@@ -657,21 +662,22 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #ccc;
-  transition: .4s;
-  border-radius: 34px;
+  background-color: #cbd5e1;
+  transition: .4s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 32px;
 }
 
 .rider-slider:before {
   position: absolute;
   content: "";
-  height: 20px;
-  width: 20px;
+  height: 24px;
+  width: 24px;
   left: 4px;
   bottom: 4px;
   background-color: white;
-  transition: .4s;
+  transition: .4s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
 input:checked + .rider-slider {
@@ -679,5 +685,5 @@ input:checked + .rider-slider {
 }
 
 input:checked + .rider-slider:before {
-  transform: translateX(22px);
+  transform: translateX(28px);
 }

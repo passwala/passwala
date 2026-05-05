@@ -7,14 +7,13 @@ import RiderProfile from './RiderProfile';
 import './RiderPortal.css'; // Import custom styles
 import { supabase } from '../supabase';
 
-function RiderPortal({ user, onLogout }) {
+function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
   const [activeTab, setActiveTab] = useState('DASHBOARD');
   const [isOnline, setIsOnline] = useState(false);
   const [riderId, setRiderId] = useState(user?.rider_id || 'demo-rider-123');
   const [stats, setStats] = useState({ earnings: 0, deliveries: 0 });
   const [loading, setLoading] = useState(true);
   const mainScrollRef = useRef(null);
-  const [riderLocation, setRiderLocation] = useState('Location Not Set');
   const [isDetecting, setIsDetecting] = useState(false);
 
   useEffect(() => {
@@ -47,7 +46,7 @@ function RiderPortal({ user, onLogout }) {
         }
       }
 
-      if (rid) {
+      if (rid && rid !== 'demo-rider-123' && rid.length > 20) { // Simple UUID check
         try {
           // Fetch stats
           const { data: earningsData, error } = await supabase
@@ -71,6 +70,12 @@ function RiderPortal({ user, onLogout }) {
             deliveries: 28
           });
         }
+      } else {
+        // For demo or invalid IDs, use mock stats
+        setStats({
+          earnings: 1250,
+          deliveries: 28
+        });
       }
       setLoading(false);
     };
@@ -113,38 +118,107 @@ function RiderPortal({ user, onLogout }) {
     checkStatus();
   }, [user]);
 
+  const [sessionStartTime, setSessionStartTime] = useState(null);
+
+  // 🛰️ Real-time Location Tracking Sync
+  useEffect(() => {
+    let trackingInterval;
+    
+    const syncLocation = async () => {
+      // Only sync if online and we have a valid rider ID
+      if (isOnline && riderId && riderId !== 'demo-rider-123') {
+        if (!navigator.geolocation) return;
+
+        navigator.geolocation.getCurrentPosition(async (position) => {
+          const { latitude, longitude } = position.coords;
+          try {
+            // Upsert to rider_locations table
+            const { error } = await supabase
+              .from('rider_locations')
+              .upsert({
+                rider_id: riderId,
+                lat: latitude,
+                lng: longitude,
+                status: 'ONLINE',
+                updated_at: new Date().toISOString()
+              }, { onConflict: 'rider_id' }); // Ensure unique rider_id in table
+            
+            if (error) console.warn("Location sync failed:", error.message);
+          } catch (err) {
+            console.error("Critical location tracking error:", err);
+          }
+        }, (err) => console.warn("GPS tracking blocked"), { enableHighAccuracy: true });
+      }
+    };
+
+    if (isOnline) {
+      syncLocation();
+      trackingInterval = setInterval(syncLocation, 15000); // Sync every 15 seconds
+    } else if (riderId && riderId !== 'demo-rider-123') {
+       // Update status to OFFLINE when rider goes off
+       supabase.from('rider_locations').upsert({ 
+         rider_id: riderId, 
+         status: 'OFFLINE',
+         updated_at: new Date().toISOString()
+       }, { onConflict: 'rider_id' });
+    }
+
+    return () => {
+      if (trackingInterval) clearInterval(trackingInterval);
+    };
+  }, [isOnline, riderId]);
+
+  useEffect(() => {
+    if (isOnline && !sessionStartTime) {
+      setSessionStartTime(Date.now());
+    } else if (!isOnline) {
+      setSessionStartTime(null);
+    }
+  }, [isOnline]);
+
   const renderContent = () => {
-    const commonProps = { user, riderId, stats, setStats };
+    const commonProps = { user, riderId, stats, setStats, isOnline, sessionStartTime };
     switch (activeTab) {
-      case 'DASHBOARD': return <RiderDashboard {...commonProps} isOnline={isOnline} setIsOnline={setIsOnline} riderLocation={riderLocation} setRiderLocation={setRiderLocation} isDetecting={isDetecting} setIsDetecting={setIsDetecting} />;
+      case 'DASHBOARD': return <RiderDashboard {...commonProps} setIsOnline={setIsOnline} riderLocation={location} setRiderLocation={setLocation} isDetecting={isDetecting} setIsDetecting={setIsDetecting} userCoords={userCoords} />;
       case 'EARNINGS': return <RiderEarnings {...commonProps} />;
       case 'WALLET': return <RiderWallet {...commonProps} />;
       case 'PROFILE': return <RiderProfile {...commonProps} onLogout={onLogout} />;
-      default: return <RiderDashboard {...commonProps} isOnline={isOnline} setIsOnline={setIsOnline} riderLocation={riderLocation} setRiderLocation={setRiderLocation} isDetecting={isDetecting} setIsDetecting={setIsDetecting} />;
+      default: return <RiderDashboard {...commonProps} setIsOnline={setIsOnline} riderLocation={location} setRiderLocation={setLocation} isDetecting={isDetecting} setIsDetecting={setIsDetecting} />;
     }
   };
 
   return (
     <div className="rider-app">
       {/* Top Header */}
-      <header className="rider-header">
+      <header className="rider-header" style={{ borderBottom: 'none', background: 'transparent', padding: '1.25rem 1rem' }}>
         <div className="rider-header-profile">
-          <div className="rider-header-avatar" style={{background: 'transparent'}}>
-             <img src="/logo.png" alt="P" style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
+          <div className="rider-header-avatar" style={{ background: 'var(--rider-primary)', padding: '8px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(249, 115, 22, 0.2)' }}>
+             <img src="/logo.png" alt="P" style={{ width: '24px', height: '24px', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
           </div>
           <div>
-            <h1 style={{ fontSize: '1.125rem', fontWeight: 700, margin: 0, color: 'var(--rider-text)' }}>Passwala Rider</h1>
-            <p style={{ fontSize: '0.75rem', color: 'var(--rider-text-secondary)', margin: 0 }}>Hello, {user?.displayName || 'Partner'}</p>
+            <h1 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--rider-text)' }}>Passwala Rider</h1>
+            <p style={{ fontSize: '0.75rem', color: 'var(--rider-text-secondary)', margin: 0, fontWeight: 600 }}>Welcome back, {user?.displayName || 'Partner'}</p>
           </div>
         </div>
-        <div>
+        <div 
+          onClick={() => setIsOnline(!isOnline)} 
+          style={{ 
+            cursor: 'pointer',
+            padding: '0.4rem 0.8rem',
+            borderRadius: '10px',
+            background: isOnline ? 'rgba(16, 185, 129, 0.1)' : 'rgba(100, 116, 139, 0.1)',
+            border: isOnline ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(100, 116, 139, 0.2)',
+            transition: 'all 0.3s'
+          }}
+          title={isOnline ? "Tap to go Offline" : "Tap to go Online"}
+        >
             {isOnline ? (
-              <span className="rider-badge-online">
+              <span style={{ color: 'var(--rider-success)', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span className="rider-pulse-dot"></span> Online
               </span>
             ) : (
-              <span className="rider-badge-online" style={{ background: '#f1f5f9', color: '#64748b' }}>
-                  Offline
+              <span style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#94a3b8' }}></div> Offline
               </span>
             )}
         </div>

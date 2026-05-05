@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabase.js';
 import { toast } from 'react-hot-toast';
-import { Bike, FileText, Star, LogOut, Info, CheckCircle, XCircle, Bell, Headset, ChevronRight, ArrowLeft, CheckCircle2, ShieldCheck, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Bike, FileText, Star, LogOut, Info, CheckCircle, XCircle, Bell, Headset, ChevronRight, ArrowLeft, CheckCircle2, ShieldCheck, Image as ImageIcon, Trash2, RefreshCw } from 'lucide-react';
 import './RiderPortal.css'; // Import custom styles
 
 function DocumentsSubpage({ user, onBack }) {
@@ -252,6 +252,7 @@ function RiderProfile({ user, onLogout, stats }) {
         <MenuItem icon={<Bell />} title="Notifications" subtitle="Alerts on new orders & payments" onClick={() => setActiveSubpage('notifications')} />
         <MenuItem icon={<Headset />} title="Help & Support" subtitle="Chat with support, report issues" onClick={() => setActiveSubpage('help')} />
         <MenuItem icon={<Info />} title="About Passwala" subtitle="Terms, policies" onClick={() => setActiveSubpage('about')} />
+        <MenuItem icon={<RefreshCw />} title="Refresh App" subtitle="Fix glitches & sync data" onClick={() => window.location.reload()} />
         
         <button 
           onClick={onLogout}

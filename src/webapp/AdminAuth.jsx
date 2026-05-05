@@ -1,19 +1,16 @@
-/* eslint-disable */
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, ChevronLeft } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import './Auth.css'; // Reusing styles
 
 const AdminAuth = ({ onAdminLogin }) => {
   const [adminCode, setAdminCode] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
 
   const handleAdminAuth = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:3004/api/admin/login', {
+      const res = await fetch(`http://${window.location.hostname}:3004/api/admin/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accessCode: adminCode })

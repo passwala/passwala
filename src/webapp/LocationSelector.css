@@ -30,6 +30,13 @@
   align-items: center;
   justify-content: center;
   color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.back-btn-v3:hover {
+  background: var(--bg-surface);
+  transform: scale(1.05);
 }
 
 .location-header h1 {
@@ -99,6 +106,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.city-item:hover {
+  border-color: var(--primary);
+  background: var(--bg-surface);
+  transform: translateY(-2px);
 }
 
 .area-gps-icon {

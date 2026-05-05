@@ -209,6 +209,34 @@
   animation: pulse 2s infinite;
 }
 
+.sync-indicator {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.sync-indicator.cloud {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #dcfce7;
+}
+
+.sync-indicator.offline {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fee2e2;
+}
+
+.sync-indicator.missing_table {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #ffedd5;
+}
+
 .badge-live {
   background: #f0fdf4;
   color: #15803d;
@@ -328,6 +356,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: 1.5rem;
 }
 
@@ -420,7 +450,7 @@
 }
 
 .add-btn {
-  background: #0f172a;
+  background: var(--premium-gradient);
   color: white;
   padding: 10px 20px;
   border-radius: 12px;
@@ -429,10 +459,14 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  box-shadow: 0 4px 10px rgba(249, 115, 22, 0.2);
+  transition: all 0.2s ease;
 }
 
 .add-btn:hover {
-  background: var(--sidebar-accent);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px rgba(249, 115, 22, 0.3);
+  filter: brightness(1.1);
 }
 
 .admin-table {
@@ -575,15 +609,54 @@
   box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.1);
 }
 
+.close-modal-btn {
+  background: #f1f5f9;
+  color: #64748b;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.close-modal-btn:hover {
+  background: #fee2e2;
+  color: #ef4444;
+  transform: rotate(90deg);
+}
+
 .submit-form-btn {
   width: 100%;
   margin-top: 2rem;
-  padding: 14px;
-  background: #0f172a;
+  padding: 16px;
+  background: var(--premium-gradient);
   color: white;
   border-radius: 12px;
   font-weight: 800;
   font-size: 1rem;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.submit-form-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(249, 115, 22, 0.3);
+  filter: brightness(1.1);
+}
+
+.submit-form-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.submit-form-btn:disabled {
+  background: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .truncate-cell {
@@ -616,6 +689,23 @@
     inset: 0;
     background: rgba(0,0,0,0.5);
     z-index: 95;
+  }
+  .admin-top-bar {
+    padding: 0 1rem;
+    gap: 0.5rem;
+  }
+  .breadcrumb {
+    font-size: 0.7rem;
+  }
+  .breadcrumb span {
+    display: none;
+  }
+  .mobile-hide {
+    display: none !important;
+  }
+  .sync-indicator {
+    font-size: 0.65rem;
+    padding: 4px 8px;
   }
 }
 

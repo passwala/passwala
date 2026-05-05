@@ -40,7 +40,7 @@ CREATE TABLE service_categories (
 
 CREATE TABLE service_providers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE, -- if a provider is also a user
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     business_name VARCHAR(255) NOT NULL,
     about TEXT,
     rating DECIMAL(3,2) DEFAULT 0.0,
@@ -69,7 +69,7 @@ CREATE TABLE service_bookings (
     service_id UUID REFERENCES services(id) ON DELETE CASCADE,
     provider_id UUID REFERENCES service_providers(id),
     address_id UUID REFERENCES addresses(id),
-    status VARCHAR(50) DEFAULT 'PENDING', -- PENDING, CONFIRMED, COMPLETED, CANCELLED
+    status VARCHAR(50) DEFAULT 'PENDING',
     scheduled_at TIMESTAMP WITH TIME ZONE,
     total_amount DECIMAL(10,2),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -151,7 +151,7 @@ CREATE TABLE orders (
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     store_id UUID REFERENCES stores(id),
     address_id UUID REFERENCES addresses(id),
-    status VARCHAR(50) DEFAULT 'PLACED', -- PLACED, ACCEPTED, DISPATCHED, DELIVERED, CANCELLED
+    status VARCHAR(50) DEFAULT 'PLACED',
     subtotal DECIMAL(10,2),
     delivery_fee DECIMAL(10,2),
     total_amount DECIMAL(10,2),
@@ -190,7 +190,7 @@ CREATE TABLE rider_locations (
     rider_id UUID REFERENCES riders(id) ON DELETE CASCADE,
     lat DECIMAL(10,8) NOT NULL,
     lng DECIMAL(11,8) NOT NULL,
-    status VARCHAR(50) DEFAULT 'OFFLINE', -- ONLINE, BUSY, OFFLINE
+    status VARCHAR(50) DEFAULT 'OFFLINE',
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -250,7 +250,7 @@ CREATE TABLE ai_recommendations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     recommendation_type VARCHAR(100),
-    item_id UUID, -- References whatever item (product/service based on type)
+    item_id UUID,
     score DECIMAL(5,4),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -270,9 +270,22 @@ CREATE TABLE admins (
 CREATE TABLE reports (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     reporter_id UUID REFERENCES users(id),
-    target_type VARCHAR(100), -- POST, VENDOR, RIDER
+    target_type VARCHAR(100),
     target_id UUID,
     reason TEXT NOT NULL,
     status VARCHAR(50) DEFAULT 'OPEN',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ==============================================
+-- 11. LOCATION MANAGEMENT
+-- ==============================================
+
+CREATE TABLE IF NOT EXISTS service_areas (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    city VARCHAR(100) DEFAULT 'Ahmedabad',
+    area_name VARCHAR(100) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

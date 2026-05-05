@@ -1,5 +1,4 @@
-/* eslint-disable */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   BarChart3, 
   ShoppingBag, 
@@ -29,9 +28,14 @@ import {
   Bell,
   Settings,
   ShieldCheck,
-  UserPlus
+  UserPlus,
+  Truck,
+  Heart,
+  Briefcase,
+  Calendar,
+  MapPin
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../supabase';
 import { toast } from 'react-hot-toast';
 import './AdminPanel.css';
@@ -65,6 +69,100 @@ const ActivityFeed = () => {
   );
 };
 
+const TABLE_SCHEMAS = {
+  users: { phone: '', full_name: '', email: '', role: 'BUYER', photo_url: '' },
+  admins: { username: '', password_hash: '', role: 'SUPERADMIN' },
+  vendors: { phone: '', full_name: '', name: '', user_id: '', business_name: '', aadhar_no: '', license_no: '', address: '', category: '', second_image_list: '', is_verified: false, profile_completed: false },
+  riders: { phone: '', full_name: '', user_id: '', vehicle_no: '', license_no: '', id_proof: '', is_active: false, is_verified: false, rating: 0, total_deliveries: 0 },
+  service_providers: { phone: '', full_name: '', user_id: '', business_name: '', aadhar_no: '', license_no: '', is_verified: false },
+  services: { provider_id: '', category_id: '', title: '', description: '', price: 0, duration_minutes: 0 },
+  products: { store_id: '', category_id: '', name: '', description: '', price: 0, discount_price: 0, image_url: '', is_active: true },
+  service_bookings: { user_id: '', service_id: '', provider_id: '', address_id: '', status: 'PENDING', total_amount: 0 },
+  deals: { store_id: '', title: '', discount_percentage: 0 },
+  posts: { user_id: '', content: '', image_url: '', likes_count: 0 },
+  notifications: { user_id: '', title: '', message: '', is_read: false },
+  service_areas: { city: 'Ahmedabad', area_name: '', is_active: true },
+};
+
+const tabSections = [
+  {
+    label: 'Main',
+    items: [
+      { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+      { id: 'users', label: 'Users', icon: Users, table: 'users' },
+      { id: 'vendors', label: 'Vendors', icon: ShoppingBag, table: 'vendors' },
+      { id: 'riders', label: 'Riders', icon: Truck, table: 'riders' },
+    ]
+  },
+  {
+    label: 'Services',
+    items: [
+      { id: 'providers', label: 'Service Providers', icon: Heart, table: 'service_providers' },
+      { id: 'services', label: 'Service List', icon: Briefcase, table: 'services' },
+      { id: 'bookings', label: 'Bookings', icon: Calendar, table: 'service_bookings' },
+    ]
+  },
+  {
+    label: 'Marketplace',
+    items: [
+      { id: 'stores', label: 'Stores', icon: ShoppingBag, table: 'vendors' },
+      { id: 'products', label: 'Products', icon: Package, table: 'products' },
+      { id: 'payments', label: 'Payments', icon: CreditCard, table: 'service_bookings' },
+      { id: 'deals', label: 'Deals & Offers', icon: Tag, table: 'deals' },
+    ]
+  },
+  {
+    label: 'Content',
+    items: [
+      { id: 'community', label: 'Community', icon: MessageSquare, table: 'posts' },
+      { id: 'notifications', label: 'Notifications', icon: Bell, table: 'notifications' },
+    ]
+  },
+  {
+    label: 'System',
+    items: [
+      { id: 'areas', label: 'Service Areas', icon: MapPin, table: 'service_areas' },
+      { id: 'reports', label: 'Reports', icon: TrendingUp },
+      { id: 'settings', label: 'Settings', icon: Settings },
+    ]
+  }
+];
+
+const MOCK_DATA = {
+  users: [
+    { id: 'u1', phone: '9876543210', full_name: 'Karan Kumar', email: 'karan@example.com', role: 'BUYER', created_at: new Date().toISOString() },
+    { id: 'u2', phone: '9988776655', full_name: 'Anita Sharma', email: 'anita@example.com', role: 'BUYER', created_at: new Date().toISOString() },
+    { id: 'u3', phone: '9123456789', full_name: 'Rahul Varma', email: 'rahul@example.com', role: 'BUYER', created_at: new Date().toISOString() }
+  ],
+  vendors: [
+    { id: 'v1', business_name: 'Satellite Bakers', phone: '9822110033', category: 'Bakery', is_verified: true, full_name: 'Vikram Singh' },
+    { id: 'v2', business_name: 'Fresh Fruits Hub', phone: '9766554433', category: 'Grocery', is_verified: false, full_name: 'Priya Patel' }
+  ],
+  riders: [
+    { id: 'r1', full_name: 'Suresh Express', vehicle_no: 'GJ-01-BK-1234', is_active: true, is_verified: true, phone: '9000111222' },
+    { id: 'r2', full_name: 'Amit Delivery', vehicle_no: 'GJ-01-CK-5678', is_active: false, is_verified: true, phone: '9111222333' }
+  ],
+  services: [
+    { id: 's1', title: 'AC Repairing', price: 499, duration_minutes: 60, description: 'Deep cleaning and gas refill' },
+    { id: 's2', title: 'Home Cleaning', price: 1200, duration_minutes: 180, description: 'Full 3BHK deep cleaning' }
+  ],
+  products: [
+    { id: 'p1', name: 'Premium Milk 1L', price: 65, discount_price: 60, is_active: true },
+    { id: 'p2', name: 'Brown Bread', price: 45, discount_price: 40, is_active: true }
+  ],
+  orders: [
+    { id: 'o1', total_amount: 1250, status: 'DELIVERED', created_at: new Date().toISOString() },
+    { id: 'o2', total_amount: 450, status: 'PLACED', created_at: new Date().toISOString() }
+  ],
+  service_areas: [
+    { id: 'sa1', city: 'Ahmedabad', area_name: 'Satellite', is_active: true },
+    { id: 'sa2', city: 'Ahmedabad', area_name: 'Bopal', is_active: true },
+    { id: 'sa3', city: 'Ahmedabad', area_name: 'Gota', is_active: false }
+  ]
+};
+
+const TABS = tabSections.flatMap(s => s.items);
+
 const AdminPanel = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('admin_active_tab') || 'dashboard');
   const [loading, setLoading] = useState(true);
@@ -79,99 +177,11 @@ const AdminPanel = ({ onLogout }) => {
   const [formData, setFormData] = useState({});
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [isSaving, setSaving] = useState(false);
+  const [syncStatus, setSyncStatus] = useState('cloud'); // 'cloud' or 'offline'
 
-  const TABLE_SCHEMAS = {
-    users: { phone: '', full_name: '', email: '', role: 'BUYER', photo_url: '' },
-    admins: { username: '', password_hash: '', role: 'SUPERADMIN' },
-    vendors: { phone: '', full_name: '', name: '', user_id: '', business_name: '', aadhar_no: '', license_no: '', address: '', category: '', second_image_list: '', is_verified: false, profile_completed: false },
-    riders: { phone: '', full_name: '', user_id: '', vehicle_no: '', license_no: '', id_proof: '', is_active: false, is_verified: false, rating: 0, total_deliveries: 0 },
-    service_providers: { phone: '', full_name: '', user_id: '', business_name: '', aadhar_no: '', license_no: '', is_verified: false },
-    services: { provider_id: '', category_id: '', title: '', description: '', price: 0, duration_minutes: 0 },
-    products: { store_id: '', category_id: '', name: '', description: '', price: 0, discount_price: 0, image_url: '', is_active: true },
-    service_bookings: { user_id: '', service_id: '', provider_id: '', address_id: '', status: 'PENDING', total_amount: 0 },
-    deals: { store_id: '', title: '', discount_percentage: 0 },
-    posts: { user_id: '', content: '', image_url: '', likes_count: 0 },
-    notifications: { user_id: '', title: '', message: '', is_read: false },
-  };
-
-  const tabSections = [
-    {
-      label: 'Main',
-      items: [
-        { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-      ]
-    },
-    {
-      label: 'Management',
-      items: [
-        { id: 'users', label: 'Buyers / Users', icon: Users, table: 'users' },
-        { id: 'vendors', label: 'Vendors', icon: FileText, table: 'vendors' },
-        { id: 'serviceProviders', label: 'Service Providers', icon: Wrench, table: 'service_providers' },
-        { id: 'riders', label: 'Riders', icon: Bike, table: 'riders' },
-      ]
-    },
-    {
-      label: 'Inventory & Data',
-      items: [
-        { id: 'services', label: 'Services', icon: Wrench, table: 'services' },
-        { id: 'products', label: 'Products', icon: ShoppingBag, table: 'products' },
-        { id: 'orders', label: 'Orders', icon: Package, table: 'orders' },
-        { id: 'serviceBookings', label: 'Service Bookings', icon: MessageSquare, table: 'service_bookings' },
-      ]
-    },
-    {
-      label: 'Financials',
-      items: [
-        { id: 'payments', label: 'Payments', icon: CreditCard, table: 'service_bookings' },
-        { id: 'deals', label: 'Deals & Offers', icon: Tag, table: 'deals' },
-      ]
-    },
-    {
-      label: 'Content',
-      items: [
-        { id: 'community', label: 'Community', icon: MessageSquare, table: 'posts' },
-        { id: 'notifications', label: 'Notifications', icon: Bell, table: 'notifications' },
-      ]
-    },
-    {
-      label: 'System',
-      items: [
-        { id: 'reports', label: 'Reports', icon: TrendingUp },
-        { id: 'settings', label: 'Settings', icon: Settings },
-      ]
-    }
-  ];
-  
-  const MOCK_DATA = {
-    users: [
-      { id: 'u1', phone: '9876543210', full_name: 'Karan Kumar', email: 'karan@example.com', role: 'BUYER', created_at: new Date().toISOString() },
-      { id: 'u2', phone: '9988776655', full_name: 'Anita Sharma', email: 'anita@example.com', role: 'BUYER', created_at: new Date().toISOString() },
-      { id: 'u3', phone: '9123456789', full_name: 'Rahul Varma', email: 'rahul@example.com', role: 'BUYER', created_at: new Date().toISOString() }
-    ],
-    vendors: [
-      { id: 'v1', business_name: 'Satellite Bakers', phone: '9822110033', category: 'Bakery', is_verified: true, full_name: 'Vikram Singh' },
-      { id: 'v2', business_name: 'Fresh Fruits Hub', phone: '9766554433', category: 'Grocery', is_verified: false, full_name: 'Priya Patel' }
-    ],
-    riders: [
-      { id: 'r1', full_name: 'Suresh Express', vehicle_no: 'GJ-01-BK-1234', is_active: true, is_verified: true, phone: '9000111222' },
-      { id: 'r2', full_name: 'Amit Delivery', vehicle_no: 'GJ-01-CK-5678', is_active: false, is_verified: true, phone: '9111222333' }
-    ],
-    services: [
-      { id: 's1', title: 'AC Repairing', price: 499, duration_minutes: 60, description: 'Deep cleaning and gas refill' },
-      { id: 's2', title: 'Home Cleaning', price: 1200, duration_minutes: 180, description: 'Full 3BHK deep cleaning' }
-    ],
-    products: [
-      { id: 'p1', name: 'Premium Milk 1L', price: 65, discount_price: 60, is_active: true },
-      { id: 'p2', name: 'Brown Bread', price: 45, discount_price: 40, is_active: true }
-    ],
-    orders: [
-      { id: 'o1', total_amount: 1250, status: 'DELIVERED', created_at: new Date().toISOString() },
-      { id: 'o2', total_amount: 450, status: 'PLACED', created_at: new Date().toISOString() }
-    ]
-  };
-
-  const TABS = tabSections.flatMap(s => s.items);
   const currentTab = TABS.find(t => t.id === activeTab) || TABS[0];
+
+  const API_URL = `http://${window.location.hostname}:3004`;
 
   const fetchStats = async () => {
     try {
@@ -196,57 +206,63 @@ const AdminPanel = ({ onLogout }) => {
     } catch (err) { console.error(err); }
   };
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (activeTab === 'dashboard') {
       setLoading(false);
       return;
     }
-
+    setLoading(true);
+    const currentTable = TABS.find(t => t.id === activeTab)?.table || activeTab;
+    
     try {
-      setLoading(true);
-      const currentTable = TABS.find(t => t.id === activeTab)?.table || activeTab;
+      // Fetch from Backend API (bypass RLS via Service Role)
+      const response = await fetch(`${API_URL}/api/admin/fetch?table=${currentTable}`);
+      if (!response.ok) throw new Error('Failed to fetch from cloud');
       
-      // Attempt Cloud Fetch
-      const { data, error } = await supabase
-        .from(currentTable)
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const result = await response.json();
+      const data = result.data || [];
 
       // Update State & Cache
       setData(data || []);
       localStorage.setItem(`admin_cache_${currentTable}`, JSON.stringify(data || []));
       setSyncStatus('cloud');
+      toast.dismiss('offline-toast'); // Clear any previous offline warnings
     } catch (err) {
       console.error('Fetch Error:', err);
-      setSyncStatus('offline');
+      
+      // Check for missing table error
+      if (err.message && err.message.includes('Could not find the table')) {
+          toast.error(`Table '${currentTable}' is missing in Supabase!`, { duration: 6000 });
+          setSyncStatus('missing_table');
+      } else {
+          setSyncStatus('offline');
+      }
       
       // Fallback to cache
-      const currentTable = TABS.find(t => t.id === activeTab)?.table || activeTab;
       const cached = localStorage.getItem(`admin_cache_${currentTable}`);
       if (cached) {
         setData(JSON.parse(cached));
-        toast('Showing local cache', { icon: '📦' });
+        toast('Showing local cache (Offline)', { 
+          icon: '📦',
+          duration: 4000,
+          action: {
+            label: 'Retry Sync',
+            onClick: () => fetchData()
+          }
+        });
       } else {
         setData(MOCK_DATA[currentTable] || []);
       }
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    if (activeTab !== currentTab.id) {
-      setActiveTab(currentTab.id); // fix invalid cache
-    } else {
-      fetchStats();
-      fetchData();
-      localStorage.setItem('admin_active_tab', activeTab);
-    }
   }, [activeTab]);
 
-  const API_URL = 'http://localhost:3004';
+  useEffect(() => {
+    fetchStats();
+    fetchData();
+    localStorage.setItem('admin_active_tab', activeTab);
+  }, [activeTab, fetchData]);
 
   const handleExecuteDelete = async () => {
     if (!deleteConfirmId) return;
@@ -261,13 +277,15 @@ const AdminPanel = ({ onLogout }) => {
               throw new Error(data.error || 'Failed to delete user');
           }
       } else {
-          const { error } = await supabase
-            .from(currentTab.table)
-            .delete()
-            .eq(pkName, deleteConfirmId);
-
-          if (error && !error.message.includes('invalid input syntax for type uuid')) {
-              throw error;
+          // Use Backend API for all tables to bypass RLS and use Service Role
+          const res = await fetch(`${API_URL}/api/admin/delete`, { 
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ table: currentTab.table, id: deleteConfirmId })
+          });
+          if (!res.ok) {
+              const data = await res.json();
+              throw new Error(data.error || 'Failed to delete record');
           }
       }
       
@@ -307,12 +325,11 @@ const AdminPanel = ({ onLogout }) => {
       }
       setSaving(true);
       // 1. Prepare payload and Update Local State (Optimistic)
-      const payload = { ...formData };
+      let payload = { ...formData };
+      
+      // Temporary local ID if missing
       if (!editingItem && !payload.id) {
-          payload.id = crypto.randomUUID();
-      }
-      if (currentTab.table === 'users' && !editingItem) {
-          if (!payload.role) payload.role = 'BUYER';
+          payload.id = 'temp_' + Date.now();
       }
 
       const localKey = `admin_local_${currentTab.table}`;
@@ -327,23 +344,30 @@ const AdminPanel = ({ onLogout }) => {
       }
 
       // 2. Attempt Background Cloud Sync
+      const syncPayload = { ...payload };
+      if (syncPayload.id && syncPayload.id.startsWith('temp_')) {
+          delete syncPayload.id;
+      }
+
       try {
         const response = await fetch(`${API_URL}/api/admin/upsert`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             table: currentTab.table, 
-            payload: payload 
+            payload: syncPayload 
           })
         });
 
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Server Error');
 
-        toast.success('Synced with Cloud! ☁️');
+        toast.success('Synced with Cloud! ☁️', { id: 'offline-toast' });
+        setSyncStatus('cloud');
       } catch (syncErr) {
         console.warn('Sync failed, record kept in Local Storage:', syncErr);
-        toast('Offline Mode: Saved locally 🏠', { icon: '🏠' });
+        setSyncStatus('offline');
+        toast('Offline Mode: Saved locally 🏠', { icon: '🏠', id: 'offline-toast' });
       }
 
       setShowModal(false);
@@ -373,7 +397,7 @@ const AdminPanel = ({ onLogout }) => {
          setFormData(cleanData);
       } else {
          const cleanData = { ...item };
-         delete cleanData.id;
+         // Keep ID for updates!
          delete cleanData.uid;
          delete cleanData.created_at;
          delete cleanData.updated_at;
@@ -426,9 +450,14 @@ const AdminPanel = ({ onLogout }) => {
                 <th>ID</th>
                 {(() => {
                   const schema = TABLE_SCHEMAS[currentTab.table];
-                  const keys = data.length > 0 
-                    ? Object.keys(data[0]).filter(k => k !== 'id' && k !== 'created_at' && k !== 'uid' && k !== 'users')
-                    : (schema ? Object.keys(schema) : ['PHONE', 'FULL_NAME']);
+                  let keys = [];
+                  if (schema) {
+                    keys = Object.keys(schema);
+                  } else if (data.length > 0) {
+                    keys = Object.keys(data[0]).filter(k => k !== 'id' && k !== 'created_at' && k !== 'uid' && k !== 'users');
+                  } else {
+                    keys = ['PHONE', 'FULL_NAME'];
+                  }
                   
                   return keys.map(key => (
                     <th key={key}>{key.toUpperCase()}</th>
@@ -439,17 +468,27 @@ const AdminPanel = ({ onLogout }) => {
             </thead>
             <tbody>
               {filtered.map((item) => {
-                const pk = item.uid || item.id;
                 const schema = TABLE_SCHEMAS[currentTab.table];
-                const keys = data.length > 0 
-                  ? Object.keys(data[0]).filter(k => k !== 'id' && k !== 'created_at' && k !== 'uid' && k !== 'users')
-                  : (schema ? Object.keys(schema) : ['PHONE', 'FULL_NAME']);
+                let keys = [];
+                if (schema) {
+                  keys = Object.keys(schema);
+                } else if (data.length > 0) {
+                  keys = Object.keys(data[0]).filter(k => k !== 'id' && k !== 'created_at' && k !== 'uid' && k !== 'users');
+                } else {
+                  keys = ['PHONE', 'FULL_NAME'];
+                }
                   
                 return (
                   <tr key={item.id}>
                     <td className="id-col">#{String(item.id).slice(-4)}</td>
                     {keys.map(k => {
-                      const v = item[k];
+                      let v = item[k];
+                      // Flatten joined user data for display
+                      if (item.users) {
+                        if (k === 'phone' && !v) v = item.users.phone;
+                        if (k === 'full_name' && !v) v = item.users.full_name;
+                      }
+                      
                       return (
                       <td key={k}>
                         {k === 'status' || k === 'role' ? (
@@ -573,7 +612,7 @@ const AdminPanel = ({ onLogout }) => {
 
       <div className="recent-activity-table glass" style={{marginTop: '2rem'}}>
           <div className="activity-header">
-            <h4><Activity size={18} /> Real-time System Load</h4>
+            <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Activity size={18} /> Real-time System Load</h4>
             <span className="badge-live">System Optimal</span>
           </div>
           <div style={{height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8'}}>
@@ -583,8 +622,8 @@ const AdminPanel = ({ onLogout }) => {
 
       <div className="recent-activity glass">
          <div className="activity-header">
-            <h4><History size={18} /> Recent Logs</h4>
-            <button className="edit-btn" style={{width: 'auto', padding: '0 8px', fontSize: '10px'}}>VIEW ALL</button>
+            <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><History size={18} /> Recent Logs</h4>
+            <button className="edit-btn" style={{width: 'auto', padding: '4px 8px', fontSize: '10px', height: 'auto'}}>VIEW ALL</button>
          </div>
          <div className="trend-content">
             <ActivityFeed />
@@ -647,18 +686,20 @@ const AdminPanel = ({ onLogout }) => {
               <Activity size={24} />
             </button>
             <div className="breadcrumb">
-               <Database size={14} /> / <span>MASTER CONTROL</span> / <strong>{activeTab.toUpperCase()}</strong>
+               <Database size={14} className="mobile-hide" /> <span className="mobile-hide">/ MASTER CONTROL /</span> <strong>{activeTab.toUpperCase()}</strong>
             </div>
           </div>
           <div className="admin-profile-pill">
-            <span className="badge-live">Live</span>
+            <span className={`sync-indicator ${syncStatus}`}>
+              {syncStatus === 'cloud' ? '☁️ Cloud Sync Active' : '🏠 Offline Mode'}
+            </span>
             <div className="avatar">SA</div>
           </div>
         </header>
 
         <div className="admin-scroll-content">
            <AnimatePresence mode='wait'>
-             <motion.div 
+             <Motion.div 
                key={activeTab}
                initial={{ opacity: 0, y: 10 }}
                animate={{ opacity: 1, y: 0 }}
@@ -671,19 +712,45 @@ const AdminPanel = ({ onLogout }) => {
                    <p style={{color: '#64748b', marginBottom: '2rem'}}>Overview of your entire business ecosystem.</p>
                    {renderDashboard()}
                  </>
-               ) : (
-                  <>
-                    <div className="table-header-row">
-                      <div>
-                        <h2 className="table-title">{currentTab.label}</h2>
-                        <p style={{color: '#64748b', fontSize: '0.9rem'}}>Manage and monitor entries in real-time.</p>
-                     </div>
-                     <span className="count-chip">{data.length} Total Records</span>
-                   </div>
-                   {renderTable()}
-                 </>
-               )}
-             </motion.div>
+               ) : syncStatus === 'missing_table' ? (
+                  <div className="missing-table-notice animate-fade-in" style={{ padding: '3rem', background: '#fff1f2', borderRadius: '24px', border: '2px dashed #f43f5e', textAlign: 'center' }}>
+                     <Database size={48} color="#f43f5e" style={{ marginBottom: '1rem' }} />
+                     <h2 style={{ color: '#9f1239' }}>Database Setup Required</h2>
+                     <p style={{ color: '#be123c', maxWidth: '500px', margin: '1rem auto' }}>
+                        The table <strong>'{currentTab.table}'</strong> does not exist in your Supabase database. 
+                        Please run the following SQL command in your Supabase SQL Editor to fix this:
+                     </p>
+                     <pre style={{ background: '#1e293b', color: '#f8fafc', padding: '1.5rem', borderRadius: '12px', textAlign: 'left', fontSize: '0.8rem', overflowX: 'auto', margin: '2rem 0' }}>
+{`-- Run this in Supabase SQL Editor
+CREATE TABLE IF NOT EXISTS service_areas (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    city VARCHAR(100) DEFAULT 'Ahmedabad',
+    area_name VARCHAR(100) UNIQUE NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);`}
+                     </pre>
+                     <button 
+                        onClick={() => fetchData()}
+                        style={{ background: '#f43f5e', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '12px', fontWeight: 600, cursor: 'pointer' }}
+                     >
+                        I've run the SQL, Refresh Now
+                     </button>
+                  </div>
+                ) : (
+                   <>
+                     <div className="table-header-row">
+                       <div>
+                         <h2 className="table-title">{currentTab.label}</h2>
+                         <p style={{color: '#64748b', fontSize: '0.9rem'}}>Manage and monitor entries in real-time.</p>
+                      </div>
+                      <span className="count-chip">{data.length} Total Records</span>
+                    </div>
+                    {renderTable()}
+                  </>
+                )}
+             </Motion.div>
            </AnimatePresence>
         </div>
       </main>
@@ -694,7 +761,7 @@ const AdminPanel = ({ onLogout }) => {
           <div className="admin-modal">
             <div className="modal-header">
                <h3>Modify Platform Resource</h3>
-               <button onClick={() => setShowModal(false)}><X /></button>
+               <button className="close-modal-btn" onClick={() => setShowModal(false)}><X size={20} /></button>
             </div>
             <form onSubmit={handleUpsert} className="admin-form">
                <div className="form-grid">
@@ -729,8 +796,8 @@ const AdminPanel = ({ onLogout }) => {
                     </div>
                   )}) : <p style={{color: 'var(--text-secondary)'}}>Open a populated table first to configure new data.</p>}
                </div>
-               <button type="submit" className="submit-form-btn">
-                 Confirm Synchronization
+               <button type="submit" className="submit-form-btn" disabled={isSaving}>
+                 {isSaving ? 'Saving...' : 'Save Changes'}
                </button>
             </form>
           </div>

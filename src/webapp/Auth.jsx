@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 
@@ -13,26 +12,21 @@ import {
   updateProfile // Added this
 } from 'firebase/auth';
 import { auth } from '../firebase';
-import { supabase } from '../supabase';
 import './Auth.css';
 
-const Auth = ({ onLogin, onAdminLogin }) => {
+const Auth = ({ onLogin }) => {
   const [step, setStep] = useState('PHONE');
-  const [isAdminMode, setIsAdminMode] = useState(false);
-  const [adminCode, setAdminCode] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [userName, setUserName] = useState('');
   const [houseNo, setHouseNo] = useState('');
   const [society, setSociety] = useState('');
   const [landmark, setLandmark] = useState('');
-  const [pincode, setPincode] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(30);
   const [confirmationResult, setConfirmationResult] = useState(null);
+  const [mode, setMode] = useState('LOGIN');
   const [loading, setLoading] = useState(false);
   const [tempCred, setTempCred] = useState(null);
-  const [role, setRole] = useState('buyer'); // Added role state
-
   const canResend = timer === 0;
 
   useEffect(() => {
@@ -85,13 +79,8 @@ const Auth = ({ onLogin, onAdminLogin }) => {
       setTimer(30);
       toast.success('OTP Sent!');
     } catch (error) {
-      toast.error('Real OTP Failed. Entering MOCK MODE...');
-      
-      // MOCK BYPASS: Allow ALL numbers for testing
-      setStep('OTP');
-      setTimer(30);
-      setConfirmationResult(null); // Explicitly null for mock check
-      toast.success('Mock OTP Sent: 123456');
+      console.error("OTP Error:", error);
+      toast.error('Failed to send verification code. Please check the phone number and try again.');
     } finally { setLoading(false); }
   };
 
@@ -112,27 +101,7 @@ const Auth = ({ onLogin, onAdminLogin }) => {
       toast.success('Google authentication successful! Please confirm your name.');
     } catch (error) {
       console.error(error);
-      
-      // 🛠️ DEV WORKAROUND: If domain is not whitelisted in Firebase yet
-      if (error.code === 'auth/unauthorized-domain') {
-        toast((t) => (
-          <span>
-            <b>Auth Error:</b> IP not whitelisted in Firebase Console. 
-            <button onClick={() => {
-              toast.dismiss(t.id);
-              onLogin({
-                uid: 'demo-google-' + Math.random().toString(36).substr(2, 9),
-                displayName: 'Demo External User',
-                role: 'buyer'
-              }); // Direct bypass for local testing
-            }} style={{ marginLeft: '10px', background: 'var(--primary)', color:'white', border:'none', padding:'4px 8px', borderRadius:'4px' }}>
-              Simulate Login
-            </button>
-          </span>
-        ), { duration: 6000 });
-      } else {
-        toast.error(`Google Sign-In failed: ${error.message || 'Check if server is running on port 3004'}`);
-      }
+      toast.error(`Google Sign-In failed: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -150,10 +119,9 @@ const Auth = ({ onLogin, onAdminLogin }) => {
         setTempCred(cred);
         setStep('NAME'); // Ask for name after verification
         toast.success('Phone Verified!');
-      } else if (otpValue === '123123' || otpValue === '123456') {
-        toast.success('Universal Mock Success!');
-        setStep('NAME');
-      } else { toast.error('Wrong code'); }
+      } else { 
+        toast.error('Verification session expired or invalid'); 
+      }
     } catch (error) {
       console.error(error);
       toast.error('Invalid OTP');
@@ -173,23 +141,15 @@ const Auth = ({ onLogin, onAdminLogin }) => {
 
     try {
       setLoading(true);
-      const userData = tempCred
-        ? {
-          uid: tempCred.user.uid,
-          displayName: userName,
-          phoneNumber: tempCred.user.phoneNumber || null,
-          email: tempCred.user.email || null,
-          photoURL: tempCred.user.photoURL || null,
-          authProvider: tempCred.authProvider || 'phone',
-          role: role // From state
-        }
-        : {
-          uid: 'demo-user-' + Math.random().toString(36).substr(2, 9),
-          displayName: userName,
-          phoneNumber: '+91' + phoneNumber,
-          authProvider: 'phone',
-          role: role // From state
-        };
+      const userData = {
+        uid: tempCred.user.uid,
+        displayName: userName,
+        phoneNumber: tempCred.user.phoneNumber || null,
+        email: tempCred.user.email || null,
+        photoURL: tempCred.user.photoURL || null,
+        authProvider: tempCred.authProvider || 'phone',
+        role: 'buyer'
+      };
 
       if (tempCred) {
         await updateProfile(tempCred.user, { displayName: userName }).catch(e => console.warn('Profile update skip:', e));
@@ -197,15 +157,14 @@ const Auth = ({ onLogin, onAdminLogin }) => {
       
       // Attempt DB Save (Through Secure Backend)
       try {
-        const response = await fetch('http://localhost:3004/api/users', {
+        const response = await fetch(`http://${window.location.hostname}:3004/api/users`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ...userData,
             address: {
               address_line_1: `${houseNo}, ${society}`,
-              address_line_2: landmark,
-              pincode: pincode
+              address_line_2: landmark
             }
           })
         });
@@ -226,15 +185,7 @@ const Auth = ({ onLogin, onAdminLogin }) => {
     } finally { setLoading(false); }
   };
 
-  const handleAdminAuth = () => {
-    if (adminCode === 'PASSWALA99') {
-      toast.success('Admin authorized!');
-      onAdminLogin();
-    } else {
-      toast.error('Invalid Admin Code');
-    }
-  };
-
+  // Premium Brand Animations (Cycled with smooth cross-fade)
   const brandAnimations = [
     "https://nwduaxtgisvjybefndfg.supabase.co/storage/v1/object/public/images/1768131673403_Passwala%20Brand%20LDC%20(1).gif",
     "https://nwduaxtgisvjybefndfg.supabase.co/storage/v1/object/public/images/1768131668420_Passwala%20Brand%20LDC%20(2).gif",
@@ -246,7 +197,7 @@ const Auth = ({ onLogin, onAdminLogin }) => {
   useEffect(() => {
     const interval = setInterval(() => {
       setAnimIndex((prev) => (prev + 1) % brandAnimations.length);
-    }, 5000);
+    }, 3000); // Faster 3s loop for a more "continuous" feel
     return () => clearInterval(interval);
   }, []);
 
@@ -254,12 +205,16 @@ const Auth = ({ onLogin, onAdminLogin }) => {
     <div className="auth-page">
       <div className="auth-container glass">
         <div className="auth-illustration">
-          <img
-            key={animIndex}
-            src={brandAnimations[animIndex]}
-            alt="Passwala Neighborhood Hub"
-            className="animated-cartoon"
-          />
+          <div className="animation-stack-v6">
+            {brandAnimations.map((url, idx) => (
+              <img
+                key={url}
+                src={url}
+                alt="Passwala Animation"
+                className={`animated-layer-v6 ${animIndex === idx ? 'active' : ''}`}
+              />
+            ))}
+          </div>
         </div>
 
         <div className="auth-content">
@@ -267,29 +222,32 @@ const Auth = ({ onLogin, onAdminLogin }) => {
             <>
             <div className="auth-header-v5">
               <h2 className="passwala-blue-stamp">PASSWALA BUYER HUB</h2>
-              <p>Authentic Neighborhood Connections</p>
+              <p>{mode === 'LOGIN' ? 'Welcome back! Please login to your account.' : 'Join your neighborhood network today.'}</p>
             </div>
 
-              <div className="social-login" style={{ marginBottom: '0.5rem' }}>
+            <div className="auth-mode-tabs">
+              <button 
+                className={`mode-tab ${mode === 'LOGIN' ? 'active' : ''}`}
+                onClick={() => setMode('LOGIN')}
+              >
+                Login
+              </button>
+              <button 
+                className={`mode-tab ${mode === 'SIGNUP' ? 'active' : ''}`}
+                onClick={() => setMode('SIGNUP')}
+              >
+                Sign Up
+              </button>
+            </div>
+
+              <div className="social-login">
                 <button className="social-btn google-btn" onClick={handleGoogleLogin} disabled={loading}>
                   <img src="/google_icon.png" alt="Google" width="20" height="20" />
-                  Continue with Google
+                  {mode === 'LOGIN' ? 'Login with Google' : 'Sign up with Google'}
                 </button>
               </div>
 
-              <button 
-                className="social-btn" 
-                style={{ marginBottom: '1.5rem', background: '#f8fafc', color: 'var(--primary)', borderColor: 'var(--primary)', borderStyle: 'dashed' }}
-                onClick={() => onLogin()}
-              >
-                Simulate Guest Login
-              </button>
-
-              <div className="divider">
-                <span>OR USE PHONE</span>
-              </div>
-
-              <div className="phone-login">
+              <div className="phone-login" style={{ marginTop: '1.5rem' }}>
                 <div className="input-group">
                   <div className="country-code">+91</div>
                   <input
@@ -301,9 +259,19 @@ const Auth = ({ onLogin, onAdminLogin }) => {
                   />
                 </div>
                 <button className="auth-submit-btn" onClick={handleSendOTP} disabled={loading}>
-                  {loading ? 'Sending...' : 'Send OTP'}
+                  {loading ? (
+                    <RefreshCw className="spin" size={20} />
+                  ) : (
+                    mode === 'LOGIN' ? 'Login' : 'Join Passwala'
+                  )}
                 </button>
               </div>
+
+              {mode === 'SIGNUP' && (
+                <p className="auth-terms-notice" style={{ marginTop: '1.5rem', fontSize: '0.8rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  By joining, you agree to our <strong>Terms</strong> and <strong>Privacy Policy</strong>.
+                </p>
+              )}
             </>
           ) : step === 'OTP' ? (
             <div className="otp-flow">
@@ -311,14 +279,21 @@ const Auth = ({ onLogin, onAdminLogin }) => {
               <h2>Verify</h2>
               <p>Enter the 6-digit code sent to +91{phoneNumber}</p>
               <div className="otp-input-container">
-                {otp.map((data, index) => (
+                {(otp || ['', '', '', '', '', '']).map((data, index) => (
                   <input
-                    key={index}
+                    key={`otp-${index}`}
                     className="otp-field"
                     type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
                     maxLength="1"
                     value={data}
                     onChange={(e) => handleOtpChange(e.target, index)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Backspace' && !otp[index] && e.target.previousSibling) {
+                        e.target.previousSibling.focus();
+                      }
+                    }}
                   />
                 ))}
               </div>

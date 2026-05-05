@@ -4,33 +4,71 @@ import './RiderPortal.css'; // Import custom styles
 
 import { supabase } from '../supabase';
 
-function RiderEarnings({ user, riderId, stats }) {
+function RiderEarnings({ user, riderId, stats, isOnline, sessionStartTime }) {
     const [deliveries, setDeliveries] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
+    const [timeRange, setTimeRange] = React.useState('today');
+    const [duration, setDuration] = React.useState('0h 0m');
+
+    // Real-time online duration timer
+    React.useEffect(() => {
+        const updateTimer = () => {
+            if (isOnline && sessionStartTime) {
+                const diff = Date.now() - sessionStartTime;
+                const hours = Math.floor(diff / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                setDuration(`${hours}h ${minutes}m`);
+            } else {
+                setDuration('0h 0m');
+            }
+        };
+
+        updateTimer();
+        const interval = setInterval(updateTimer, 60000); // Update every minute
+        return () => clearInterval(interval);
+    }, [isOnline, sessionStartTime]);
 
     React.useEffect(() => {
         const fetchRecent = async () => {
             if (riderId) {
-                const { data } = await supabase
+                setLoading(true);
+                let query = supabase
                     .from('rider_earnings')
                     .select('*')
-                    .eq('rider_id', riderId)
+                    .eq('rider_id', riderId);
+                
+                // Add time range filtering
+                const now = new Date();
+                if (timeRange === 'today') {
+                    const startOfDay = new Date(now.setHours(0,0,0,0)).toISOString();
+                    query = query.gte('created_at', startOfDay);
+                } else if (timeRange === 'weekly') {
+                    const startOfWeek = new Date(now.setDate(now.getDate() - 7)).toISOString();
+                    query = query.gte('created_at', startOfWeek);
+                } else if (timeRange === 'monthly') {
+                    const startOfMonth = new Date(now.setMonth(now.getMonth() - 1)).toISOString();
+                    query = query.gte('created_at', startOfMonth);
+                }
+
+                const { data } = await query
                     .order('created_at', { ascending: false })
-                    .limit(10);
+                    .limit(20);
                 
                 if (data) {
                     setDeliveries(data.map(d => ({
-                        id: `#ORD-${d.order_id.substring(0, 6).toUpperCase()}`,
+                        id: `#ORD-${d.order_id.toString().substring(0, 6).toUpperCase()}`,
                         amount: d.amount,
                         time: new Date(d.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                         distance: '1.2 km'
                     })));
+                } else {
+                    setDeliveries([]);
                 }
             }
             setLoading(false);
         };
         fetchRecent();
-    }, [riderId]);
+    }, [riderId, timeRange]);
 
   return (
     <div className="rider-screen">
@@ -41,17 +79,21 @@ function RiderEarnings({ user, riderId, stats }) {
          <div style={{ position: 'absolute', top: 0, right: 0, padding: '1rem', opacity: 0.1 }}>
             <IndianRupee size={120} />
          </div>
-         <p style={{ fontWeight: 500, marginBottom: '0.25rem', color: 'rgba(255,255,255,0.8)' }}>Total Earnings (Today)</p>
-         <h3 style={{ fontSize: '3rem', fontWeight: 900, marginBottom: '1rem', display: 'flex', alignItems: 'center' }}>₹{stats.earnings}</h3>
+         <p style={{ fontWeight: 500, marginBottom: '0.25rem', color: 'rgba(255,255,255,0.8)' }}>
+            Total Earnings ({timeRange.charAt(0).toUpperCase() + timeRange.slice(1)})
+         </p>
+         <h3 style={{ fontSize: '3rem', fontWeight: 900, marginBottom: '1rem', display: 'flex', alignItems: 'center' }}>
+            ₹{timeRange === 'today' ? stats.earnings : (deliveries.reduce((sum, d) => sum + d.amount, 0))}
+         </h3>
          
          <div className="rider-grid-2" style={{ borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '1rem' }}>
             <div>
                <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)' }}>Deliveries</p>
-               <p style={{ fontSize: '1.25rem', fontWeight: 700 }}>{stats.deliveries}</p>
+               <p style={{ fontSize: '1.25rem', fontWeight: 700 }}>{timeRange === 'today' ? stats.deliveries : deliveries.length}</p>
             </div>
             <div>
                <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)' }}>Online Time</p>
-               <p style={{ fontSize: '1.25rem', fontWeight: 700 }}>0h 0m</p>
+               <p style={{ fontSize: '1.25rem', fontWeight: 700 }}>{duration}</p>
             </div>
          </div>
       </div>
@@ -74,15 +116,61 @@ function RiderEarnings({ user, riderId, stats }) {
 
       {/* Tabs / Filters for Earnings */}
       <div style={{ display: 'flex', gap: '0.5rem', background: '#e5e7eb', padding: '4px', borderRadius: '12px', marginBottom: '1.5rem' }}>
-         <button style={{ flex: 1, background: 'white', border: 'none', borderRadius: '8px', padding: '0.5rem', fontWeight: 700, fontSize: '0.875rem', boxShadow: 'var(--rider-shadow)' }}>Today</button>
-         <button style={{ flex: 1, background: 'transparent', border: 'none', borderRadius: '8px', padding: '0.5rem', fontWeight: 600, fontSize: '0.875rem', color: 'var(--rider-text-secondary)' }}>Weekly</button>
-         <button style={{ flex: 1, background: 'transparent', border: 'none', borderRadius: '8px', padding: '0.5rem', fontWeight: 600, fontSize: '0.875rem', color: 'var(--rider-text-secondary)' }}>Monthly</button>
+         <button 
+            onClick={() => setTimeRange('today')}
+            style={{ 
+                flex: 1, 
+                background: timeRange === 'today' ? 'white' : 'transparent', 
+                border: 'none', 
+                borderRadius: '8px', 
+                padding: '0.5rem', 
+                fontWeight: timeRange === 'today' ? 700 : 600, 
+                fontSize: '0.875rem', 
+                color: timeRange === 'today' ? 'var(--rider-text)' : 'var(--rider-text-secondary)',
+                boxShadow: timeRange === 'today' ? 'var(--rider-shadow)' : 'none',
+                transition: 'all 0.2s ease'
+            }}
+         >Today</button>
+         <button 
+            onClick={() => setTimeRange('weekly')}
+            style={{ 
+                flex: 1, 
+                background: timeRange === 'weekly' ? 'white' : 'transparent', 
+                border: 'none', 
+                borderRadius: '8px', 
+                padding: '0.5rem', 
+                fontWeight: timeRange === 'weekly' ? 700 : 600, 
+                fontSize: '0.875rem', 
+                color: timeRange === 'weekly' ? 'var(--rider-text)' : 'var(--rider-text-secondary)',
+                boxShadow: timeRange === 'weekly' ? 'var(--rider-shadow)' : 'none',
+                transition: 'all 0.2s ease'
+            }}
+         >Weekly</button>
+         <button 
+            onClick={() => setTimeRange('monthly')}
+            style={{ 
+                flex: 1, 
+                background: timeRange === 'monthly' ? 'white' : 'transparent', 
+                border: 'none', 
+                borderRadius: '8px', 
+                padding: '0.5rem', 
+                fontWeight: timeRange === 'monthly' ? 700 : 600, 
+                fontSize: '0.875rem', 
+                color: timeRange === 'monthly' ? 'var(--rider-text)' : 'var(--rider-text-secondary)',
+                boxShadow: timeRange === 'monthly' ? 'var(--rider-shadow)' : 'none',
+                transition: 'all 0.2s ease'
+            }}
+         >Monthly</button>
       </div>
 
       {/* Breakdown List */}
       <div>
-         <h4 style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', margin: 0 }}><Clock size={18} color="var(--rider-text-secondary)" /> Recent Deliveries</h4>
-         {deliveries.length > 0 ? (
+         <h4 style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', margin: 0 }}><Clock size={18} color="var(--rider-text-secondary)" /> {timeRange.charAt(0).toUpperCase() + timeRange.slice(1)} Deliveries</h4>
+         {loading ? (
+             <div style={{ textAlign: 'center', padding: '2rem' }}>
+                 <p style={{ color: 'var(--rider-text-secondary)' }}>Loading earnings...</p>
+             </div>
+         ) : deliveries.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
                 {deliveries.map((delivery, i) => (
                 <div key={i} className="rider-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: 0 }}>

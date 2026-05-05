@@ -1,10 +1,10 @@
-/* eslint-disable */
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import userRoutes from './routes/users.js';
 import vendorRoutes from './routes/vendor.js';
 import adminRoutes from './routes/admin.js';
+import ridersRoutes from './routes/riders.js';
 
 dotenv.config();
 
@@ -32,7 +32,6 @@ app.get('/', (req, res) => {
 
 app.get('/health', (req, res) => res.json({ status: 'healthy', database: 'connected' }));
 
-import ridersRoutes from './routes/riders.js';
 app.use('/api/users', userRoutes);
 app.use('/api/vendor', vendorRoutes);
 app.use('/api/riders', ridersRoutes);
@@ -48,7 +47,7 @@ app.use((req, res) => {
 });
 
 // Error Handler
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   console.error('🔥 Server Error:', err.stack);
   res.status(err.status || 500).json({ 
     error: 'Backend Failure', 

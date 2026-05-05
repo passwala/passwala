@@ -60,6 +60,14 @@
   object-fit: contain;
 }
 
+.rec-details {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-grow: 1;
+  width: 100%;
+}
+
 .rec-badge {
   font-size: 0.75rem;
   font-weight: 700;
@@ -69,6 +77,7 @@
   border-radius: 6px;
   width: fit-content;
   margin-bottom: 1.5rem;
+  align-self: flex-start;
 }
 
 .rec-card strong {
@@ -90,4 +99,41 @@
   padding: 0.8rem;
   border-radius: 10px;
   font-weight: 700;
+  margin-top: auto;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .ai-recs { padding: 3rem 0; }
+  
+  .section-header-ai {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+    align-items: center;
+  }
+  
+  .section-title { font-size: 1.5rem; }
+
+  .rec-scroll {
+    justify-content: flex-start;
+    padding: 1rem 1.5rem;
+    margin: 0 -1.5rem; /* Full bleed scroll */
+  }
+
+  .rec-card {
+    min-width: 280px;
+    max-width: 280px;
+    padding: 1.5rem;
+  }
+  
+  .rec-card strong { font-size: 1.25rem; }
+  .rec-card span { font-size: 0.875rem; }
+}
+
+@media (max-width: 480px) {
+  .rec-card {
+    min-width: 85vw;
+    max-width: 85vw;
+  }
 }

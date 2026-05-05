@@ -1,5 +1,4 @@
-/* eslint-disable no-unused-vars */
-import React, { useState, useEffect } from 'react'
+import React, { Suspense, useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom'
 import Navbar from './web/Navbar'
 import Hero from './web/Hero'
@@ -37,7 +36,7 @@ import { Toaster, toast } from 'react-hot-toast'
 import './App.css'
 
 import { auth } from './firebase'
-import { onAuthStateChanged, signOut } from 'firebase/auth'
+import { onAuthStateChanged } from 'firebase/auth'
 import { supabase } from './supabase'
 import AIAssistant from './webapp/AIAssistant'
 import CustomerDetails from './webapp/CustomerDetails'
@@ -64,29 +63,42 @@ const RoleGuard = ({ children, allowedRoles, user, loading }) => {
       <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#6366f1]"></div>
     </div>
   );
-  
+
   if (!user) return <Navigate to="/" replace />;
-  
+
   const userRole = user.role || 'BUYER';
   if (!allowedRoles.includes(userRole)) {
     console.warn(`🛡️ Access Denied: Role [${userRole}] cannot access these resources.`);
     return <Navigate to="/" replace />;
   }
-  
+
   return children;
 };
 
-const AppContent = ({ 
-  effectiveUser, isProfileComplete, setIsProfileComplete, updateDemoUser, 
-  isWebappMode, isAdmin, setIsAdmin, location, userCoords, setLocation 
+const AppContent = ({
+  effectiveUser, isProfileComplete, setIsProfileComplete,
+  isWebappMode, isAdmin, setIsAdmin, location, userCoords, setLocation, userAddress, setUserAddress, setUser
 }) => {
-  const [loading, setLoading] = useState(true);
-  
   const navigate = useNavigate();
   const locationPath = useLocation().pathname;
   const isWebMode = window.location.port === '3000';
   const isVendorMode = window.location.port === '3002';
   const isRiderMode = window.location.port === '3003';
+  const isAdminMode = window.location.port === '3005';
+
+  useEffect(() => {
+    if (isAdminMode) {
+      document.title = 'Passwala | Admin Portal';
+    } else if (isVendorMode) {
+      document.title = 'Passwala | Vendor Portal';
+    } else if (isRiderMode) {
+      document.title = 'Passwala | Rider Portal';
+    } else if (isWebappMode) {
+      document.title = 'Passwala | Web App';
+    } else {
+      document.title = 'Passwala | Local Services & Community Hub';
+    }
+  }, [isAdminMode, isVendorMode, isRiderMode, isWebappMode]);
 
   // Admin Persistence
   useEffect(() => {
@@ -110,21 +122,29 @@ const AppContent = ({
     }
   }, [isDarkMode]);
 
+  // 📍 Compulsory Location Enforcement
   useEffect(() => {
-    const splashTimer = setTimeout(() => setLoading(false), isWebappMode ? 1500 : 500);
-    return () => clearTimeout(splashTimer);
-  }, [isWebappMode]);
+    const isAuthPage = locationPath === '/auth' || locationPath === '/' || locationPath === '/rider-auth';
+    const isLocationPage = locationPath === '/select-location';
+    const isProfilePage = locationPath === '/complete-profile';
+    
+    // Force profile completion for Buyers
+    const userRole = effectiveUser?.role || 'BUYER';
+    if (isWebappMode && effectiveUser && userRole === 'BUYER' && !isProfileComplete && !isAuthPage && !isProfilePage) {
+      console.log('📝 Redirecting to complete-profile (Profile incomplete for Buyer)');
+      navigate('/complete-profile');
+    }
+  }, [isWebappMode, isRiderMode, effectiveUser, isProfileComplete, location, locationPath, navigate]);
 
   const handleLogout = async (skipToast = false) => {
     try {
-      updateDemoUser(null);
       if (auth.currentUser) {
         await auth.signOut().catch(e => console.warn('Firebase Signout Skip:', e));
       }
       localStorage.clear();
       if (!skipToast) toast.success('Signed Out.');
       if (window.location.host.includes('3002')) {
-        window.location.href = '/'; 
+        window.location.href = '/';
       } else {
         navigate('/');
       }
@@ -134,69 +154,79 @@ const AppContent = ({
     }
   };
 
-  const currentView = 
+  const currentView =
     locationPath === '/near-shops' ? 'NEAR_SHOPS' :
-    locationPath === '/expert-services' ? 'EXPERT_SERVICES' :
-    locationPath === '/neighbors' ? 'NEIGHBORS' :
-    locationPath === '/track-orders' ? 'TRACKING' :
-    locationPath === '/profile' ? 'PROFILE' : 'DASHBOARD';
+      locationPath === '/expert-services' ? 'EXPERT_SERVICES' :
+        locationPath === '/neighbors' ? 'NEIGHBORS' :
+          locationPath === '/track-orders' ? 'TRACKING' :
+            locationPath === '/profile' ? 'PROFILE' : 'DASHBOARD';
 
 
-  // 🛡️ Final Security Check for Admin
   const isAuthorizedAdmin = isAdmin || (effectiveUser && effectiveUser.role === 'ADMIN');
-  if (isAuthorizedAdmin) return <AdminPanel onLogout={() => { setIsAdmin(false); localStorage.removeItem('admin_session'); sessionStorage.removeItem('admin_active'); }} />;
-  
+
   return (
-    <div className="app-main-layout" style={(isVendorMode || locationPath === '/vendor' || isRiderMode || locationPath === '/rider') ? { width: '100%', margin: 0, padding: 0 } : {}}>
-      {/* 1. Vendor Mode (Port 3002) - High level takeover */}
-      {(isVendorMode || locationPath === '/vendor') ? (
+    <div className="app-main-layout" style={(isVendorMode || locationPath === '/vendor' || isRiderMode || locationPath === '/rider' || isAdminMode) ? { width: '100%', margin: 0, padding: 0 } : {}}>
+      {/* 0. Admin Mode (Port 3005) - Strict Isolation */}
+      {isAdminMode ? (
+        !isAuthorizedAdmin ? (
+          <AdminAuth onAdminLogin={() => setIsAdmin(true)} />
+        ) : (
+          <AdminPanel onLogout={() => { setIsAdmin(false); localStorage.removeItem('admin_session'); sessionStorage.removeItem('admin_active'); }} />
+        )
+      ) : /* 1. Vendor Mode (Port 3002) - High level takeover */
+      (locationPath === '/vendor' || isVendorMode) ? (
         (!effectiveUser) ? (
-          <VendorAuth onLogin={(isDemo, num) => {
-            if (isDemo) updateDemoUser({ phoneNumber: `+91${num || '9999999999'}`, displayName: 'Demo Partner' });
+          <VendorAuth onLogin={(isDemo, phone, profile) => {
+            setUser({ ...profile, displayName: profile?.name || 'Vendor', phoneNumber: phone, isDemo, role: 'VENDOR' });
           }} />
         ) : (
           <VendorPortal user={effectiveUser} onLogout={handleLogout} />
         )
-      ) : (isRiderMode || locationPath === '/rider') ? (
+      ) : locationPath === '/select-location' ? (
+        <LocationSelector
+          currentLocation={location}
+          onLocationChange={(loc, coords) => {
+            setLocation(loc, coords);
+            navigate(isRiderMode ? '/rider' : '/');
+          }}
+        />
+      ) : (locationPath === '/rider' || isRiderMode) ? (
         /* Rider Mode (Port 3003) */
         (!effectiveUser) ? (
-          <RiderAuth onLogin={(isDemo, num, mockUser) => {
-             updateDemoUser({ 
-               phoneNumber: `+91${num || '8888888888'}`, 
-               displayName: mockUser?.name || 'Demo Rider',
-               photoURL: mockUser?.photo || null,
-               vehicleNo: mockUser?.vehicleNo || 'Bajaj Pulsar (GJ-01-AB-1234)',
-               licenseNo: mockUser?.licenseNo || 'Driving License',
-               idProof: mockUser?.idProof || 'Aadhar Card',
-               id: mockUser?.user_id || 'demo-user-123',
-               rider_id: mockUser?.rider_id || 'demo-rider-123'
-             });
+          <RiderAuth onLogin={(isDemo, phone, profile) => {
+            setUser({ ...profile, displayName: profile.name, phoneNumber: phone, isDemo, role: 'RIDER' });
           }} />
         ) : (
-          <RiderPortal user={effectiveUser} onLogout={handleLogout} />
+          <RiderPortal
+            user={effectiveUser}
+            onLogout={handleLogout}
+            location={location}
+            setLocation={setLocation}
+            userCoords={userCoords}
+          />
         )
       ) : (
         <>
           {/* Global Navbar Logic */}
           {isWebMode ? (
-            <Navbar 
+            <Navbar
               isAuthenticated={!!effectiveUser} user={effectiveUser} onLogout={handleLogout}
               onOpenProfile={() => navigate('/profile')} onOpenAI={() => navigate('/')}
               onJoin={() => navigate('/auth')}
             />
           ) : (
-            effectiveUser && (
-              <WebappNavbar 
+            (effectiveUser && isProfileComplete) && (
+              <WebappNavbar
                 user={effectiveUser} location={location} onLocationChange={setLocation}
                 isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)}
-                onOpenProfile={() => navigate('/profile')} 
+                onOpenProfile={() => navigate('/profile')}
                 onBack={locationPath !== '/' ? () => navigate(-1) : null}
                 title={
-                  currentView === 'PROFILE' ? 'Profile' : 
-                  currentView === 'NEAR_SHOPS' ? 'Near Shops' :
-                  currentView === 'EXPERT_SERVICES' ? 'Local Experts' :
-                  currentView === 'TRACKING' ? 'Active Orders' :
-                  currentView === 'NEIGHBORS' ? 'Community' : null
+                  currentView === 'PROFILE' ? 'Profile' :
+                    currentView === 'NEAR_SHOPS' ? 'Near Shops' :
+                      currentView === 'EXPERT_SERVICES' ? 'Local Experts' :
+                        currentView === 'TRACKING' ? 'Active Orders' :
+                          currentView === 'NEIGHBORS' ? 'Community' : null
                 }
               />
             )
@@ -207,35 +237,34 @@ const AppContent = ({
             <Routes>
               {/* Home Route */}
               <Route path="/" element={
-                 <>
-                   {/* Webapp Logic (Auth or Hub) */}
-                   {isWebappMode ? (
-                     (!effectiveUser || !effectiveUser.displayName || !isProfileComplete) ? <Auth onLogin={(mockData) => { if (mockData) updateDemoUser(mockData); setIsProfileComplete(true); navigate('/'); }} /> : <NeighborhoodHub user={effectiveUser} isProfileComplete={isProfileComplete} onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : v === '/complete-profile' ? '/complete-profile' : '/')} />
-                   ) : (
-                     /* Marketing Logic (Hub on top if logged in, then standard homepage) */
-                     <>
-                        {effectiveUser && (
-                          <NeighborhoodHub user={effectiveUser} isProfileComplete={isProfileComplete} onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')} />
-                        )}
-                        <Hero />
-                        <AIRecommendations />
-                        <QuickServices />
-                        <Services />
-                        <Essentials />
-                        <NearbyDeals />
-                        <Community />
-                        <VendorCTA onOpenVendor={() => window.open('http://localhost:3002', '_blank')} />
-                     </>
-                   )}
-                 </>
+                <>
+                  {/* Webapp Logic (Auth or Hub) */}
+                  {isWebappMode ? (
+                   (!effectiveUser || !effectiveUser.displayName || !isProfileComplete) ? <Auth onLogin={() => { setIsProfileComplete(true); navigate('/'); }} /> : <NeighborhoodHub user={effectiveUser} isProfileComplete={isProfileComplete} onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : v === '/complete-profile' ? '/complete-profile' : '/')} />
+                  ) : (
+                    /* Marketing Logic (Hub on top if logged in, then standard homepage) */
+                    <>
+                      {effectiveUser && (
+                        <NeighborhoodHub user={effectiveUser} isProfileComplete={isProfileComplete} onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')} />
+                      )}
+                      <Hero />
+                      <AIRecommendations />
+                      <QuickServices />
+                      <Services />
+                      <Essentials />
+                      <NearbyDeals />
+                      <Community />
+                      <VendorCTA onOpenVendor={() => window.open('http://localhost:3002', '_blank')} />
+                    </>
+                  )}
+                </>
               } />
 
               {/* Common Application Routes */}
-              <Route path="/admin" element={!isAdmin ? <AdminAuth onAdminLogin={() => setIsAdmin(true)} /> : <Navigate to="/" />} />
               <Route path="/near-shops" element={effectiveUser ? <NearShops onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/" />} />
               <Route path="/expert-services" element={effectiveUser ? <ExpertServices onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
               <Route path="/neighbors" element={effectiveUser ? <NeighborsCommunity onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
-              <Route path="/track-orders" element={effectiveUser ? <TrackOrders onBack={() => navigate('/')} /> : <Navigate to="/" />} />
+              <Route path="/track-orders" element={effectiveUser ? <TrackOrders user={effectiveUser} onBack={() => navigate('/')} /> : <Navigate to="/" />} />
               <Route path="/profile" element={effectiveUser ? <WebappProfile user={effectiveUser} onLogout={handleLogout} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/" />} />
               <Route path="/order-history" element={effectiveUser ? <OrderHistory /> : <Navigate to="/" />} />
               <Route path="/wallet" element={effectiveUser ? <Wallet /> : <Navigate to="/" />} />
@@ -243,20 +272,20 @@ const AppContent = ({
               <Route path="/help-support" element={effectiveUser ? <HelpSupport /> : <Navigate to="/" />} />
               <Route path="/settings" element={effectiveUser ? <AppSettings isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/" />} />
               <Route path="/select-location" element={effectiveUser ? <LocationSelector currentLocation={location} onLocationChange={setLocation} /> : <Navigate to="/" />} />
-              <Route path="/complete-profile" element={effectiveUser ? <CustomerDetails user={effectiveUser} onComplete={() => { setIsProfileComplete(true); navigate('/'); }} /> : <Navigate to="/" />} />
+              <Route path="/complete-profile" element={effectiveUser ? <CustomerDetails user={effectiveUser} onComplete={(addr) => { setIsProfileComplete(true); setUserAddress(addr); navigate('/'); }} /> : <Navigate to="/" />} />
             </Routes>
           </main>
 
           {/* 4. Global Footers/Navs */}
-          {isWebappMode && effectiveUser && (
+          {isWebappMode && effectiveUser && isProfileComplete && (
             <BottomNav activeTab={currentView} onTabChange={(v) => navigate(v === 'DASHBOARD' ? '/' : v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'TRACKING' ? '/track-orders' : v === 'NEIGHBORS' ? '/neighbors' : v === 'PROFILE' ? '/profile' : '/')} />
           )}
 
           {isWebMode && <Footer />}
 
           {/* 5. Drawers / Modals */}
-          <CartDrawer />
-          <AIAssistant isOpen={false} onClose={() => {}} onOpen={() => {}} />
+          <CartDrawer location={location} isProfileComplete={isProfileComplete} userAddress={userAddress} />
+          <AIAssistant isOpen={false} onClose={() => { }} onOpen={() => { }} />
         </>
       )}
     </div>
@@ -281,32 +310,51 @@ class ErrorBoundary extends React.Component {
 }
 
 function App() {
-  const [user, setUser] = useState(null);
-  const [demoUser, setDemoUser] = useState(() => {
-    const saved = localStorage.getItem('v_demo_session');
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('passwala_user');
+    try {
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+  const [authLoading, setAuthLoading] = useState(() => {
+    // If we have a saved user, we can skip the initial loading state to feel faster
+    return !localStorage.getItem('passwala_user');
+  });
+  const [isProfileComplete, setIsProfileComplete] = useState(() => {
+    return localStorage.getItem('passwala_profile_complete') === 'true';
+  });
+  const [userAddress, setUserAddress] = useState(() => {
+    const saved = localStorage.getItem('passwala_user_address');
     return saved ? JSON.parse(saved) : null;
   });
-  const [authLoading, setAuthLoading] = useState(true);
-  const [isProfileComplete, setIsProfileComplete] = useState(true);
   const [minSplashDone, setMinSplashDone] = useState(false);
   const [isAdmin, setIsAdmin] = useState(() => {
-    const isWebapp = window.location.port === '3001';
+    const isAdminApp = window.location.port === '3005';
     const hasAdminSession = localStorage.getItem('admin_session') === 'true';
-    if (isWebapp && !sessionStorage.getItem('admin_active')) return false;
+    if (!isAdminApp) return false;
     return hasAdminSession;
   });
-  const [location, setLocation] = useState('Ahmedabad, Gujarat');
-  const [userCoords, setUserCoords] = useState({ lat: 23.0225, lng: 72.5714 });
+  const [location, setLocation] = useState(() => localStorage.getItem('passwala_location') || null);
+  const [userCoords, setUserCoords] = useState(() => {
+    const saved = localStorage.getItem('passwala_coords');
+    return saved ? JSON.parse(saved) : { lat: 23.0225, lng: 72.5714 };
+  });
+
+  const updateLocation = (newLoc, coords) => {
+    setLocation(newLoc);
+    localStorage.setItem('passwala_location', newLoc);
+    if (coords) updateCoords(coords);
+  };
+
+  const updateCoords = (newCoords) => {
+    setUserCoords(newCoords);
+    localStorage.setItem('passwala_coords', JSON.stringify(newCoords));
+  };
   const isWebappMode = window.location.port === '3001';
 
-  // Sync demo session to local storage
-  useEffect(() => {
-    if (demoUser) {
-      localStorage.setItem('v_demo_session', JSON.stringify(demoUser));
-    } else {
-      localStorage.removeItem('v_demo_session');
-    }
-  }, [demoUser]);
+  // Authentication state logic
 
   useEffect(() => {
     const autoDetectLocation = async () => {
@@ -322,7 +370,7 @@ function App() {
                 const city = data.address.city || data.address.town || data.address.village || data.address.state_district;
                 const state = data.address.state;
                 if (city && state) {
-                  setLocation(`${city}, ${state}`);
+                  updateLocation(`${city}, ${state}`);
                   return;
                 }
               }
@@ -346,9 +394,14 @@ function App() {
         const res = await fetch('https://ipapi.co/json/');
         const data = await res.json();
         if (data && data.city && data.region) {
-          setLocation(`${data.city}, ${data.region}`);
+          const detectedCity = data.city || '';
+          if (detectedCity.toLowerCase().includes('ahmedabad')) {
+            updateLocation(`${data.city}, ${data.region}`);
+          } else {
+          updateLocation(`${data.city}, ${data.region}`);
+          }
           if (data.latitude && data.longitude) {
-            setUserCoords({ lat: parseFloat(data.latitude), lng: parseFloat(data.longitude) });
+            updateCoords({ lat: parseFloat(data.latitude), lng: parseFloat(data.longitude) });
           }
         } else {
           throw new Error('ipapi failed');
@@ -358,8 +411,8 @@ function App() {
           const res2 = await fetch('http://ip-api.com/json/');
           const data2 = await res2.json();
           if (data2 && data2.status === 'success') {
-            setLocation(`${data2.city}, ${data2.regionName}`);
-            setUserCoords({ lat: data2.lat, lng: data2.lon });
+            updateLocation(`${data2.city}, ${data2.regionName}`);
+            updateCoords({ lat: data2.lat, lng: data2.lon });
           }
         } catch (err2) {
           console.warn('All IP Location fallbacks failed');
@@ -370,48 +423,86 @@ function App() {
     autoDetectLocation();
   }, []);
 
+  // PERSISTENCE: Sync user state to localStorage
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('passwala_user', JSON.stringify(user));
+      localStorage.setItem('passwala_profile_complete', JSON.stringify(isProfileComplete));
+      if (userAddress) localStorage.setItem('passwala_user_address', JSON.stringify(userAddress));
+    }
+  }, [user, isProfileComplete, userAddress]);
+
   useEffect(() => {
     const alreadyShown = sessionStorage.getItem('v_initial_splash_done');
-    const delay = alreadyShown ? 500 : 2000;
+    const delay = alreadyShown ? 200 : 800; // Much faster startup
     const splashTimer = setTimeout(() => {
       setMinSplashDone(true);
       sessionStorage.setItem('v_initial_splash_done', 'true');
     }, delay);
 
+    // EMERGENCY TIMEOUT: Don't stay stuck on splash if Firebase is slow
+    const authTimeout = setTimeout(() => {
+        setAuthLoading(false);
+    }, 3000);
+
     const unsub = onAuthStateChanged(auth, async (u) => {
-       if (u) {
-         try {
-           const { data: addr } = await supabase
-             .from('addresses')
-             .select('id')
-             .eq('user_id', u.uid)
-             .maybeSingle();
-           
-           if (!addr) {
-              const { data: usr } = await supabase.from('users').select('id').eq('email', u.email).maybeSingle();
-              if (usr) {
-                const { data: addr2 } = await supabase.from('addresses').select('id').eq('user_id', usr.id).maybeSingle();
-                setIsProfileComplete(!!addr2);
-              } else {
-                setIsProfileComplete(false);
-              }
-           } else {
-             setIsProfileComplete(true);
-           }
-         } catch (err) {
-           console.error("Auto Sync Failed", err);
-           setIsProfileComplete(true);
-         }
-       } else {
-         setIsProfileComplete(true);
-       }
-       setUser(u);
-       setAuthLoading(false);
+      clearTimeout(authTimeout); // Firebase responded, clear timeout
+      // PROTECT: Don't overwrite a manual session (Rider/Vendor) with a null Firebase session
+      const savedUser = localStorage.getItem('passwala_user');
+      const manualUser = savedUser ? JSON.parse(savedUser) : null;
+      const wasComplete = localStorage.getItem('passwala_profile_complete') === 'true';
+      
+      if (!u && manualUser && manualUser.role && manualUser.role !== 'BUYER') {
+          // Keep the manual session for non-buyers
+          setAuthLoading(false);
+          setIsProfileComplete(true); 
+          return;
+      }
+
+      let finalUser = u || manualUser;
+      if (u) {
+        try {
+          // 1. Fetch Supabase ID (UUID) for this user
+          const phoneNo = u.phoneNumber?.replace('+91', '');
+          const { data: usr } = await supabase.from('users')
+            .select('id')
+            .or(`email.eq.${u.email}${phoneNo ? ',phone.eq.' + phoneNo : ''}`)
+            .maybeSingle();
+          
+          if (usr) {
+            // Augment Firebase user with Supabase UUID
+            finalUser = { ...u, id: usr.id, uid: u.uid, email: u.email, phoneNumber: u.phoneNumber, displayName: u.displayName || manualUser?.displayName };
+            
+            // 2. Fetch address using the UUID
+            const { data: addr } = await supabase.from('addresses').select('*').eq('user_id', usr.id).maybeSingle();
+            if (addr) {
+              setIsProfileComplete(true);
+              setUserAddress(addr);
+            } else {
+              // Try legacy UID lookup
+              const { data: addrLegacy } = await supabase.from('addresses').select('*').eq('user_id', u.uid).maybeSingle();
+              setIsProfileComplete(!!addrLegacy || wasComplete);
+              if (addrLegacy) setUserAddress(addrLegacy);
+            }
+          } else {
+            // No user in Supabase yet, use UID
+            setIsProfileComplete(wasComplete);
+          }
+        } catch (err) {
+          console.error("Auto Sync Failed", err);
+          setIsProfileComplete(wasComplete);
+        }
+      } else {
+        setIsProfileComplete(false);
+      }
+      
+      setUser(finalUser);
+      setAuthLoading(false);
     });
 
     return () => {
-       unsub();
-       clearTimeout(splashTimer);
+      unsub();
+      clearTimeout(splashTimer);
     };
   }, []);
 
@@ -428,17 +519,19 @@ function App() {
                 <CartProvider user={user}>
                   <div className="app-container">
                     <Toaster position="bottom-center" toastOptions={{ duration: 3000 }} />
-                    <AppContent 
-                      effectiveUser={user || demoUser} 
+                    <AppContent
+                      effectiveUser={user}
                       isProfileComplete={isProfileComplete}
                       setIsProfileComplete={setIsProfileComplete}
-                      updateDemoUser={setDemoUser}
                       isWebappMode={isWebappMode}
                       isAdmin={isAdmin}
                       setIsAdmin={setIsAdmin}
                       location={location}
                       userCoords={userCoords}
-                      setLocation={setLocation}
+                      setLocation={updateLocation}
+                      userAddress={userAddress}
+                      setUserAddress={setUserAddress}
+                      setUser={setUser}
                     />
                   </div>
                 </CartProvider>

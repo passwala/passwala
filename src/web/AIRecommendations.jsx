@@ -3,6 +3,7 @@ import { toast } from 'react-hot-toast';
 import { useCart } from '../context/CartContext';
 import { useSearch } from '../context/SearchContext';
 import { supabase } from '../supabase';
+import { MOCK_AI_RECOMMENDATIONS } from '../data/mockData';
 import './AIRecommendations.css';
 
 const AIRecommendations = () => {
@@ -15,16 +16,20 @@ const AIRecommendations = () => {
     const fetchRecs = async () => {
       try {
         const { data, error } = await supabase.from('ai_recommendations').select('*').order('created_at', { ascending: false });
-        if (error) throw error;
-        // Filter unique names
-        const uniqueData = data.reduce((acc, current) => {
-          const x = acc.find(item => item.name === current.name);
-          if (!x) return acc.concat([current]);
-          else return acc;
-        }, []);
-        setRecs(uniqueData);
+        if (error || !data || data.length === 0) {
+           setRecs(MOCK_AI_RECOMMENDATIONS);
+        } else {
+           // Filter unique names
+           const uniqueData = data.reduce((acc, current) => {
+             const x = acc.find(item => item.name === current.name);
+             if (!x) return acc.concat([current]);
+             else return acc;
+           }, []);
+           setRecs(uniqueData);
+        }
       } catch (err) {
         console.error(err);
+        setRecs(MOCK_AI_RECOMMENDATIONS);
       } finally {
         setLoading(false);
       }
@@ -50,7 +55,11 @@ const AIRecommendations = () => {
           {filteredRecs.map(r => (
             <div key={r.id} className="rec-card glass card-hover flex-column items-center">
                <div className="rec-image-box">
-                  <img src={r.image} alt={r.name} />
+                  <img 
+                    src={r.image || 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&q=80&w=400'} 
+                    alt={r.name} 
+                    onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&q=80&w=400' }}
+                  />
                </div>
                <div className="rec-details text-center">
                   <div className="rec-badge">✨ Optimized</div>

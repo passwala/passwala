@@ -186,6 +186,25 @@
   border: 2px solid white;
 }
 
+.nav-cart-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--primary);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 800;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(255, 118, 34, 0.3);
+}
+
 .theme-toggle-v2:hover,
 .nav-action-btn-v2:hover,
 .nav-back-btn:hover {

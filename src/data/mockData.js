@@ -103,6 +103,36 @@ export const MOCK_DEALS = [
   }
 ];
 
+export const MOCK_AI_RECOMMENDATIONS = [
+  {
+    id: 'ai1',
+    name: 'Full Home Cleaning',
+    provider: 'Elite Shine',
+    price: 1299,
+    reason: 'Trending in your neighborhood',
+    image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6954?auto=format&fit=crop&q=80&w=400',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'ai2',
+    name: 'RO Purifier Service',
+    provider: 'PureAqua Fix',
+    price: 499,
+    reason: 'Recommended for summer season',
+    image: 'https://images.unsplash.com/photo-1581094288338-2314dddb7ecc?auto=format&fit=crop&q=80&w=400',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'ai3',
+    name: 'Pest Control',
+    provider: 'SafeGuard Pests',
+    price: 899,
+    reason: 'Monthly essential service',
+    image: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&q=80&w=400',
+    created_at: new Date().toISOString()
+  }
+];
+
 export const MOCK_VENDORS = [
   { 
     id: 'demo1', 

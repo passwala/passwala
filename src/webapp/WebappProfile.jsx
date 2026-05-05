@@ -58,7 +58,7 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onVendorMode
     setIsUpdatingName(true);
     try {
       const searchId = user?.uid || user?.email || user?.phoneNumber;
-      const res = await fetch(`http://localhost:3004/api/users/${encodeURIComponent(searchId)}/name`, {
+      const res = await fetch(`http://${window.location.hostname}:3004/api/users/${encodeURIComponent(searchId)}/name`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayName: newName })
@@ -96,7 +96,7 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onVendorMode
       
       try {
         const id = user?.phoneNumber || user?.email || user?.uid;
-        const res = await fetch(`http://localhost:3004/api/users/${encodeURIComponent(id)}/photo`, {
+        const res = await fetch(`http://${window.location.hostname}:3004/api/users/${encodeURIComponent(id)}/photo`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ photoURL: base64String })
@@ -129,7 +129,7 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onVendorMode
       const searchId = user?.uid || user?.email || user?.phoneNumber;
       
       // 1. Delete from Supabase Database
-      const res = await fetch(`http://localhost:3004/api/users/${encodeURIComponent(searchId)}`, {
+      const res = await fetch(`http://${window.location.hostname}:3004/api/users/${encodeURIComponent(searchId)}`, {
         method: 'DELETE',
       });
       

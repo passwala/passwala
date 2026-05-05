@@ -10,25 +10,32 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
   const navigate = useNavigate();
 
   const ahmedabadAreas = [
-    'Satellite, Ahmedabad',
-    'Prahlad Nagar, Ahmedabad',
-    'Bopal, Ahmedabad',
-    'South Bopal, Ahmedabad',
-    'Vastrapur, Ahmedabad',
-    'Bodakdev, Ahmedabad',
-    'S.G. Highway, Ahmedabad',
-    'Thaltej, Ahmedabad',
-    'Gota, Ahmedabad',
-    'Ghatlodia, Ahmedabad',
-    'Chandkheda, Ahmedabad',
-    'Maninagar, Ahmedabad',
-    'Navrangpura, Ahmedabad',
-    'C.G. Road, Ahmedabad'
+    { name: 'Satellite, Ahmedabad', lat: 23.0305, lng: 72.5075 },
+    { name: 'Prahlad Nagar, Ahmedabad', lat: 23.0120, lng: 72.5108 },
+    { name: 'Bopal, Ahmedabad', lat: 23.0350, lng: 72.4397 },
+    { name: 'South Bopal, Ahmedabad', lat: 23.0158, lng: 72.4566 },
+    { name: 'Vastrapur, Ahmedabad', lat: 23.0393, lng: 72.5244 },
+    { name: 'Bodakdev, Ahmedabad', lat: 23.0416, lng: 72.5133 },
+    { name: 'S.G. Highway, Ahmedabad', lat: 23.0257, lng: 72.5033 },
+    { name: 'Thaltej, Ahmedabad', lat: 23.0497, lng: 72.5107 },
+    { name: 'Gota, Ahmedabad', lat: 23.0753, lng: 72.5258 },
+    { name: 'Ghatlodia, Ahmedabad', lat: 23.0645, lng: 72.5413 },
+    { name: 'Chandkheda, Ahmedabad', lat: 23.1119, lng: 72.5854 },
+    { name: 'Maninagar, Ahmedabad', lat: 22.9972, lng: 72.6014 },
+    { name: 'Navrangpura, Ahmedabad', lat: 23.0333, lng: 72.5621 },
+    { name: 'C.G. Road, Ahmedabad', lat: 23.0269, lng: 72.5599 }
   ];
 
-  const handleSelect = (area) => {
-    onLocationChange(area);
-    toast.success(`Location set to ${area.split(',')[0]}`);
+  const handleSelect = (areaObj) => {
+    onLocationChange(areaObj.name, { lat: areaObj.lat, lng: areaObj.lng });
+    toast.success(`Location set to ${areaObj.name.split(',')[0]}`);
+  };
+
+  const handleBack = () => {
+    if (!currentLocation) {
+      toast.error('Location is compulsory for real-time services!');
+      return;
+    }
     navigate(-1);
   };
 
@@ -42,11 +49,11 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
           const { latitude, longitude } = position.coords;
           const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`);
           const data = await res.json();
-          const area = data.address.suburb || data.address.neighbourhood || data.address.city || 'Ahmedabad';
-          const full = `${area}, Ahmedabad`;
+          const area = data.address?.suburb || data.address?.neighbourhood || data.address?.city || data.address?.town || 'My Location';
+          const city = data.address?.city || data.address?.town || data.address?.state_district || '';
+          const full = city ? `${area}, ${city}` : area;
           onLocationChange(full);
           toast.success(`Located: ${full}`, { id: 'geo' });
-          navigate(-1);
         } catch (err) {
           fallbackToIP();
         }
@@ -67,7 +74,6 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
         const full = `${data.city}, ${data.region}`;
         onLocationChange(full);
         toast.success(`Approximated: ${full}`, { id: 'geo', duration: 3000 });
-        navigate(-1);
       } else {
         throw new Error('IP failed');
       }
@@ -84,7 +90,7 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
       className="location-selector-page"
     >
       <div className="location-header">
-        <button className="back-btn-v3" onClick={() => navigate(-1)}>
+        <button className="back-btn-v3" onClick={handleBack}>
           <ChevronLeft size={24} />
         </button>
         <h1>Ahmedabad Areas</h1>
@@ -101,17 +107,17 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
         <div className="cities-list">
           {ahmedabadAreas.map((area) => (
             <button 
-              key={area} 
-              className={`city-item ${currentLocation === area ? 'active' : ''}`}
+              key={area.name} 
+              className={`city-item ${currentLocation === area.name ? 'active' : ''}`}
               onClick={() => handleSelect(area)}
             >
               <div className="city-info">
                  <div className="area-gps-icon">
                     <MapPin size={16} />
                  </div>
-                 <span>{area.split(',')[0]}</span>
+                 <span>{area.name.split(',')[0]}</span>
               </div>
-              {currentLocation === area && <CheckCircle2 size={18} className="check-icon" />}
+              {currentLocation === area.name && <CheckCircle2 size={18} className="check-icon" />}
             </button>
           ))}
         </div>

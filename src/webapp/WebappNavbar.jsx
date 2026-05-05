@@ -1,18 +1,22 @@
- 
+
 import React from 'react';
 import { 
   ArrowLeft, 
   MapPin, 
   Bell, 
   Sun,
-  Moon
+  Moon,
+  ShoppingBag
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { useCart } from '../context/CartContext';
 import './WebappNavbar.css';
 
 const WebappNavbar = ({ user, onOpenProfile, onBack, title, location }) => {
   const navigate = useNavigate();
+  const { totalItems, setCartOpen } = useCart();
+  
   return (
     <nav className="webapp-navbar glass">
       <div className="navbar-top-main">
@@ -43,6 +47,11 @@ const WebappNavbar = ({ user, onOpenProfile, onBack, title, location }) => {
         </div>
 
         <div className="navbar-right-actions">
+          <button className="nav-action-btn-v2" onClick={() => setCartOpen(true)}>
+             <ShoppingBag size={20} />
+             {totalItems > 0 && <span className="nav-cart-badge">{totalItems}</span>}
+          </button>
+          
           <button className="nav-action-btn-v2" onClick={() => toast('No new notifications.')}>
              <Bell size={20} />
              <span className="notif-dot"></span>
@@ -64,4 +73,3 @@ const WebappNavbar = ({ user, onOpenProfile, onBack, title, location }) => {
 };
 
 export default WebappNavbar;
-
