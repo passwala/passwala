@@ -234,16 +234,21 @@ const AdminPanel = ({ onLogout }) => {
     const currentTable = TABS.find(t => t.id === activeTab)?.table || activeTab;
     
     try {
-      // Fetch from Backend API (bypass RLS via Service Role)
-      const response = await fetch(`${API_URL}/api/admin/fetch?table=${currentTable}`);
-      if (!response.ok) throw new Error('Failed to fetch from cloud');
+      if (!supabase) throw new Error('Supabase client not initialized');
+
+      // Fetch directly from Supabase
+      let query = supabase.from(currentTable).select(
+          currentTable === 'riders' || currentTable === 'vendors' || currentTable === 'service_providers'
+              ? '*, users(phone, full_name)'
+              : '*'
+      );
       
-      const result = await response.json();
-      const data = result.data || [];
+      const { data: suData, error: suError } = await query.order('created_at', { ascending: false });
+      if (suError) throw suError;
 
       // Update State & Cache
-      setData(data || []);
-      localStorage.setItem(`admin_cache_${currentTable}`, JSON.stringify(data || []));
+      setData(suData || []);
+      localStorage.setItem(`admin_cache_${currentTable}`, JSON.stringify(suData || []));
       setSyncStatus('cloud');
       toast.dismiss('offline-toast'); // Clear any previous offline warnings
     } catch (err) {
@@ -285,28 +290,16 @@ const AdminPanel = ({ onLogout }) => {
 
   const handleExecuteDelete = async () => {
     if (!deleteConfirmId) return;
-    const pkName = 'id';
 
     try {
-      if (currentTab.table === 'users') {
-          // Use Backend API for users to ensure we use the Service Role Key
-          const res = await fetch(`${API_URL}/api/users/${deleteConfirmId}`, { method: 'DELETE' });
-          if (!res.ok) {
-              const data = await res.json();
-              throw new Error(data.error || 'Failed to delete user');
-          }
-      } else {
-          // Use Backend API for all tables to bypass RLS and use Service Role
-          const res = await fetch(`${API_URL}/api/admin/delete`, { 
-              method: 'DELETE',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ table: currentTab.table, id: deleteConfirmId })
-          });
-          if (!res.ok) {
-              const data = await res.json();
-              throw new Error(data.error || 'Failed to delete record');
-          }
-      }
+      if (!supabase) throw new Error('Supabase client not initialized');
+
+      const { error } = await supabase
+          .from(currentTab.table)
+          .delete()
+          .eq('id', deleteConfirmId);
+
+      if (error) throw error;
       
       // Remove from local storage to clean up any stuck items
       const localKey = `admin_local_${currentTab.table}`;
@@ -369,23 +362,56 @@ const AdminPanel = ({ onLogout }) => {
       }
 
       // 2. Attempt Background Cloud Sync
-      const syncPayload = { ...payload };
-      if (syncPayload.id && syncPayload.id.startsWith('temp_')) {
-          delete syncPayload.id;
-      }
+      let finalPayload = { ...payload };
 
       try {
-        const response = await fetch(`${API_URL}/api/admin/upsert`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            table: currentTab.table, 
-            payload: syncPayload 
-          })
-        });
+        if (!supabase) throw new Error('Supabase client not initialized');
 
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Server Error');
+        // A. Handle User-Linked Tables (riders, vendors, service_providers)
+        const userLinkedTables = ['riders', 'vendors', 'service_providers'];
+        if (userLinkedTables.includes(currentTab.table) && finalPayload.phone) {
+            const { data: user, error: userError } = await supabase
+                .from('users')
+                .upsert({ 
+                    phone: finalPayload.phone, 
+                    full_name: finalPayload.full_name || 'Admin Created'
+                }, { onConflict: 'phone' })
+                .select()
+                .single();
+            
+            if (userError) {
+                console.error('❌ Failed to link user:', userError.message);
+            } else {
+                finalPayload.user_id = user.id;
+            }
+        }
+
+        // B. Clear temporary/local id
+        if (finalPayload.id && finalPayload.id.startsWith('temp_')) {
+            delete finalPayload.id;
+        }
+
+        // C. Clean payload according to table schema
+        const schema = TABLE_SCHEMAS[currentTab.table];
+        let cleanedPayload = {};
+        if (schema) {
+            const allowedKeys = [...Object.keys(schema), 'id'];
+            Object.keys(finalPayload).forEach(key => {
+                if (allowedKeys.includes(key)) {
+                    cleanedPayload[key] = finalPayload[key];
+                }
+            });
+        } else {
+            cleanedPayload = { ...finalPayload };
+        }
+
+        // D. Perform Upsert directly on Supabase
+        const conflictTarget = currentTab.table === 'service_areas' ? 'area_name' : 'id';
+        const { error: suError } = await supabase
+            .from(currentTab.table)
+            .upsert(cleanedPayload, { onConflict: conflictTarget });
+        
+        if (suError) throw suError;
 
         toast.success('Synced with Cloud! ☁️', { id: 'offline-toast' });
         setSyncStatus('cloud');

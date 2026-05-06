@@ -10,22 +10,16 @@ const AdminAuth = ({ onAdminLogin }) => {
   const handleAdminAuth = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://${window.location.hostname}:3004/api/admin/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessCode: adminCode })
-      });
-      const data = await res.json();
-      
-      if (data.success) {
+      const secureCode = import.meta.env.VITE_ADMIN_ACCESS_CODE || 'PASSWALA_SECURE_99';
+      if (adminCode === secureCode) {
         toast.success('Admin Authorized!');
         onAdminLogin();
       } else {
-        toast.error(data.error || 'Invalid Credentials');
+        toast.error('Invalid Credentials');
       }
     } catch (err) {
       console.error(err);
-      toast.error('Connection failed');
+      toast.error('Authentication failed');
     } finally {
       setLoading(false);
     }
