@@ -345,6 +345,12 @@ const AdminPanel = ({ onLogout }) => {
       setSaving(true);
       // 1. Prepare payload and Update Local State (Optimistic)
       let payload = { ...formData };
+      if (payload.aadhar_no) {
+          payload.aadhar_no = payload.aadhar_no.replace(/\s/g, '');
+      }
+      if (payload.id_proof) {
+          payload.id_proof = payload.id_proof.replace(/\s/g, '');
+      }
       
       // Temporary local ID if missing
       if (!editingItem && !payload.id) {
@@ -508,12 +514,21 @@ const AdminPanel = ({ onLogout }) => {
                         if (k === 'full_name' && !v) v = item.users.full_name;
                       }
                       
+                      let displayVal = v === null || v === undefined ? 'N/A' : String(v);
+                      if ((k === 'id_proof' || k === 'aadhar_no') && displayVal.length === 12 && /^\d+$/.test(displayVal)) {
+                        const parts = [];
+                        for (let i = 0; i < displayVal.length; i += 4) {
+                          parts.push(displayVal.slice(i, i + 4));
+                        }
+                        displayVal = parts.join(' ');
+                      }
+
                       return (
                       <td key={k}>
                         {k === 'status' || k === 'role' ? (
                           <span className={`status-badge ${v}`}>{v}</span>
                         ) : typeof v === 'boolean' ? (v ? '✅' : '❌') : (
-                          <span className="truncate-cell">{v === null || v === undefined ? 'N/A' : String(v)}</span>
+                          <span className="truncate-cell">{displayVal}</span>
                         )}
                       </td>
                     )})}
@@ -803,10 +818,31 @@ CREATE TABLE IF NOT EXISTS service_areas (
                         <input 
                           type={typeof formData[key] === 'number' ? 'number' : 'text'}
                           value={formData[key] || ''}
+                          maxLength={key === 'phone' ? 10 : (key === 'aadhar_no' ? 14 : (key === 'id_proof' ? (formData[key] && /^\d+$/.test(formData[key].replace(/[^A-Z0-9]/g, '')) ? 14 : 10) : undefined))}
                           onChange={(e) => {
                             let val = e.target.value;
                             if (key === 'phone') {
                                 val = val.replace(/\D/g, '').slice(0, 10);
+                            } else if (key === 'aadhar_no') {
+                                const clean = val.replace(/\D/g, '').slice(0, 12);
+                                const parts = [];
+                                for (let i = 0; i < clean.length; i += 4) {
+                                  parts.push(clean.slice(i, i + 4));
+                                }
+                                val = parts.join(' ');
+                            } else if (key === 'id_proof') {
+                                val = val.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                                const isNumeric = /^\d+$/.test(val) || val.length === 0;
+                                if (isNumeric) {
+                                  const sliced = val.slice(0, 12);
+                                  const parts = [];
+                                  for (let i = 0; i < sliced.length; i += 4) {
+                                    parts.push(sliced.slice(i, i + 4));
+                                  }
+                                  val = parts.join(' ');
+                                } else {
+                                  val = val.slice(0, 10);
+                                }
                             }
                             setFormData({...formData, [key]: val});
                           }}

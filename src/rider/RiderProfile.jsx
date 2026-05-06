@@ -4,6 +4,20 @@ import { toast } from 'react-hot-toast';
 import { Bike, FileText, Star, LogOut, Info, CheckCircle, XCircle, Bell, Headset, ChevronRight, ArrowLeft, CheckCircle2, ShieldCheck, Image as ImageIcon, Trash2, RefreshCw } from 'lucide-react';
 import './RiderPortal.css'; // Import custom styles
 
+const formatIdProofForDisplay = (val) => {
+  if (!val) return 'Not Provided';
+  const cleanVal = val.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const isNumeric = /^\d+$/.test(cleanVal);
+  if (isNumeric && cleanVal.length === 12) {
+    const parts = [];
+    for (let i = 0; i < cleanVal.length; i += 4) {
+      parts.push(cleanVal.slice(i, i + 4));
+    }
+    return parts.join(' ');
+  }
+  return cleanVal;
+};
+
 function DocumentsSubpage({ user, onBack }) {
   return (
     <div className="rider-screen" style={{ animation: 'slideUp 0.3s ease-out' }}>
@@ -26,7 +40,7 @@ function DocumentsSubpage({ user, onBack }) {
          <h4 style={{ margin: '0 0 1rem 0', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}><CheckCircle2 size={18} color="var(--rider-success)" /> Personal ID</h4>
          <div style={{ background: '#f3f4f6', padding: '1rem', borderRadius: '12px' }}>
             <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.75rem', color: 'var(--rider-text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>Aadhar / PAN</p>
-            <p style={{ margin: 0, fontWeight: 700, fontSize: '1.125rem', letterSpacing: '0.05em' }}>{user?.idProof || 'Not Provided'}</p>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: '1.125rem', letterSpacing: '0.05em' }}>{formatIdProofForDisplay(user?.idProof)}</p>
          </div>
       </div>
 
@@ -248,7 +262,7 @@ function RiderProfile({ user, onLogout, stats }) {
       {/* Details List */}
       <div style={{ background: 'white', borderRadius: '24px', border: '1px solid var(--rider-border)', overflow: 'hidden', boxShadow: 'var(--rider-shadow)' }}>
         <MenuItem icon={<Bike />} title="Vehicle Details" subtitle={user?.vehicleNo || "Bajaj Pulsar (GJ-01-AB-1234)"} onClick={() => setActiveSubpage('vehicle')} />
-        <MenuItem icon={<FileText />} title="Documents" subtitle={`${user?.licenseNo || 'Driving License'}, ${user?.idProof || 'Aadhar Card'} (Verified)`} onClick={() => setActiveSubpage('documents')} />
+        <MenuItem icon={<FileText />} title="Documents" subtitle={`${user?.licenseNo || 'Driving License'}, ${formatIdProofForDisplay(user?.idProof) || 'Aadhar Card'} (Verified)`} onClick={() => setActiveSubpage('documents')} />
         <MenuItem icon={<Bell />} title="Notifications" subtitle="Alerts on new orders & payments" onClick={() => setActiveSubpage('notifications')} />
         <MenuItem icon={<Headset />} title="Help & Support" subtitle="Chat with support, report issues" onClick={() => setActiveSubpage('help')} />
         <MenuItem icon={<Info />} title="About Passwala" subtitle="Terms, policies" onClick={() => setActiveSubpage('about')} />

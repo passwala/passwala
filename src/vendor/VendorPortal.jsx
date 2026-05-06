@@ -43,6 +43,15 @@ import {
   VendorSupport 
 } from './VendorSubPages';
 
+const formatAadhar = (val) => {
+  const cleanVal = val.replace(/\D/g, '').slice(0, 12);
+  const parts = [];
+  for (let i = 0; i < cleanVal.length; i += 4) {
+    parts.push(cleanVal.slice(i, i + 4));
+  }
+  return parts.join(' ');
+};
+
 const VendorPortal = ({ user, onLogout }) => {
   const [appStatus, setAppStatus] = useState('loading'); // loading, onboarding, dashboard, pending
   console.log('VendorPortal Rendering, appStatus:', appStatus);
@@ -309,7 +318,7 @@ const VendorPortal = ({ user, onLogout }) => {
               business_name: editFormData.business_name,
               address: editFormData.address,
               license_no: editFormData.license_no,
-              aadhar_no: editFormData.aadhar_no
+              aadhar_no: editFormData.aadhar_no ? editFormData.aadhar_no.replace(/\s/g, '') : null
            })
            .eq('id', vendorData.id);
            
@@ -476,7 +485,7 @@ const VendorPortal = ({ user, onLogout }) => {
             {isEditingProfile ? (
               <>
                 <button className="v-nav-item" style={{ width: 'auto', background: '#f1f5f9', color: '#64748b', fontWeight: 700 }} onClick={() => setIsEditingProfile(false)} disabled={isUpdating}>Cancel</button>
-                <button className="auth-submit-btn" style={{ width: 'auto', padding: '12px 32px' }} onClick={handleUpdateProfile} disabled={isUpdating || !editFormData.name || !editFormData.business_name || (editFormData.aadhar_no?.length > 0 && editFormData.aadhar_no?.length !== 12)}>
+                <button className="auth-submit-btn" style={{ width: 'auto', padding: '12px 32px' }} onClick={handleUpdateProfile} disabled={isUpdating || !editFormData.name || !editFormData.business_name || (editFormData.aadhar_no && editFormData.aadhar_no.replace(/\s/g, '').length > 0 && editFormData.aadhar_no.replace(/\s/g, '').length !== 12)}>
                   {isUpdating ? 'Saving...' : 'Save Changes'}
                 </button>
               </>
@@ -577,7 +586,14 @@ const VendorPortal = ({ user, onLogout }) => {
           
           <div className="v-form-group">
             <label>Aadhar Number</label>
-            <input type="text" placeholder="12-digit Aadhar No" maxLength={12} className="v-input" value={formData.aadhar_no} onChange={e => setFormData({...formData, aadhar_no: e.target.value.replace(/\D/g, '')})} />
+            <input 
+              type="text" 
+              placeholder="12-digit Aadhar No" 
+              maxLength={14} 
+              className="v-input" 
+              value={formData.aadhar_no} 
+              onChange={e => setFormData({...formData, aadhar_no: formatAadhar(e.target.value)})} 
+            />
           </div>
 
           <div className="v-form-group">
@@ -617,7 +633,7 @@ const VendorPortal = ({ user, onLogout }) => {
              onClick={() => setOnboardingSubStep(3)} 
              disabled={
                !formData.name || 
-               formData.aadhar_no.length !== 12 || 
+               formData.aadhar_no.replace(/\s/g, '').length !== 12 || 
                !formData.business_name
              }
           >
@@ -655,7 +671,7 @@ const VendorPortal = ({ user, onLogout }) => {
                 const targetTable = businessType === 'shop' ? 'vendors' : 'service_providers';
                 const tablePayload = {
                    business_name: formData.business_name,
-                   aadhar_no: formData.aadhar_no,
+                   aadhar_no: formData.aadhar_no.replace(/\s/g, ''),
                    license_no: formData.license_no,
                    address: formData.address,
                    phone: currentPhone,

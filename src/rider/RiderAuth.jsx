@@ -71,6 +71,21 @@ const CameraModal = ({ isOpen, onClose, onCapture, mode = 'user' }) => {
   );
 };
 
+const formatIdProof = (val) => {
+  const cleanVal = val.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const isNumeric = /^\d+$/.test(cleanVal) || cleanVal.length === 0;
+  if (isNumeric) {
+    const sliced = cleanVal.slice(0, 12);
+    const parts = [];
+    for (let i = 0; i < sliced.length; i += 4) {
+      parts.push(sliced.slice(i, i + 4));
+    }
+    return parts.join(' ');
+  } else {
+    return cleanVal.slice(0, 10);
+  }
+};
+
 function RiderAuth({ onLogin }) {
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
@@ -115,17 +130,19 @@ function RiderAuth({ onLogin }) {
       return;
     }
 
+    const cleanIdProof = profile.idProof.replace(/[^A-Z0-9]/g, '');
+
     // Aadhar / PAN Validation
-    const isAadhar = /^\d{12}$/.test(profile.idProof);
-    const isPan = /^[A-Z]{5}\d{4}[A-Z]{1}$/.test(profile.idProof);
+    const isAadhar = /^\d{12}$/.test(cleanIdProof);
+    const isPan = /^[A-Z]{5}\d{4}[A-Z]{1}$/.test(cleanIdProof);
     
-    if (profile.idProof.length === 10 && !isPan) {
+    if (cleanIdProof.length === 10 && !isPan) {
       toast.error('Invalid PAN format. Should be 5 letters, 4 numbers, 1 letter.');
       return;
-    } else if (profile.idProof.length === 12 && !isAadhar) {
+    } else if (cleanIdProof.length === 12 && !isAadhar) {
       toast.error('Invalid Aadhar format. Must be exactly 12 digits.');
       return;
-    } else if (profile.idProof.length !== 10 && profile.idProof.length !== 12) {
+    } else if (cleanIdProof.length !== 10 && cleanIdProof.length !== 12) {
       toast.error('ID Proof must be 12-digit Aadhar or 10-digit PAN');
       return;
     }
@@ -155,7 +172,7 @@ function RiderAuth({ onLogin }) {
           user_id: resolvedUserId,
           vehicle_no: profile.vehicleNo,
           license_no: profile.licenseNo,
-          id_proof: profile.idProof,
+          id_proof: cleanIdProof,
           is_active: false,
           is_verified: false
       };
@@ -176,6 +193,7 @@ function RiderAuth({ onLogin }) {
       
       onLogin(false, phone, {
          ...profile,
+         idProof: cleanIdProof,
          user_id: resolvedUserId,
          rider_id: finalRiderId
       });
@@ -293,7 +311,19 @@ function RiderAuth({ onLogin }) {
 
                   <div className="rider-input-group">
                     <label className="rider-label">ID Proof (Aadhar/PAN)</label>
-                    <input type="text" className="rider-input" placeholder="Enter 12-digit Aadhar or 10-digit PAN" maxLength={12} value={profile.idProof} onChange={e => setProfile({...profile, idProof: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')})} style={{ paddingLeft: '1rem', textTransform: 'uppercase' }} />
+                    <input 
+                      type="text" 
+                      className="rider-input" 
+                      placeholder="Enter 12-digit Aadhar or 10-digit PAN" 
+                      maxLength={(() => {
+                        const cleanVal = profile.idProof.replace(/[^A-Z0-9]/g, '');
+                        const isNumeric = cleanVal.length === 0 || /^\d+$/.test(cleanVal);
+                        return isNumeric ? 14 : 10;
+                      })()} 
+                      value={profile.idProof} 
+                      onChange={e => setProfile({...profile, idProof: formatIdProof(e.target.value)})} 
+                      style={{ paddingLeft: '1rem', textTransform: 'uppercase' }} 
+                    />
                   </div>
                   
                   <div className="rider-input-group">
