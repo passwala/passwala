@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  BarChart3, 
-  ShoppingBag, 
-  Wrench, 
-  Tag, 
-  Sparkles, 
-  Users, 
-  FileText, 
-  LogOut, 
-  Plus, 
-  Trash2, 
+import {
+  BarChart3,
+  ShoppingBag,
+  Wrench,
+  Tag,
+  Sparkles,
+  Users,
+  FileText,
+  LogOut,
+  Plus,
+  Trash2,
   ChevronRight,
   Database,
   ArrowLeft,
@@ -57,10 +57,10 @@ const ActivityFeed = () => {
     // ⚡ REAL-TIME: Listen for any new orders platform-wide
     const channel = supabase
       .channel('admin-activity-pulse')
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'orders' 
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'orders'
       }, (payload) => {
         setRecent(prev => [payload.new, ...prev].slice(0, 5));
         toast.success("New platform order detected!");
@@ -79,8 +79,8 @@ const ActivityFeed = () => {
       {recent.length === 0 ? <p style={{ padding: '1rem', color: '#64748b' }}>No recent activity.</p> :
         recent.map(b => (
           <div className="trend-item" key={b.id} style={{ borderLeft: '3px solid #6366f1', paddingLeft: '10px', marginBottom: '8px' }}>
-             <strong>New Order:</strong> <span>#{b.id.substring(0,6)} (₹{b.total_amount || 0})</span>
-             <div style={{ fontSize: '10px', color: '#94a3b8' }}>{new Date(b.created_at).toLocaleTimeString()}</div>
+            <strong>New Order:</strong> <span>#{b.id.substring(0, 6)} (₹{b.total_amount || 0})</span>
+            <div style={{ fontSize: '10px', color: '#94a3b8' }}>{new Date(b.created_at).toLocaleTimeString()}</div>
           </div>
         ))
       }
@@ -189,7 +189,7 @@ const AdminPanel = ({ onLogout }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [stats, setStats] = useState({ users: 0, services: 0, apps: 0, bookings: 0 });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
+
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -213,9 +213,9 @@ const AdminPanel = ({ onLogout }) => {
       const { count: unverifiedVendors } = await supabase.from('vendors').select('*', { count: 'exact', head: true }).eq('is_verified', false);
       const { count: unverifiedRiders } = await supabase.from('riders').select('*', { count: 'exact', head: true }).eq('is_verified', false);
       const { count: bCount } = await supabase.from('service_bookings').select('*', { count: 'exact', head: true });
-      
+
       const pendingTotal = (unverifiedVendors || 0) + (unverifiedRiders || 0);
-      
+
       setStats({
         users: uCount || 0,
         services: sCount || 0,
@@ -232,17 +232,17 @@ const AdminPanel = ({ onLogout }) => {
     }
     setLoading(true);
     const currentTable = TABS.find(t => t.id === activeTab)?.table || activeTab;
-    
+
     try {
       if (!supabase) throw new Error('Supabase client not initialized');
 
       // Fetch directly from Supabase
       let query = supabase.from(currentTable).select(
-          currentTable === 'riders' || currentTable === 'vendors' || currentTable === 'service_providers'
-              ? '*, users(phone, full_name)'
-              : '*'
+        currentTable === 'riders' || currentTable === 'vendors' || currentTable === 'service_providers'
+          ? '*, users(phone, full_name)'
+          : '*'
       );
-      
+
       const { data: suData, error: suError } = await query.order('created_at', { ascending: false });
       if (suError) throw suError;
 
@@ -253,20 +253,20 @@ const AdminPanel = ({ onLogout }) => {
       toast.dismiss('offline-toast'); // Clear any previous offline warnings
     } catch (err) {
       console.error('Fetch Error:', err);
-      
+
       // Check for missing table error
       if (err.message && err.message.includes('Could not find the table')) {
-          toast.error(`Table '${currentTable}' is missing in Supabase!`, { duration: 6000 });
-          setSyncStatus('missing_table');
+        toast.error(`Table '${currentTable}' is missing in Supabase!`, { duration: 6000 });
+        setSyncStatus('missing_table');
       } else {
-          setSyncStatus('offline');
+        setSyncStatus('offline');
       }
-      
+
       // Fallback to cache
       const cached = localStorage.getItem(`admin_cache_${currentTable}`);
       if (cached) {
         setData(JSON.parse(cached));
-        toast('Showing local cache (Offline)', { 
+        toast('Showing local cache (Offline)', {
           icon: '📦',
           duration: 4000,
           action: {
@@ -295,28 +295,28 @@ const AdminPanel = ({ onLogout }) => {
       if (!supabase) throw new Error('Supabase client not initialized');
 
       const { error } = await supabase
-          .from(currentTab.table)
-          .delete()
-          .eq('id', deleteConfirmId);
+        .from(currentTab.table)
+        .delete()
+        .eq('id', deleteConfirmId);
 
       if (error) throw error;
-      
+
       // Remove from local storage to clean up any stuck items
       const localKey = `admin_local_${currentTab.table}`;
       const localAdded = JSON.parse(localStorage.getItem(localKey) || '[]');
-      const newLocal = localAdded.filter(item => 
-        (item.id && item.id !== deleteConfirmId) && 
+      const newLocal = localAdded.filter(item =>
+        (item.id && item.id !== deleteConfirmId) &&
         (item.uid && item.uid !== deleteConfirmId) &&
         (item.phone && item.phone !== deleteConfirmId)
       );
       localStorage.setItem(localKey, JSON.stringify(newLocal));
 
-      setData(prev => prev.filter(item => 
-        (item.id && item.id !== deleteConfirmId) && 
+      setData(prev => prev.filter(item =>
+        (item.id && item.id !== deleteConfirmId) &&
         (item.uid && item.uid !== deleteConfirmId) &&
         (item.phone && item.phone !== deleteConfirmId)
       ));
-      
+
       toast.success('Removed successfully');
       setDeleteConfirmId(null);
       fetchStats();
@@ -332,27 +332,27 @@ const AdminPanel = ({ onLogout }) => {
     e.preventDefault();
     try {
       if (formData.phone && formData.phone.length !== 10) {
-          toast.error('Phone number must be exactly 10 digits');
-          return;
+        toast.error('Phone number must be exactly 10 digits');
+        return;
       }
       setSaving(true);
       // 1. Prepare payload and Update Local State (Optimistic)
       let payload = { ...formData };
       if (payload.aadhar_no) {
-          payload.aadhar_no = payload.aadhar_no.replace(/\s/g, '');
+        payload.aadhar_no = payload.aadhar_no.replace(/\s/g, '');
       }
       if (payload.id_proof) {
-          payload.id_proof = payload.id_proof.replace(/\s/g, '');
+        payload.id_proof = payload.id_proof.replace(/\s/g, '');
       }
-      
+
       // Temporary local ID if missing
       if (!editingItem && !payload.id) {
-          payload.id = 'temp_' + Date.now();
+        payload.id = 'temp_' + Date.now();
       }
 
       const localKey = `admin_local_${currentTab.table}`;
       const localAdded = JSON.parse(localStorage.getItem(localKey) || '[]');
-      
+
       if (editingItem) {
         setData(data.map(item => item.id === editingItem.id ? { ...item, ...payload } : item));
       } else {
@@ -370,47 +370,47 @@ const AdminPanel = ({ onLogout }) => {
         // A. Handle User-Linked Tables (riders, vendors, service_providers)
         const userLinkedTables = ['riders', 'vendors', 'service_providers'];
         if (userLinkedTables.includes(currentTab.table) && finalPayload.phone) {
-            const { data: user, error: userError } = await supabase
-                .from('users')
-                .upsert({ 
-                    phone: finalPayload.phone, 
-                    full_name: finalPayload.full_name || 'Admin Created'
-                }, { onConflict: 'phone' })
-                .select()
-                .single();
-            
-            if (userError) {
-                console.error('❌ Failed to link user:', userError.message);
-            } else {
-                finalPayload.user_id = user.id;
-            }
+          const { data: user, error: userError } = await supabase
+            .from('users')
+            .upsert({
+              phone: finalPayload.phone,
+              full_name: finalPayload.full_name || 'Admin Created'
+            }, { onConflict: 'phone' })
+            .select()
+            .single();
+
+          if (userError) {
+            console.error('❌ Failed to link user:', userError.message);
+          } else {
+            finalPayload.user_id = user.id;
+          }
         }
 
         // B. Clear temporary/local id
         if (finalPayload.id && finalPayload.id.startsWith('temp_')) {
-            delete finalPayload.id;
+          delete finalPayload.id;
         }
 
         // C. Clean payload according to table schema
         const schema = TABLE_SCHEMAS[currentTab.table];
         let cleanedPayload = {};
         if (schema) {
-            const allowedKeys = [...Object.keys(schema), 'id'];
-            Object.keys(finalPayload).forEach(key => {
-                if (allowedKeys.includes(key)) {
-                    cleanedPayload[key] = finalPayload[key];
-                }
-            });
+          const allowedKeys = [...Object.keys(schema), 'id'];
+          Object.keys(finalPayload).forEach(key => {
+            if (allowedKeys.includes(key)) {
+              cleanedPayload[key] = finalPayload[key];
+            }
+          });
         } else {
-            cleanedPayload = { ...finalPayload };
+          cleanedPayload = { ...finalPayload };
         }
 
         // D. Perform Upsert directly on Supabase
         const conflictTarget = currentTab.table === 'service_areas' ? 'area_name' : 'id';
         const { error: suError } = await supabase
-            .from(currentTab.table)
-            .upsert(cleanedPayload, { onConflict: conflictTarget });
-        
+          .from(currentTab.table)
+          .upsert(cleanedPayload, { onConflict: conflictTarget });
+
         if (suError) throw suError;
 
         toast.success('Synced with Cloud! ☁️', { id: 'offline-toast' });
@@ -434,26 +434,26 @@ const AdminPanel = ({ onLogout }) => {
   const openModal = (item = null) => {
     setEditingItem(item);
     const schema = TABLE_SCHEMAS[currentTab.table];
-    
+
     if (item) {
       if (schema) {
-         const cleanData = {};
-         Object.keys(schema).forEach(key => {
-             // Avoid rendering nested objects directly
-             cleanData[key] = (item[key] !== undefined && typeof item[key] !== 'object') ? item[key] : schema[key];
-         });
-         // Since phone/full_name may come from joined users, populate them if we have them in item
-         if (item.phone) cleanData.phone = item.phone;
-         if (item.full_name) cleanData.full_name = item.full_name;
-         setFormData(cleanData);
+        const cleanData = {};
+        Object.keys(schema).forEach(key => {
+          // Avoid rendering nested objects directly
+          cleanData[key] = (item[key] !== undefined && typeof item[key] !== 'object') ? item[key] : schema[key];
+        });
+        // Since phone/full_name may come from joined users, populate them if we have them in item
+        if (item.phone) cleanData.phone = item.phone;
+        if (item.full_name) cleanData.full_name = item.full_name;
+        setFormData(cleanData);
       } else {
-         const cleanData = { ...item };
-         // Keep ID for updates!
-         delete cleanData.uid;
-         delete cleanData.created_at;
-         delete cleanData.updated_at;
-         delete cleanData.users;
-         setFormData(cleanData);
+        const cleanData = { ...item };
+        // Keep ID for updates!
+        delete cleanData.uid;
+        delete cleanData.created_at;
+        delete cleanData.updated_at;
+        delete cleanData.users;
+        setFormData(cleanData);
       }
     } else {
       if (schema) {
@@ -478,8 +478,8 @@ const AdminPanel = ({ onLogout }) => {
     const currentTabLabel = currentTab.label;
     if (loading) return <div className="admin-loading"><History className="animate-spin" /> Syncing Cloud Data...</div>;
 
-    const filtered = data.filter(item => 
-      Object.values(item).some(val => 
+    const filtered = data.filter(item =>
+      Object.values(item).some(val =>
         String(val).toLowerCase().includes(searchTerm.toLowerCase())
       )
     );
@@ -487,11 +487,11 @@ const AdminPanel = ({ onLogout }) => {
     return (
       <div className="admin-table-container">
         <div className="table-actions">
-           <div className="search-admin">
-              <Search size={18} />
-              <input type="text" placeholder={`Search ${currentTabLabel}...`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-           </div>
-           <button className="add-btn" onClick={() => openModal()}><Plus size={18} /> Add New</button>
+          <div className="search-admin">
+            <Search size={18} />
+            <input type="text" placeholder={`Search ${currentTabLabel}...`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          </div>
+          <button className="add-btn" onClick={() => openModal()}><Plus size={18} /> Add New</button>
         </div>
 
         <div className="table-scroll">
@@ -509,7 +509,7 @@ const AdminPanel = ({ onLogout }) => {
                   } else {
                     keys = ['PHONE', 'FULL_NAME'];
                   }
-                  
+
                   return keys.map(key => (
                     <th key={key}>{key.toUpperCase()}</th>
                   ));
@@ -528,7 +528,7 @@ const AdminPanel = ({ onLogout }) => {
                 } else {
                   keys = ['PHONE', 'FULL_NAME'];
                 }
-                  
+
                 return (
                   <tr key={item.id}>
                     <td className="id-col">#{String(item.id).slice(-4)}</td>
@@ -539,7 +539,7 @@ const AdminPanel = ({ onLogout }) => {
                         if (k === 'phone' && !v) v = item.users.phone;
                         if (k === 'full_name' && !v) v = item.users.full_name;
                       }
-                      
+
                       let displayVal = v === null || v === undefined ? 'N/A' : String(v);
                       if ((k === 'id_proof' || k === 'aadhar_no') && displayVal.length === 12 && /^\d+$/.test(displayVal)) {
                         const parts = [];
@@ -550,14 +550,15 @@ const AdminPanel = ({ onLogout }) => {
                       }
 
                       return (
-                      <td key={k}>
-                        {k === 'status' || k === 'role' ? (
-                          <span className={`status-badge ${v}`}>{v}</span>
-                        ) : typeof v === 'boolean' ? (v ? '✅' : '❌') : (
-                          <span className="truncate-cell">{displayVal}</span>
-                        )}
-                      </td>
-                    )})}
+                        <td key={k}>
+                          {k === 'status' || k === 'role' ? (
+                            <span className={`status-badge ${v}`}>{v}</span>
+                          ) : typeof v === 'boolean' ? (v ? '✅' : '❌') : (
+                            <span className="truncate-cell">{displayVal}</span>
+                          )}
+                        </td>
+                      )
+                    })}
                     <td className="actions-cell">
                       <div className="control-cell">
                         <button className="edit-btn" onClick={() => openModal(item)}><Edit2 size={16} /></button>
@@ -576,41 +577,125 @@ const AdminPanel = ({ onLogout }) => {
   const handleSeedData = async () => {
     try {
       toast.loading('Seeding platform data...', { id: 'seed' });
-      
+
       // 1. Create a Buyer
       const buyerId = '00000000-0000-0000-0000-000000000001';
-      await supabase.from('users').upsert([{ 
-        id: buyerId, phone: '9999999999', full_name: 'John Doe', role: 'BUYER' 
+      await supabase.from('users').upsert([{
+        id: buyerId,
+        phone: '9999999999',
+        full_name: 'John Doe',
+        email: 'john@example.com'
       }]);
 
-      // 2. Create a Vendor
+      // 2. Create a Vendor User & Vendor Record
       const vendorUserId = '00000000-0000-0000-0000-000000000002';
-      await supabase.from('users').upsert([{ 
-        id: vendorUserId, phone: '8888888888', full_name: 'Anita Owner', role: 'VENDOR' 
+      const vendorId = '11111111-1111-1111-1111-111111111111';
+      await supabase.from('users').upsert([{
+        id: vendorUserId,
+        phone: '8888888888',
+        full_name: 'Anita Owner',
+        email: 'anita@example.com'
       }]);
-      await supabase.from('vendors').upsert([{ 
-        id: 'v-001', user_id: vendorUserId, business_name: 'Anita Bakers', category: 'Bakery', 
-        address: 'Downtown 10', phone: '8888888888', is_verified: true, profile_completed: true 
+      await supabase.from('vendors').upsert([{
+        id: vendorId,
+        user_id: vendorUserId,
+        phone: '8888888888',
+        is_verified: true
       }]);
 
-      // 3. Create a Rider
+      // 3. Create a Store Record
+      const storeId = '22222222-2222-2222-2222-222222222222';
+      await supabase.from('stores').upsert([{
+        id: storeId,
+        vendor_id: vendorId,
+        name: 'Anita Bakers',
+        description: 'Delicious hot bread, pastries, and cakes baked daily.',
+        address: 'Downtown Street 10, Ahmedabad',
+        is_open: true,
+        rating: 4.8
+      }]);
+
+      // 4. Create a Rider User & Rider Record
       const riderUserId = '00000000-0000-0000-0000-000000000003';
-      await supabase.from('users').upsert([{ 
-        id: riderUserId, phone: '7777777777', full_name: 'Flash Rider', role: 'RIDER' 
+      const riderId = '33333333-3333-3333-3333-333333333333';
+      await supabase.from('users').upsert([{
+        id: riderUserId,
+        phone: '7777777777',
+        full_name: 'Flash Rider',
+        email: 'flash@example.com'
       }]);
-      await supabase.from('riders').upsert([{ 
-        id: 'r-001', user_id: riderUserId, phone: '7777777777', full_name: 'Flash Rider', vehicle_no: 'GJ-01-BK-9999', is_verified: true, is_active: true 
+      await supabase.from('riders').upsert([{
+        id: riderId,
+        user_id: riderUserId,
+        vehicle_no: 'GJ-01-BK-9999',
+        license_no: 'DL-1234567890123',
+        id_proof: '123456789012',
+        is_active: true,
+        is_verified: true,
+        rating: 4.9,
+        total_deliveries: 120
       }]);
 
-      // 4. Create a Product
+      // 5. Create a Service Provider User & Provider Record
+      const providerUserId = '00000000-0000-0000-0000-000000000004';
+      const providerId = '66666666-6666-6666-6666-666666666666';
+      await supabase.from('users').upsert([{
+        id: providerUserId,
+        phone: '6666666666',
+        full_name: 'Super Plumber',
+        email: 'plumber@example.com'
+      }]);
+      await supabase.from('service_providers').upsert([{
+        id: providerId,
+        user_id: providerUserId,
+        business_name: 'Plumbing Experts',
+        about: 'Pro plumbing services, leaks, pipe fixing and sanitary installations.',
+        rating: 4.7,
+        is_verified: true
+      }]);
+
+      // 6. Create Service Category & Service
+      const serviceCategoryId = '77777777-7777-7777-7777-777777777777';
+      const serviceId = '88888888-8888-8888-8888-888888888888';
+      await supabase.from('service_categories').upsert([{
+        id: serviceCategoryId,
+        name: 'Plumbing',
+        icon_url: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?auto=format&fit=crop&q=80&w=800'
+      }]);
+      await supabase.from('services').upsert([{
+        id: serviceId,
+        provider_id: providerId,
+        category_id: serviceCategoryId,
+        title: 'Leak Repair & Pipeline Fixing',
+        description: 'Quick repair of household water leaks and pipe replacements.',
+        price: 299.0,
+        duration_minutes: 45
+      }]);
+
+      // 7. Create a Product Category & Product
+      const productCategoryId = '44444444-4444-4444-4444-444444444444';
+      const productId = '55555555-5555-5555-5555-555555555555';
+      await supabase.from('product_categories').upsert([{
+        id: productCategoryId,
+        store_id: storeId,
+        name: 'Fresh Bread'
+      }]);
       await supabase.from('products').upsert([{
-        id: 'p-001', store_id: 'v-001', name: 'Whole Wheat Bread', price: 45, is_active: true,
-        image_url: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&q=80&w=800'
+        id: productId,
+        store_id: storeId,
+        category_id: productCategoryId,
+        name: 'Whole Wheat Bread',
+        description: 'Healthy and fiber-rich whole wheat bread.',
+        price: 45.0,
+        discount_price: 40.0,
+        image_url: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&q=80&w=800',
+        is_active: true
       }]);
 
       toast.success('Platform seeded with real data!', { id: 'seed' });
       fetchStats();
     } catch (err) {
+      console.error('Seeding error details:', err);
       toast.error('Seeding failed: ' + err.message, { id: 'seed' });
     }
   };
@@ -652,40 +737,40 @@ const AdminPanel = ({ onLogout }) => {
         </div>
 
         <div className="dashboard-actions-row" style={{ marginTop: '2rem' }}>
-           <button className="seed-btn" onClick={handleSeedData} style={{
-              background: 'linear-gradient(135deg, #FF7622 0%, #FF9F66 100%)',
-              color: 'white',
-              padding: '12px 24px',
-              borderRadius: '12px',
-              border: 'none',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              cursor: 'pointer',
-              boxShadow: '0 4px 15px rgba(255, 118, 34, 0.3)'
-           }}>
-             <Database size={20} /> Seed Initial Platform Data
-           </button>
+          <button className="seed-btn" onClick={handleSeedData} style={{
+            background: 'linear-gradient(135deg, #FF7622 0%, #FF9F66 100%)',
+            color: 'white',
+            padding: '12px 24px',
+            borderRadius: '12px',
+            border: 'none',
+            fontWeight: '600',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 15px rgba(255, 118, 34, 0.3)'
+          }}>
+            <Database size={20} /> Seed Initial Platform Data
+          </button>
         </div>
       </div>
 
 
       <div className="recent-activity glass">
-         <div className="activity-header">
-            <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><History size={18} /> Recent Logs</h4>
-            <button className="edit-btn" style={{width: 'auto', padding: '4px 8px', fontSize: '10px', height: 'auto'}}>VIEW ALL</button>
-         </div>
-         <div className="trend-content">
-            <ActivityFeed />
-         </div>
-         
-         <div className="notification-preview" style={{marginTop: '1.5rem', padding: '1rem', background: '#f8fafc', borderRadius: '12px'}}>
-            <h5 style={{fontSize: '0.75rem', fontWeight: 800, color: '#64748b', marginBottom: '8px'}}>SYSTEM ALERTS</h5>
-            <div style={{fontSize: '0.8rem', color: '#0f172a', fontWeight: 600}}>
-              ⚠️ Server load increased by 12% in last 10 mins.
-            </div>
-         </div>
+        <div className="activity-header">
+          <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><History size={18} /> Recent Logs</h4>
+          <button className="edit-btn" style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: 'auto' }}>VIEW ALL</button>
+        </div>
+        <div className="trend-content">
+          <ActivityFeed />
+        </div>
+
+        <div className="notification-preview" style={{ marginTop: '1.5rem', padding: '1rem', background: '#f8fafc', borderRadius: '12px' }}>
+          <h5 style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', marginBottom: '8px' }}>SYSTEM ALERTS</h5>
+          <div style={{ fontSize: '0.8rem', color: '#0f172a', fontWeight: 600 }}>
+            ⚠️ Server load increased by 12% in last 10 mins.
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -697,10 +782,10 @@ const AdminPanel = ({ onLogout }) => {
       <aside className={`admin-sidebar ${isSidebarOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-header">
 
-           <div className="admin-brand-info">
-             <h2>Passwala</h2>
-             <span>SYSTEM OPS</span>
-           </div>
+          <div className="admin-brand-info">
+            <h2>Passwala</h2>
+            <span>SYSTEM OPS</span>
+          </div>
 
         </div>
 
@@ -709,9 +794,9 @@ const AdminPanel = ({ onLogout }) => {
             <React.Fragment key={section.label}>
               <div className="nav-section-label">{section.label}</div>
               {section.items.map((tab) => (
-                <button 
-                  key={tab.id} 
-                  className={`nav-item ${activeTab === tab.id ? 'active' : ''}`} 
+                <button
+                  key={tab.id}
+                  className={`nav-item ${activeTab === tab.id ? 'active' : ''}`}
                   onClick={() => {
                     setActiveTab(tab.id);
                     setIsSidebarOpen(false);
@@ -737,7 +822,7 @@ const AdminPanel = ({ onLogout }) => {
               <Activity size={24} />
             </button>
             <div className="breadcrumb">
-               <Database size={14} className="mobile-hide" /> <span className="mobile-hide">/ MASTER CONTROL /</span> <strong>{activeTab.toUpperCase()}</strong>
+              <Database size={14} className="mobile-hide" /> <span className="mobile-hide">/ MASTER CONTROL /</span> <strong>{activeTab.toUpperCase()}</strong>
             </div>
           </div>
           <div className="admin-profile-pill">
@@ -749,30 +834,30 @@ const AdminPanel = ({ onLogout }) => {
         </header>
 
         <div className="admin-scroll-content">
-           <AnimatePresence mode='wait'>
-             <Motion.div 
-               key={activeTab}
-               initial={{ opacity: 0, y: 10 }}
-               animate={{ opacity: 1, y: 0 }}
-               exit={{ opacity: 0, y: -10 }}
-               transition={{ duration: 0.2 }}
-             >
-               {activeTab === 'dashboard' ? (
-                 <>
-                   <h1 className="admin-hero-title">Platform Intelligence</h1>
-                   <p style={{color: '#64748b', marginBottom: '2rem'}}>Overview of your entire business ecosystem.</p>
-                   {renderDashboard()}
-                 </>
-               ) : syncStatus === 'missing_table' ? (
-                  <div className="missing-table-notice animate-fade-in" style={{ padding: '3rem', background: '#fff1f2', borderRadius: '24px', border: '2px dashed #f43f5e', textAlign: 'center' }}>
-                     <Database size={48} color="#f43f5e" style={{ marginBottom: '1rem' }} />
-                     <h2 style={{ color: '#9f1239' }}>Database Setup Required</h2>
-                     <p style={{ color: '#be123c', maxWidth: '500px', margin: '1rem auto' }}>
-                        The table <strong>'{currentTab.table}'</strong> does not exist in your Supabase database. 
-                        Please run the following SQL command in your Supabase SQL Editor to fix this:
-                     </p>
-                     <pre style={{ background: '#1e293b', color: '#f8fafc', padding: '1.5rem', borderRadius: '12px', textAlign: 'left', fontSize: '0.8rem', overflowX: 'auto', margin: '2rem 0' }}>
-{`-- Run this in Supabase SQL Editor
+          <AnimatePresence mode='wait'>
+            <Motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              {activeTab === 'dashboard' ? (
+                <>
+                  <h1 className="admin-hero-title">Platform Intelligence</h1>
+                  <p style={{ color: '#64748b', marginBottom: '2rem' }}>Overview of your entire business ecosystem.</p>
+                  {renderDashboard()}
+                </>
+              ) : syncStatus === 'missing_table' ? (
+                <div className="missing-table-notice animate-fade-in" style={{ padding: '3rem', background: '#fff1f2', borderRadius: '24px', border: '2px dashed #f43f5e', textAlign: 'center' }}>
+                  <Database size={48} color="#f43f5e" style={{ marginBottom: '1rem' }} />
+                  <h2 style={{ color: '#9f1239' }}>Database Setup Required</h2>
+                  <p style={{ color: '#be123c', maxWidth: '500px', margin: '1rem auto' }}>
+                    The table <strong>'{currentTab.table}'</strong> does not exist in your Supabase database.
+                    Please run the following SQL command in your Supabase SQL Editor to fix this:
+                  </p>
+                  <pre style={{ background: '#1e293b', color: '#f8fafc', padding: '1.5rem', borderRadius: '12px', textAlign: 'left', fontSize: '0.8rem', overflowX: 'auto', margin: '2rem 0' }}>
+                    {`-- Run this in Supabase SQL Editor
 CREATE TABLE IF NOT EXISTS service_areas (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     city VARCHAR(100) DEFAULT 'Ahmedabad',
@@ -781,28 +866,28 @@ CREATE TABLE IF NOT EXISTS service_areas (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );`}
-                     </pre>
-                     <button 
-                        onClick={() => fetchData()}
-                        style={{ background: '#f43f5e', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '12px', fontWeight: 600, cursor: 'pointer' }}
-                     >
-                        I've run the SQL, Refresh Now
-                     </button>
-                  </div>
-                ) : (
-                   <>
-                     <div className="table-header-row">
-                       <div>
-                         <h2 className="table-title">{currentTab.label}</h2>
-                         <p style={{color: '#64748b', fontSize: '0.9rem'}}>Manage and monitor entries in real-time.</p>
-                      </div>
-                      <span className="count-chip">{data.length} Total Records</span>
+                  </pre>
+                  <button
+                    onClick={() => fetchData()}
+                    style={{ background: '#f43f5e', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '12px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    I've run the SQL, Refresh Now
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="table-header-row">
+                    <div>
+                      <h2 className="table-title">{currentTab.label}</h2>
+                      <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Manage and monitor entries in real-time.</p>
                     </div>
-                    {renderTable()}
-                  </>
-                )}
-             </Motion.div>
-           </AnimatePresence>
+                    <span className="count-chip">{data.length} Total Records</span>
+                  </div>
+                  {renderTable()}
+                </>
+              )}
+            </Motion.div>
+          </AnimatePresence>
         </div>
       </main>
 
@@ -811,66 +896,67 @@ CREATE TABLE IF NOT EXISTS service_areas (
         <div className="admin-modal-overlay">
           <div className="admin-modal">
             <div className="modal-header">
-               <h3>Modify Platform Resource</h3>
-               <button className="close-modal-btn" onClick={() => setShowModal(false)}><X size={20} /></button>
+              <h3>Modify Platform Resource</h3>
+              <button className="close-modal-btn" onClick={() => setShowModal(false)}><X size={20} /></button>
             </div>
             <form onSubmit={handleUpsert} className="admin-form">
-               <div className="form-grid">
-                  {Object.keys(formData).length > 0 ? Object.keys(formData).map(key => {
-                    const hiddenFields = ['id', 'uid', 'created_at', 'updated_at', 'users', 'user_id', 'provider_id', 'store_id', 'category_id', 'address_id', 'service_id'];
-                    if (hiddenFields.includes(key)) return null;
+              <div className="form-grid">
+                {Object.keys(formData).length > 0 ? Object.keys(formData).map(key => {
+                  const hiddenFields = ['id', 'uid', 'created_at', 'updated_at', 'users', 'user_id', 'provider_id', 'store_id', 'category_id', 'address_id', 'service_id'];
+                  if (hiddenFields.includes(key)) return null;
 
-                    const isBoolean = typeof formData[key] === 'boolean';
-                    return (
-                    <div className="form-field" key={key} style={isBoolean ? {flexDirection: 'row', alignItems: 'center', gap: '0.5rem'} : {}}>
+                  const isBoolean = typeof formData[key] === 'boolean';
+                  return (
+                    <div className="form-field" key={key} style={isBoolean ? { flexDirection: 'row', alignItems: 'center', gap: '0.5rem' } : {}}>
                       <label>{key.replace(/_/g, ' ').toUpperCase()}</label>
                       {isBoolean ? (
-                        <input 
+                        <input
                           type="checkbox"
                           checked={formData[key]}
-                          onChange={(e) => setFormData({...formData, [key]: e.target.checked})}
-                          style={{width: 'auto', marginBottom: 0}}
+                          onChange={(e) => setFormData({ ...formData, [key]: e.target.checked })}
+                          style={{ width: 'auto', marginBottom: 0 }}
                         />
                       ) : (
-                        <input 
+                        <input
                           type={typeof formData[key] === 'number' ? 'number' : 'text'}
                           value={formData[key] || ''}
                           maxLength={key === 'phone' ? 10 : (key === 'aadhar_no' ? 14 : (key === 'id_proof' ? (formData[key] && /^\d+$/.test(formData[key].replace(/[^A-Z0-9]/g, '')) ? 14 : 10) : undefined))}
                           onChange={(e) => {
                             let val = e.target.value;
                             if (key === 'phone') {
-                                val = val.replace(/\D/g, '').slice(0, 10);
+                              val = val.replace(/\D/g, '').slice(0, 10);
                             } else if (key === 'aadhar_no') {
-                                const clean = val.replace(/\D/g, '').slice(0, 12);
+                              const clean = val.replace(/\D/g, '').slice(0, 12);
+                              const parts = [];
+                              for (let i = 0; i < clean.length; i += 4) {
+                                parts.push(clean.slice(i, i + 4));
+                              }
+                              val = parts.join(' ');
+                            } else if (key === 'id_proof') {
+                              val = val.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                              const isNumeric = /^\d+$/.test(val) || val.length === 0;
+                              if (isNumeric) {
+                                const sliced = val.slice(0, 12);
                                 const parts = [];
-                                for (let i = 0; i < clean.length; i += 4) {
-                                  parts.push(clean.slice(i, i + 4));
+                                for (let i = 0; i < sliced.length; i += 4) {
+                                  parts.push(sliced.slice(i, i + 4));
                                 }
                                 val = parts.join(' ');
-                            } else if (key === 'id_proof') {
-                                val = val.toUpperCase().replace(/[^A-Z0-9]/g, '');
-                                const isNumeric = /^\d+$/.test(val) || val.length === 0;
-                                if (isNumeric) {
-                                  const sliced = val.slice(0, 12);
-                                  const parts = [];
-                                  for (let i = 0; i < sliced.length; i += 4) {
-                                    parts.push(sliced.slice(i, i + 4));
-                                  }
-                                  val = parts.join(' ');
-                                } else {
-                                  val = val.slice(0, 10);
-                                }
+                              } else {
+                                val = val.slice(0, 10);
+                              }
                             }
-                            setFormData({...formData, [key]: val});
+                            setFormData({ ...formData, [key]: val });
                           }}
                         />
                       )}
                     </div>
-                  )}) : <p style={{color: 'var(--text-secondary)'}}>Open a populated table first to configure new data.</p>}
-               </div>
-               <button type="submit" className="submit-form-btn" disabled={isSaving}>
-                 {isSaving ? 'Saving...' : 'Save Changes'}
-               </button>
+                  )
+                }) : <p style={{ color: 'var(--text-secondary)' }}>Open a populated table first to configure new data.</p>}
+              </div>
+              <button type="submit" className="submit-form-btn" disabled={isSaving}>
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
             </form>
           </div>
         </div>
@@ -881,20 +967,20 @@ CREATE TABLE IF NOT EXISTS service_areas (
         <div className="admin-modal-overlay">
           <div className="admin-modal" style={{ maxWidth: '400px' }}>
             <div className="modal-header" style={{ borderBottom: 'none', paddingBottom: 0 }}>
-               <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Trash2 color="#ef4444" size={24} /> Confirm Deletion</h3>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Trash2 color="#ef4444" size={24} /> Confirm Deletion</h3>
             </div>
             <div style={{ padding: '1.5rem', color: '#64748b', fontSize: '0.9rem', lineHeight: '1.5' }}>
-              Are you sure you want to permanently delete this {currentTab.label.replace(/s$/, '')}? <br/><br/>
+              Are you sure you want to permanently delete this {currentTab.label.replace(/s$/, '')}? <br /><br />
               <strong style={{ color: '#0f172a' }}>This action cannot be undone.</strong>
             </div>
             <div style={{ padding: '1.5rem', paddingTop: 0, display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-              <button 
-                onClick={() => setDeleteConfirmId(null)} 
+              <button
+                onClick={() => setDeleteConfirmId(null)}
                 style={{ padding: '10px 16px', borderRadius: '8px', fontWeight: 600, color: '#475569', background: '#f1f5f9', border: 'none', cursor: 'pointer' }}>
                 Cancel
               </button>
-              <button 
-                onClick={handleExecuteDelete} 
+              <button
+                onClick={handleExecuteDelete}
                 style={{ padding: '10px 16px', borderRadius: '8px', fontWeight: 600, color: 'white', background: '#ef4444', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.39)' }}>
                 Delete Permanently
               </button>
