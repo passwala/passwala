@@ -32,6 +32,7 @@ import PrivacySecurity from './webapp/profile_pages/PrivacySecurity'
 import HelpSupport from './webapp/profile_pages/HelpSupport'
 import AppSettings from './webapp/profile_pages/AppSettings'
 import Footer from './web/Footer'
+import Policies from './web/Policies'
 import { Toaster, toast } from 'react-hot-toast'
 import './App.css'
 
@@ -55,6 +56,8 @@ const ScrollToTop = () => {
   }, [pathname]);
   return null;
 };
+
+
 
 // 🛡️ Security Guard Component for Role-Based Access
 const RoleGuard = ({ children, allowedRoles, user, loading }) => {
@@ -260,6 +263,13 @@ const AppContent = ({
                 </>
               } />
 
+              {/* Public Legal & Policy Routes for App Store / Play Store Reviewers & Users */}
+              <Route path="/privacy-policy" element={<Policies />} />
+              <Route path="/terms" element={<Policies />} />
+              <Route path="/refunds-cancellation" element={<Policies />} />
+              <Route path="/data-deletion" element={<Policies />} />
+              <Route path="/policies" element={<Policies />} />
+
               {/* Common Application Routes */}
               <Route path="/near-shops" element={effectiveUser ? <NearShops onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/" />} />
               <Route path="/expert-services" element={effectiveUser ? <ExpertServices onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
@@ -460,7 +470,7 @@ function App() {
       }
 
       let finalUser = u || manualUser;
-      if (u) {
+      if (u && supabase) {
         try {
           // 1. Fetch Supabase ID (UUID) for this user
           const phoneNo = u.phoneNumber?.replace('+91', '');

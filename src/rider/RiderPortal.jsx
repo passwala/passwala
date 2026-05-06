@@ -152,8 +152,8 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
     };
 
     if (isOnline) {
-      syncLocation();
-      trackingInterval = setInterval(syncLocation, 15000); // Sync every 15 seconds
+      syncLocation(); // Initial sync
+      trackingInterval = setInterval(syncLocation, 3000); // 🚀 Zepto-speed: Sync every 3 seconds
     } else if (riderId && riderId !== 'demo-rider-123') {
        // Update status to OFFLINE when rider goes off
        supabase.from('rider_locations').upsert({ 
@@ -192,8 +192,8 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
       {/* Top Header */}
       <header className="rider-header" style={{ borderBottom: 'none', background: 'transparent', padding: '1.25rem 1rem' }}>
         <div className="rider-header-profile">
-          <div className="rider-header-avatar" style={{ background: 'var(--rider-primary)', padding: '8px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(249, 115, 22, 0.2)' }}>
-             <img src="/logo.png" alt="P" style={{ width: '24px', height: '24px', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+          <div className="rider-header-avatar" style={{ background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 10px rgba(0,0,0,0.04)' }}>
+             <img src="/logo.png" alt="Passwala Logo" style={{ width: '26px', height: '26px', objectFit: 'contain' }} />
           </div>
           <div>
             <h1 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--rider-text)' }}>Passwala Rider</h1>

@@ -23,16 +23,48 @@ const OrderHistory = () => {
 
   useEffect(() => {
     fetchOrders();
+
+    // ⚡ REAL-TIME: Listen for status updates on orders
+    const channel = supabase
+      .channel('buyer-order-updates')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'orders' 
+      }, (payload) => {
+        // If an order status changed, refresh the list
+        fetchOrders();
+        
+        // If the new status is DELIVERED, show a celebratory toast
+        if (payload.new && payload.new.status === 'DELIVERED') {
+           toast.success("Your order has been delivered! Enjoy!", { icon: '🎁' });
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      // In a real app, we'd filter by current user
-      const { data, error } = await supabase
+      // Get current user ID if available
+      const savedUser = JSON.parse(localStorage.getItem('passwala_user') || '{}');
+      const userId = savedUser.id || savedUser.uid;
+
+      let query = supabase
         .from('orders')
-        .select('*')
+        .select('*, addresses(society)')
         .order('created_at', { ascending: false });
+      
+      // If we have a user ID, filter by it
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+
+      const { data, error } = await query;
       
       if (error) throw error;
       setOrders(data || []);
@@ -91,14 +123,21 @@ const OrderHistory = () => {
                   className="order-history-card glass"
                 >
                   <div className="order-card-top">
-                     <div className="order-main-info">
-                        <strong>Order #{order.id.toString().slice(0, 8)}</strong>
-                        <span>{new Date(order.created_at).toLocaleDateString()}</span>
-                     </div>
-                     <div className="order-status-badge">
-                        {getStatusIcon(order.status)}
-                        <span>{order.status || 'Processing'}</span>
-                     </div>
+                      <div className="order-main-info">
+                         <strong>Order #{order.id.toString().slice(0, 8)}</strong>
+                         <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#64748b' }}>
+                            <Clock size={12} /> {new Date(order.created_at).toLocaleDateString()}
+                         </span>
+                         {order.addresses?.society && (
+                            <span style={{ color: 'var(--rider-primary)', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                               <MapPin size={12} /> {order.addresses.society}
+                            </span>
+                         )}
+                      </div>
+                      <div className="order-status-badge">
+                         {getStatusIcon(order.status)}
+                         <span>{order.status || 'Processing'}</span>
+                      </div>
                   </div>
                   <div className="order-card-items">
                      <p>{order.items?.length || 0} items purchased</p>

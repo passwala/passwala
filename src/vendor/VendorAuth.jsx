@@ -179,7 +179,7 @@ const VendorAuth = ({ onLogin }) => {
                 style={{ background: 'white', color: '#ff7622', border: '2px dashed #ff7622', boxShadow: 'none' }}
                 onClick={() => {
                   toast.success('Universal Vendor Mock Access');
-                  onLogin({ phoneNumber: '9999999999' });
+                  onLogin(true, '9999999999', { name: 'Demo Vendor', business_name: 'Premium Store' });
                 }}
               >
                 Simulate Vendor Login
@@ -201,7 +201,8 @@ const VendorAuth = ({ onLogin }) => {
                 <p className="auth-subtitle">Enter OTP sent to +91 {phoneNumber}</p>
               </div>
 
-              <div className="otp-container" style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '2rem' }}>
+                            <div className="otp-container" style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '2rem' }}>
+
                 {otp.map((digit, i) => (
                   <input
                     key={i} id={`otp-${i}`} type="text" maxLength={1} value={digit}
@@ -220,7 +221,13 @@ const VendorAuth = ({ onLogin }) => {
                       color: '#0f172a',
                       transition: 'all 0.2s'
                     }}
-                    onFocus={(e) => { e.target.style.borderColor = '#f97316'; e.target.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.1)'; }}
+                                        onFocus={(e) => { 
+                      e.target.style.borderColor = '#f97316'; 
+                      e.target.style.boxShadow = '0 0 0 4px rgba(249, 115, 22, 0.15)'; 
+                      e.target.style.background = 'white';
+                      e.target.style.transform = 'translateY(-2px)';
+                    }}
+
                     onBlur={(e) => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none'; }}
                   />
                 ))}
@@ -235,7 +242,14 @@ const VendorAuth = ({ onLogin }) => {
                   Resend OTP in <span style={{ color: 'var(--primary-color)', fontWeight: 700 }}>{timer}s</span>
                 </p>
               ) : (
-                <button className="back-btn-ghost" style={{ width: '100%', marginTop: '1rem', background: 'transparent', fontSize: '0.9rem', fontWeight: 700 }} onClick={handleSendOTP}>Resend OTP</button>
+                                <button 
+                  className="resend-link-btn" 
+                  style={{ width: '100%', background: 'none', border: 'none', fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '4px' }} 
+                  onClick={handleSendOTP}
+                >
+                  Resend OTP
+                </button>
+
               )}
             </motion.div>
           )}

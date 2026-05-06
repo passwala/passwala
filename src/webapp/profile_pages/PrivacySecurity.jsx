@@ -57,7 +57,15 @@ const PrivacySecurity = () => {
 
         <div className="profile-menu-container glass">
            {securityItems.map((item) => (
-             <div key={item.id} className="profile-menu-item no-border-hover">
+             <div 
+               key={item.id} 
+               className="profile-menu-item no-border-hover"
+               style={{ cursor: item.chevron ? 'pointer' : 'default' }}
+               onClick={() => {
+                 if (item.id === 3) navigate('/privacy-policy');
+                 if (item.id === 4) navigate('/data-deletion');
+               }}
+             >
                 <div className="menu-item-left">
                    <div className="menu-icon-box" style={{ background: 'rgba(59, 130, 246, 0.08)', color: '#3b82f6' }}>
                       {item.icon}
@@ -83,7 +91,7 @@ const PrivacySecurity = () => {
         </div>
 
         <div className="profile-menu-container glass danger-zone-menu">
-           <div className="profile-menu-item danger-text" onClick={() => toast('Requesting data export...')}>
+           <div className="profile-menu-item danger-text" style={{ cursor: 'pointer' }} onClick={() => navigate('/data-deletion')}>
               <div className="menu-item-left">
                  <div className="menu-icon-box danger-icon-bg"><Eye size={20} /></div>
                  <div className="menu-text">
@@ -92,7 +100,7 @@ const PrivacySecurity = () => {
                  </div>
               </div>
            </div>
-           <div className="profile-menu-item danger-text" onClick={() => toast('Delete account requested. This is permanent.')}>
+           <div className="profile-menu-item danger-text" style={{ cursor: 'pointer' }} onClick={() => navigate('/data-deletion')}>
               <div className="menu-item-left">
                  <div className="menu-icon-box danger-icon-bg"><Trash2 size={20} /></div>
                  <div className="menu-text">

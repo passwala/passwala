@@ -45,6 +45,7 @@ import {
 
 const VendorPortal = ({ user, onLogout }) => {
   const [appStatus, setAppStatus] = useState('loading'); // loading, onboarding, dashboard, pending
+  console.log('VendorPortal Rendering, appStatus:', appStatus);
   const [vendorData, setVendorData] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024);
   
@@ -66,9 +67,69 @@ const VendorPortal = ({ user, onLogout }) => {
   const [editFormData, setEditFormData] = useState({});
   const [isUpdating, setIsUpdating] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showSuccessPop, setShowSuccessPop] = useState(false);
   
   const [stats, setStats] = useState({ orders: 0, earnings: 0, pending: 0, rating: 4.8 });
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('vendorActiveTab') || 'dashboard'); 
+
+  // ⚡ REAL-TIME STATS ENGINE
+  const fetchLiveStats = async () => {
+    if (!supabase) return;
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // 1. Get Pending Orders
+      const { count: pendingCount } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['PLACED', 'PREPARING']);
+
+      // 2. Get Today's Earnings
+      const { data: earningsData } = await supabase
+        .from('orders')
+        .select('total_amount')
+        .eq('status', 'DELIVERED')
+        .gt('created_at', today.toISOString());
+      
+      const totalEarnings = (earningsData || []).reduce((sum, o) => sum + (o.total_amount || 0), 0);
+
+      setStats({
+        pending: pendingCount || 0,
+        earnings: totalEarnings,
+        orders: (earningsData || []).length,
+        rating: 4.8 
+      });
+    } catch (err) {
+      console.error("Stats fetch failed:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (appStatus === 'dashboard') {
+      fetchLiveStats();
+
+      // Real-time listener for any order changes
+      const channel = supabase
+        .channel('vendor-dashboard-realtime')
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'orders' 
+        }, (payload) => {
+          fetchLiveStats();
+          if (payload.eventType === 'INSERT') {
+            toast.success("New Order Received!", { icon: '🔔' });
+            // Play notification sound could be added here
+          }
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [appStatus]);
 
   useEffect(() => {
     localStorage.setItem('vendorActiveTab', activeTab);
@@ -95,11 +156,23 @@ const VendorPortal = ({ user, onLogout }) => {
       const isLocallyCompleted = localStorage.getItem('vProfileCompleted') === 'true';
 
       if (supabase) {
-        const { data, error } = await supabase
+        // First check vendors table
+        let { data, error } = await supabase
           .from('vendors')
           .select('*')
           .eq('phone', phone)
           .maybeSingle();
+
+        // If not found in vendors, check service_providers
+        if (!data && !error) {
+          const { data: sData, error: sError } = await supabase
+            .from('service_providers')
+            .select('*')
+            .eq('phone', phone)
+            .maybeSingle();
+          data = sData;
+          error = sError;
+        }
 
         if (error && !isLocallyCompleted) throw error;
 
@@ -137,42 +210,87 @@ const VendorPortal = ({ user, onLogout }) => {
 
   const renderDashboard = () => (
     <div className="v-container animate-fade-in">
-      <div className="v-hero-section">
-        <h1>Welcome Back, {vendorData?.name || 'Partner'}!</h1>
-        <p>Here's what's happening with your business today.</p>
+      <div className="v-welcome-banner">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <h1>Good {new Date().getHours() < 12 ? 'Morning' : (new Date().getHours() < 18 ? 'Afternoon' : 'Evening')}, {vendorData?.name?.split(' ')[0] || 'Partner'}!</h1>
+          <p>Your {businessType} is currently online and accepting orders. Here's your performance snapshot for today.</p>
+          
+          <div style={{ display: 'flex', gap: '1.5rem' }}>
+            <button 
+              onClick={() => setActiveTab('orders')}
+              className="v-banner-btn-primary"
+            >
+              View Active Orders <ChevronRight size={18} />
+            </button>
+            <button 
+              onClick={() => setActiveTab('inventory')}
+              className="v-banner-btn-outline"
+            >
+              Manage {businessType === 'shop' ? 'Inventory' : 'Services'}
+            </button>
+          </div>
+        </motion.div>
       </div>
 
       <div className="v-stats-grid">
-        <div className="v-stat-card">
+        <motion.div whileHover={{ y: -5 }} className="v-stat-card">
           <div className="v-stat-header">
-            <div className="v-stat-icon" style={{background: '#fff7ed'}}><Clock size={20} color="#f97316" /></div>
-            <span className="v-stat-label">Pending {businessType === 'shop' ? 'Orders' : 'Jobs'}</span>
+            <div className="v-stat-icon v-icon-orange"><Clock size={24} /></div>
+            <span className="v-stat-label">Live {businessType === 'shop' ? 'Orders' : 'Jobs'}</span>
           </div>
-          <div className="v-stat-value">0</div>
-        </div>
-        <div className="v-stat-card">
-          <div className="v-stat-header">
-            <div className="v-stat-icon" style={{background: '#f0fdf4'}}><IndianRupee size={20} color="#16a34a" /></div>
-            <span className="v-stat-label">Earnings Today</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+            <span className="v-stat-value">{stats.pending}</span>
+            <span style={{ fontSize: '0.85rem', color: '#16a34a', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <TrendingUp size={14} /> +12%
+            </span>
           </div>
-          <div className="v-stat-value">₹0</div>
-        </div>
-        <div className="v-stat-card">
+        </motion.div>
+
+        <motion.div whileHover={{ y: -5 }} className="v-stat-card">
           <div className="v-stat-header">
-            <div className="v-stat-icon" style={{background: '#f0f9ff'}}><Star size={20} color="#0ea5e9" /></div>
+            <div className="v-stat-icon v-icon-green"><IndianRupee size={24} /></div>
+            <span className="v-stat-label">Today's Revenue</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+            <span className="v-stat-value">₹{stats.earnings}</span>
+            <span style={{ fontSize: '0.85rem', color: '#16a34a', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <TrendingUp size={14} /> +5%
+            </span>
+          </div>
+        </motion.div>
+
+        <motion.div whileHover={{ y: -5 }} className="v-stat-card">
+          <div className="v-stat-header">
+            <div className="v-stat-icon v-icon-blue"><Star size={24} /></div>
             <span className="v-stat-label">Avg. Rating</span>
           </div>
-          <div className="v-stat-value">{stats.rating}</div>
-        </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+            <span className="v-stat-value">{stats.rating}</span>
+            <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Top 5%</span>
+          </div>
+        </motion.div>
       </div>
 
       <div className="v-chart-card">
-         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
-            <h3 style={{fontWeight: 800, fontSize: '1.1rem'}}>Performance Analytics</h3>
-            <span style={{fontSize: '0.8rem', color: '#64748b', fontWeight: 600}}>Last 7 Days</span>
-         </div>
-         <div style={{height: '240px', background: '#f8fafc', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', border: '1px dashed #e2e8f0'}}>
-           Detailed analytics will appear once you have orders.
+        <div className="v-chart-header">
+          <div className="v-chart-info">
+            <h3>Growth Analytics</h3>
+            <p>Visualize your business expansion over time</p>
+          </div>
+          <select className="v-chart-select">
+            <option>Last 7 Days</option>
+            <option>Last 30 Days</option>
+            <option>This Month</option>
+          </select>
+        </div>
+         <div style={{height: '300px', background: 'linear-gradient(to bottom, #f8fafc, #fff)', borderRadius: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', border: '1px dashed #e2e8f0'}}>
+           <TrendingUp size={48} strokeWidth={1} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+           <p style={{ fontWeight: 700 }}>Analytics are warming up!</p>
+           <p style={{ fontSize: '0.85rem', marginTop: '4px' }}>Complete more orders to unlock detailed insights.</p>
          </div>
       </div>
     </div>
@@ -223,16 +341,57 @@ const VendorPortal = ({ user, onLogout }) => {
     try {
       setIsUpdating(true);
       if (supabase && vendorData?.id) {
-        const { error } = await supabase.from('vendors').delete().eq('id', vendorData.id);
-        if (error) throw error;
+        const targetId = vendorData.id;
+
+        // 1. Find all order IDs for this vendor to clear their dependencies
+        const { data: vendorOrders } = await supabase
+          .from('orders')
+          .select('id')
+          .eq('store_id', targetId);
+
+        if (vendorOrders && vendorOrders.length > 0) {
+          const orderIds = vendorOrders.map(o => o.id);
+          
+          // 2. Clear rider earnings linked to these orders
+          await supabase.from('rider_earnings').delete().in('order_id', orderIds);
+          
+          // 3. Clear order items (if they exist)
+          try {
+            await supabase.from('order_items').delete().in('order_id', orderIds);
+          } catch (itemErr) {
+            console.warn("Order items delete skipped:", itemErr);
+          }
+          
+          // 4. Clear orders themselves
+          await supabase.from('orders').delete().in('id', orderIds);
+        }
+
+        // 4. Delete products and deals
+        await supabase.from('products').delete().eq('store_id', targetId);
+        await supabase.from('deals').delete().eq('store_id', targetId);
+
+        // 5. Delete the store
+        await supabase.from('stores').delete().eq('vendor_id', targetId);
+
+        // 6. Finally delete the vendor profile
+        const { error: vendorError } = await supabase.from('vendors').delete().eq('id', targetId);
+        if (vendorError) throw vendorError;
       }
-      toast.success('Account deleted successfully.');
+      
+      toast.success('Account and associated records deleted.', { icon: '🗑️' });
+      
       localStorage.removeItem('vProfileCompleted');
       localStorage.removeItem('vendorActiveTab');
-      if (onLogout) onLogout(true);
+      localStorage.removeItem('vBusinessType');
+      
+      if (onLogout) {
+        onLogout(true);
+      } else {
+        window.location.href = '/';
+      }
     } catch (e) {
-      console.error(e);
-      toast.error('Failed to delete account.');
+      console.error("Deep Delete Error:", e);
+      toast.error(`Delete Failed: ${e.message || "Dependency error"}`);
     } finally {
       setIsUpdating(false);
     }
@@ -254,62 +413,61 @@ const VendorPortal = ({ user, onLogout }) => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '2rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
             <div className="v-form-group">
-              <label>Full Name</label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Package size={16} /> Owner Name
+              </label>
               {isEditingProfile ? 
                 <input type="text" className="v-input" value={currentData?.name || ''} onChange={e => setEditFormData({...editFormData, name: e.target.value})} /> :
-                <div className="v-input" style={{ background: '#f8fafc', color: '#64748b' }}>{currentData?.name || 'Not provided'}</div>
+                <div className="v-input v-readonly">{currentData?.name || 'Not provided'}</div>
               }
             </div>
+
             <div className="v-form-group">
-              <label>Phone Number (Not Editable)</label>
-              <div className="v-input" style={{ background: '#f8fafc', color: '#94a3b8', cursor: 'not-allowed' }}>+91 {vendorData?.phone || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : '9999999999')}</div>
-            </div>
-            <div className="v-form-group">
-              <label>Business / Shop Name</label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Star size={16} /> Business Name
+              </label>
               {isEditingProfile ? 
                 <input type="text" className="v-input" value={currentData?.business_name || ''} onChange={e => setEditFormData({...editFormData, business_name: e.target.value})} /> :
-                <div className="v-input" style={{ background: '#f8fafc', color: '#64748b' }}>{currentData?.business_name || 'Not provided'}</div>
+                <div className="v-input v-readonly">{currentData?.business_name || 'Not provided'}</div>
               }
             </div>
+
             <div className="v-form-group">
-              <label>License / Registration No</label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <HelpCircle size={16} /> Business Category
+              </label>
+              <div className="v-input v-readonly" style={{ textTransform: 'capitalize' }}>{businessType} Service</div>
+            </div>
+
+            <div className="v-form-group">
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CheckCircle size={16} /> License / Registration
+              </label>
               {isEditingProfile ? 
                 <input 
                   type="text" 
-                  maxLength={16}
                   className="v-input" 
                   value={currentData?.license_no || ''} 
-                  onChange={e => {
-                    const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-                    setEditFormData({...editFormData, license_no: val});
-                  }} 
+                  onChange={e => setEditFormData({...editFormData, license_no: e.target.value})} 
                 /> :
-                <div className="v-input" style={{ background: '#f8fafc', color: '#64748b' }}>{currentData?.license_no || 'Not applicable'}</div>
+                <div className="v-input v-readonly">{currentData?.license_no || 'Pending Verification'}</div>
               }
             </div>
+
             <div className="v-form-group" style={{ gridColumn: '1 / -1' }}>
-              <label>Aadhar Number</label>
-              {isEditingProfile ? 
-                <input type="text" className="v-input" maxLength={12} value={currentData?.aadhar_no || ''} onChange={e => setEditFormData({...editFormData, aadhar_no: e.target.value.replace(/\D/g, '')})} /> :
-                <div className="v-input" style={{ background: '#f8fafc', color: '#64748b' }}>
-                  {currentData?.aadhar_no ? `XXXX-XXXX-${currentData?.aadhar_no.toString().slice(-4)}` : 'Not provided'}
-                </div>
-              }
-            </div>
-            <div className="v-form-group" style={{ gridColumn: '1 / -1' }}>
-              <label>{businessType === 'shop' ? 'Shop Address' : 'Business Address'}</label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MapPin size={16} /> Store Address
+              </label>
               {isEditingProfile ? 
                 <textarea 
                   className="v-input" 
-                  style={{ minHeight: '80px', resize: 'vertical' }}
+                  style={{ minHeight: '80px' }}
                   value={currentData?.address || ''} 
                   onChange={e => setEditFormData({...editFormData, address: e.target.value})} 
                 /> :
-                <div className="v-input" style={{ background: '#f8fafc', color: '#64748b', minHeight: '60px' }}>
-                  {currentData?.address || 'Address not provided'}
-                </div>
+                <div className="v-input v-readonly" style={{ minHeight: '60px' }}>{currentData?.address || 'Address not set'}</div>
               }
             </div>
           </div>
@@ -401,7 +559,6 @@ const VendorPortal = ({ user, onLogout }) => {
           <button className="submit-form-btn" style={{marginTop: '2rem'}} onClick={() => setOnboardingSubStep(2)}>Get Started</button>
         </motion.div>
       )}
-      {/* Additional onboarding steps would follow similar beautiful pattern */}
       {onboardingSubStep === 2 && (
         <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="onboarding-content" style={{ position: 'relative' }}>
           <button className="back-btn-ghost" style={{ position: 'absolute', left: '-10px', top: '-10px', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }} onClick={() => setOnboardingSubStep(1)}>
@@ -441,9 +598,6 @@ const VendorPortal = ({ user, onLogout }) => {
                 setFormData({...formData, license_no: val});
               }} 
             />
-            {formData.license_no && (formData.license_no.length < 14) && (
-              <p style={{color: '#ef4444', fontSize: '0.75rem', marginTop: '4px'}}>Must be 14 to 16 alphanumeric characters</p>
-            )}
           </div>
 
           <div className="v-form-group">
@@ -464,10 +618,7 @@ const VendorPortal = ({ user, onLogout }) => {
              disabled={
                !formData.name || 
                formData.aadhar_no.length !== 12 || 
-               !formData.business_name || 
-               (businessType === 'shop' 
-                 ? !(formData.license_no.length >= 14 && formData.license_no.length <= 16) 
-                 : (formData.license_no.length > 0 && !(formData.license_no.length >= 14 && formData.license_no.length <= 16)))
+               !formData.business_name
              }
           >
             Continue
@@ -476,82 +627,164 @@ const VendorPortal = ({ user, onLogout }) => {
       )}
       
       {onboardingSubStep > 2 && (
-        <div style={{textAlign: 'center', padding: '2rem 1rem'}}>
-           <Clock size={48} color="#f97316" style={{margin: '0 auto 1.5rem auto'}} />
-           <h3 style={{fontWeight: 800}}>Completing Set-up...</h3>
-           <p style={{color: '#64748b', fontSize: '0.9rem'}}>We are finalizing your {businessType} profile. You will be redirected shortly.</p>
-           <button onClick={async () => {
-              if (supabase) {
-                 const currentPhone = vendorData?.phone || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : (typeof user === 'string' ? user : '9999999999'));
-                 let resolvedUserId = null;
-                 
-                 try {
-                    const { data: ud } = await supabase.from('users').select('id').eq('phone', currentPhone).maybeSingle();
-                    if (ud) {
-                        resolvedUserId = ud.id;
-                    } else {
-                        const { data: newUser } = await supabase.from('users').insert([{ phone: currentPhone, full_name: formData.name }]).select().single();
-                        if (newUser) resolvedUserId = newUser.id;
-                    }
-                 } catch (e) {
-                    console.error("User resolve error:", e);
-                 }
+        <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="onboarding-content" style={{ position: 'relative', textAlign: 'center', padding: '2rem 1rem' }}>
+          <button className="back-btn-ghost" style={{ position: 'absolute', left: '-10px', top: '-10px', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }} onClick={() => setOnboardingSubStep(2)}>
+             <ArrowLeft size={24} />
+          </button>
 
-                 const payload = {
-                    name: formData.name,
-                    business_name: formData.business_name,
-                    aadhar_no: formData.aadhar_no,
-                    license_no: formData.license_no,
-                    address: formData.address,
-                    category: businessType,
-                    profile_completed: true,
-                    phone: currentPhone
-                 };
+          <Clock size={48} color="#f97316" style={{margin: '0 auto 1.5rem auto'}} />
+          <h3 style={{fontWeight: 800}}>Completing Set-up...</h3>
+          <p style={{color: '#64748b', fontSize: '0.9rem'}}>We are finalizing your {businessType} profile. You will be redirected shortly.</p>
+          <button onClick={async () => {
+             if (supabase) {
+                const currentPhone = vendorData?.phone || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : (typeof user === 'string' ? user : '9999999999'));
+                let resolvedUserId = null;
+                
+                try {
+                   const { data: ud } = await supabase.from('users').select('id').eq('phone', currentPhone).maybeSingle();
+                   if (ud) {
+                       resolvedUserId = ud.id;
+                   } else {
+                       const { data: newUser } = await supabase.from('users').insert([{ phone: currentPhone, full_name: formData.name }]).select().single();
+                       if (newUser) resolvedUserId = newUser.id;
+                   }
+                } catch (e) {
+                   console.error("User resolve error:", e);
+                }
 
-                 if (resolvedUserId) {
-                    payload.user_id = resolvedUserId;
-                 }
+                const targetTable = businessType === 'shop' ? 'vendors' : 'service_providers';
+                const tablePayload = {
+                   business_name: formData.business_name,
+                   aadhar_no: formData.aadhar_no,
+                   license_no: formData.license_no,
+                   address: formData.address,
+                   phone: currentPhone,
+                   profile_completed: true,
+                   user_id: resolvedUserId
+                };
 
-                 try {
-                    if (vendorData?.id) {
-                       const { error } = await supabase.from('vendors').update(payload).eq('id', vendorData.id);
-                       if (error) console.error("Update error:", error);
-                    } else {
-                       const { data, error } = await supabase.from('vendors').insert([payload]).select().single();
-                       if (data) {
-                          payload.id = data.id; 
-                       }
-                       if (error) {
-                          console.error("Insert error:", error);
-                  if (error.code === '23505') { 
-                            const { data: ud, error: ue } = await supabase.from('vendors').update(payload).eq('phone', currentPhone).select().single();
-                            if (ud) payload.id = ud.id;
-                          }
-                       }
-                    }
-                    if (payload.id) {
-                       await supabase.from('stores').upsert({
-                         id: payload.id,
-                         vendor_id: payload.id,
-                         name: payload.business_name,
-                         address: payload.address
-                       });
-                    }
-                 } catch (e) {
-                    console.error("Supabase operation failed:", e);
-                 }
-              }
-              setVendorData(prev => ({...prev, ...formData, category: businessType, profile_completed: true}));
-              
-              // Clear cached onboarding data since we are done
-              localStorage.removeItem('vOnboardingStep');
-              localStorage.removeItem('vBusinessType');
-              localStorage.removeItem('vFormData');
-              
-              localStorage.setItem('vProfileCompleted', 'true');
-              
-              setAppStatus('dashboard');
-           }} style={{marginTop: '2rem', padding: '12px 24px', background: '#0f172a', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 800}}>Continue to Dashboard</button>
+                if (targetTable === 'vendors') {
+                  tablePayload.name = formData.name;
+                  tablePayload.category = businessType;
+                } else {
+                  tablePayload.full_name = formData.name;
+                  tablePayload.name = formData.name;
+                }
+
+                let toastId = toast.loading('Setting up your profile...');
+                try {
+                   let savedId = vendorData?.id;
+                   if (savedId) {
+                      const { error } = await supabase.from(targetTable).update(tablePayload).eq('id', savedId);
+                      if (error) throw error;
+                   } else {
+                      const { data, error } = await supabase.from(targetTable).insert([tablePayload]).select().single();
+                      if (error) throw error;
+                      if (data) savedId = data.id;
+                   }
+                   
+                   if (savedId && targetTable === 'vendors') {
+                      const { error: storeError } = await supabase.from('stores').upsert({
+                        id: savedId,
+                        vendor_id: savedId,
+                        name: tablePayload.business_name,
+                        address: tablePayload.address
+                      });
+                      if (storeError) throw storeError;
+                   }
+                   
+                   toast.success('Onboarding completed successfully!', { id: toastId });
+                   setVendorData(prev => ({...prev, ...formData, category: businessType, profile_completed: true}));
+                   localStorage.setItem('vProfileCompleted', 'true');
+                   setShowSuccessPop(true);
+                } catch (e) {
+                   console.error(`Supabase ${targetTable} operation failed:`, e);
+                   toast.error(`Setup failed: ${e.message || 'Please check your database connection or SQL schemas.'}`, { id: toastId });
+                }
+             } else {
+                setVendorData(prev => ({...prev, ...formData, category: businessType, profile_completed: true}));
+                localStorage.setItem('vProfileCompleted', 'true');
+                setShowSuccessPop(true);
+             }
+          }} style={{marginTop: '2rem', padding: '12px 24px', background: '#0f172a', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 800}}>Continue to Dashboard</button>
+        </motion.div>
+      )}
+
+      {showSuccessPop && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', damping: 20 }}
+            style={{
+              background: 'white',
+              padding: '2.5rem',
+              borderRadius: '24px',
+              maxWidth: '440px',
+              width: '100%',
+              textAlign: 'center',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
+          >
+            <div style={{
+              width: '80px',
+              height: '80px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #f97316 0%, #ff8f3d 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.5rem auto',
+              boxShadow: '0 8px 16px rgba(249, 115, 22, 0.3)'
+            }}>
+              <CheckCircle size={40} color="white" />
+            </div>
+            
+            <h3 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', marginBottom: '0.75rem' }}>
+              Welcome Aboard! 🎉
+            </h3>
+            
+            <p style={{ color: '#64748b', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '2rem' }}>
+              Congratulations, <strong style={{color: '#0f172a'}}>{formData.name}</strong>! Your <strong>{businessType === 'shop' ? 'Shop Owner' : 'Service Provider'}</strong> profile has been registered successfully.
+            </p>
+            
+            <button 
+              onClick={() => {
+                setShowSuccessPop(false);
+                setAppStatus('dashboard');
+              }}
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: '12px',
+                background: '#0f172a',
+                color: 'white',
+                border: 'none',
+                fontWeight: 800,
+                fontSize: '1rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              Explore Dashboard
+            </button>
+          </motion.div>
         </div>
       )}
     </div>
@@ -615,12 +848,18 @@ const VendorPortal = ({ user, onLogout }) => {
                <div className="v-status-badge">Accepting Orders</div>
             </div>
             
-            <div className="v-profile-pill">
-               <div className="v-user-info" style={{textAlign: 'right'}}>
-                  <span style={{display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800}}>PARTNER ID #4289</span>
-                  <span style={{fontSize: '0.85rem'}}>{vendorData?.business_name || 'My Store'}</span>
-               </div>
-               <div className="v-avatar">{vendorData?.name?.charAt(0) || 'P'}</div>
+            <div className="v-top-right">
+              <div className="v-user-info">
+                <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800 }}>PARTNER ID #{vendorData?.id?.substring(0,4)?.toUpperCase() || '4289'}</span>
+                <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>{vendorData?.business_name || 'My Store'}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <MapPin size={10} color="#f97316" />
+                  <span style={{ fontSize: '0.7rem', color: '#f97316', fontWeight: 700 }}>
+                    {vendorData?.address?.split(',')[0] || 'Local Area'}
+                  </span>
+                </div>
+              </div>
+              <div className="v-avatar">{vendorData?.name?.charAt(0) || 'P'}</div>
             </div>
           </header>
         )}

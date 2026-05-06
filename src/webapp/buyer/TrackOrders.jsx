@@ -81,34 +81,45 @@ const TrackOrders = ({ onBack, user }) => {
   const [riderCoords, setRiderCoords] = useState(null);
 
   useEffect(() => {
-    let interval;
-    const updateRiderPos = async () => {
-      // TRACKING: Find orders where a rider is assigned and active
-      const trackingStatuses = ['ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED'];
-      const activeShipment = activeOrders.find(o => trackingStatuses.includes(o.status));
+    // TRACKING: Find orders where a rider is assigned and active
+    const trackingStatuses = ['ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED'];
+    const activeShipment = activeOrders.find(o => trackingStatuses.includes(o.status));
+    
+    if (!activeShipment?.rider_id) return;
+
+    // 1. Get initial position
+    const getInitialPos = async () => {
+      const { data } = await supabase
+        .from('rider_locations')
+        .select('lat, lng, status')
+        .eq('rider_id', activeShipment.rider_id)
+        .maybeSingle();
       
-      if (activeShipment?.rider_id) {
-        const { data } = await supabase
-          .from('rider_locations')
-          .select('lat, lng, status')
-          .eq('rider_id', activeShipment.rider_id)
-          .maybeSingle();
-        
-        if (data && data.status === 'ONLINE') {
-          setRiderCoords({ lat: data.lat, lng: data.lng });
-        }
+      if (data && data.status === 'ONLINE') {
+        setRiderCoords({ lat: data.lat, lng: data.lng });
       }
     };
+    getInitialPos();
 
-    const hasActiveTracking = activeOrders.some(o => 
-      ['ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED'].includes(o.status)
-    );
+    // ⚡ REAL-TIME: Listen for live location updates instead of polling
+    const channel = supabase
+      .channel(`rider-tracking-${activeShipment.rider_id}`)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'rider_locations',
+        filter: `rider_id=eq.${activeShipment.rider_id}`
+      }, (payload) => {
+        // Instant update as rider moves
+        if (payload.new.status === 'ONLINE') {
+          setRiderCoords({ lat: payload.new.lat, lng: payload.new.lng });
+        }
+      })
+      .subscribe();
 
-    if (hasActiveTracking) {
-      updateRiderPos();
-      interval = setInterval(updateRiderPos, 10000);
-    }
-    return () => clearInterval(interval);
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [activeOrders]);
 
   return (

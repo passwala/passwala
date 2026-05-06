@@ -205,7 +205,9 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           setIncomingOrder({
             id: `#ORD-${order.id.substring(0,6).toUpperCase()}`,
             store: order.stores?.name || 'Passwala Partner Store',
+            storeArea: order.stores?.address?.split(',')[0] || 'Nearby', // 📍 Added Store Area
             customerName: order.users?.full_name || 'Customer',
+            area: order.addresses?.society || 'Near Ahmedabad', // 📍 Added Customer Area
             pickupAddress: order.stores?.address || 'Nearby Market',
             dropAddress: dropAddr,
             distance: `${totalDist.toFixed(1)} km`, 
@@ -221,9 +223,27 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       }
     };
 
+    // Initial fetch to catch existing orders
     fetchPendingOrder();
-    const poller = setInterval(fetchPendingOrder, 5000);
-    return () => clearInterval(poller);
+
+    // ⚡ REAL-TIME: Listen for NEW orders instead of polling
+    const channel = supabase
+      .channel('new-orders-broadcast')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'orders' 
+      }, (payload) => {
+        // If a new order is placed, check if it's nearby
+        if (payload.new.status === 'PLACED') {
+          fetchPendingOrder();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [isOnline, activeOrder, incomingOrder, rejectedOrderIds]);
 
   // 🛡️ Real-time Order Availability Guard
@@ -615,9 +635,13 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                <div className="rider-order-details">
                   <div className="rider-order-location">
                       <div style={{ marginTop: '4px' }}><MapPin color="var(--rider-primary)" size={20} /></div>
-                      <div>
+                       <div>
                           <p style={{ fontSize: '0.75rem', color: 'var(--rider-text-secondary)', margin: 0 }}>Pickup from</p>
-                          <p style={{ fontWeight: 700, margin: 0 }}>{incomingOrder.store}</p>
+                          <p style={{ fontWeight: 700, margin: '0 0 2px 0' }}>{incomingOrder.store}</p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                             <MapPin size={12} color="var(--rider-primary)" />
+                             <span style={{ fontSize: '0.75rem', color: 'var(--rider-primary)', fontWeight: 600 }}>{incomingOrder.storeArea}</span>
+                          </div>
                           <p style={{ fontSize: '0.75rem', color: 'var(--rider-text-secondary)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{incomingOrder.pickupAddress}</p>
                       </div>
                   </div>
@@ -626,7 +650,11 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                       <div style={{ marginTop: '4px' }}><Navigation color="var(--rider-success)" size={20} /></div>
                       <div>
                           <p style={{ fontSize: '0.75rem', color: 'var(--rider-text-secondary)', margin: 0 }}>Deliver to</p>
-                          <p style={{ fontWeight: 700, margin: 0 }}>{incomingOrder.customerName}</p>
+                          <p style={{ fontWeight: 700, margin: '0 0 2px 0', fontSize: '1rem' }}>{incomingOrder.customerName}</p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                             <MapPin size={12} color="var(--rider-primary)" />
+                             <span style={{ fontSize: '0.8rem', color: 'var(--rider-primary)', fontWeight: 600 }}>{incomingOrder.area}</span>
+                          </div>
                           <p style={{ fontSize: '0.75rem', color: 'var(--rider-text-secondary)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{incomingOrder.dropAddress}</p>
                       </div>
                   </div>

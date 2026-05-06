@@ -43,15 +43,33 @@ const ActivityFeed = () => {
   const [recent, setRecent] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchRecent = async () => {
+    try {
+      const { data: bData } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(5);
+      setRecent(bData || []);
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  };
+
   useEffect(() => {
-    const fetchRecent = async () => {
-      try {
-        const { data: bData } = await supabase.from('service_bookings').select('*').order('created_at', { ascending: false }).limit(5);
-        setRecent(bData || []);
-      } catch (err) { console.error(err); }
-      finally { setLoading(false); }
-    };
     fetchRecent();
+
+    // ⚡ REAL-TIME: Listen for any new orders platform-wide
+    const channel = supabase
+      .channel('admin-activity-pulse')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'orders' 
+      }, (payload) => {
+        setRecent(prev => [payload.new, ...prev].slice(0, 5));
+        toast.success("New platform order detected!");
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   if (loading) return <div style={{ padding: '1rem', color: '#64748b' }}>Syncing feed...</div>;
@@ -60,8 +78,9 @@ const ActivityFeed = () => {
     <div className="activity-list">
       {recent.length === 0 ? <p style={{ padding: '1rem', color: '#64748b' }}>No recent activity.</p> :
         recent.map(b => (
-          <div className="trend-item" key={b.id}>
-             <strong>New Order:</strong> <span>{b.item_name || 'Order'} (₹{b.price || b.total_amount || 0})</span>
+          <div className="trend-item" key={b.id} style={{ borderLeft: '3px solid #6366f1', paddingLeft: '10px', marginBottom: '8px' }}>
+             <strong>New Order:</strong> <span>#{b.id.substring(0,6)} (₹{b.total_amount || 0})</span>
+             <div style={{ fontSize: '10px', color: '#94a3b8' }}>{new Date(b.created_at).toLocaleTimeString()}</div>
           </div>
         ))
       }
