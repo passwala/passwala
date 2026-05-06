@@ -670,15 +670,6 @@ const AdminPanel = ({ onLogout }) => {
         </div>
       </div>
 
-      <div className="recent-activity-table glass" style={{marginTop: '2rem'}}>
-          <div className="activity-header">
-            <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Activity size={18} /> Real-time System Load</h4>
-            <span className="badge-live">System Optimal</span>
-          </div>
-          <div style={{height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8'}}>
-            [ Interactive Growth Analytics Visualization Coming Soon ]
-          </div>
-      </div>
 
       <div className="recent-activity glass">
          <div className="activity-header">
