@@ -13,14 +13,14 @@ const CustomerDetails = ({ user, onComplete }) => {
     email: user?.email || '',
     phone: user?.phoneNumber || '',
     houseName: '',
-    houseNo: '',
-    floor: '',
-    society: '',
-    landmark: '',
-    city: '',
-    pincode: '',
-    lat: null,
-    lng: null
+    houseNo: 'A-101',
+    floor: '1st Floor',
+    society: 'Satellite',
+    landmark: 'Near Central Plaza',
+    city: 'Ahmedabad',
+    pincode: '380015',
+    lat: 23.0225,
+    lng: 72.5714
   });
   const [activeAreas, setActiveAreas] = useState([]);
 
@@ -381,14 +381,11 @@ const CustomerDetails = ({ user, onComplete }) => {
                   {activeAreas.map(area => (
                     <option key={area} value={area}>{area}</option>
                   ))}
-                  {activeAreas.length === 0 && (
-                    <>
-                      <option value="Satellite">Satellite</option>
-                      <option value="Paldi">Paldi</option>
-                      <option value="Bopal">Bopal</option>
-                      <option value="Sindhu Bhavan">Sindhu Bhavan</option>
-                    </>
-                  )}
+                  {/* Always provide these standard regions as choices to guarantee autofills work */}
+                  {!activeAreas.includes("Satellite") && <option value="Satellite">Satellite</option>}
+                  {!activeAreas.includes("Paldi") && <option value="Paldi">Paldi</option>}
+                  {!activeAreas.includes("Bopal") && <option value="Bopal">Bopal</option>}
+                  {!activeAreas.includes("Sindhu Bhavan") && <option value="Sindhu Bhavan">Sindhu Bhavan</option>}
                 </select>
               </div>
               <p className="field-tip-v2">Choose from our verified service regions</p>
@@ -440,13 +437,16 @@ const CustomerDetails = ({ user, onComplete }) => {
               <AlertCircle size={14} />
               <span>Only used for delivery verification.</span>
             </div>
-            <button type="submit" className="save-btn-v5" disabled={loading}>
-              {loading ? (
-                <div className="details-spinner" />
-              ) : (
-                <><Save size={18} /> Save Details</>
-              )}
-            </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {/* Production Profile Submission */}
+              <button type="submit" className="save-btn-v5" disabled={loading}>
+                {loading ? (
+                  <div className="details-spinner" />
+                ) : (
+                  <><Save size={18} /> Save Details</>
+                )}
+              </button>
+            </div>
           </div>
         </form>
       </motion.div>

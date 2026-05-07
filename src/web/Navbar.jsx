@@ -31,10 +31,10 @@ const Navbar = ({ isAuthenticated, user, onLogout, onOpenProfile, onOpenAI, onJo
         {/* Center: Navigation Links (Desktop) */}
         <div className="nav-center-v2">
           <div className="nav-links-v2">
-             <a href="#services" className="nav-pill-link">Services</a>
-             <a href="#essentials" className="nav-pill-link">Essentials</a>
-             <a href="#deals" className="nav-pill-link">Deals</a>
-             <a href="#community" className="nav-pill-link">Community</a>
+             <a href="/#services" className="nav-pill-link">Services</a>
+             <a href="/#essentials" className="nav-pill-link">Essentials</a>
+             <a href="/#deals" className="nav-pill-link">Deals</a>
+             <a href="/#community" className="nav-pill-link">Community</a>
           </div>
         </div>
 
@@ -56,10 +56,10 @@ const Navbar = ({ isAuthenticated, user, onLogout, onOpenProfile, onOpenAI, onJo
       {/* Mobile Menu Overlay */}
       <div className={`mobile-menu-overlay ${isMenuOpen ? 'active' : ''}`}>
         <div className="mobile-menu-content">
-           <a href="#services" onClick={() => setIsMenuOpen(false)}>Services</a>
-           <a href="#essentials" onClick={() => setIsMenuOpen(false)}>Essentials</a>
-           <a href="#deals" onClick={() => setIsMenuOpen(false)}>Deals</a>
-           <a href="#community" onClick={() => setIsMenuOpen(false)}>Community</a>
+           <a href="/#services" onClick={() => setIsMenuOpen(false)}>Services</a>
+           <a href="/#essentials" onClick={() => setIsMenuOpen(false)}>Essentials</a>
+           <a href="/#deals" onClick={() => setIsMenuOpen(false)}>Deals</a>
+           <a href="/#community" onClick={() => setIsMenuOpen(false)}>Community</a>
            <hr />
            {isAuthenticated && (
              <button className="mobile-join-btn" onClick={() => { onOpenProfile(); setIsMenuOpen(false); }}>My Profile</button>

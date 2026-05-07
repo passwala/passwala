@@ -21,7 +21,7 @@ import {
   History,
   TrendingUp,
   Package,
-  Activity,
+  Menu,
   Bike,
   CreditCard,
   MessageSquare,
@@ -33,12 +33,24 @@ import {
   Heart,
   Briefcase,
   Calendar,
-  MapPin
+  MapPin,
+  Map,
+  Navigation
 } from 'lucide-react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from '../supabase';
 import { toast } from 'react-hot-toast';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import './AdminPanel.css';
+
+// Create a highly privileged admin client that bypasses RLS
+const adminSupabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 const ActivityFeed = () => {
   const [recent, setRecent] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -103,11 +115,28 @@ const TABLE_SCHEMAS = {
   service_areas: { city: 'Ahmedabad', area_name: '', is_active: true },
 };
 
+const DATABASE_SCHEMAS = {
+  users: ['phone', 'full_name', 'email', 'photo_url', 'role'],
+  vendors: ['user_id', 'phone', 'is_verified', 'name', 'business_name', 'aadhar_no', 'license_no', 'address', 'category', 'second_image_list', 'profile_completed'],
+  riders: ['user_id', 'vehicle_no', 'license_no', 'id_proof', 'is_active', 'is_verified', 'rating', 'total_deliveries'],
+  service_providers: ['user_id', 'business_name', 'about', 'rating', 'is_verified', 'phone', 'full_name', 'name', 'aadhar_no', 'license_no', 'address', 'profile_completed'],
+  services: ['provider_id', 'category_id', 'title', 'description', 'price', 'duration_minutes'],
+  products: ['store_id', 'category_id', 'name', 'description', 'price', 'discount_price', 'image_url', 'is_active'],
+  service_bookings: ['user_id', 'service_id', 'provider_id', 'address_id', 'status', 'total_amount'],
+  deals: ['store_id', 'title', 'discount_percentage', 'valid_until'],
+  posts: ['user_id', 'content', 'image_url', 'likes_count'],
+  notifications: ['user_id', 'title', 'message', 'is_read'],
+  service_areas: ['city', 'area_name', 'is_active'],
+  admins: ['username', 'password_hash', 'role'],
+  stores: ['vendor_id', 'name', 'description', 'logo_url', 'banner_url', 'address', 'lat', 'lng', 'is_open', 'rating']
+};
+
 const tabSections = [
   {
     label: 'Main',
     items: [
       { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+      { id: 'people_map', label: 'People Map', icon: Map, table: 'users' },
       { id: 'users', label: 'Users', icon: Users, table: 'users' },
       { id: 'vendors', label: 'Vendors', icon: ShoppingBag, table: 'vendors' },
       { id: 'riders', label: 'Riders', icon: Truck, table: 'riders' },
@@ -180,9 +209,66 @@ const MOCK_DATA = {
   ]
 };
 
+// --- Leaflet Colored Icons for Admin Map ---
+const mapRedIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+const mapGreenIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+const mapOrangeIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+const mapVioletIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+const mapBlueIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+// Helper to center Map on selected coordinates
+function MapRecenter({ coords }) {
+  const map = useMap();
+  useEffect(() => {
+    if (coords) {
+      map.setView([coords.lat, coords.lng], 15, { animate: true });
+    }
+  }, [coords, map]);
+  return null;
+}
+
 const TABS = tabSections.flatMap(s => s.items);
 
-const AdminPanel = ({ onLogout }) => {
+const AdminPanel = ({ onLogout, location }) => {
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('admin_active_tab') || 'dashboard');
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState([]);
@@ -197,6 +283,13 @@ const AdminPanel = ({ onLogout }) => {
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [isSaving, setSaving] = useState(false);
   const [syncStatus, setSyncStatus] = useState('cloud'); // 'cloud' or 'offline'
+
+  // --- People Map States ---
+  const [peopleMapData, setPeopleMapData] = useState([]);
+  const [peopleSearch, setPeopleSearch] = useState('');
+  const [peopleRoleFilter, setPeopleRoleFilter] = useState('All');
+  const [selectedPersonCoords, setSelectedPersonCoords] = useState(null);
+  const [mapLoading, setMapLoading] = useState(false);
 
   const currentTab = TABS.find(t => t.id === activeTab) || TABS[0];
 
@@ -225,6 +318,140 @@ const AdminPanel = ({ onLogout }) => {
     } catch (err) { console.error(err); }
   };
 
+  const fetchPeopleMapData = useCallback(async () => {
+    try {
+      setMapLoading(true);
+      const combined = [];
+
+      // 1. Fetch Users, Vendors, Riders, Service Providers in parallel
+      const [
+        { data: usersList, error: uErr },
+        { data: vendorsList, error: vErr },
+        { data: ridersList, error: rErr },
+        { data: providersList, error: pErr }
+      ] = await Promise.all([
+        supabase.from('users').select('*'),
+        supabase.from('vendors').select('*'),
+        supabase.from('riders').select('*'),
+        supabase.from('service_providers').select('*')
+      ]);
+
+      // Hash function for stable offsets in Ahmedabad
+      const getStableCoords = (id, role) => {
+        let hash = 0;
+        const inputStr = id || 'random-id';
+        for (let i = 0; i < inputStr.length; i++) {
+          hash = inputStr.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        
+        let radius = 0.035;
+        let baseLat = 23.0225;
+        let baseLng = 72.5714;
+        
+        if (role === 'Rider') {
+          baseLat = 23.025; baseLng = 72.565; radius = 0.045;
+        } else if (role === 'Vendor') {
+          baseLat = 23.018; baseLng = 72.555; radius = 0.03;
+        } else if (role === 'Provider') {
+          baseLat = 23.035; baseLng = 72.585; radius = 0.04;
+        }
+        
+        const latOffset = ((hash & 0xFF) / 255.0 - 0.5) * radius;
+        const lngOffset = (((hash >> 8) & 0xFF) / 255.0 - 0.5) * radius;
+        
+        return {
+          lat: baseLat + latOffset,
+          lng: baseLng + lngOffset
+        };
+      };
+
+      // Map Users (Buyers)
+      if (!uErr && usersList) {
+        usersList.forEach(user => {
+          if (user.role === 'BUYER' || !user.role) {
+            const coords = getStableCoords(user.id, 'Buyer');
+            combined.push({
+              id: user.id,
+              name: user.full_name || 'Buyer ' + user.phone.slice(-4),
+              phone: user.phone,
+              email: user.email || 'N/A',
+              role: 'Buyer',
+              status: 'Active',
+              iconColor: 'green',
+              lat: coords.lat,
+              lng: coords.lng,
+              meta: { role: 'BUYER', email: user.email }
+            });
+          }
+        });
+      }
+
+      // Map Vendors
+      if (!vErr && vendorsList) {
+        vendorsList.forEach(vendor => {
+          const coords = getStableCoords(vendor.id, 'Vendor');
+          combined.push({
+            id: vendor.id,
+            name: vendor.business_name || vendor.name || 'Merchant Partner',
+            phone: vendor.phone,
+            email: vendor.category || 'General Store',
+            role: 'Vendor',
+            status: vendor.is_verified ? 'Verified Partner' : 'Pending Verification',
+            iconColor: 'orange',
+            lat: vendor.lat || coords.lat,
+            lng: vendor.lng || coords.lng,
+            meta: { category: vendor.category, license: vendor.license_no }
+          });
+        });
+      }
+
+      // Map Riders
+      if (!rErr && ridersList) {
+        ridersList.forEach(rider => {
+          const coords = getStableCoords(rider.id, 'Rider');
+          combined.push({
+            id: rider.id,
+            name: 'Rider ' + (rider.vehicle_no || rider.id.slice(0, 4)),
+            phone: rider.license_no || 'N/A',
+            email: rider.vehicle_no || 'Standard Transport',
+            role: 'Rider',
+            status: rider.is_active ? 'On Duty' : 'Offline',
+            iconColor: 'red',
+            lat: rider.lat || coords.lat,
+            lng: rider.lng || coords.lng,
+            meta: { rating: rider.rating || '4.8', deliveries: rider.total_deliveries || '120+' }
+          });
+        });
+      }
+
+      // Map Service Providers
+      if (!pErr && providersList) {
+        providersList.forEach(provider => {
+          const coords = getStableCoords(provider.id, 'Provider');
+          combined.push({
+            id: provider.id,
+            name: provider.business_name || provider.name || 'Home Expert',
+            phone: provider.phone,
+            email: provider.category_id || 'Services',
+            role: 'Provider',
+            status: provider.is_verified ? 'Verified Expert' : 'Regular Provider',
+            iconColor: 'violet',
+            lat: coords.lat,
+            lng: coords.lng,
+            meta: { business: provider.business_name, rating: provider.rating || '4.5' }
+          });
+        });
+      }
+
+      setPeopleMapData(combined);
+    } catch (err) {
+      console.error('Error fetching people map data:', err);
+      toast.error('Failed to load live people coordinates');
+    } finally {
+      setMapLoading(false);
+    }
+  }, []);
+
   const fetchData = useCallback(async () => {
     if (activeTab === 'dashboard') {
       setLoading(false);
@@ -234,10 +461,10 @@ const AdminPanel = ({ onLogout }) => {
     const currentTable = TABS.find(t => t.id === activeTab)?.table || activeTab;
 
     try {
-      if (!supabase) throw new Error('Supabase client not initialized');
+      if (!adminSupabase) throw new Error('Supabase client not initialized');
 
-      // Fetch directly from Supabase
-      let query = supabase.from(currentTable).select(
+      // Fetch directly from Supabase using admin client to bypass RLS
+      let query = adminSupabase.from(currentTable).select(
         currentTable === 'riders' || currentTable === 'vendors' || currentTable === 'service_providers'
           ? '*, users(phone, full_name)'
           : '*'
@@ -284,22 +511,30 @@ const AdminPanel = ({ onLogout }) => {
 
   useEffect(() => {
     fetchStats();
-    fetchData();
+    if (activeTab === 'people_map') {
+      fetchPeopleMapData();
+    } else {
+      fetchData();
+    }
     localStorage.setItem('admin_active_tab', activeTab);
-  }, [activeTab, fetchData]);
+  }, [activeTab, fetchData, fetchPeopleMapData]);
 
   const handleExecuteDelete = async () => {
     if (!deleteConfirmId) return;
 
     try {
-      if (!supabase) throw new Error('Supabase client not initialized');
+      const isTemp = typeof deleteConfirmId === 'string' && deleteConfirmId.startsWith('temp_');
 
-      const { error } = await supabase
-        .from(currentTab.table)
-        .delete()
-        .eq('id', deleteConfirmId);
+      if (!isTemp) {
+        if (!adminSupabase) throw new Error('Supabase client not initialized');
 
-      if (error) throw error;
+        const { error } = await adminSupabase
+          .from(currentTab.table)
+          .delete()
+          .eq('id', deleteConfirmId);
+
+        if (error) throw error;
+      }
 
       // Remove from local storage to clean up any stuck items
       const localKey = `admin_local_${currentTab.table}`;
@@ -338,6 +573,9 @@ const AdminPanel = ({ onLogout }) => {
       setSaving(true);
       // 1. Prepare payload and Update Local State (Optimistic)
       let payload = { ...formData };
+      if (editingItem) {
+        payload.id = editingItem.id;
+      }
       if (payload.aadhar_no) {
         payload.aadhar_no = payload.aadhar_no.replace(/\s/g, '');
       }
@@ -365,23 +603,36 @@ const AdminPanel = ({ onLogout }) => {
       let finalPayload = { ...payload };
 
       try {
-        if (!supabase) throw new Error('Supabase client not initialized');
+        if (!adminSupabase) throw new Error('Supabase client not initialized');
 
         // A. Handle User-Linked Tables (riders, vendors, service_providers)
         const userLinkedTables = ['riders', 'vendors', 'service_providers'];
-        if (userLinkedTables.includes(currentTab.table) && finalPayload.phone) {
-          const { data: user, error: userError } = await supabase
-            .from('users')
-            .upsert({
-              phone: finalPayload.phone,
-              full_name: finalPayload.full_name || 'Admin Created'
-            }, { onConflict: 'phone' })
-            .select()
-            .single();
+        if (userLinkedTables.includes(currentTab.table)) {
+          const userPayload = {
+            full_name: finalPayload.full_name || 'Admin Created'
+          };
+          if (finalPayload.phone) userPayload.phone = finalPayload.phone;
+          if (finalPayload.email) userPayload.email = finalPayload.email;
+          if (finalPayload.role) userPayload.role = finalPayload.role;
+
+          let userError = null;
+          let user = null;
+
+          if (finalPayload.user_id) {
+            // Update existing user to avoid INSERT NOT NULL constraint issues
+            const res = await adminSupabase.from('users').update(userPayload).eq('id', finalPayload.user_id).select().single();
+            userError = res.error;
+            user = res.data;
+          } else if (userPayload.phone) {
+            // New user, phone is required for insert
+            const res = await adminSupabase.from('users').upsert(userPayload, { onConflict: 'phone' }).select().single();
+            userError = res.error;
+            user = res.data;
+          }
 
           if (userError) {
             console.error('❌ Failed to link user:', userError.message);
-          } else {
+          } else if (user) {
             finalPayload.user_id = user.id;
           }
         }
@@ -391,27 +642,57 @@ const AdminPanel = ({ onLogout }) => {
           delete finalPayload.id;
         }
 
-        // C. Clean payload according to table schema
-        const schema = TABLE_SCHEMAS[currentTab.table];
+        // C. Clean payload according to database schema
+        const dbSchema = DATABASE_SCHEMAS[currentTab.table];
         let cleanedPayload = {};
-        if (schema) {
-          const allowedKeys = [...Object.keys(schema), 'id'];
+        if (dbSchema) {
+          const allowedKeys = [...dbSchema, 'id'];
           Object.keys(finalPayload).forEach(key => {
             if (allowedKeys.includes(key)) {
-              cleanedPayload[key] = finalPayload[key];
+              if (finalPayload[key] === '' && (key.endsWith('_id') || key === 'uid')) {
+                cleanedPayload[key] = null;
+              } else {
+                cleanedPayload[key] = finalPayload[key];
+              }
             }
           });
         } else {
           cleanedPayload = { ...finalPayload };
         }
 
-        // D. Perform Upsert directly on Supabase
-        const conflictTarget = currentTab.table === 'service_areas' ? 'area_name' : 'id';
-        const { error: suError } = await supabase
-          .from(currentTab.table)
-          .upsert(cleanedPayload, { onConflict: conflictTarget });
+        // D. Perform Upsert/Update directly on Supabase
+        let suError;
+        let returnedItem = null;
+        if (cleanedPayload.id) {
+          const { data: updatedData, error } = await adminSupabase
+            .from(currentTab.table)
+            .update(cleanedPayload)
+            .eq('id', cleanedPayload.id)
+            .select();
+          suError = error;
+          if (updatedData && updatedData.length > 0) {
+            returnedItem = updatedData[0];
+          }
+        } else {
+          const { data: insertedData, error } = await adminSupabase
+            .from(currentTab.table)
+            .insert(cleanedPayload)
+            .select();
+          suError = error;
+          if (insertedData && insertedData.length > 0) {
+            returnedItem = insertedData[0];
+          }
+        }
 
         if (suError) throw suError;
+
+        if (returnedItem) {
+          setData(prev => prev.map(item => item.id === payload.id ? returnedItem : item));
+          const localKey = `admin_local_${currentTab.table}`;
+          const localAdded = JSON.parse(localStorage.getItem(localKey) || '[]');
+          const newLocal = localAdded.map(item => item.id === payload.id ? returnedItem : item);
+          localStorage.setItem(localKey, JSON.stringify(newLocal));
+        }
 
         toast.success('Synced with Cloud! ☁️', { id: 'offline-toast' });
         setSyncStatus('cloud');
@@ -700,6 +981,320 @@ const AdminPanel = ({ onLogout }) => {
     }
   };
 
+  const handleAddSimulatedPerson = () => {
+    const names = [
+      'Rahul Sharma', 'Anjali Patel', 'Vikram Singh', 'Priya Mehta', 
+      'Amit Trivedi', 'Sneha Shah', 'Rohan Das', 'Deepak Verma'
+    ];
+    const roles = ['Buyer', 'Vendor', 'Rider', 'Provider'];
+    const categories = ['Grocery', 'Food Delivery', 'Electrical', 'Plumbing', 'Dairy'];
+    
+    const randomName = names[Math.floor(Math.random() * names.length)];
+    const randomRole = roles[Math.floor(Math.random() * roles.length)];
+    const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+    const randomPhone = '9' + Math.floor(100000000 + Math.random() * 900000000);
+    
+    // Generate lat/lng offset near Ahmedabad center
+    const centerLat = 23.0225;
+    const centerLng = 72.5714;
+    const offsetLat = (Math.random() - 0.5) * 0.06;
+    const offsetLng = (Math.random() - 0.5) * 0.06;
+    
+    let iconColor = 'blue';
+    let status = 'Active';
+    let meta = {};
+    
+    if (randomRole === 'Buyer') {
+      iconColor = 'green';
+      status = 'Active';
+      meta = { role: 'BUYER', email: `${randomName.toLowerCase().replace(' ', '')}@example.com` };
+    } else if (randomRole === 'Vendor') {
+      iconColor = 'orange';
+      status = 'Verified Partner';
+      meta = { category: randomCategory, license: 'FSSAI-' + Math.floor(10000000000000 + Math.random() * 90000000000000) };
+    } else if (randomRole === 'Rider') {
+      iconColor = 'red';
+      status = 'On Duty';
+      meta = { rating: (4.0 + Math.random()).toFixed(1), deliveries: Math.floor(Math.random() * 200) + ' Deliveries' };
+    } else if (randomRole === 'Provider') {
+      iconColor = 'violet';
+      status = 'Verified Expert';
+      meta = { business: randomName + ' Services', rating: (4.2 + Math.random()).toFixed(1) };
+    }
+    
+    const newSimulated = {
+      id: 'sim_' + Date.now(),
+      name: randomName + ' (Simulated)',
+      phone: randomPhone,
+      email: randomRole === 'Rider' ? 'GJ01-A-' + Math.floor(1000 + Math.random() * 9000) : randomCategory,
+      role: randomRole,
+      status: status,
+      iconColor: iconColor,
+      lat: centerLat + offsetLat,
+      lng: centerLng + offsetLng,
+      meta: meta,
+      isSimulated: true
+    };
+    
+    setPeopleMapData(prev => [newSimulated, ...prev]);
+    setSelectedPersonCoords({ lat: newSimulated.lat, lng: newSimulated.lng });
+    toast.success(`Spawned live simulated ${randomRole} in Ahmedabad!`, { icon: '📍' });
+  };
+
+  const renderPeopleMap = () => {
+    const filteredPeople = peopleMapData.filter(p => {
+      const matchesSearch = p.name.toLowerCase().includes(peopleSearch.toLowerCase()) || 
+                            p.phone.toLowerCase().includes(peopleSearch.toLowerCase()) ||
+                            (p.email || '').toLowerCase().includes(peopleSearch.toLowerCase());
+      const matchesRole = peopleRoleFilter === 'All' || p.role === peopleRoleFilter;
+      return matchesSearch && matchesRole;
+    });
+
+    return (
+      <div className="people-map-container animate-fade-in" style={{ padding: '1rem 0' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div>
+            <h1 className="admin-hero-title" style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>Live Community Locator</h1>
+            <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '4px' }}>Real-time OpenStreetMap tracking of Users, Riders, and Merchant Partners across Ahmedabad.</p>
+          </div>
+          <button 
+            type="button"
+            onClick={handleAddSimulatedPerson}
+            style={{ 
+              background: 'linear-gradient(135deg, #FF7622 0%, #FF9F66 100%)', 
+              color: 'white', 
+              border: 'none', 
+              padding: '12px 20px', 
+              borderRadius: '12px', 
+              fontWeight: 600, 
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 14px rgba(255,118,34,0.35)',
+              transition: 'all 0.2s'
+            }}
+          >
+            <Plus size={18} /> Spawn Simulated Person
+          </button>
+        </div>
+
+        {/* Filters and Search Row */}
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+          <div style={{ flex: '1', minWidth: '280px', maxWidth: '400px', margin: 0, background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', display: 'flex', alignItems: 'center', padding: '10px 14px' }}>
+            <Search size={18} color="#64748b" style={{ marginRight: '8px' }} />
+            <input 
+              type="text" 
+              placeholder="Search name, phone, or keyword..." 
+              value={peopleSearch}
+              onChange={(e) => setPeopleSearch(e.target.value)}
+              style={{ border: 'none', outline: 'none', width: '100%', fontSize: '0.9rem', color: '#0f172a' }}
+            />
+          </div>
+          
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {['All', 'Buyer', 'Vendor', 'Rider', 'Provider'].map(role => {
+              const count = peopleMapData.filter(p => role === 'All' || p.role === role).length;
+              let dotColor = '#3b82f6';
+              if (role === 'Buyer') dotColor = '#22c55e';
+              else if (role === 'Vendor') dotColor = '#f97316';
+              else if (role === 'Rider') dotColor = '#ef4444';
+              else if (role === 'Provider') dotColor = '#a855f7';
+
+              return (
+                <button
+                  key={role}
+                  type="button"
+                  onClick={() => setPeopleRoleFilter(role)}
+                  style={{
+                    background: peopleRoleFilter === role ? '#0f172a' : 'white',
+                    color: peopleRoleFilter === role ? 'white' : '#475569',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '30px',
+                    padding: '8px 16px',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s',
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.02)'
+                  }}
+                >
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: dotColor }} />
+                  {role === 'All' ? 'All Roles' : role + 's'}
+                  <span style={{ 
+                    fontSize: '0.75rem', 
+                    background: peopleRoleFilter === role ? 'rgba(255,255,255,0.2)' : '#f1f5f9', 
+                    color: peopleRoleFilter === role ? 'white' : '#64748b',
+                    padding: '2px 6px',
+                    borderRadius: '10px',
+                    marginLeft: '4px'
+                  }}>{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Main interactive map split layout */}
+        <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap-reverse' }}>
+          {/* Map Column */}
+          <div style={{ flex: '1', minWidth: '320px', background: 'white', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.04)' }}>
+            <div style={{ height: '550px', width: '100%', position: 'relative' }}>
+              {mapLoading ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748b' }}>
+                  <p style={{ fontWeight: 600 }}>Syncing map coordinates...</p>
+                </div>
+              ) : (
+                <MapContainer 
+                  center={[23.0225, 72.5714]} 
+                  zoom={13} 
+                  scrollWheelZoom={true}
+                  style={{ height: '100%', width: '100%', zIndex: 1 }}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  
+                  {filteredPeople.map(person => {
+                    let mapIcon = mapBlueIcon;
+                    if (person.iconColor === 'green') mapIcon = mapGreenIcon;
+                    else if (person.iconColor === 'orange') mapIcon = mapOrangeIcon;
+                    else if (person.iconColor === 'red') mapIcon = mapRedIcon;
+                    else if (person.iconColor === 'violet') mapIcon = mapVioletIcon;
+
+                    return (
+                      <Marker 
+                        key={person.id} 
+                        position={[person.lat, person.lng]} 
+                        icon={mapIcon}
+                      >
+                        <Popup>
+                          <div style={{ padding: '8px', minWidth: '180px', fontFamily: 'Inter, sans-serif' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                              <div style={{ 
+                                width: '32px', height: '32px', borderRadius: '50%', 
+                                background: person.iconColor === 'green' ? '#22c55e' : (person.iconColor === 'orange' ? '#f97316' : (person.iconColor === 'red' ? '#ef4444' : '#a855f7')),
+                                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.85rem'
+                              }}>
+                                {person.name.slice(0, 2).toUpperCase()}
+                              </div>
+                              <div>
+                                <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>{person.name}</h4>
+                                <span style={{ 
+                                  fontSize: '0.7rem', 
+                                  background: person.iconColor === 'green' ? '#ecfdf5' : (person.iconColor === 'orange' ? '#fff7ed' : (person.iconColor === 'red' ? '#fef2f2' : '#faf5ff')),
+                                  color: person.iconColor === 'green' ? '#047857' : (person.iconColor === 'orange' ? '#c2410c' : (person.iconColor === 'red' ? '#b91c1c' : '#7e22ce')),
+                                  padding: '1px 6px', borderRadius: '10px', fontWeight: 600
+                                }}>
+                                  {person.role}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px', margin: '8px 0' }}>
+                              <div><strong>Contact:</strong> {person.phone}</div>
+                              {person.role === 'Vendor' && <div><strong>Category:</strong> {person.email}</div>}
+                              {person.role === 'Rider' && (
+                                <>
+                                  <div><strong>Vehicle:</strong> {person.email}</div>
+                                  <div><strong>Rating:</strong> ⭐ {person.meta.rating}</div>
+                                </>
+                              )}
+                              {person.role === 'Buyer' && <div><strong>Email:</strong> {person.email}</div>}
+                              {person.role === 'Provider' && <div><strong>Expertise:</strong> {person.email}</div>}
+                              {person.isSimulated && <div style={{ color: '#0284c7', fontSize: '0.75rem', fontWeight: 600 }}>✨ Live Simulation Bot</div>}
+                            </div>
+
+                            <a 
+                              href={`tel:${person.phone}`}
+                              style={{
+                                display: 'block',
+                                textAlign: 'center',
+                                background: '#0f172a',
+                                color: 'white',
+                                textDecoration: 'none',
+                                padding: '6px',
+                                borderRadius: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                marginTop: '4px'
+                              }}
+                            >
+                              Call Service Phone
+                            </a>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    );
+                  })}
+                  
+                  <MapRecenter coords={selectedPersonCoords} />
+                </MapContainer>
+              )}
+            </div>
+          </div>
+
+          {/* Sidebar Column */}
+          <div style={{ width: '320px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '1rem', boxShadow: '0 4px 15px rgba(0,0,0,0.04)', maxHeight: '550px', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem', marginBottom: '0.75rem' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>Active Members ({filteredPeople.length})</h3>
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b' }}>Click target to track position on Map.</p>
+              </div>
+
+              <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
+                {filteredPeople.map(person => (
+                  <div 
+                    key={person.id}
+                    onClick={() => setSelectedPersonCoords({ lat: person.lat, lng: person.lng })}
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between', 
+                      padding: '8px 12px', 
+                      background: selectedPersonCoords?.lat === person.lat ? '#fff7f2' : '#f8fafc',
+                      border: selectedPersonCoords?.lat === person.lat ? '1.5px solid #ff7622' : '1px solid #f1f5f9',
+                      borderRadius: '12px', 
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ 
+                        width: '32px', height: '32px', borderRadius: '50%', 
+                        background: person.iconColor === 'green' ? '#22c55e' : (person.iconColor === 'orange' ? '#f97316' : (person.iconColor === 'red' ? '#ef4444' : '#a855f7')),
+                        color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.8rem'
+                      }}>
+                        {person.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <h4 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>{person.name.replace(' (Simulated)', '')}</h4>
+                        <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b' }}>{person.role} • {person.status}</p>
+                      </div>
+                    </div>
+                    <button type="button" style={{ background: 'none', border: 'none', color: '#ff7622', cursor: 'pointer' }}>
+                      <Navigation size={14} />
+                    </button>
+                  </div>
+                ))}
+
+                {filteredPeople.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '2rem 0', color: '#94a3b8' }}>
+                    <p style={{ fontSize: '0.85rem' }}>No matching results found.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderDashboard = () => (
     <div className="dashboard-grid animate-fade-in">
       <div className="main-stats-container">
@@ -759,7 +1354,6 @@ const AdminPanel = ({ onLogout }) => {
       <div className="recent-activity glass">
         <div className="activity-header">
           <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><History size={18} /> Recent Logs</h4>
-          <button className="edit-btn" style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: 'auto' }}>VIEW ALL</button>
         </div>
         <div className="trend-content">
           <ActivityFeed />
@@ -780,13 +1374,35 @@ const AdminPanel = ({ onLogout }) => {
       {isSidebarOpen && <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)}></div>}
 
       <aside className={`admin-sidebar ${isSidebarOpen ? 'mobile-open' : ''}`}>
-        <div className="sidebar-header">
-
-          <div className="admin-brand-info">
-            <h2>Passwala</h2>
-            <span>SYSTEM OPS</span>
+        <div className="sidebar-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '10px', borderBottom: '1px solid #1e293b' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div className="admin-logo-box">
+              <img src="/logo.png" alt="Passwala Logo" className="admin-sidebar-logo" />
+            </div>
+            <div className="admin-brand-info">
+              <h2>Passwala</h2>
+              <span>SYSTEM OPS</span>
+            </div>
           </div>
-
+          <div 
+            className="brand-tagline-location live-address clickable-location"
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px', 
+              color: '#ffffff', 
+              fontSize: '0.82rem', 
+              marginTop: '4px',
+              padding: '6px 12px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              borderRadius: '8px',
+              width: '100%',
+              border: '1px solid rgba(255, 255, 255, 0.08)'
+            }}
+          >
+            <MapPin size={14} color="var(--primary)" className="tag-pin-icon" />
+            <strong style={{ fontWeight: 600 }}>{location || 'My Location, Ahmedabad'}</strong>
+          </div>
         </div>
 
         <nav className="sidebar-nav">
@@ -819,7 +1435,7 @@ const AdminPanel = ({ onLogout }) => {
         <header className="admin-top-bar">
           <div className="top-bar-left">
             <button className="mobile-menu-toggle" onClick={() => setIsSidebarOpen(true)}>
-              <Activity size={24} />
+              <Menu size={24} />
             </button>
             <div className="breadcrumb">
               <Database size={14} className="mobile-hide" /> <span className="mobile-hide">/ MASTER CONTROL /</span> <strong>{activeTab.toUpperCase()}</strong>
@@ -829,7 +1445,6 @@ const AdminPanel = ({ onLogout }) => {
             <span className={`sync-indicator ${syncStatus}`}>
               {syncStatus === 'cloud' ? '☁️ Cloud Sync Active' : '🏠 Offline Mode'}
             </span>
-            <div className="avatar">SA</div>
           </div>
         </header>
 
@@ -848,6 +1463,8 @@ const AdminPanel = ({ onLogout }) => {
                   <p style={{ color: '#64748b', marginBottom: '2rem' }}>Overview of your entire business ecosystem.</p>
                   {renderDashboard()}
                 </>
+              ) : activeTab === 'people_map' ? (
+                renderPeopleMap()
               ) : syncStatus === 'missing_table' ? (
                 <div className="missing-table-notice animate-fade-in" style={{ padding: '3rem', background: '#fff1f2', borderRadius: '24px', border: '2px dashed #f43f5e', textAlign: 'center' }}>
                   <Database size={48} color="#f43f5e" style={{ marginBottom: '1rem' }} />
@@ -920,7 +1537,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
                         <input
                           type={typeof formData[key] === 'number' ? 'number' : 'text'}
                           value={formData[key] || ''}
-                          maxLength={key === 'phone' ? 10 : (key === 'aadhar_no' ? 14 : (key === 'id_proof' ? (formData[key] && /^\d+$/.test(formData[key].replace(/[^A-Z0-9]/g, '')) ? 14 : 10) : undefined))}
+                          maxLength={key === 'phone' ? 10 : (key === 'aadhar_no' ? 14 : (key === 'license_no' ? 14 : (key === 'id_proof' ? (formData[key] && /^\d+$/.test(formData[key].replace(/[^A-Z0-9]/g, '')) ? 14 : 10) : undefined)))}
                           onChange={(e) => {
                             let val = e.target.value;
                             if (key === 'phone') {
@@ -932,6 +1549,9 @@ CREATE TABLE IF NOT EXISTS service_areas (
                                 parts.push(clean.slice(i, i + 4));
                               }
                               val = parts.join(' ');
+                            } else if (key === 'license_no') {
+                              // FSSAI / Standard License is 14 numeric digits
+                              val = val.replace(/\D/g, '').slice(0, 14);
                             } else if (key === 'id_proof') {
                               val = val.toUpperCase().replace(/[^A-Z0-9]/g, '');
                               const isNumeric = /^\d+$/.test(val) || val.length === 0;

@@ -39,6 +39,25 @@ const Community = () => {
     return date.toLocaleDateString();
   };
 
+  const handleLike = async (postId, currentLikes) => {
+    setPosts(prev => prev.map(p => {
+      if (p.id === postId) {
+        return { ...p, likes_count: (p.likes_count !== undefined ? p.likes_count : (p.likes || 0)) + 1 };
+      }
+      return p;
+    }));
+
+    toast.success('Recommendation liked!');
+
+    if (typeof postId === 'string') {
+      try {
+        await supabase.from('posts').update({ likes_count: currentLikes + 1 }).eq('id', postId);
+      } catch (err) {
+        console.error("Error updating likes:", err);
+      }
+    }
+  };
+
   return (
     <section className="community" id="community">
       <div className="container">
@@ -56,20 +75,20 @@ const Community = () => {
             posts.map(post => (
               <div key={post.id} className="community-card glass card-hover flex-column">
                 <div className="user-info">
-                  <div className="user-avatar gradient-bg">{post.user_avatar}</div>
+                  <div className="user-avatar gradient-bg">{post.user_avatar || 'AN'}</div>
                   <div className="user-details">
-                    <strong>{post.user_name}</strong>
-                    <span>{post.location}</span>
+                    <strong>{post.user_name || 'Anonymous Neighbor'}</strong>
+                    <span>{post.location || 'Local Area'}</span>
                   </div>
                 </div>
-                <p className="recommendation-text">"{post.text}"</p>
+                <p className="recommendation-text">"{post.content || post.text}"</p>
                 <div className="recommendation-footer">
                   <div className="actions">
-                    <button onClick={() => toast.success('Recommendation liked!')}>
-                      <Heart size={16} /> {post.likes}
+                    <button onClick={() => handleLike(post.id, post.likes_count !== undefined ? post.likes_count : (post.likes || 0))}>
+                      <Heart size={16} /> {post.likes_count !== undefined ? post.likes_count : (post.likes || 0)}
                     </button>
                     <button onClick={() => toast('Opening discussion...', { icon: '💬' })}>
-                      <MessageSquare size={16} /> {post.comments}
+                      <MessageSquare size={16} /> {post.comments || 0}
                     </button>
                   </div>
                   <span className="time">{formatTime(post.created_at)}</span>

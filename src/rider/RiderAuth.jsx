@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { Phone, CheckCircle, Navigation, Shield, Bike, UploadCloud, Camera, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../supabase';
+import { auth } from '../firebase';
+import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import './RiderPortal.css'; // Import custom styles
 
 const CameraModal = ({ isOpen, onClose, onCapture, mode = 'user' }) => {
@@ -104,25 +106,89 @@ function RiderAuth({ onLogin }) {
     setCameraConfig({ isOpen: true, field, mode });
   };
 
-  const handleSendOtp = () => {
-    if (phone.length < 10) {
+  const [confirmationResult, setConfirmationResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    return () => {
+      if (window.recaptchaVerifier) {
+        window.recaptchaVerifier.clear();
+        window.recaptchaVerifier = null;
+      }
+    };
+  }, []);
+
+  const setupRecaptcha = () => {
+    try {
+      if (window.recaptchaVerifier) return;
+      
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        'size': 'invisible',
+        'callback': () => {},
+        'expired-callback': () => {
+          if (window.recaptchaVerifier) {
+            window.recaptchaVerifier.clear();
+            window.recaptchaVerifier = null;
+          }
+        }
+      });
+    } catch (error) {
+      console.error("Recaptcha Error:", error);
+      toast.error("Recaptcha initialization failed");
+    }
+  };
+
+  const handleSendOtp = async () => {
+    if (phone.length !== 10) {
       toast.error('Please enter a valid 10-digit number');
       return;
     }
-    toast.success('OTP Sent! Use 123456');
-    setStep('OTP');
-  };
+    setLoading(true);
+    try {
+      const formatPhone = `+91${phone}`;
 
-  const handleVerifyOtp = () => {
-    if (otp === '123456') {
-      toast.success('OTP Verified!');
-      setStep('PROFILE_SETUP');
-    } else {
-      toast.error('Invalid OTP. Use 123456');
+      setupRecaptcha();
+      const appVerifier = window.recaptchaVerifier;
+      if (!appVerifier) throw new Error("Recaptcha failed");
+      const result = await signInWithPhoneNumber(auth, formatPhone, appVerifier);
+      setConfirmationResult(result);
+      setStep('OTP');
+      toast.success('OTP Sent!');
+    } catch (error) {
+      console.error("Rider OTP Error:", error);
+      const detailedMessage = error.code ? `Firebase [${error.code}]: ${error.message}` : error.message || error;
+      toast.error(`Failed to send verification code: ${detailedMessage}`);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const [loading, setLoading] = useState(false);
+  const handleVerifyOtp = async () => {
+    if (otp.length !== 6) {
+      toast.error('Please enter the 6-digit OTP');
+      return;
+    }
+    setLoading(true);
+    try {
+      if (confirmationResult) {
+        await confirmationResult.confirm(otp);
+        toast.success('OTP Verified!');
+        setStep('PROFILE_SETUP');
+      } else {
+        toast.error('Verification session expired or invalid');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(error.message || 'Invalid OTP. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = () => {
+    setOtp('');
+    handleSendOtp();
+  };
 
   const handleCompleteProfile = async () => {
     if (!profile.name || !profile.vehicleNo || !profile.licenseNo || !profile.idProof) {
@@ -144,6 +210,12 @@ function RiderAuth({ onLogin }) {
       return;
     } else if (cleanIdProof.length !== 10 && cleanIdProof.length !== 12) {
       toast.error('ID Proof must be 12-digit Aadhar or 10-digit PAN');
+      return;
+    }
+
+    const cleanLicense = profile.licenseNo.replace(/[^A-Z0-9]/g, '');
+    if (cleanLicense.length < 15 || cleanLicense.length > 16) {
+      toast.error('License Number must be 15-16 alphanumeric characters');
       return;
     }
 
@@ -191,7 +263,7 @@ function RiderAuth({ onLogin }) {
       toast.dismiss(toastId);
       toast.success('Rider Profile Ready! Go online now.', { icon: '🎉' });
       
-      onLogin(false, phone, {
+      onLogin(phone, {
          ...profile,
          idProof: cleanIdProof,
          user_id: resolvedUserId,
@@ -266,9 +338,18 @@ function RiderAuth({ onLogin }) {
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                   />
                 </div>
-                <button onClick={handleVerifyOtp} className="rider-btn-primary">
-                  Verify OTP
+                <button onClick={handleVerifyOtp} className="rider-btn-primary" disabled={loading}>
+                  {loading ? 'Verifying...' : 'Verify OTP'}
                 </button>
+                <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                  <button 
+                    onClick={handleResendOtp} 
+                    disabled={loading}
+                    style={{ color: 'var(--rider-text-secondary)', fontSize: '0.875rem', fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer', opacity: loading ? 0.5 : 1 }}
+                  >
+                    Didn't receive code? <span style={{ color: 'var(--rider-primary)' }}>Resend OTP</span>
+                  </button>
+                </div>
               </div>
             ) : (
                <div style={{ animation: 'slideUp 0.3s ease-out' }}>
@@ -306,7 +387,15 @@ function RiderAuth({ onLogin }) {
                   
                   <div className="rider-input-group">
                     <label className="rider-label">License Number</label>
-                    <input type="text" className="rider-input" placeholder="Enter License No" value={profile.licenseNo} onChange={e => setProfile({...profile, licenseNo: e.target.value})} style={{ paddingLeft: '1rem', textTransform: 'uppercase' }} />
+                    <input 
+                      type="text" 
+                      className="rider-input" 
+                      placeholder="Enter 15-16 character License No" 
+                      maxLength={16}
+                      value={profile.licenseNo} 
+                      onChange={e => setProfile({...profile, licenseNo: e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()})} 
+                      style={{ paddingLeft: '1rem' }} 
+                    />
                   </div>
 
                   <div className="rider-input-group">
@@ -362,19 +451,7 @@ function RiderAuth({ onLogin }) {
                </div>
             )}
             
-            {step !== 'PROFILE_SETUP' && (
-              <>
-                <div className="rider-divider">
-                   <span className="rider-divider-text">Quick Login for Devs</span>
-                </div>
-                <button 
-                    onClick={() => onLogin(true, '8888888888', { name: 'Demo Rider', vehicle: 'Bike' })}
-                    className="rider-btn-secondary"
-                >
-                  Login as Demo Rider
-                </button>
-              </>
-            )}
+            
           </div>
         </div>
       </div>
@@ -385,6 +462,7 @@ function RiderAuth({ onLogin }) {
         onClose={() => setCameraConfig({ ...cameraConfig, isOpen: false })}
         onCapture={(img) => setProfile({ ...profile, [cameraConfig.field]: img })}
       />
+      <div id="recaptcha-container"></div>
     </div>
   );
 }

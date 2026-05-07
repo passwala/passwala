@@ -56,7 +56,13 @@ const Essentials = () => {
             <span className="badge-secondary">{searchQuery ? 'Search Results' : 'Local Delivery'}</span>
             <h3 className="section-title">Home <span className="highlight-green">Essentials</span></h3>
             <p className="description">Get your daily needs from neighborhood stores within minutes. No minimum delivery for Prime neighbors!</p>
-            {/* Featured banner removed */}
+            <div className="featured-banner">
+              <img src="/essentials_banner.png" alt="Fresh local groceries" />
+              <div className="banner-content">
+                <strong>Fresh & Fast</strong>
+                <span>Directly from local partners</span>
+              </div>
+            </div>
           </div>
           
           <div className="essentials-items">

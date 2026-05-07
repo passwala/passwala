@@ -1,4 +1,4 @@
-/* eslint-disable no-unused-vars, no-empty */
+/* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, Plus, Sparkles, Sunrise, Users, ShoppingBasket, MapPin } from 'lucide-react';
@@ -50,7 +50,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
       }
     };
     checkAddress();
-  }, [user]);
+  }, [user, isProfileComplete]);
   
   const cards = [
     {

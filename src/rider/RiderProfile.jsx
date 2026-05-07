@@ -79,7 +79,7 @@ function VehicleSubpage({ user, onBack }) {
          <div style={{ width: '80px', height: '80px', background: 'var(--rider-primary-light)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem auto' }}>
             <Bike size={40} color="var(--rider-primary)" />
          </div>
-         <h3 style={{ margin: '0 0 0.5rem 0', fontWeight: 700 }}>{user?.vehicleNo || 'Bajaj Pulsar (GJ-01-AB-1234)'}</h3>
+         <h3 style={{ margin: '0 0 0.5rem 0', fontWeight: 700 }}>{user?.vehicleNo || 'Not Registered'}</h3>
          <span style={{ background: 'var(--rider-success-light)', color: 'var(--rider-success)', padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 700, border: '1px solid #a7f3d0' }}>Active Vehicle</span>
       </div>
 
@@ -181,7 +181,7 @@ function AboutSubpage({ onBack }) {
   );
 }
 
-function RiderProfile({ user, onLogout, stats }) {
+function RiderProfile({ user, onLogout, stats, riderId }) {
   const [activeSubpage, setActiveSubpage] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -190,19 +190,41 @@ function RiderProfile({ user, onLogout, stats }) {
     setShowDeleteModal(false);
     try {
       setIsDeleting(true);
+      // Prioritize Supabase UUID (id) over Firebase UID (uid)
+      const userId = user?.id || user?.uid;
+      const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
       
-      if (supabase && user?.uid) {
-        const { error } = await supabase.from('riders').delete().eq('user_id', user.uid);
-        if (error) throw error;
+      if (supabase) {
+        // 1. Delete dependent records first using riderId (Primary Key)
+        if (riderId) {
+           await supabase.from('rider_locations').delete().eq('rider_id', riderId);
+           await supabase.from('rider_earnings').delete().eq('rider_id', riderId);
+           
+           // 2. Delete main rider record using primary key (safest)
+           const { error: delError } = await supabase.from('riders').delete().eq('id', riderId);
+           if (delError) throw delError;
+        } 
+        // Fallback: Delete using user_id if riderId is missing
+        else if (userId) {
+          if (isUUID(userId)) {
+            console.log("Deleting via user_id (UUID):", userId);
+            const { error: delError } = await supabase.from('riders').delete().eq('user_id', userId);
+            if (delError) throw delError;
+          } else {
+            console.warn("Skipping deletion: userId is not a valid UUID", userId);
+            // If it's a Firebase UID and we can't find a UUID, we might need to fetch the rider first
+            // But usually riderId should be present if they are logged in.
+          }
+        }
       }
       
-      toast.success('Rider Account deleted successfully.');
+      toast.success('Account deleted successfully.');
       localStorage.removeItem('rOnboardingStep');
       localStorage.removeItem('rProfileCompleted');
       if (onLogout) onLogout(true);
     } catch (e) {
-      console.error(e);
-      toast.error('Failed to delete account.');
+      console.error("Account Deletion Error:", e);
+      toast.error(`Deletion failed: ${e.message || 'Please contact support'}`);
     } finally {
       setIsDeleting(false);
     }
@@ -222,10 +244,10 @@ function RiderProfile({ user, onLogout, stats }) {
       <div className="rider-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: 0, width: '100%', height: '6rem', background: 'linear-gradient(90deg, #fb923c, #ef4444)', zIndex: 0 }}></div>
         <div style={{ position: 'relative', zIndex: 10, width: '6rem', height: '6rem', background: 'white', borderRadius: '50%', padding: '4px', boxShadow: 'var(--rider-shadow)', marginBottom: '0.75rem', marginTop: '1rem' }}>
-           <img src={user?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.displayName || 'rider'}`} alt="avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', background: 'var(--rider-primary-light)', objectFit: 'cover' }} />
+           <img src={user?.photo || user?.photoURL || 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png'} alt="avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', background: 'var(--rider-primary-light)', objectFit: 'cover' }} />
         </div>
-        <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, position: 'relative', zIndex: 10 }}>{user?.displayName || 'Demo Rider'}</h3>
-        <p style={{ color: 'var(--rider-text-secondary)', fontSize: '0.875rem', fontWeight: 500, margin: 0, position: 'relative', zIndex: 10 }}>{user?.phoneNumber || '+91 88888 88888'}</p>
+        <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, position: 'relative', zIndex: 10 }}>{user?.displayName || 'Passwala Partner'}</h3>
+        <p style={{ color: 'var(--rider-text-secondary)', fontSize: '0.875rem', fontWeight: 500, margin: 0, position: 'relative', zIndex: 10 }}>{user?.phoneNumber || 'Identity Unverified'}</p>
         <span style={{ marginTop: '0.5rem', background: 'var(--rider-success-light)', color: 'var(--rider-success)', padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 700, border: '1px solid #a7f3d0' }}>Verified Partner</span>
       </div>
 

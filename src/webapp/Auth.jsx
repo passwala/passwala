@@ -14,6 +14,14 @@ import {
 import { auth } from '../firebase';
 import './Auth.css';
 
+// Premium Brand Animations (Cycled with smooth cross-fade)
+const brandAnimations = [
+  "https://nwduaxtgisvjybefndfg.supabase.co/storage/v1/object/public/images/1768131673403_Passwala%20Brand%20LDC%20(1).gif",
+  "https://nwduaxtgisvjybefndfg.supabase.co/storage/v1/object/public/images/1768131668420_Passwala%20Brand%20LDC%20(2).gif",
+  "https://nwduaxtgisvjybefndfg.supabase.co/storage/v1/object/public/images/1768131660469_Passwala%20Brand%20LDC%20(3).gif",
+  "https://nwduaxtgisvjybefndfg.supabase.co/storage/v1/object/public/images/1768132754331_Passwala%20Brand%20LDC%20(4).gif"
+];
+
 const Auth = ({ onLogin }) => {
   const [step, setStep] = useState('PHONE');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -22,7 +30,7 @@ const Auth = ({ onLogin }) => {
   const [society, setSociety] = useState('');
   const [landmark, setLandmark] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [timer, setTimer] = useState(30);
+  const [timer, setTimer] = useState(0);
   const [confirmationResult, setConfirmationResult] = useState(null);
   const [mode, setMode] = useState('LOGIN');
   const [loading, setLoading] = useState(false);
@@ -55,9 +63,16 @@ const Auth = ({ onLogin }) => {
   const setupRecaptcha = () => {
     try {
       if (window.recaptchaVerifier) return;
+      
       window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         'size': 'invisible',
-        'callback': () => {}
+        'callback': () => {},
+        'expired-callback': () => {
+          if (window.recaptchaVerifier) {
+            window.recaptchaVerifier.clear();
+            window.recaptchaVerifier = null;
+          }
+        }
       });
     } catch (error) {
       console.error("Recaptcha Error:", error);
@@ -71,6 +86,7 @@ const Auth = ({ onLogin }) => {
       setLoading(true);
       setupRecaptcha();
       const formatPhone = `+91${phoneNumber}`;
+      
       const appVerifier = window.recaptchaVerifier;
       if (!appVerifier) throw new Error("Recaptcha failed");
       const result = await signInWithPhoneNumber(auth, formatPhone, appVerifier);
@@ -80,7 +96,8 @@ const Auth = ({ onLogin }) => {
       toast.success('OTP Sent!');
     } catch (error) {
       console.error("OTP Error:", error);
-      toast.error('Failed to send verification code. Please check the phone number and try again.');
+      const detailedMessage = error.code ? `Firebase [${error.code}]: ${error.message}` : error.message || error;
+      toast.error(`Failed to send verification code: ${detailedMessage}`);
     } finally { setLoading(false); }
   };
 
@@ -185,13 +202,7 @@ const Auth = ({ onLogin }) => {
     } finally { setLoading(false); }
   };
 
-  // Premium Brand Animations (Cycled with smooth cross-fade)
-  const brandAnimations = [
-    "https://nwduaxtgisvjybefndfg.supabase.co/storage/v1/object/public/images/1768131673403_Passwala%20Brand%20LDC%20(1).gif",
-    "https://nwduaxtgisvjybefndfg.supabase.co/storage/v1/object/public/images/1768131668420_Passwala%20Brand%20LDC%20(2).gif",
-    "https://nwduaxtgisvjybefndfg.supabase.co/storage/v1/object/public/images/1768131660469_Passwala%20Brand%20LDC%20(3).gif",
-    "https://nwduaxtgisvjybefndfg.supabase.co/storage/v1/object/public/images/1768132754331_Passwala%20Brand%20LDC%20(4).gif"
-  ];
+
   const [animIndex, setAnimIndex] = useState(0);
 
   useEffect(() => {

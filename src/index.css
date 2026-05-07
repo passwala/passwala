@@ -11,10 +11,15 @@
   /* Neutral Palette */
   --bg-main: #ffffff;
   --bg-soft: #f8fafc;
+  --bg-surface: #f1f5f9;
+  --bg-card: #ffffff;
   --text-primary: #0f172a;
   --text-secondary: #475569;
   --text-muted: #94a3b8;
   --border-light: #e2e8f0;
+  --glass-border: rgba(15, 23, 42, 0.08);
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --primary-light: rgba(249, 115, 22, 0.08);
   
   /* Effects */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -29,6 +34,23 @@
   --font-main: 'Poppins', sans-serif;
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* Premium Dark Mode Token Overrides */
+body.dark-mode {
+  --bg-main: #0b0f19;
+  --bg-soft: #111827;
+  --bg-surface: #1e293b;
+  --bg-card: #111827;
+  --text-primary: #f9fafb;
+  --text-secondary: #cbd5e1;
+  --text-muted: #6b7280;
+  --border-light: #1f2937;
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-bg: rgba(15, 23, 42, 0.6);
+  --primary-light: rgba(249, 115, 22, 0.25);
+  --secondary: #ffffff;
+}
+  
 
 * {
   margin: 0;

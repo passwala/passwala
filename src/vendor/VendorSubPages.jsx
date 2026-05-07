@@ -1,6 +1,7 @@
 import React from 'react';
 import { Package, FileText, IndianRupee, Wallet, Star, Bell, HelpCircle, CheckCircle, Clock, MapPin, Download, ArrowUpRight, ArrowDownRight, Tag, Trash2, PackagePlus, Camera } from 'lucide-react';
 import { supabase } from '../supabase';
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const VendorInventory = ({ businessType }) => {
@@ -254,7 +255,7 @@ export const VendorInventory = ({ businessType }) => {
   );
 };
 
-export const VendorOrders = ({ businessType }) => {
+export const VendorOrders = ({ _businessType }) => {
   const [activeTab, setActiveTab] = React.useState('active');
   const [orders, setOrders] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -508,7 +509,7 @@ export const VendorEarnings = () => (
 );
 
 export const VendorWallet = () => {
-  const [balance, setBalance] = React.useState(0);
+  const [balance] = React.useState(0);
   const transactions = [
     { id: 1, type: 'credit', amount: 1200, status: 'Completed', date: 'Today, 2:30 PM', label: 'Order #8821' },
     { id: 2, type: 'debit', amount: 4500, status: 'Processing', date: 'Yesterday', label: 'Bank Withdrawal' },

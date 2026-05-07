@@ -46,10 +46,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--primary);
   font-weight: 600;
   font-size: 1rem;
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  background: rgba(249, 115, 22, 0.1);
 }
 
 .user-details {
@@ -79,11 +79,13 @@
   justify-content: space-between;
   align-items: center;
   margin-top: auto;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  padding-top: 1rem;
 }
 
 .actions {
   display: flex;
-  gap: 1rem;
+  gap: 1.5rem;
 }
 
 .actions button {
@@ -94,6 +96,11 @@
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-secondary);
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s ease;
 }
 
 .actions button:hover {

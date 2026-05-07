@@ -687,3 +687,61 @@ input:checked + .rider-slider {
 input:checked + .rider-slider:before {
   transform: translateX(28px);
 }
+
+/* Custom Leaflet Map Adjustments */
+.leaflet-container {
+  font-family: var(--font-main), sans-serif !important;
+}
+
+.map-tiles {
+  filter: contrast(1.05) brightness(1.02);
+}
+
+.custom-leaflet-marker {
+  background: none !important;
+  border: none !important;
+}
+
+.custom-leaflet-marker .marker-container {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.custom-leaflet-marker .marker-container:hover {
+  transform: scale(1.15);
+}
+
+/* Pulsing rings for active markers */
+@keyframes marker-pulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* Customize Leaflet Popup styling */
+.leaflet-popup-content-wrapper {
+  background: white !important;
+  border-radius: 16px !important;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+  border: 1px solid rgba(0,0,0,0.05) !important;
+  padding: 4px !important;
+}
+
+.leaflet-popup-content {
+  margin: 8px 12px !important;
+  font-size: 0.85rem !important;
+  line-height: 1.4 !important;
+}
+
+.leaflet-popup-tip {
+  background: white !important;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+}
+

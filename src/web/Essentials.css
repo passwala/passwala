@@ -141,13 +141,29 @@
 }
 
 .view-all {
-  background: transparent;
-  color: var(--text-secondary);
+  background: var(--primary);
+  color: white;
   font-weight: 700;
-  font-size: 1rem;
-  margin-top: 1rem;
-  text-decoration: underline;
+  font-size: 0.95rem;
+  margin-top: 1.5rem;
+  text-decoration: none;
   text-align: center;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  padding: 14px 28px;
+  transition: all 0.3s ease;
+  width: 100%;
+  max-width: 300px;
+  align-self: center;
+  box-shadow: 0 4px 10px rgba(249, 115, 22, 0.2);
+}
+
+.view-all:hover {
+  background: var(--primary-hover);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(249, 115, 22, 0.3);
 }
 
 @media (max-width: 1024px) {

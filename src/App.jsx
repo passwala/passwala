@@ -43,7 +43,7 @@ import AIAssistant from './webapp/AIAssistant'
 import CustomerDetails from './webapp/CustomerDetails'
 import { CartProvider } from './context/CartContext'
 import CartDrawer from './webapp/buyer/CartDrawer'
-import { NotificationProvider } from './context/NotificationContext'
+import { NotificationProvider, useNotifications } from './context/NotificationContext'
 import { SearchProvider } from './context/SearchContext'
 import { LanguageProvider } from './webapp/LanguageContext'
 
@@ -110,6 +110,29 @@ const AppContent = ({
     else sessionStorage.removeItem('admin_active');
   }, [isAdmin]);
 
+  // Global Notification Listener for Buyer
+  const { addNotification } = useNotifications();
+  useEffect(() => {
+    if (!effectiveUser?.id || isVendorMode || isRiderMode || isAdminMode) return;
+
+    const sub = supabase.channel('global_order_updates')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `user_id=eq.${effectiveUser.id}` }, (payload) => {
+        const shortId = payload.new.id.substring(0, 6).toUpperCase();
+        toast.success(`Order #${shortId} is now ${payload.new.status}`, { icon: '🛵', duration: 4000 });
+        
+        // Push Real-Time Notification to Context globally
+        addNotification({
+          title: 'Order Status Update',
+          text: `Update on Order #${shortId}: Status changed to ${payload.new.status}`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          type: 'order_update'
+        });
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(sub);
+  }, [effectiveUser, addNotification, isVendorMode, isRiderMode, isAdminMode]);
+
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('theme');
     return saved === 'dark' || (saved === null && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -128,13 +151,12 @@ const AppContent = ({
   // 📍 Compulsory Location Enforcement
   useEffect(() => {
     const isAuthPage = locationPath === '/auth' || locationPath === '/' || locationPath === '/rider-auth';
-    const isLocationPage = locationPath === '/select-location';
     const isProfilePage = locationPath === '/complete-profile';
     
     // Force profile completion for Buyers
     const userRole = effectiveUser?.role || 'BUYER';
     if (isWebappMode && effectiveUser && userRole === 'BUYER' && !isProfileComplete && !isAuthPage && !isProfilePage) {
-      console.log('📝 Redirecting to complete-profile (Profile incomplete for Buyer)');
+      // Redirecting to profile completion
       navigate('/complete-profile');
     }
   }, [isWebappMode, isRiderMode, effectiveUser, isProfileComplete, location, locationPath, navigate]);
@@ -145,7 +167,11 @@ const AppContent = ({
         await auth.signOut().catch(e => console.warn('Firebase Signout Skip:', e));
       }
       localStorage.clear();
+      sessionStorage.clear();
+      setUser(null); // CRITICAL: Clear React state to trigger UI update
+      
       if (!skipToast) toast.success('Signed Out.');
+      
       if (window.location.host.includes('3002')) {
         window.location.href = '/';
       } else {
@@ -153,6 +179,7 @@ const AppContent = ({
       }
     } catch (error) {
       console.error('Logout error:', error);
+      setUser(null);
       window.location.href = '/';
     }
   };
@@ -174,13 +201,13 @@ const AppContent = ({
         !isAuthorizedAdmin ? (
           <AdminAuth onAdminLogin={() => setIsAdmin(true)} />
         ) : (
-          <AdminPanel onLogout={() => { setIsAdmin(false); localStorage.removeItem('admin_session'); sessionStorage.removeItem('admin_active'); }} />
+          <AdminPanel location={location} onLogout={() => { setIsAdmin(false); localStorage.removeItem('admin_session'); sessionStorage.removeItem('admin_active'); }} />
         )
       ) : /* 1. Vendor Mode (Port 3002) - High level takeover */
       (locationPath === '/vendor' || isVendorMode) ? (
         (!effectiveUser) ? (
-          <VendorAuth onLogin={(isDemo, phone, profile) => {
-            setUser({ ...profile, displayName: profile?.name || 'Vendor', phoneNumber: phone, isDemo, role: 'VENDOR' });
+          <VendorAuth onLogin={(phone, profile) => {
+            setUser({ ...profile, displayName: profile?.name || 'Vendor', phoneNumber: phone, role: 'VENDOR' });
           }} />
         ) : (
           <VendorPortal user={effectiveUser} onLogout={handleLogout} />
@@ -196,8 +223,8 @@ const AppContent = ({
       ) : (locationPath === '/rider' || isRiderMode) ? (
         /* Rider Mode (Port 3003) */
         (!effectiveUser) ? (
-          <RiderAuth onLogin={(isDemo, phone, profile) => {
-            setUser({ ...profile, displayName: profile.name, phoneNumber: phone, isDemo, role: 'RIDER' });
+          <RiderAuth onLogin={(phone, profile) => {
+            setUser({ ...profile, displayName: profile.name, phoneNumber: phone, role: 'RIDER' });
           }} />
         ) : (
           <RiderPortal
@@ -242,8 +269,8 @@ const AppContent = ({
               <Route path="/" element={
                 <>
                   {/* Webapp Logic (Auth or Hub) */}
-                  {isWebappMode ? (
-                   (!effectiveUser || !effectiveUser.displayName || !isProfileComplete) ? <Auth onLogin={() => { setIsProfileComplete(true); navigate('/'); }} /> : <NeighborhoodHub user={effectiveUser} isProfileComplete={isProfileComplete} onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : v === '/complete-profile' ? '/complete-profile' : '/')} />
+                   {isWebappMode ? (
+                    (!effectiveUser || !effectiveUser.displayName || !isProfileComplete) ? <Auth onLogin={(userData) => { setUser(userData); setIsProfileComplete(true); navigate('/'); }} /> : <NeighborhoodHub user={effectiveUser} isProfileComplete={isProfileComplete} onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : v === '/complete-profile' ? '/complete-profile' : '/')} />
                   ) : (
                     /* Marketing Logic (Hub on top if logged in, then standard homepage) */
                     <>
@@ -431,6 +458,7 @@ function App() {
     };
 
     autoDetectLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // PERSISTENCE: Sync user state to localStorage
@@ -528,7 +556,7 @@ function App() {
               <LanguageProvider>
                 <CartProvider user={user}>
                   <div className="app-container">
-                    <Toaster position="bottom-center" toastOptions={{ duration: 3000 }} />
+                    <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
                     <AppContent
                       effectiveUser={user}
                       isProfileComplete={isProfileComplete}

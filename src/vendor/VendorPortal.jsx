@@ -54,7 +54,7 @@ const formatAadhar = (val) => {
 
 const VendorPortal = ({ user, onLogout }) => {
   const [appStatus, setAppStatus] = useState('loading'); // loading, onboarding, dashboard, pending
-  console.log('VendorPortal Rendering, appStatus:', appStatus);
+  // Removed chatty log for production
   const [vendorData, setVendorData] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024);
   
@@ -157,10 +157,19 @@ const VendorPortal = ({ user, onLogout }) => {
 
   const checkVendorStatus = async () => {
     try {
-      if (!user) return;
-      const phone = user && typeof user === 'object' && user.phoneNumber 
+      if (!user) {
+        setAppStatus('onboarding');
+        return;
+      }
+      const phone = user.phoneNumber 
           ? user.phoneNumber.replace(/\D/g, '').slice(-10) 
-          : (typeof user === 'string' ? user : '9999999999');
+          : null;
+
+      if (!phone) {
+        toast.error("Phone number missing from authentication.");
+        setAppStatus('onboarding');
+        return;
+      }
 
       const isLocallyCompleted = localStorage.getItem('vProfileCompleted') === 'true';
 
@@ -308,7 +317,11 @@ const VendorPortal = ({ user, onLogout }) => {
   const handleUpdateProfile = async () => {
     try {
       setIsUpdating(true);
-      const phone = vendorData?.phone || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : '9999999999');
+      const phone = vendorData?.phone || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : null);
+      if (!phone) {
+        toast.error("Identity verification failed.");
+        return;
+      }
       
       if (supabase && vendorData?.id) {
          const { error } = await supabase
@@ -458,8 +471,16 @@ const VendorPortal = ({ user, onLogout }) => {
                 <input 
                   type="text" 
                   className="v-input" 
+                  maxLength={18}
+                  placeholder="e.g. 2026-CITY-12345678"
                   value={currentData?.license_no || ''} 
-                  onChange={e => setEditFormData({...editFormData, license_no: e.target.value})} 
+                  onChange={e => {
+                    const clean = e.target.value.replace(/[^A-Z0-9]/ig, '').toUpperCase().slice(0, 16);
+                    let formatted = clean.slice(0, 4);
+                    if (clean.length > 4) formatted += '-' + clean.slice(4, 8);
+                    if (clean.length > 8) formatted += '-' + clean.slice(8, 16);
+                    setEditFormData({...editFormData, license_no: formatted});
+                  }} 
                 /> :
                 <div className="v-input v-readonly">{currentData?.license_no || 'Pending Verification'}</div>
               }
@@ -605,13 +626,16 @@ const VendorPortal = ({ user, onLogout }) => {
             <label>{businessType === 'shop' ? 'Shop License No' : 'Registration No (Optional)'}</label>
             <input 
               type="text" 
-              maxLength={16} 
-              placeholder="Enter 14-16 digit license number" 
+              maxLength={18} 
+              placeholder="e.g. 2026-CITY-12345678" 
               className="v-input" 
               value={formData.license_no} 
               onChange={e => {
-                const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-                setFormData({...formData, license_no: val});
+                const clean = e.target.value.replace(/[^A-Z0-9]/ig, '').toUpperCase().slice(0, 16);
+                let formatted = clean.slice(0, 4);
+                if (clean.length > 4) formatted += '-' + clean.slice(4, 8);
+                if (clean.length > 8) formatted += '-' + clean.slice(8, 16);
+                setFormData({...formData, license_no: formatted});
               }} 
             />
           </div>
@@ -653,7 +677,11 @@ const VendorPortal = ({ user, onLogout }) => {
           <p style={{color: '#64748b', fontSize: '0.9rem'}}>We are finalizing your {businessType} profile. You will be redirected shortly.</p>
           <button onClick={async () => {
              if (supabase) {
-                const currentPhone = vendorData?.phone || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : (typeof user === 'string' ? user : '9999999999'));
+                const currentPhone = vendorData?.phone || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : null);
+                 if (!currentPhone) {
+                    toast.error("Phone number required for registration.");
+                    return;
+                 }
                 let resolvedUserId = null;
                 
                 try {

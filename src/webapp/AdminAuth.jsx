@@ -10,7 +10,11 @@ const AdminAuth = ({ onAdminLogin }) => {
   const handleAdminAuth = async () => {
     setLoading(true);
     try {
-      const secureCode = import.meta.env.VITE_ADMIN_ACCESS_CODE || 'PASSWALA_SECURE_99';
+      const secureCode = import.meta.env.VITE_ADMIN_ACCESS_CODE;
+      if (!secureCode) {
+        toast.error('Admin system not configured. Please set environment variables.');
+        return;
+      }
       if (adminCode === secureCode) {
         toast.success('Admin Authorized!');
         onAdminLogin();

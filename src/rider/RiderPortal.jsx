@@ -10,9 +10,8 @@ import { supabase } from '../supabase';
 function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
   const [activeTab, setActiveTab] = useState('DASHBOARD');
   const [isOnline, setIsOnline] = useState(false);
-  const [riderId, setRiderId] = useState(user?.rider_id || 'demo-rider-123');
+  const [riderId, setRiderId] = useState(user?.rider_id || '');
   const [stats, setStats] = useState({ earnings: 0, deliveries: 0 });
-  const [loading, setLoading] = useState(true);
   const mainScrollRef = useRef(null);
   const [isDetecting, setIsDetecting] = useState(false);
 
@@ -46,21 +45,29 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
         }
       }
 
-      if (rid && rid !== 'demo-rider-123' && rid.length > 20) { // Simple UUID check
+      if (rid && rid.length > 20) { // Simple UUID check
         try {
-          // Fetch stats
-          const { data: earningsData, error } = await supabase
+          // Fetch earnings
+          const { data: earningsData, error: earningsError } = await supabase
             .from('rider_earnings')
             .select('amount')
             .eq('rider_id', rid);
           
-          if (error) throw error;
+          if (earningsError) throw earningsError;
+
+          // Fetch actual delivered orders count as a fallback
+          const { count: deliveriesCount } = await supabase
+            .from('orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('rider_id', rid)
+            .eq('status', 'DELIVERED');
 
           if (earningsData) {
             const total = earningsData.reduce((sum, item) => sum + Number(item.amount), 0);
+            const actualDeliveries = deliveriesCount || 0;
             setStats({
               earnings: total,
-              deliveries: earningsData.length
+              deliveries: Math.max(earningsData.length, actualDeliveries)
             });
           }
         } catch (err) {
@@ -77,15 +84,16 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
           deliveries: 28
         });
       }
-      setLoading(false);
     };
 
     initRider();
     
-    // Subscribe to earnings updates
+    // Subscribe to earnings updates and order updates
     const channel = supabase
       .channel('rider_stats')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rider_earnings', filter: `rider_id=eq.${riderId}` }, 
+        () => initRider())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `rider_id=eq.${riderId}` }, 
         () => initRider())
       .subscribe();
 
@@ -126,7 +134,7 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
     
     const syncLocation = async () => {
       // Only sync if online and we have a valid rider ID
-      if (isOnline && riderId && riderId !== 'demo-rider-123') {
+      if (isOnline && riderId) {
         if (!navigator.geolocation) return;
 
         navigator.geolocation.getCurrentPosition(async (position) => {
@@ -147,14 +155,14 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
           } catch (err) {
             console.error("Critical location tracking error:", err);
           }
-        }, (err) => console.warn("GPS tracking blocked"), { enableHighAccuracy: true });
+        }, () => console.warn("GPS tracking blocked"), { enableHighAccuracy: true });
       }
     };
 
     if (isOnline) {
       syncLocation(); // Initial sync
       trackingInterval = setInterval(syncLocation, 3000); // 🚀 Zepto-speed: Sync every 3 seconds
-    } else if (riderId && riderId !== 'demo-rider-123') {
+    } else if (riderId) {
        // Update status to OFFLINE when rider goes off
        supabase.from('rider_locations').upsert({ 
          rider_id: riderId, 
@@ -174,7 +182,7 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
     } else if (!isOnline) {
       setSessionStartTime(null);
     }
-  }, [isOnline]);
+  }, [isOnline, sessionStartTime]);
 
   const renderContent = () => {
     const commonProps = { user, riderId, stats, setStats, isOnline, sessionStartTime };
@@ -192,8 +200,8 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
       {/* Top Header */}
       <header className="rider-header" style={{ borderBottom: 'none', background: 'transparent', padding: '1.25rem 1rem' }}>
         <div className="rider-header-profile">
-          <div className="rider-header-avatar" style={{ background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 10px rgba(0,0,0,0.04)' }}>
-             <img src="/logo.png" alt="Passwala Logo" style={{ width: '26px', height: '26px', objectFit: 'contain' }} />
+          <div className="rider-header-avatar" style={{ background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 10px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+             <img src={user?.photoURL || user?.photo || "/logo.png"} alt="Rider Profile" style={{ width: (user?.photoURL || user?.photo) ? '100%' : '26px', height: (user?.photoURL || user?.photo) ? '100%' : '26px', objectFit: (user?.photoURL || user?.photo) ? 'cover' : 'contain' }} />
           </div>
           <div>
             <h1 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--rider-text)' }}>Passwala Rider</h1>

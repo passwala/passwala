@@ -22,19 +22,30 @@ const VendorAuth = ({ onLogin }) => {
     }
     return () => clearInterval(interval);
   }, [timer]);
-  const setupRecaptcha = () => {
-    try {
+
+  useEffect(() => {
+    return () => {
       if (window.recaptchaVerifier) {
         window.recaptchaVerifier.clear();
+        window.recaptchaVerifier = null;
       }
+    };
+  }, []);
+
+  const setupRecaptcha = () => {
+    try {
+      if (window.recaptchaVerifier) return;
+      
       window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-wrapper', {
         size: 'invisible',
         'callback': (response) => {
           console.log("reCAPTCHA solved");
         },
         'expired-callback': () => {
-          window.recaptchaVerifier.clear();
-          window.recaptchaVerifier = null;
+          if (window.recaptchaVerifier) {
+            window.recaptchaVerifier.clear();
+            window.recaptchaVerifier = null;
+          }
         }
       });
     } catch (e) {
@@ -97,18 +108,14 @@ const VendorAuth = ({ onLogin }) => {
       
       if (confirmationResult) {
         await confirmationResult.confirm(otpValue);
-      } else if (otpValue !== '123456') {
-        throw new Error('Invalid OTP');
+      } else {
+        throw new Error('Verification session expired');
       }
       
       const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
 
       // Finalize login flow and hand over to VendorPortal
-      if (confirmationResult) {
-        onLogin(false);
-      } else {
-        onLogin(true, cleanPhone); // Pass phone back for mock
-      }
+      onLogin(cleanPhone, { name: 'Vendor Partner' });
       
     } catch (error) {
       toast.error('Invalid OTP. Please try again.');
@@ -168,22 +175,6 @@ const VendorAuth = ({ onLogin }) => {
                 </button>
               </form>
 
-              <div className="divider" style={{ margin: '1.5rem 0', display: 'flex', alignItems: 'center', color: '#94a3b8', fontSize: '0.75rem', fontWeight: 700 }}>
-                <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
-                <span style={{ padding: '0 10px' }}>DEV ONLY</span>
-                <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
-              </div>
-
-              <button 
-                className="auth-submit-btn" 
-                style={{ background: 'white', color: '#ff7622', border: '2px dashed #ff7622', boxShadow: 'none' }}
-                onClick={() => {
-                  toast.success('Universal Vendor Mock Access');
-                  onLogin(true, '9999999999', { name: 'Demo Vendor', business_name: 'Premium Store' });
-                }}
-              >
-                Simulate Vendor Login
-              </button>
               <div id="recaptcha-wrapper"></div>
             </motion.div>
           )}

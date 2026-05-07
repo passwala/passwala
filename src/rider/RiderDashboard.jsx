@@ -1,23 +1,16 @@
 /* eslint-disable */
-// Location Fixed
-import React, { useState, useEffect } from 'react';
+// Location Fixed with Real Premium Leaflet Mapping
+import React, { useState, useEffect, useRef } from 'react';
 import { MapPin, Navigation, Phone, CheckCircle, Package, Clock, ChevronRight, Check, RefreshCw, IndianRupee } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../supabase'; // Import supabase client
 import { getShortestPathDistance, getNearestLandmark } from '../utils/dijkstra';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import './RiderPortal.css'; // Import custom styles
 
-const mockIncomingOrder = {
-  id: '#ORD-9921',
-  store: 'Sharma Groceries',
-  pickupAddress: 'Satellite, Ahmedabad',
-  dropAddress: 'Vastrapur, Ahmedabad',
-  distance: '2.5 km',
-  earnings: '₹45',
-  time: '15 mins',
-  items: 4
-};
+
 
 function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats, riderLocation, setRiderLocation, isDetecting, setIsDetecting, userCoords }) {
   const [activeOrder, setActiveOrder] = useState(null);
@@ -30,23 +23,39 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
   const [activeAreas, setActiveAreas] = useState([]);
+  const [nearbyStores, setNearbyStores] = useState([]);
 
+  // Map elements refs
+  const mapRef = useRef(null);
+  const leafletMapRef = useRef(null);
+  const markerGroupRef = useRef(null);
+
+  // Sync coords on prop change
   useEffect(() => {
     if (userCoords && !isManualLocation) {
       setMapCoords({ lat: userCoords.lat, lon: userCoords.lng });
     }
   }, [userCoords, isManualLocation]);
 
+  // Fetch serviceable areas and nearby stores
   useEffect(() => {
-    const fetchAreas = async () => {
+    const fetchAreasAndStores = async () => {
        try {
-         const { data } = await supabase.from('service_areas').select('*').eq('is_active', true);
-         setActiveAreas(data || []);
-       } catch (err) { console.error('Areas fetch failed', err); }
+         // Serviceable Areas
+         const { data: areas } = await supabase.from('service_areas').select('*').eq('is_active', true);
+         setActiveAreas(areas || []);
+
+         // Real Active Partner Stores
+         const { data: stores } = await supabase.from('stores').select('id, name, address, lat, lng, is_open');
+         setNearbyStores(stores || []);
+       } catch (err) { 
+         console.error('Database fetch failed', err); 
+       }
     };
-    fetchAreas();
+    fetchAreasAndStores();
   }, []);
 
+  // Update current time clock
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
@@ -54,28 +63,22 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     return () => clearInterval(timer);
   }, []);
 
+  // Auto-detect location on start
   useEffect(() => {
-    // Auto-detect location on mount if not set, but wait for areas to load
     if (activeAreas.length > 0 && (!riderLocation || riderLocation === 'Location Not Set' || riderLocation.includes('coming soon'))) {
       if (!isManualLocation) requestLiveLocation();
     }
   }, [activeAreas.length]);
 
+  // Handle GPS location tracking
   const requestLiveLocation = async (force = false) => {
     if (isManualLocation && !force) return;
     setIsDetecting(true);
     
-    // Fallback method if GPS fails or is denied (Common on non-HTTPS sites)
     const handleFallback = () => {
        if (userCoords) {
          setMapCoords({ lat: userCoords.lat, lon: userCoords.lng });
-         // We don't overwrite riderLocation here because it's already managed by App.jsx
-         // But if we want to ensure it's synced:
-         if (!riderLocation || riderLocation.includes('Location Not Set')) {
-            // Just let the prop flow
-         }
        } else {
-         // Final fallback to Ahmedabad
          setMapCoords({ lat: 23.0225, lon: 72.5714 });
          setRiderLocation("Ahmedabad, Gujarat");
        }
@@ -93,15 +96,10 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           const data = await res.json();
           const addr = data.address;
           
-          // Check if the detected city is Ahmedabad
           const detectedCity = (addr.city || addr.town || addr.village || addr.state_district || addr.county || '').toLowerCase();
-          
-          // Build a broad search string from all address parts to find our area
           const addressSearchString = Object.values(addr).join(' ').toLowerCase();
           
           if (detectedCity.includes('ahmedabad')) {
-            // Check against admin-managed active areas
-            // If activeAreas is empty, we allow it (development fallback)
             const isServiceable = activeAreas.length === 0 || activeAreas.some(a => {
               const areaName = a.area_name.toLowerCase();
               return addressSearchString.includes(areaName) || areaName.includes(addressSearchString);
@@ -124,7 +122,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         }
       }, (err) => {
          console.warn("GPS Error:", err.message);
-         handleFallback(); // User denied or error
+         handleFallback();
       }, {
         enableHighAccuracy: true,
         timeout: 10000,
@@ -134,13 +132,13 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
        handleFallback();
     }
   };
+
   const steps = ['Accepted', 'Reached Store', 'Order Picked', 'Out for Delivery', 'Delivered'];
 
-  // Add a polling mechanism to refresh location when online
+  // Periodic location polling when online
   useEffect(() => {
     let interval;
     if (isOnline) {
-      // Refresh every 60 seconds
       interval = setInterval(() => {
         requestLiveLocation();
       }, 60000);
@@ -150,7 +148,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     };
   }, [isOnline]);
 
-  // Add a polling mechanism to fetch new orders when online
+  // Real-time order dispatch and polling mechanism
   useEffect(() => {
     if (!isOnline || activeOrder || incomingOrder) return;
 
@@ -163,30 +161,28 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           .from('orders')
           .select('*, stores(name, address, lat, lng), addresses(*), users(full_name), order_items(id)')
           .eq('status', 'PLACED')
-          .gt('total_amount', 0) // Filter out zero-amount "fake" orders
-          .gt('created_at', yesterday.toISOString()) // Only recent orders
+          .gt('total_amount', 0)
+          .gt('created_at', yesterday.toISOString())
           .order('created_at', { ascending: false });
 
         if (rejectedOrderIds.length > 0) {
           query = query.not('id', 'in', `(${rejectedOrderIds.join(',')})`);
         }
 
-        const { data, error } = await query.limit(5); // Fetch a few to find a nearby one
+        const { data, error } = await query.limit(5);
 
         if (error) return;
         
         if (data && data.length > 0) {
-          // Find the first order that is within a reasonable distance (e.g., 15km)
           const validOrder = data.find(order => {
             const storeCoords = { lat: order.stores?.lat || 23.0225, lng: order.stores?.lng || 72.5714 };
             const dist = getShortestPathDistance(mapCoords.lat, mapCoords.lon, storeCoords.lat, storeCoords.lng);
-            return dist <= 15; // Only show if within 15km
+            return dist <= 15;
           });
 
           if (!validOrder) return;
 
           const order = validOrder;
-          
           let dropAddr = 'Customer Location';
           let customerCoords = { lat: 23.0225, lng: 72.5714 }; 
 
@@ -194,10 +190,10 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
             const a = order.addresses;
             const parts = [a.house_no, a.floor, a.address_line_1, a.city, a.pincode].filter(Boolean);
             dropAddr = parts.join(', ') || 'Customer Location';
-            customerCoords = { lat: a.lat || 23.0225, lng: a.lng || 72.5714 };
+            customerCoords = { lat: parseFloat(a.lat) || 23.0225, lng: parseFloat(a.lng) || 72.5714 };
           }
 
-          const storeCoords = { lat: order.stores?.lat || 23.0225, lng: order.stores?.lng || 72.5714 };
+          const storeCoords = { lat: parseFloat(order.stores?.lat) || 23.0225, lng: parseFloat(order.stores?.lng) || 72.5714 };
           const distToStore = getShortestPathDistance(mapCoords.lat, mapCoords.lon, storeCoords.lat, storeCoords.lng);
           const distToCustomer = getShortestPathDistance(storeCoords.lat, storeCoords.lng, customerCoords.lat, customerCoords.lng);
           const totalDist = distToStore + distToCustomer;
@@ -205,16 +201,18 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           setIncomingOrder({
             id: `#ORD-${order.id.substring(0,6).toUpperCase()}`,
             store: order.stores?.name || 'Passwala Partner Store',
-            storeArea: order.stores?.address?.split(',')[0] || 'Nearby', // 📍 Added Store Area
+            storeArea: order.stores?.address?.split(',')[0] || 'Nearby',
             customerName: order.users?.full_name || 'Customer',
-            area: order.addresses?.society || 'Near Ahmedabad', // 📍 Added Customer Area
+            area: order.addresses?.society || 'Near Ahmedabad',
             pickupAddress: order.stores?.address || 'Nearby Market',
             dropAddress: dropAddr,
             distance: `${totalDist.toFixed(1)} km`, 
             earnings: `₹${order.total_amount || 50}`, 
             time: `${Math.round(totalDist * 5 + 5)} mins`, 
             items: order.order_items?.length || 2,
-            dbId: order.id
+            dbId: order.id,
+            storeCoords: storeCoords,
+            customerCoords: customerCoords
           });
           toast.success(`New Delivery Request! (${totalDist.toFixed(1)} km)`, { icon: "🔔" });
         }
@@ -223,10 +221,8 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       }
     };
 
-    // Initial fetch to catch existing orders
     fetchPendingOrder();
 
-    // ⚡ REAL-TIME: Listen for NEW orders instead of polling
     const channel = supabase
       .channel('new-orders-broadcast')
       .on('postgres_changes', { 
@@ -234,7 +230,6 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         schema: 'public', 
         table: 'orders' 
       }, (payload) => {
-        // If a new order is placed, check if it's nearby
         if (payload.new.status === 'PLACED') {
           fetchPendingOrder();
         }
@@ -246,11 +241,10 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     };
   }, [isOnline, activeOrder, incomingOrder, rejectedOrderIds]);
 
-  // 🛡️ Real-time Order Availability Guard
+  // Sync and clean up order real-time updates
   useEffect(() => {
     if (!incomingOrder?.dbId) return;
 
-    // Listen for updates to the specific order being shown
     const channel = supabase
       .channel(`incoming-order-${incomingOrder.dbId}`)
       .on('postgres_changes', { 
@@ -259,7 +253,6 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         table: 'orders', 
         filter: `id=eq.${incomingOrder.dbId}` 
       }, (payload) => {
-        // If status changed from PLACED, it's either taken by another rider or cancelled
         if (payload.new.status !== 'PLACED') {
           setIncomingOrder(null);
           toast('Order taken by another rider', { icon: '🤝' });
@@ -272,32 +265,191 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     };
   }, [incomingOrder?.dbId]);
 
+  // Leaflet Map Initialization and Lifecycle management
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    if (!leafletMapRef.current) {
+      leafletMapRef.current = L.map(mapRef.current, {
+        zoomControl: false,
+        attributionControl: false
+      }).setView([mapCoords.lat, mapCoords.lon], 14);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        className: 'map-tiles'
+      }).addTo(leafletMapRef.current);
+
+      L.control.zoom({ position: 'topright' }).addTo(leafletMapRef.current);
+      markerGroupRef.current = L.featureGroup().addTo(leafletMapRef.current);
+    }
+
+    return () => {
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+        markerGroupRef.current = null;
+      }
+    };
+  }, []);
+
+  // Sync Leaflet markers and route polylines dynamically
+  useEffect(() => {
+    if (!leafletMapRef.current || !markerGroupRef.current) return;
+
+    // Clear previous layers
+    markerGroupRef.current.clearLayers();
+
+    // Define premium DivIcons with inline vector SVGs
+    const createRiderIcon = () => L.divIcon({
+      className: 'custom-leaflet-marker rider-marker',
+      html: `<div class="marker-container" style="background: #10b981; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative;">
+               <span class="pulse-ring" style="position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 3px solid #10b981; animation: marker-pulse 1.8s infinite; opacity: 0.6;"></span>
+               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(45deg);"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+             </div>`,
+      iconSize: [42, 42],
+      iconAnchor: [21, 21]
+    });
+
+    const createStoreIcon = (name) => L.divIcon({
+      className: 'custom-leaflet-marker store-marker',
+      html: `<div class="marker-container" style="background: #f97316; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; position: relative;">
+               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 17H2"/></svg>
+             </div>`,
+      iconSize: [42, 42],
+      iconAnchor: [21, 21]
+    });
+
+    const createCustomerIcon = (name) => L.divIcon({
+      className: 'custom-leaflet-marker customer-marker',
+      html: `<div class="marker-container" style="background: #3b82f6; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative;">
+               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+             </div>`,
+      iconSize: [42, 42],
+      iconAnchor: [21, 21]
+    });
+
+    const riderLatLng = [mapCoords.lat, mapCoords.lon];
+
+    // 1. Draw Rider
+    L.marker(riderLatLng, { icon: createRiderIcon() })
+      .bindPopup(`<b>You (Rider)</b><br/>Status: ${isOnline ? 'Online' : 'Offline'}`)
+      .addTo(markerGroupRef.current);
+
+    if (activeOrder) {
+      // Show Delivery Routing (Real Map, No fake streets)
+      const storeCoords = activeOrder.storeCoords || { lat: 23.0305, lng: 72.5075 };
+      const customerCoords = activeOrder.customerCoords || { lat: 23.0393, lng: 72.5244 };
+
+      const storeLatLng = [storeCoords.lat, storeCoords.lng];
+      const customerLatLng = [customerCoords.lat, customerCoords.lng];
+
+      // Draw Store Marker
+      L.marker(storeLatLng, { icon: createStoreIcon(activeOrder.store) })
+        .bindPopup(`<b>Store Hub:</b> ${activeOrder.store}<br/>Pickup point`)
+        .addTo(markerGroupRef.current);
+
+      // Draw Customer Marker
+      L.marker(customerLatLng, { icon: createCustomerIcon(activeOrder.customerName) })
+        .bindPopup(`<b>Customer:</b> ${activeOrder.customerName}<br/>Deliver to: ${activeOrder.dropAddress}`)
+        .addTo(markerGroupRef.current);
+
+      // Draw interactive path depending on active phase
+      if (deliveryStep < 2) {
+        // Leg 1 (Rider -> Store) is active SOLID orange route
+        L.polyline([riderLatLng, storeLatLng], {
+          color: '#f97316',
+          weight: 6,
+          opacity: 0.9,
+          lineJoin: 'round'
+        }).addTo(markerGroupRef.current);
+
+        // Leg 2 (Store -> Customer) is DASHED upcoming blue route
+        L.polyline([storeLatLng, customerLatLng], {
+          color: '#3b82f6',
+          weight: 4,
+          opacity: 0.5,
+          dashArray: '8, 8',
+          lineJoin: 'round'
+        }).addTo(markerGroupRef.current);
+      } else {
+        // Leg 1 (Store -> Rider) is faded completed dashed route
+        L.polyline([storeLatLng, riderLatLng], {
+          color: '#94a3b8',
+          weight: 3,
+          opacity: 0.4,
+          dashArray: '4, 4',
+          lineJoin: 'round'
+        }).addTo(markerGroupRef.current);
+
+        // Leg 2 (Rider -> Customer) is active SOLID blue route
+        L.polyline([riderLatLng, customerLatLng], {
+          color: '#3b82f6',
+          weight: 6,
+          opacity: 0.9,
+          lineJoin: 'round'
+        }).addTo(markerGroupRef.current);
+      }
+
+      // Automatically focus bounds to include all elements
+      try {
+        const bounds = L.latLngBounds([riderLatLng, storeLatLng, customerLatLng]);
+        leafletMapRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+      } catch (e) {
+        console.warn('Map bounds fit error', e);
+      }
+
+    } else {
+      // No active order - Show surrounding vendor shops & hubs
+      if (nearbyStores.length > 0) {
+        nearbyStores.forEach(store => {
+          if (!store.lat || !store.lng) return;
+          const storeLatLng = [parseFloat(store.lat), parseFloat(store.lng)];
+          const dist = getShortestPathDistance(mapCoords.lat, mapCoords.lon, storeLatLng[0], storeLatLng[1]);
+          
+          L.marker(storeLatLng, { icon: createStoreIcon(store.name) })
+            .bindPopup(`
+              <div style="font-family: inherit; line-height: 1.4;">
+                <h4 style="margin: 0 0 2px 0; color: #f97316; font-weight: 800;">${store.name}</h4>
+                <p style="margin: 0 0 6px 0; font-size: 0.75rem; color: #64748b; font-weight: 500;">${store.address || 'Nearby Shop'}</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed #e2e8f0; padding-top: 6px; margin-top: 4px;">
+                  <span style="font-size: 0.75rem; font-weight: 700; color: #1e293b;">📍 ${dist.toFixed(1)} km away</span>
+                  <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(249,115,22,0.1); color: #f97316; border-radius: 4px; font-weight: 700;">Partner Hub</span>
+                </div>
+              </div>
+            `)
+            .addTo(markerGroupRef.current);
+        });
+      }
+
+      // Re-center on Rider smoothly
+      leafletMapRef.current.setView(riderLatLng, 14);
+    }
+  }, [mapCoords, activeOrder, deliveryStep, nearbyStores, isOnline]);
+
   const handleToggleOnline = async () => {
     let id = user?.id || user?.uid;
-    // Fallback for stale local sessions that only have phoneNumber
     if (!id && user?.phoneNumber) {
       const phoneNo = user.phoneNumber.replace('+91', '');
       try {
         const { data } = await supabase.from('users').select('id').eq('phone', phoneNo).maybeSingle();
         if (data) id = data.id;
       } catch (e) {
-        console.warn("Supabase unreachable, using provided ID fallback");
+        console.warn("Supabase unreachable");
       }
     }
     
-    // Unstoppable ID fallback for development/demo
     if (!id) {
-        console.warn("User ID not found, using 'demo-user-123' as fallback.");
-        id = 'demo-user-123';
+        toast.error("User identity missing. Please re-login.");
+        return;
     }
 
     const newStatus = !isOnline;
     setIsOnline(newStatus);
     toast.success(newStatus ? "You are now online" : "You are offline");
 
-    // Sync to Supabase
     try {
-      if (id && id !== 'demo-user-123') {
+      if (id) {
         await supabase
           .from('riders')
           .update({ is_active: newStatus })
@@ -319,12 +471,22 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     setDeliveryStep(0);
     toast.success('Order Accepted!');
     
-    // Sync back to db with rider assignment
     if (orderToStart?.dbId) {
-       await supabase.from('orders').update({ 
-         status: 'ACCEPTED',
-         rider_id: riderId 
-       }).eq('id', orderToStart.dbId);
+       try {
+         const updatePayload = { status: 'ACCEPTED' };
+         // Only append rider_id if it looks like a valid UUID (length > 20)
+         if (riderId && riderId.length > 20) {
+           updatePayload.rider_id = riderId;
+         }
+         
+         const { error } = await supabase.from('orders').update(updatePayload).eq('id', orderToStart.dbId);
+         if (error) {
+           console.error("Error accepting order:", error);
+           toast.error("Database update failed, but proceeding locally.");
+         }
+       } catch (err) {
+         console.error("Exception accepting order:", err);
+       }
     }
   };
 
@@ -342,34 +504,41 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       setDeliveryStep(nextIdx);
       toast.success(`Status updated: ${steps[nextIdx]}`);
       
-      // Update DB status mapping
-      if (activeOrder?.dbId) {
-         let newDbStatus = 'ACCEPTED';
-         if (nextIdx === 2) newDbStatus = 'ACCEPTED'; // Wait, maybe we use DISPATCHED for 'Out for Delivery' step 3
-         if (nextIdx === 3) newDbStatus = 'DISPATCHED';
-         await supabase.from('orders').update({ status: newDbStatus }).eq('id', activeOrder.dbId);
-      }
-    } else {
-      // Complete Delivery logic
       if (activeOrder?.dbId) {
          try {
-           // 1. Update Order Status
-           await supabase.from('orders').update({ status: 'DELIVERED', updated_at: new Date().toISOString() }).eq('id', activeOrder.dbId);
+           let newDbStatus = 'ACCEPTED';
+           if (nextIdx === 1) newDbStatus = 'PREPARING'; // Reached Store
+           if (nextIdx === 2) newDbStatus = 'PREPARING'; // Order Picked
+           if (nextIdx === 3) newDbStatus = 'DISPATCHED'; // Out for Delivery
+           const { error } = await supabase.from('orders').update({ status: newDbStatus }).eq('id', activeOrder.dbId);
+           if (error) console.error("Error updating order step:", error);
+         } catch (err) {
+           console.error("Exception updating order step:", err);
+         }
+      }
+    } else {
+      if (activeOrder?.dbId) {
+         try {
+           const { error: completeErr } = await supabase.from('orders').update({ status: 'DELIVERED', updated_at: new Date().toISOString() }).eq('id', activeOrder.dbId);
+           if (completeErr) console.error("Error completing order:", completeErr);
            
-           // 2. Record Earnings
            if (riderId) {
              const earningsAmount = Number(activeOrder.earnings.replace('₹', '')) || 50;
-             await supabase.from('rider_earnings').insert([{
+             const { error: earnErr } = await supabase.from('rider_earnings').insert([{
                rider_id: riderId,
                order_id: activeOrder.dbId,
                amount: earningsAmount
              }]);
              
-             // Update local stats immediately for better UX
-             setStats(prev => ({
-               earnings: prev.earnings + earningsAmount,
-               deliveries: prev.deliveries + 1
-             }));
+             if (earnErr) {
+               console.error("Error inserting rider earnings:", earnErr);
+               toast.error(`Earnings error: ${earnErr.message}`);
+             } else {
+               setStats(prev => ({
+                 earnings: prev.earnings + earningsAmount,
+                 deliveries: prev.deliveries + 1
+               }));
+             }
            }
          } catch (err) {
            console.error("Error completing delivery in DB:", err);
@@ -392,22 +561,18 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           borderRadius: '24px',
           margin: '0 1rem 1.5rem 1rem',
           boxShadow: 'var(--rider-shadow-lg)',
-          border: '1px solid var(--rider-border)'
+          border: '1px solid var(--rider-border)',
+          zIndex: 1
       }}>
-        <iframe 
-          width="100%" 
-          height="100%" 
-          frameBorder="0" 
-          scrolling="no" 
-          marginHeight="0" 
-          marginWidth="0" 
-          src={`https://www.openstreetmap.org/export/embed.html?bbox=${mapCoords.lon-0.01},${mapCoords.lat-0.01},${mapCoords.lon+0.01},${mapCoords.lat+0.01}&layer=mapnik&marker=${mapCoords.lat},${mapCoords.lon}`}
-          style={{ border: 'none', filter: 'contrast(1.1) brightness(1.05)' }}
-        ></iframe>
+        {/* Leaflet Map Div Container */}
+        <div 
+          ref={mapRef} 
+          style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 1 }}
+        ></div>
 
-        {/* GPS FAB */}
+        {/* GPS FAB Overlay */}
         <button 
-          onClick={requestLiveLocation}
+          onClick={() => requestLiveLocation(true)}
           style={{ 
             position: 'absolute', 
             bottom: '1rem', 
@@ -433,130 +598,100 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         </button>
 
         {!activeOrder ? (
-          <>
-            <div style={{ 
-                position: 'absolute', 
-                top: '1rem', 
-                left: '1rem', 
-                right: '1rem',
-                display: 'flex',
-                flexDirection: 'column',
+          <div style={{ 
+              position: 'absolute', 
+              top: '1rem', 
+              left: '1rem', 
+              right: '1rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.75rem',
+              zIndex: 10,
+              pointerEvents: 'none'
+          }}>
+            {/* Location Pill Overlay */}
+            <div className="glass" style={{ 
+                padding: '0.6rem 1rem', 
+                borderRadius: '16px', 
+                display: 'flex', 
+                alignItems: 'center', 
                 gap: '0.75rem',
-                zIndex: 10
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                alignSelf: 'flex-start',
+                maxWidth: '100%',
+                pointerEvents: 'auto'
             }}>
-              {/* Location Pill */}
-              <div className="glass" style={{ 
-                  padding: '0.6rem 1rem', 
-                  borderRadius: '16px', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.75rem',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                  alignSelf: 'flex-start',
-                  maxWidth: '100%'
-              }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--rider-primary)' }}></div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current Hub</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span onClick={() => setShowAreaPicker(!showAreaPicker)} style={{ cursor: 'pointer', fontSize: '0.85rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{riderLocation}</span>
-                    <RefreshCw 
-                      size={14} 
-                      className={isDetecting ? "animate-spin" : ""} 
-                      style={{ cursor: 'pointer', color: 'var(--rider-primary)' }} 
-                      onClick={() => requestLiveLocation(true)}
-                    />
-                  </div>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--rider-primary)' }}></div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current Hub</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span onClick={() => setShowAreaPicker(!showAreaPicker)} style={{ cursor: 'pointer', fontSize: '0.85rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{riderLocation}</span>
+                  <RefreshCw 
+                    size={14} 
+                    className={isDetecting ? "animate-spin" : ""} 
+                    style={{ cursor: 'pointer', color: 'var(--rider-primary)' }} 
+                    onClick={() => requestLiveLocation(true)}
+                  />
                 </div>
-
-                {showAreaPicker && (
-                  <div className="glass" style={{ position: 'absolute', top: '100%', left: 0, marginTop: '8px', width: '220px', maxHeight: '200px', overflowY: 'auto', zIndex: 100, padding: '10px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
-                    <p style={{ margin: '0 0 8px 0', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>SWITCH SERVICE AREA</p>
-                    {activeAreas.map(area => (
-                      <div 
-                        key={area.id} 
-                        onClick={() => {
-                          setRiderLocation(`${area.area_name}, Ahmedabad`);
-                          setIsManualLocation(true);
-                          setShowAreaPicker(false);
-                          toast.success(`Hub changed to ${area.area_name}`);
-                        }}
-                        style={{ padding: '8px 12px', fontSize: '0.8rem', cursor: 'pointer', borderRadius: '10px', background: 'rgba(0,0,0,0.03)', marginBottom: '4px', fontWeight: 600, transition: 'all 0.2s' }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.06)'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.03)'}
-                      >
-                        {area.area_name}
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
 
-              {/* Order Search Pill */}
-              {isOnline && (
-                <div className="glass" style={{ 
-                    padding: '0.75rem 1.25rem', 
-                    borderRadius: '20px', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '0.75rem',
-                    boxShadow: '0 8px 20px rgba(249, 115, 22, 0.15)',
-                    alignSelf: 'center',
-                    border: '1px solid rgba(249, 115, 22, 0.2)',
-                    background: 'rgba(255, 255, 255, 0.9)'
-                }}>
-                  <span className="rider-pulse-dot" style={{ width: '10px', height: '10px' }}></span>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--rider-text)' }}>Looking for orders...</span>
+              {showAreaPicker && (
+                <div className="glass" style={{ position: 'absolute', top: '100%', left: 0, marginTop: '8px', width: '220px', maxHeight: '200px', overflowY: 'auto', zIndex: 100, padding: '10px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>SWITCH SERVICE AREA</p>
+                  {activeAreas.map(area => (
+                    <div 
+                      key={area.id} 
+                      onClick={() => {
+                        setRiderLocation(`${area.area_name}, Ahmedabad`);
+                        setIsManualLocation(true);
+                        setShowAreaPicker(false);
+                        toast.success(`Hub changed to ${area.area_name}`);
+                      }}
+                      style={{ padding: '8px 12px', fontSize: '0.8rem', cursor: 'pointer', borderRadius: '10px', background: 'rgba(0,0,0,0.03)', marginBottom: '4px', fontWeight: 600, transition: 'all 0.2s' }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.06)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.03)'}
+                    >
+                      {area.area_name}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-          </>
+
+            {/* Order Search Pill */}
+            {isOnline && (
+              <div className="glass" style={{ 
+                  padding: '0.75rem 1.25rem', 
+                  borderRadius: '20px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.75rem',
+                  boxShadow: '0 8px 20px rgba(249, 115, 22, 0.15)',
+                  alignSelf: 'center',
+                  border: '1px solid rgba(249, 115, 22, 0.2)',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  pointerEvents: 'auto'
+              }}>
+                <span className="rider-pulse-dot" style={{ width: '10px', height: '10px' }}></span>
+                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--rider-text)' }}>Looking for orders...</span>
+              </div>
+            )}
+          </div>
         ) : (
-           <>
-             {/* Map Mock Background Streets */}
-             <div style={{position: 'absolute', width: '100%', height: '100%', top: 0, left: 0, opacity: 0.4}}>
-                 <div style={{position: 'absolute', top: '30%', left: 0, width: '100%', height: '12px', background: 'white', transform: 'rotate(-5deg)'}}></div>
-                 <div style={{position: 'absolute', top: '70%', left: 0, width: '100%', height: '12px', background: 'white', transform: 'rotate(15deg)'}}></div>
-                 <div style={{position: 'absolute', left: '40%', top: 0, width: '12px', height: '100%', background: 'white', transform: 'rotate(10deg)'}}></div>
-                 <div style={{position: 'absolute', left: '70%', top: 0, width: '12px', height: '100%', background: 'white', transform: 'rotate(-20deg)'}}></div>
-             </div>
-
-             {/* Route Line SVG */}
-             <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 5 }}>
-                <path d={deliveryStep < 2 ? "M 80 180 Q 150 150 250 80" : "M 80 180 Q 180 200 280 100"} stroke="var(--rider-primary)" strokeWidth="5" strokeDasharray="8 6" fill="none" strokeLinecap="round" />
-             </svg>
-
-             {/* ETA Floating Card */}
-             <div style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'white', padding: '0.5rem 1rem', borderRadius: '12px', boxShadow: 'var(--rider-shadow-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 10 }}>
-                <span style={{ fontSize: '0.7rem', color: 'var(--rider-text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>
-                  ETA to {deliveryStep < 2 ? 'Store' : 'Customer'}
-                </span>
-                <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--rider-primary)' }}>
-                  {deliveryStep === 0 ? (() => { let d = new Date(); d.setMinutes(d.getMinutes() + 5); return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); })() 
-                   : deliveryStep === 1 ? 'Arrived' 
-                   : deliveryStep === 2 ? (() => { let d = new Date(); d.setMinutes(d.getMinutes() + 15); return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); })()
-                   : deliveryStep === 3 ? (() => { let d = new Date(); d.setMinutes(d.getMinutes() + 4); return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); })()
-                   : 'Delivered'}
-                </span>
-             </div>
-
-             {/* Destination Pin */}
-             <div style={{ position: 'absolute', top: deliveryStep < 2 ? '80px' : '100px', left: deliveryStep < 2 ? '250px' : '280px', transform: 'translate(-50%, -100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 10 }}>
-                <div style={{ background: deliveryStep < 2 ? 'var(--rider-text)' : 'var(--rider-primary)', color: 'white', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 'bold', marginBottom: '4px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                  {deliveryStep < 2 ? activeOrder.store : activeOrder.dropAddress}
-                </div>
-                <MapPin size={36} color={deliveryStep < 2 ? "var(--rider-text)" : "var(--rider-primary)"} fill="white" />
-             </div>
-
-             {/* Rider Current Pin */}
-             <div style={{ position: 'absolute', top: '180px', left: '80px', transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 10 }}>
-                <div style={{ background: '#10b981', color: 'white', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 4px rgba(16,185,129,0.3)', marginBottom: '8px' }}>
-                  <Navigation size={12} style={{transform: 'rotate(45deg)'}} />
-                </div>
-                <div style={{ background: 'white', color: 'var(--rider-text)', padding: '2px 8px', borderRadius: '999px', fontSize: '10px', fontWeight: 700, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>You</div>
-             </div>
-           </>
-         )}
+          /* ETA Floating Card */
+          <div style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'white', padding: '0.5rem 1rem', borderRadius: '12px', boxShadow: 'var(--rider-shadow-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 10 }}>
+             <span style={{ fontSize: '0.7rem', color: 'var(--rider-text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>
+               ETA to {deliveryStep < 2 ? 'Store' : 'Customer'}
+             </span>
+             <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--rider-primary)' }}>
+               {deliveryStep === 0 ? (() => { let d = new Date(); d.setMinutes(d.getMinutes() + 5); return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); })() 
+                : deliveryStep === 1 ? 'Arrived' 
+                : deliveryStep === 2 ? (() => { let d = new Date(); d.setMinutes(d.getMinutes() + 15); return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); })()
+                : deliveryStep === 3 ? (() => { let d = new Date(); d.setMinutes(d.getMinutes() + 4); return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); })()
+                : 'Delivered'}
+             </span>
+          </div>
+        )}
       </div>
 
       {/* Online Status Toggle - Premium Card */}
@@ -643,7 +778,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                              <span style={{ fontSize: '0.75rem', color: 'var(--rider-primary)', fontWeight: 600 }}>{incomingOrder.storeArea}</span>
                           </div>
                           <p style={{ fontSize: '0.75rem', color: 'var(--rider-text-secondary)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{incomingOrder.pickupAddress}</p>
-                      </div>
+                       </div>
                   </div>
                   <div style={{ borderLeft: '2px dashed #e5e7eb', marginLeft: '9px', height: '16px', marginTop: '-12px', marginBottom: '4px' }}></div>
                   <div className="rider-order-location" style={{ marginBottom: 0 }}>
@@ -659,17 +794,17 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                       </div>
                   </div>
                   
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem 0 0 0', marginTop: '1rem', borderTop: '1px dashed #e5e7eb', fontSize: '0.875rem', fontWeight: 600, color: 'var(--rider-text-secondary)' }}>
+                  <div style={{ display: 'flex', justifySpaceBetween: 'space-between', padding: '1rem 0 0 0', marginTop: '1rem', borderTop: '1px dashed #e5e7eb', fontSize: '0.875rem', fontWeight: 600, color: 'var(--rider-text-secondary)', justifyContent: 'space-between' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Package size={16}/> {incomingOrder.items} items</span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Navigation size={16}/> {incomingOrder.distance}</span>
                   </div>
                </div>
 
                <div className="rider-order-btn-group">
-                 <button onClick={handleReject} className="rider-btn-reject">Reject</button>
-                 <button onClick={handleAccept} className="rider-btn-accept" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
-                    Accept Order <ChevronRight size={20}/>
-                 </button>
+                  <button onClick={handleReject} className="rider-btn-reject">Reject</button>
+                  <button onClick={handleAccept} className="rider-btn-accept" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
+                     Accept Order <ChevronRight size={20}/>
+                  </button>
                </div>
             </div>
         </div>
@@ -726,15 +861,51 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                     <ChevronRight size={20} />
                 </button>
                 {deliveryStep === 0 && (
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
-                        <button className="rider-btn-secondary" style={{ flex: 1, padding: '0.75rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}><Phone size={18} /> Call Store</button>
-                        <button className="rider-btn-secondary" style={{ flex: 1, padding: '0.75rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}><Navigation size={18} /> Navigate</button>
+                    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+                        <button 
+                            onClick={() => toast.success('Connecting call to store...')} 
+                            style={{ flex: 1, padding: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: 'white', color: '#1e293b', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                        >
+                            <Phone size={18} color="#64748b" /> Call Store
+                        </button>
+                        <button 
+                            onClick={() => {
+                                const lat = activeOrder?.storeCoords?.lat || 23.0305;
+                                const lng = activeOrder?.storeCoords?.lng || 72.5075;
+                                window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
+                            }} 
+                            style={{ flex: 1, padding: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: 'white', color: '#1e293b', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                        >
+                            <Navigation size={18} color="#3b82f6" /> Navigate
+                        </button>
                     </div>
                 )}
                 {deliveryStep === 3 && (
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
-                        <button className="rider-btn-secondary" style={{ flex: 1, padding: '0.75rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}><Phone size={18} /> Call</button>
-                        <button className="rider-btn-secondary" style={{ flex: 1, padding: '0.75rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}><Navigation size={18} /> Navigate</button>
+                    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+                        <button 
+                            onClick={() => toast.success('Connecting call to customer...')} 
+                            style={{ flex: 1, padding: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: 'white', color: '#1e293b', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                        >
+                            <Phone size={18} color="#64748b" /> Call Customer
+                        </button>
+                        <button 
+                            onClick={() => {
+                                const lat = activeOrder?.customerCoords?.lat || 23.0393;
+                                const lng = activeOrder?.customerCoords?.lng || 72.5244;
+                                window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
+                            }} 
+                            style={{ flex: 1, padding: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: 'white', color: '#1e293b', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                        >
+                            <Navigation size={18} color="#3b82f6" /> Navigate
+                        </button>
                     </div>
                 )}
             </div>

@@ -8,9 +8,11 @@ import {
   Clock, 
   CheckCircle2, 
   XCircle,
-  AlertCircle
+  AlertCircle,
+  MapPin
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import { supabase } from '../../supabase';
 import { useTranslation } from '../LanguageContext';
 import './ProfilePages.css';
