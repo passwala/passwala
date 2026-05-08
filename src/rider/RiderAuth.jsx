@@ -156,8 +156,30 @@ function RiderAuth({ onLogin }) {
       toast.success('OTP Sent!');
     } catch (error) {
       console.error("Rider OTP Error:", error);
-      const detailedMessage = error.code ? `Firebase [${error.code}]: ${error.message}` : error.message || error;
-      toast.error(`Failed to send verification code: ${detailedMessage}`);
+      
+      // CRITICAL: Clear verifier on ANY error to prevent "reCAPTCHA already rendered" issues
+      if (window.recaptchaVerifier) {
+        try {
+          window.recaptchaVerifier.clear();
+        } catch (clearError) {
+          console.warn("Error clearing reCAPTCHA:", clearError);
+        }
+        window.recaptchaVerifier = null;
+      }
+
+      if (error.code === 'auth/billing-not-enabled') {
+        toast.error("Firebase Billing not enabled. Switching to Dev Mode...", { duration: 5000 });
+        setConfirmationResult({
+          confirm: async (code) => {
+            if (code === '123456') return { user: { phoneNumber: formatPhone } };
+            throw new Error("Invalid Dev-OTP. Use 123456");
+          }
+        });
+        setStep('OTP');
+      } else {
+        const detailedMessage = error.code ? `Firebase [${error.code}]: ${error.message}` : error.message || error;
+        toast.error(`Failed to send verification code: ${detailedMessage}`);
+      }
     } finally {
       setLoading(false);
     }

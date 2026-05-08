@@ -39,10 +39,19 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
     navigate(-1);
   };
 
+  const [detecting, setDetecting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredAreas = ahmedabadAreas.filter(area => 
+    area.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   const detectLocation = async () => {
-    toast.loading('Detecting area...', { id: 'geo' });
+    // ... same detection logic ...
+    if (detecting) return;
+    setDetecting(true);
+    toast.loading('Finding your location...', { id: 'geo' });
     
-    // First, try browser Geolocation
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(async (position) => {
         try {
@@ -52,10 +61,12 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
           const area = data.address?.suburb || data.address?.neighbourhood || data.address?.city || data.address?.town || 'My Location';
           const city = data.address?.city || data.address?.town || data.address?.state_district || '';
           const full = city ? `${area}, ${city}` : area;
-          onLocationChange(full);
+          onLocationChange(full, { lat: latitude, lng: longitude });
           toast.success(`Located: ${full}`, { id: 'geo' });
         } catch (err) {
           fallbackToIP();
+        } finally {
+          setDetecting(false);
         }
       }, () => {
         fallbackToIP();
@@ -67,59 +78,90 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
 
   const fallbackToIP = async () => {
     try {
-      // Fallback to IP-based location (No HTTPS requirement)
       const res = await fetch('https://ipapi.co/json/');
       const data = await res.json();
       if (data.city) {
         const full = `${data.city}, ${data.region}`;
-        onLocationChange(full);
+        onLocationChange(full, { lat: parseFloat(data.latitude), lng: parseFloat(data.longitude) });
         toast.success(`Approximated: ${full}`, { id: 'geo', duration: 3000 });
       } else {
         throw new Error('IP failed');
       }
     } catch (err) {
-      toast.error('Could not detect automatically. Please select from the list below.', { id: 'geo' });
+      toast.error('Automatic detection unavailable. Please select your area manually.', { id: 'geo' });
+    } finally {
+      setDetecting(false);
     }
   };
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: '100%' }}
+      initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: '100%' }}
+      exit={{ opacity: 0, y: 30 }}
       className="location-selector-page"
     >
-      <div className="location-header">
-        <button className="back-btn-v3" onClick={handleBack}>
-          <ChevronLeft size={24} />
-        </button>
-        <h1>Ahmedabad Areas</h1>
+      <div className="location-header-premium">
+        <div className="header-top-row">
+          <button className="back-mini-circle" onClick={handleBack}>
+            <ChevronLeft size={24} />
+          </button>
+          <div className="header-title-stack">
+            <h1>Neighborhood Hub</h1>
+            <span>Find your local expert today</span>
+          </div>
+        </div>
+
+        <div className="location-search-box">
+          <Search size={20} className="search-icon-v3" />
+          <input 
+            type="text" 
+            placeholder="Search neighborhood..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
       </div>
 
-      <div className="location-content">
-        <button className="current-loc-action-v2" onClick={detectLocation}>
-          <div className="pulse-circle"></div>
-          <Navigation size={20} />
-          <span>Detect My Exact Neighborhood</span>
-        </button>
+      <div className="location-scroll-content">
+        <div className="auto-detect-card" onClick={detectLocation}>
+          <div className="detect-visual">
+             <div className="pulse-ripple"></div>
+             <Navigation size={24} color="#ff7622" />
+          </div>
+          <div className="detect-info">
+             <strong>{detecting ? 'Locating...' : 'Detect My Exact Neighborhood'}</strong>
+             <span>Enable GPS for high accuracy</span>
+          </div>
+        </div>
 
-        <h3 className="location-section-title">CHOOSE YOUR AREA</h3>
-        <div className="cities-list">
-          {ahmedabadAreas.map((area) => (
-            <button 
-              key={area.name} 
-              className={`city-item ${currentLocation === area.name ? 'active' : ''}`}
-              onClick={() => handleSelect(area)}
-            >
-              <div className="city-info">
-                 <div className="area-gps-icon">
-                    <MapPin size={16} />
-                 </div>
-                 <span>{area.name.split(',')[0]}</span>
-              </div>
-              {currentLocation === area.name && <CheckCircle2 size={18} className="check-icon" />}
-            </button>
-          ))}
+        <div className="neighborhood-list-container">
+           <h3 className="section-label-v3">EXPLORE AHMEDABAD</h3>
+           
+           <div className="neighborhood-grid">
+             {filteredAreas.length > 0 ? (
+               filteredAreas.map((area) => (
+                 <button 
+                   key={area.name} 
+                   className={`neighborhood-item ${currentLocation === area.name ? 'selected' : ''}`}
+                   onClick={() => handleSelect(area)}
+                 >
+                   <div className="neighborhood-icon-box">
+                      <MapPin size={18} />
+                   </div>
+                   <div className="neighborhood-meta">
+                      <strong>{area.name.split(',')[0]}</strong>
+                      <span>Ahmedabad</span>
+                   </div>
+                   {currentLocation === area.name && <CheckCircle2 size={20} className="selection-tick" />}
+                 </button>
+               ))
+             ) : (
+               <div className="no-results-location">
+                  <p>No neighborhoods found matching "{searchTerm}"</p>
+               </div>
+             )}
+           </div>
         </div>
       </div>
     </motion.div>

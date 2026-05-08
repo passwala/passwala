@@ -340,10 +340,19 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
         {/* Items */}
         <div className="cart-body">
           {cartItems.length === 0 ? (
-            <div className="cart-empty">
-              <ShoppingBag size={48} strokeWidth={1} />
-              <p>{t('cart_empty')}</p>
-              <span>Add services or essentials to get started</span>
+            <div className="cart-empty-v5">
+              <div className="empty-illustration">
+                <div className="empty-bag-glow"></div>
+                <ShoppingBag size={72} strokeWidth={1} color="var(--primary)" />
+                <div className="floating-item item-1">🍅</div>
+                <div className="floating-item item-2">🥛</div>
+                <div className="floating-item item-3">📦</div>
+              </div>
+              <h4>{t('cart_empty')}</h4>
+              <p>Looks like you haven't added any essentials or services yet. Your neighborhood's best is just a tap away!</p>
+              <button className="empty-explore-btn" onClick={() => setCartOpen(false)}>
+                Start Exploring
+              </button>
             </div>
           ) : (
             <>

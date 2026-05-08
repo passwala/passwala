@@ -44,7 +44,10 @@ const blueIcon = new L.Icon({
 function RecenterMap({ coords }) {
   const map = useMap();
   useEffect(() => {
-    if (coords) map.setView([coords.lat, coords.lng], 14);
+    // 🛡️ Safety Check: Prevent crash if coordinates are partially undefined
+    if (coords && coords.lat && coords.lng && !isNaN(coords.lat) && !isNaN(coords.lng)) {
+      map.setView([coords.lat, coords.lng], 14);
+    }
   }, [coords, map]);
   return null;
 }
@@ -209,22 +212,28 @@ const NearShops = ({ onBack, location, userCoords }) => {
                 />
                 
                 {/* User Location Marker */}
-                {userCoords && (
+                {userCoords && userCoords.lat && userCoords.lng && (
                   <Marker position={[userCoords.lat, userCoords.lng]} icon={blueIcon}>
                     <Popup>You are here</Popup>
                   </Marker>
                 )}
 
                 {/* Shop Markers */}
-                {filteredShops.map((shop) => (
-                   <Marker 
-                     key={shop.id} 
-                     position={[shop.lat, shop.lng]} 
-                     icon={orangeIcon}
-                     eventHandlers={{
-                       click: () => handleOpenShop(shop),
-                     }}
-                   >
+                 {filteredShops.map((shop) => {
+                    // 🛡️ Safety Check: Prevent Map Crash on invalid coordinates
+                    const lat = parseFloat(shop.lat);
+                    const lng = parseFloat(shop.lng);
+                    if (isNaN(lat) || isNaN(lng)) return null;
+                    
+                    return (
+                      <Marker 
+                        key={shop.id} 
+                        position={[lat, lng]} 
+                        icon={orangeIcon}
+                        eventHandlers={{
+                          click: () => handleOpenShop(shop),
+                        }}
+                      >
                      <Popup>
                        <div style={{ padding: '4px' }}>
                          <h4 style={{ margin: '0 0 4px 0', fontSize: '14px' }}>{shop.name}</h4>
@@ -246,8 +255,9 @@ const NearShops = ({ onBack, location, userCoords }) => {
                          </button>
                        </div>
                      </Popup>
-                   </Marker>
-                ))}
+                      </Marker>
+                    );
+                 })}
                 
                 <RecenterMap coords={userCoords} />
              </MapContainer>

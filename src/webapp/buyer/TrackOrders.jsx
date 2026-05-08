@@ -96,7 +96,9 @@ function OrderTrackingMap({ order, riderCoords }) {
       ? [parseFloat(order.addresses.lat), parseFloat(order.addresses.lng)]
       : [23.0393, 72.5244];
 
-    let riderLatLng = riderCoords ? [riderCoords.lat, riderCoords.lng] : null;
+    let riderLatLng = (riderCoords && riderCoords.lat && riderCoords.lng) 
+      ? [parseFloat(riderCoords.lat), parseFloat(riderCoords.lng)] 
+      : null;
     
     // Fallback simulation for rider position if live tracking is temporarily unavailable
     if (!riderLatLng && ['ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED'].includes(order.status)) {
@@ -178,7 +180,7 @@ function OrderTrackingMap({ order, riderCoords }) {
         leafletMapRef.current.invalidateSize();
       }
       const bounds = L.latLngBounds([storeLatLng, customerLatLng]);
-      if (riderLatLng) bounds.extend(riderLatLng);
+      if (riderLatLng && !isNaN(riderLatLng[0]) && !isNaN(riderLatLng[1])) bounds.extend(riderLatLng);
       leafletMapRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
     } catch (e) {
       console.warn('Map boundary fit failed', e);

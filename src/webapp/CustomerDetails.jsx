@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, MapPin, Mail, Home, Building2, Save, Sparkles, AlertCircle, Navigation } from 'lucide-react';
+import { User, MapPin, Home, Building2, AlertCircle, Navigation, Phone, Search, ShieldCheck, Share2, ArrowRight } from 'lucide-react';
 import { supabase } from '../supabase';
 import { toast } from 'react-hot-toast';
 /* eslint-disable no-unused-vars */
@@ -10,8 +10,8 @@ const CustomerDetails = ({ user, onComplete }) => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     fullName: user?.displayName || '',
-    email: user?.email || '',
     phone: user?.phoneNumber || '',
+    email: user?.email || '',
     houseName: '',
     houseNo: 'A-101',
     floor: '1st Floor',
@@ -19,9 +19,11 @@ const CustomerDetails = ({ user, onComplete }) => {
     landmark: 'Near Central Plaza',
     city: 'Ahmedabad',
     pincode: '380015',
-    lat: 23.0225,
-    lng: 72.5714
+    lat: null,
+    lng: null
   });
+  const [view, setView] = useState('identity'); // 'identity' | 'address_selection' | 'address_form'
+  const [errors, setErrors] = useState({});
   const [activeAreas, setActiveAreas] = useState([]);
 
   // Fetch active areas from Admin Panel settings
@@ -113,11 +115,14 @@ const CustomerDetails = ({ user, onComplete }) => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: null }));
+    }
   };
 
   const detectLocation = () => {
     if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by your browser');
+      toast.error('Geolocation is not supported by your browser', { id: 'geo-unsupported' });
       return;
     }
     
@@ -158,17 +163,36 @@ const CustomerDetails = ({ user, onComplete }) => {
       },
       (error) => {
         console.error('GPS Error:', error);
-        toast.error('Could not get precise location. Please enter address manually.');
+        const toastId = 'gps-error';
+        if (error.code === 1) {
+          toast.error('Location access denied. Please enable GPS in settings.', { id: toastId });
+        } else if (error.code === 3) {
+          toast.error('Location request timed out. Please try again.', { id: toastId });
+        } else {
+          toast.error('Could not get precise location. Please enter manually.', { id: toastId });
+        }
         setLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
     );
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.fullName || !formData.society || !formData.houseNo) {
-      toast.error('Please fill in required fields');
+    const newErrors = {};
+    if (!formData.fullName) newErrors.fullName = 'Full Name is required';
+    if (!formData.phone) newErrors.phone = 'Phone Number is required';
+    if (!formData.society) newErrors.society = 'Please select your area';
+    if (!formData.houseNo) newErrors.houseNo = 'House / Flat No is required';
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      toast.error('Please fill in required fields', { id: 'form-validation' });
+      return;
+    }
+
+    if (view === 'identity') {
+      setView('address_selection');
       return;
     }
 
@@ -180,11 +204,13 @@ const CustomerDetails = ({ user, onComplete }) => {
       const { data: updatedUser, error: userError } = await supabase
         .from('users')
         .upsert([{ 
-          id: userId.length === 36 ? userId : undefined,
+          id: userId?.length === 36 ? userId : undefined,
+          uid: user?.uid || userId, // Ensure UID is stored for Auth lookup
           phone: formData.phone || user?.phoneNumber,
           full_name: formData.fullName,
-          email: formData.email 
-        }], { onConflict: 'phone' })
+          email: formData.email,
+          role: 'BUYER' // Explicitly set role
+        }], { onConflict: 'uid' }) // Sync by UID
         .select()
         .single();
 
@@ -252,203 +278,186 @@ const CustomerDetails = ({ user, onComplete }) => {
   return (
     <div className="customer-details-page">
       <motion.div 
-        className="details-container glass shadow-2xl"
+        className="details-container shadow-2xl"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <div className="details-header">
-          <div className="sparkle-title">
-            <Sparkles className="icon-sparkle" />
-            <h1>Complete Your Profile</h1>
-          </div>
-          <p>Help us serve you better in your neighborhood</p>
+        <div className="left-illustration-pane">
+          <img src="/illustration_profile.png" alt="Welcome to Passwala" />
         </div>
 
-        <form onSubmit={handleSubmit} className="details-form">
-          {/* Identity Section */}
-          <section className="form-section">
-            <h3 className="section-title"><User size={18} /> Basic Identity</h3>
-            <div className="input-row">
-              <div className="input-group-v2">
-                <label>Full Name *</label>
+        <div className="right-form-pane">
+          <div className="details-header">
+            <h1>Complete Profile</h1>
+            <p>Welcome to the Hub! Let's set up your identity.</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="details-form">
+          {view === 'identity' && (
+            <section className="form-section">
+              <span className="section-label">Basic Info</span>
+              
+              <div className={`input-group-v2 ${errors.fullName ? 'has-error' : ''}`}>
                 <div className="input-with-icon">
-                  <User size={18} />
+                  <div className="icon-box"><User size={20} /></div>
+                  <input name="fullName" value={formData.fullName} onChange={handleChange} placeholder="Full Name" />
+                </div>
+                {errors.fullName && <span className="error-text">{errors.fullName}</span>}
+              </div>
+
+              <div className={`input-group-v2 ${errors.phone ? 'has-error' : ''}`}>
+                <div className="input-with-icon">
+                  <div className="icon-box"><Phone size={20} /></div>
                   <input 
-                    name="fullName" 
-                    value={formData.fullName} 
+                    name="phone" 
+                    value={formData.phone} 
                     onChange={handleChange} 
-                    placeholder="Enter your full name"
-                    required
+                    placeholder="Phone Number"
+                    readOnly={!!user?.phoneNumber && user?.phoneNumber !== ''}
+                    className={!!user?.phoneNumber && user?.phoneNumber !== '' ? "readonly-input" : ""}
                   />
                 </div>
+                {errors.phone && <span className="error-text">{errors.phone}</span>}
               </div>
+
               <div className="input-group-v2">
-                <label>Email Address</label>
                 <div className={`input-with-icon ${user?.email ? 'disabled' : ''}`}>
-                  <Mail size={18} />
+                  <div className="icon-box"><ShieldCheck size={20} /></div>
                   <input 
                     name="email" 
                     type="email"
                     value={formData.email} 
                     onChange={handleChange} 
-                    placeholder="Enter your email address"
-                    disabled={user?.email} // Disable if already have verified email from Google/Firebase
+                    placeholder="Email Address"
+                    disabled={user?.email} 
                   />
                 </div>
               </div>
-            </div>
-          </section>
-          {/* Location Section */}
-          <section className="form-section">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 className="section-title" style={{ margin: 0 }}><MapPin size={18} /> Delivery Address</h3>
-              <button 
-                type="button" 
-                onClick={detectLocation}
-                className="detect-loc-btn"
-                style={{ 
-                  fontSize: '0.75rem', 
-                  padding: '6px 12px', 
-                  borderRadius: '10px', 
-                  background: formData.lat ? '#22c55e' : '#ff7622',
-                  color: 'white',
-                  border: 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  cursor: 'pointer',
-                  fontWeight: 700
-                }}
-              >
-                <Navigation size={14} style={{ transform: 'rotate(45deg)' }} />
-                {formData.lat ? 'Location Captured' : 'Detect My Location'}
-              </button>
-            </div>
-            
-            <div className="input-group-v2" style={{ marginBottom: '1.2rem' }}>
-              <label>House / Bungalow Name</label>
-              <div className="input-with-icon">
-                <Home size={18} />
-                <input 
-                  name="houseName" 
-                  value={formData.houseName} 
-                  onChange={handleChange} 
-                  placeholder="e.g. Silver Oak / Harmony"
-                />
-              </div>
-            </div>
+            </section>
+          )}
 
-            <div className="input-grid-v2">
-              <div className="input-group-v2">
-                <label>House / Flat No *</label>
-                <div className="input-with-icon">
-                  <Home size={18} />
-                  <input 
-                    name="houseNo" 
-                    value={formData.houseNo} 
-                    onChange={handleChange} 
-                    placeholder="e.g. A-101"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="input-group-v2">
-                <label>Floor</label>
-                <div className="input-with-icon">
-                  <Building2 size={18} />
-                  <input 
-                    name="floor" 
-                    value={formData.floor} 
-                    onChange={handleChange} 
-                    placeholder="e.g. 1st Floor"
-                  />
-                </div>
-              </div>
-            </div>
+          {view === 'address_selection' && (
+            <section className="form-section address-selection-view">
+              <span className="section-label">Where to deliver?</span>
+              <div className="selection-cards-container">
 
-            <div className="input-group-v2">
-              <label>Select Neighborhood / Area *</label>
-              <div className="input-with-icon">
-                <Building2 size={18} />
-                <select 
-                  name="society" 
-                  value={formData.society} 
-                  onChange={handleChange} 
-                  required
-                  className="area-select-v2"
+                <div className="search-location-btn-dashed" onClick={() => setView('address_form')}>
+                  <Search size={20} />
+                  <span>Search your Location</span>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {view === 'address_form' && (
+            <section className="form-section">
+              <span className="section-label">Delivery Address</span>
+              <div className="location-action-row">
+                <button 
+                  type="button" 
+                  className={`detect-btn-v2 ${formData.lat ? 'success' : ''} ${loading ? 'loading' : ''}`}
+                  onClick={detectLocation}
+                  disabled={loading}
                 >
-                  <option value="">-- Choose your Area --</option>
-                  {activeAreas.map(area => (
-                    <option key={area} value={area}>{area}</option>
-                  ))}
-                  {/* Always provide these standard regions as choices to guarantee autofills work */}
-                  {!activeAreas.includes("Satellite") && <option value="Satellite">Satellite</option>}
-                  {!activeAreas.includes("Paldi") && <option value="Paldi">Paldi</option>}
-                  {!activeAreas.includes("Bopal") && <option value="Bopal">Bopal</option>}
-                  {!activeAreas.includes("Sindhu Bhavan") && <option value="Sindhu Bhavan">Sindhu Bhavan</option>}
-                </select>
+                  {loading ? (
+                    <div className="btn-spinner" />
+                  ) : formData.lat ? (
+                    <ShieldCheck size={14} />
+                  ) : (
+                    <Navigation size={14} style={{ transform: 'rotate(45deg)' }} />
+                  )}
+                  {loading ? 'Detecting...' : formData.lat ? 'Location Captured' : 'Detect My Location'}
+                </button>
               </div>
-              <p className="field-tip-v2">Choose from our verified service regions</p>
-            </div>
-
-            <div className="input-group-v2">
-              <label>Landmark (Optional)</label>
-              <div className="input-with-icon">
-                <MapPin size={18} />
-                <input 
-                  name="landmark" 
-                  value={formData.landmark} 
-                  onChange={handleChange} 
-                  placeholder="e.g. Opposite City Mall"
-                />
-              </div>
-            </div>
-
-            <div className="input-row">
+              
               <div className="input-group-v2">
-                <label>City</label>
                 <div className="input-with-icon">
-                  <MapPin size={18} />
-                  <input 
-                    name="city"
-                    value={formData.city}
-                    onChange={handleChange}
-                    placeholder="City Name"
-                  />
+                  <div className="icon-box"><Home size={20} /></div>
+                  <input name="houseName" value={formData.houseName} onChange={handleChange} placeholder="House / Bungalow Name" />
                 </div>
               </div>
-              <div className="input-group-v2">
-                <label>Pincode</label>
-                <div className="input-with-icon">
-                  <span className="pincode-icon">🏢</span>
-                  <input 
-                    name="pincode" 
-                    value={formData.pincode} 
-                    onChange={handleChange} 
-                    placeholder="6-digit Pincode"
-                  />
+
+              <div className="input-grid-v2">
+                <div className={`input-group-v2 ${errors.houseNo ? 'has-error' : ''}`}>
+                  <div className="input-with-icon">
+                    <div className="icon-box"><Home size={20} /></div>
+                    <input name="houseNo" value={formData.houseNo} onChange={handleChange} placeholder="House / Flat No *" />
+                  </div>
+                  {errors.houseNo && <span className="error-text">{errors.houseNo}</span>}
+                </div>
+                <div className="input-group-v2">
+                  <div className="input-with-icon">
+                    <div className="icon-box"><Building2 size={20} /></div>
+                    <input name="floor" value={formData.floor} onChange={handleChange} placeholder="Floor" />
+                  </div>
                 </div>
               </div>
-            </div>
-          </section>
+
+              <div className={`input-group-v2 ${errors.society ? 'has-error' : ''}`}>
+                <div className="input-with-icon">
+                  <div className="icon-box"><Building2 size={20} /></div>
+                  <select name="society" value={formData.society} onChange={handleChange} className="area-select-v2">
+                    <option value="">-- Select Neighborhood --</option>
+                    {activeAreas.map(area => (
+                      <option key={area} value={area}>{area}</option>
+                    ))}
+                    {!activeAreas.includes("Satellite") && <option key="Satellite" value="Satellite">Satellite</option>}
+                    {!activeAreas.includes("Paldi") && <option key="Paldi" value="Paldi">Paldi</option>}
+                    {!activeAreas.includes("Bopal") && <option key="Bopal" value="Bopal">Bopal</option>}
+                    {!activeAreas.includes("Sindhu Bhavan") && <option key="Sindhu Bhavan" value="Sindhu Bhavan">Sindhu Bhavan</option>}
+                  </select>
+                </div>
+                {errors.society ? <span className="error-text">{errors.society}</span> : <p className="field-tip-v2">Choose from our verified service regions</p>}
+              </div>
+
+              <div className="input-group-v2">
+                <div className="input-with-icon">
+                  <div className="icon-box"><MapPin size={20} /></div>
+                  <input name="landmark" value={formData.landmark} onChange={handleChange} placeholder="Landmark (Optional)" />
+                </div>
+              </div>
+
+              <div className="input-row">
+                <div className="input-group-v2">
+                  <div className="input-with-icon">
+                    <div className="icon-box"><MapPin size={20} /></div>
+                    <input name="city" value={formData.city} onChange={handleChange} placeholder="City Name" />
+                  </div>
+                </div>
+                <div className="input-group-v2">
+                  <div className="input-with-icon">
+                    <div className="icon-box"><Building2 size={20} /></div>
+                    <input name="pincode" value={formData.pincode} onChange={handleChange} placeholder="6-digit Pincode" />
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
 
           <div className="details-footer">
             <div className="privacy-msg">
               <AlertCircle size={14} />
               <span>Only used for delivery verification.</span>
             </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              {/* Production Profile Submission */}
-              <button type="submit" className="save-btn-v5" disabled={loading}>
-                {loading ? (
-                  <div className="details-spinner" />
-                ) : (
-                  <><Save size={18} /> Save Details</>
-                )}
-              </button>
+            <div className="footer-actions">
+              {view !== 'identity' && (
+                <button type="button" className="back-btn-v5" onClick={() => setView(view === 'address_form' ? 'address_selection' : 'identity')}>
+                  Back
+                </button>
+              )}
+              {view !== 'address_selection' && (
+                <button type="submit" className="save-btn-v5" disabled={loading}>
+                  {loading ? (
+                    <div className="details-spinner" />
+                  ) : (
+                    view === 'identity' ? "Next" : "Start Exploring"
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </form>
+        </div>
       </motion.div>
     </div>
   );

@@ -1166,6 +1166,8 @@ const AdminPanel = ({ onLogout, location }) => {
                     else if (person.iconColor === 'red') mapIcon = mapRedIcon;
                     else if (person.iconColor === 'violet') mapIcon = mapVioletIcon;
 
+                    if (!person.lat || !person.lng || isNaN(person.lat) || isNaN(person.lng)) return null;
+
                     return (
                       <Marker 
                         key={person.id} 

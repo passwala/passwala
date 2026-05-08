@@ -118,8 +118,12 @@ const AppContent = ({
     const sub = supabase.channel('global_order_updates')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `user_id=eq.${effectiveUser.id}` }, (payload) => {
         const shortId = payload.new.id.substring(0, 6).toUpperCase();
-        toast.success(`Order #${shortId} is now ${payload.new.status}`, { icon: '🛵', duration: 4000 });
-        
+        toast.success(`Order #${shortId} is now ${payload.new.status}`, {
+          icon: '🛵',
+          duration: 4000,
+          id: `order-update-${payload.new.id}`
+        });
+
         // Push Real-Time Notification to Context globally
         addNotification({
           title: 'Order Status Update',
@@ -152,7 +156,7 @@ const AppContent = ({
   useEffect(() => {
     const isAuthPage = locationPath === '/auth' || locationPath === '/' || locationPath === '/rider-auth';
     const isProfilePage = locationPath === '/complete-profile';
-    
+
     // Force profile completion for Buyers
     const userRole = effectiveUser?.role || 'BUYER';
     if (isWebappMode && effectiveUser && userRole === 'BUYER' && !isProfileComplete && !isAuthPage && !isProfilePage) {
@@ -166,20 +170,33 @@ const AppContent = ({
       if (auth.currentUser) {
         await auth.signOut().catch(e => console.warn('Firebase Signout Skip:', e));
       }
+
+      // Clear ALL possible session markers
       localStorage.clear();
       sessionStorage.clear();
-      setUser(null); // CRITICAL: Clear React state to trigger UI update
-      
+
+      // Clear React State
+      setUser(null);
+      setIsProfileComplete(false);
+
       if (!skipToast) toast.success('Signed Out.');
-      
-      if (window.location.host.includes('3002')) {
+
+      // For Port 3000 (Webapp/Marketing) we can use navigate, 
+      // but for absolute certainty on deletion/logout, href is safer.
+      if (window.location.port !== '3000') {
         window.location.href = '/';
       } else {
         navigate('/');
+        // Force a soft reload if still on dashboard
+        setTimeout(() => {
+          if (window.location.pathname === '/') {
+            // Ensure components re-render
+          }
+        }, 100);
       }
     } catch (error) {
       console.error('Logout error:', error);
-      setUser(null);
+      localStorage.clear();
       window.location.href = '/';
     }
   };
@@ -204,127 +221,141 @@ const AppContent = ({
           <AdminPanel location={location} onLogout={() => { setIsAdmin(false); localStorage.removeItem('admin_session'); sessionStorage.removeItem('admin_active'); }} />
         )
       ) : /* 1. Vendor Mode (Port 3002) - High level takeover */
-      (locationPath === '/vendor' || isVendorMode) ? (
-        (!effectiveUser) ? (
-          <VendorAuth onLogin={(phone, profile) => {
-            setUser({ ...profile, displayName: profile?.name || 'Vendor', phoneNumber: phone, role: 'VENDOR' });
-          }} />
-        ) : (
-          <VendorPortal user={effectiveUser} onLogout={handleLogout} />
-        )
-      ) : locationPath === '/select-location' ? (
-        <LocationSelector
-          currentLocation={location}
-          onLocationChange={(loc, coords) => {
-            setLocation(loc, coords);
-            navigate(isRiderMode ? '/rider' : '/');
-          }}
-        />
-      ) : (locationPath === '/rider' || isRiderMode) ? (
-        /* Rider Mode (Port 3003) */
-        (!effectiveUser) ? (
-          <RiderAuth onLogin={(phone, profile) => {
-            setUser({ ...profile, displayName: profile.name, phoneNumber: phone, role: 'RIDER' });
-          }} />
-        ) : (
-          <RiderPortal
-            user={effectiveUser}
-            onLogout={handleLogout}
-            location={location}
-            setLocation={setLocation}
-            userCoords={userCoords}
-          />
-        )
-      ) : (
-        <>
-          {/* Global Navbar Logic */}
-          {isWebMode ? (
-            <Navbar
-              isAuthenticated={!!effectiveUser} user={effectiveUser} onLogout={handleLogout}
-              onOpenProfile={() => navigate('/profile')} onOpenAI={() => navigate('/')}
-              onJoin={() => navigate('/auth')}
-            />
+        (locationPath === '/vendor' || isVendorMode) ? (
+          (!effectiveUser) ? (
+            <VendorAuth onLogin={(phone, profile) => {
+              setUser({ ...profile, displayName: profile?.name || 'Vendor', phoneNumber: phone, role: 'VENDOR' });
+            }} />
           ) : (
-            (effectiveUser && isProfileComplete) && (
-              <WebappNavbar
-                user={effectiveUser} location={location} onLocationChange={setLocation}
-                isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)}
-                onOpenProfile={() => navigate('/profile')}
-                onBack={locationPath !== '/' ? () => navigate(-1) : null}
-                title={
-                  currentView === 'PROFILE' ? 'Profile' :
-                    currentView === 'NEAR_SHOPS' ? 'Near Shops' :
-                      currentView === 'EXPERT_SERVICES' ? 'Local Experts' :
-                        currentView === 'TRACKING' ? 'Active Orders' :
-                          currentView === 'NEIGHBORS' ? 'Community' : null
-                }
+            <VendorPortal user={effectiveUser} onLogout={handleLogout} />
+          )
+        ) : locationPath === '/select-location' ? (
+          <LocationSelector
+            currentLocation={location}
+            onLocationChange={(loc, coords) => {
+              setLocation(loc, coords);
+              navigate(isRiderMode ? '/rider' : '/');
+            }}
+          />
+        ) : (locationPath === '/rider' || isRiderMode) ? (
+          /* Rider Mode (Port 3003) */
+          (!effectiveUser) ? (
+            <RiderAuth onLogin={(phone, profile) => {
+              setUser({ ...profile, displayName: profile.name, phoneNumber: phone, role: 'RIDER' });
+            }} />
+          ) : (
+            <RiderPortal
+              user={effectiveUser}
+              onLogout={handleLogout}
+              location={location}
+              setLocation={setLocation}
+              userCoords={userCoords}
+            />
+          )
+        ) : (
+          <>
+            {/* Global Navbar Logic */}
+            {isWebMode ? (
+              <Navbar
+                isAuthenticated={!!effectiveUser} user={effectiveUser} onLogout={handleLogout}
+                onOpenProfile={() => navigate('/profile')} onOpenAI={() => navigate('/')}
+                onJoin={() => navigate('/auth')}
               />
-            )
-          )}
+            ) : (
+              (effectiveUser && isProfileComplete) && (
+                <WebappNavbar
+                  user={effectiveUser} location={location} onLocationChange={setLocation}
+                  isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+                  onOpenProfile={() => navigate('/profile')}
+                  onBack={locationPath !== '/' ? () => navigate(-1) : null}
+                  title={
+                    currentView === 'PROFILE' ? 'Profile' :
+                      currentView === 'NEAR_SHOPS' ? 'Near Shops' :
+                        currentView === 'EXPERT_SERVICES' ? 'Local Experts' :
+                          currentView === 'TRACKING' ? 'Active Orders' :
+                            currentView === 'NEIGHBORS' ? 'Community' : null
+                  }
+                />
+              )
+            )}
 
-          {/* 3. Main Content Routes */}
-          <main className={isWebappMode ? `webapp-main ${currentView === 'PROFILE' ? 'profile-mode' : ''}` : 'web-marketing-main'}>
-            <Routes>
-              {/* Home Route */}
-              <Route path="/" element={
-                <>
-                  {/* Webapp Logic (Auth or Hub) */}
-                   {isWebappMode ? (
-                    (!effectiveUser || !effectiveUser.displayName || !isProfileComplete) ? <Auth onLogin={(userData) => { setUser(userData); setIsProfileComplete(true); navigate('/'); }} /> : <NeighborhoodHub user={effectiveUser} isProfileComplete={isProfileComplete} onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : v === '/complete-profile' ? '/complete-profile' : '/')} />
-                  ) : (
-                    /* Marketing Logic (Hub on top if logged in, then standard homepage) */
-                    <>
-                      {effectiveUser && (
-                        <NeighborhoodHub user={effectiveUser} isProfileComplete={isProfileComplete} onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')} />
-                      )}
-                      <Hero />
-                      <AIRecommendations />
-                      <QuickServices />
-                      <Services />
-                      <Essentials />
-                      <NearbyDeals />
-                      <Community />
-                      <VendorCTA onOpenVendor={() => window.open('http://localhost:3002', '_blank')} />
-                    </>
-                  )}
-                </>
-              } />
+            {/* 3. Main Content Routes */}
+            <main className={isWebappMode ? `webapp-main ${currentView === 'PROFILE' ? 'profile-mode' : ''}` : 'web-marketing-main'}>
+              <Routes>
+                {/* Home Route */}
+                <Route path="/" element={
+                  <>
+                    {/* Webapp Logic (Auth or Hub) */}
+                    {isWebappMode ? (
+                      (isProfileComplete) ? <NeighborhoodHub
+                        user={effectiveUser}
+                        setLocation={setLocation}
+                        location={location}
+                        onLogout={handleLogout}
+                        onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')}
+                      /> : <Auth onLogin={(userData) => {
+                        setUser(userData);
+                        setIsProfileComplete(true);
+                        localStorage.setItem('passwala_user', JSON.stringify(userData));
+                        localStorage.setItem('passwala_profile_complete', 'true');
+                        navigate('/');
+                        // Small delay before reload to ensure storage is flushed
+                        setTimeout(() => window.location.reload(), 200);
+                      }} />
+                    ) : (
+                      /* Marketing Logic (Hub on top if logged in, then standard homepage) */
+                      <>
+                        {effectiveUser && (
+                          <NeighborhoodHub user={effectiveUser} isProfileComplete={isProfileComplete} onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')} />
+                        )}
+                        <Hero />
+                        <AIRecommendations />
+                        <QuickServices />
+                        <Services />
+                        <Essentials />
+                        <NearbyDeals />
+                        <Community />
+                        <VendorCTA onOpenVendor={() => window.open(`http://${window.location.hostname}:3002`, '_blank')} />
+                      </>
+                    )}
+                  </>
+                } />
 
-              {/* Public Legal & Policy Routes for App Store / Play Store Reviewers & Users */}
-              <Route path="/privacy-policy" element={<Policies />} />
-              <Route path="/terms" element={<Policies />} />
-              <Route path="/refunds-cancellation" element={<Policies />} />
-              <Route path="/data-deletion" element={<Policies />} />
-              <Route path="/policies" element={<Policies />} />
+                {/* Public Legal & Policy Routes for App Store / Play Store Reviewers & Users */}
+                <Route path="/privacy-policy" element={<Policies />} />
+                <Route path="/terms" element={<Policies />} />
+                <Route path="/refunds-cancellation" element={<Policies />} />
+                <Route path="/data-deletion" element={<Policies />} />
+                <Route path="/policies" element={<Policies />} />
 
-              {/* Common Application Routes */}
-              <Route path="/near-shops" element={effectiveUser ? <NearShops onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/" />} />
-              <Route path="/expert-services" element={effectiveUser ? <ExpertServices onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
-              <Route path="/neighbors" element={effectiveUser ? <NeighborsCommunity onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
-              <Route path="/track-orders" element={effectiveUser ? <TrackOrders user={effectiveUser} onBack={() => navigate('/')} /> : <Navigate to="/" />} />
-              <Route path="/profile" element={effectiveUser ? <WebappProfile user={effectiveUser} onLogout={handleLogout} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/" />} />
-              <Route path="/order-history" element={effectiveUser ? <OrderHistory /> : <Navigate to="/" />} />
-              <Route path="/wallet" element={effectiveUser ? <Wallet /> : <Navigate to="/" />} />
-              <Route path="/privacy-security" element={effectiveUser ? <PrivacySecurity /> : <Navigate to="/" />} />
-              <Route path="/help-support" element={effectiveUser ? <HelpSupport /> : <Navigate to="/" />} />
-              <Route path="/settings" element={effectiveUser ? <AppSettings isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/" />} />
-              <Route path="/select-location" element={effectiveUser ? <LocationSelector currentLocation={location} onLocationChange={setLocation} /> : <Navigate to="/" />} />
-              <Route path="/complete-profile" element={effectiveUser ? <CustomerDetails user={effectiveUser} onComplete={(addr) => { setIsProfileComplete(true); setUserAddress(addr); navigate('/'); }} /> : <Navigate to="/" />} />
-            </Routes>
-          </main>
+                {/* Common Application Routes */}
+                <Route path="/near-shops" element={effectiveUser ? <NearShops onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/" />} />
+                <Route path="/expert-services" element={effectiveUser ? <ExpertServices onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
+                <Route path="/neighbors" element={effectiveUser ? <NeighborsCommunity onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
+                <Route path="/track-orders" element={effectiveUser ? <TrackOrders user={effectiveUser} onBack={() => navigate('/')} /> : <Navigate to="/" />} />
+                <Route path="/profile" element={effectiveUser ? <WebappProfile user={effectiveUser} onLogout={handleLogout} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} onUpdateUser={(updated) => setUser(updated)} /> : <Navigate to="/" />} />
+                <Route path="/order-history" element={effectiveUser ? <OrderHistory /> : <Navigate to="/" />} />
+                <Route path="/wallet" element={effectiveUser ? <Wallet /> : <Navigate to="/" />} />
+                <Route path="/privacy-security" element={effectiveUser ? <PrivacySecurity /> : <Navigate to="/" />} />
+                <Route path="/help-support" element={effectiveUser ? <HelpSupport /> : <Navigate to="/" />} />
+                <Route path="/settings" element={effectiveUser ? <AppSettings isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/" />} />
+                <Route path="/select-location" element={effectiveUser ? <LocationSelector currentLocation={location} onLocationChange={setLocation} /> : <Navigate to="/" />} />
+                <Route path="/complete-profile" element={effectiveUser ? <CustomerDetails user={effectiveUser} onComplete={(addr) => { setIsProfileComplete(true); setUserAddress(addr); navigate('/'); }} /> : <Navigate to="/" />} />
+              </Routes>
+            </main>
 
-          {/* 4. Global Footers/Navs */}
-          {isWebappMode && effectiveUser && isProfileComplete && (
-            <BottomNav activeTab={currentView} onTabChange={(v) => navigate(v === 'DASHBOARD' ? '/' : v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'TRACKING' ? '/track-orders' : v === 'NEIGHBORS' ? '/neighbors' : v === 'PROFILE' ? '/profile' : '/')} />
-          )}
+            {/* 4. Global Footers/Navs */}
+            {isWebappMode && effectiveUser && isProfileComplete && (
+              <BottomNav activeTab={currentView} onTabChange={(v) => navigate(v === 'DASHBOARD' ? '/' : v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'TRACKING' ? '/track-orders' : v === 'NEIGHBORS' ? '/neighbors' : v === 'PROFILE' ? '/profile' : '/')} />
+            )}
 
-          {isWebMode && <Footer />}
+            {isWebMode && <Footer />}
 
-          {/* 5. Drawers / Modals */}
-          <CartDrawer location={location} isProfileComplete={isProfileComplete} userAddress={userAddress} />
-          <AIAssistant isOpen={false} onClose={() => { }} onOpen={() => { }} />
-        </>
-      )}
+            {/* 5. Drawers / Modals */}
+            <CartDrawer location={location} isProfileComplete={isProfileComplete} userAddress={userAddress} />
+            <AIAssistant isOpen={false} onClose={() => { }} onOpen={() => { }} />
+          </>
+        )}
     </div>
   );
 };
@@ -373,7 +404,7 @@ function App() {
     if (!isAdminApp) return false;
     return hasAdminSession;
   });
-  const [location, setLocation] = useState(() => localStorage.getItem('passwala_location') || null);
+  const [location, setLocation] = useState(() => localStorage.getItem('passwala_location') || 'Ahmedabad, Gujarat');
   const [userCoords, setUserCoords] = useState(() => {
     const saved = localStorage.getItem('passwala_coords');
     return saved ? JSON.parse(saved) : { lat: 23.0225, lng: 72.5714 };
@@ -395,19 +426,34 @@ function App() {
 
   useEffect(() => {
     const autoDetectLocation = async () => {
+      // 📍 Optimization: If location is already set, don't auto-detect again on every refresh
+      const savedLoc = localStorage.getItem('passwala_location');
+      // Always try to detect if location is not explicitly set in storage or is the generic default
+      if (savedLoc && savedLoc !== 'Detecting Location...' && savedLoc !== 'Ahmedabad, Gujarat') return;
+
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           async (position) => {
             try {
               const { latitude, longitude } = position.coords;
-              setUserCoords({ lat: latitude, lng: longitude });
-              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`);
+              updateCoords({ lat: latitude, lng: longitude });
+              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18`);
               const data = await res.json();
               if (data.address) {
-                const city = data.address.city || data.address.town || data.address.village || data.address.state_district;
-                const state = data.address.state;
-                if (city && state) {
-                  updateLocation(`${city}, ${state}`);
+                const area = data.address.suburb || data.address.neighbourhood || data.address.residential || data.address.village || '';
+                const city = data.address.city || data.address.town || data.address.state_district || '';
+
+                if (area && city) {
+                  updateLocation(`${area}, ${city}`);
+                  // 📍 Only show toast if we don't have a verified address yet
+                  const savedLoc = localStorage.getItem('passwala_location');
+                  if (!savedLoc || savedLoc === 'Detecting Location...' || savedLoc === 'Ahmedabad, Gujarat') {
+                    toast.success(`Located: ${area}`, { icon: '📍', id: 'auto-geo' });
+                  }
+                  return;
+                } else if (city) {
+                  const state = data.address.state || '';
+                  updateLocation(`${city}${state ? `, ${state}` : ''}`);
                   return;
                 }
               }
@@ -416,10 +462,11 @@ function App() {
               fetchIPLocation();
             }
           },
-          () => {
-            console.warn('GPS Access denied, falling back to IP');
-            fetchIPLocation();
-          }
+          (error) => {
+        console.warn('GPS Denied or Failed:', error);
+        // 🛡️ Silently fall back to IP without annoying error toast
+        fetchIPLocation();
+      },
         );
       } else {
         fetchIPLocation();
@@ -435,7 +482,7 @@ function App() {
           if (detectedCity.toLowerCase().includes('ahmedabad')) {
             updateLocation(`${data.city}, ${data.region}`);
           } else {
-          updateLocation(`${data.city}, ${data.region}`);
+            updateLocation(`${data.city}, ${data.region}`);
           }
           if (data.latitude && data.longitude) {
             updateCoords({ lat: parseFloat(data.latitude), lng: parseFloat(data.longitude) });
@@ -472,7 +519,11 @@ function App() {
 
   useEffect(() => {
     const alreadyShown = sessionStorage.getItem('v_initial_splash_done');
-    const delay = alreadyShown ? 200 : 800; // Much faster startup
+    const isRedirect = localStorage.getItem('google_login_pending') === 'true';
+    
+    // 🚀 Fast-Track: If we are returning from a Google Redirect, skip the heavy splash
+    const delay = (alreadyShown || isRedirect) ? 100 : 800; 
+    
     const splashTimer = setTimeout(() => {
       setMinSplashDone(true);
       sessionStorage.setItem('v_initial_splash_done', 'true');
@@ -480,7 +531,7 @@ function App() {
 
     // EMERGENCY TIMEOUT: Don't stay stuck on splash if Firebase is slow
     const authTimeout = setTimeout(() => {
-        setAuthLoading(false);
+      setAuthLoading(false);
     }, 3000);
 
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -489,12 +540,12 @@ function App() {
       const savedUser = localStorage.getItem('passwala_user');
       const manualUser = savedUser ? JSON.parse(savedUser) : null;
       const wasComplete = localStorage.getItem('passwala_profile_complete') === 'true';
-      
+
       if (!u && manualUser && manualUser.role && manualUser.role !== 'BUYER') {
-          // Keep the manual session for non-buyers
-          setAuthLoading(false);
-          setIsProfileComplete(true); 
-          return;
+        // Keep the manual session for non-buyers
+        setAuthLoading(false);
+        setIsProfileComplete(true);
+        return;
       }
 
       let finalUser = u || manualUser;
@@ -506,16 +557,20 @@ function App() {
             .select('id')
             .or(`email.eq.${u.email}${phoneNo ? ',phone.eq.' + phoneNo : ''}`)
             .maybeSingle();
-          
+
           if (usr) {
             // Augment Firebase user with Supabase UUID
             finalUser = { ...u, id: usr.id, uid: u.uid, email: u.email, phoneNumber: u.phoneNumber, displayName: u.displayName || manualUser?.displayName };
-            
+
             // 2. Fetch address using the UUID
             const { data: addr } = await supabase.from('addresses').select('*').eq('user_id', usr.id).maybeSingle();
             if (addr) {
               setIsProfileComplete(true);
               setUserAddress(addr);
+              // 📍 Update global location string to match the verified address
+              const displayLoc = addr.society || addr.city || location;
+              setLocation(displayLoc);
+              localStorage.setItem('passwala_location', displayLoc);
             } else {
               // Try legacy UID lookup
               const { data: addrLegacy } = await supabase.from('addresses').select('*').eq('user_id', u.uid).maybeSingle();
@@ -531,9 +586,17 @@ function App() {
           setIsProfileComplete(wasComplete);
         }
       } else {
-        setIsProfileComplete(false);
+        // Firebase user is null: ONLY set complete to false if there is NO manual user
+        if (!manualUser) {
+          setIsProfileComplete(false);
+          setUser(null);
+        } else {
+          // Keep the manual user's completion status
+          setIsProfileComplete(wasComplete);
+          setUser(manualUser);
+        }
       }
-      
+
       setUser(finalUser);
       setAuthLoading(false);
     });
@@ -556,7 +619,23 @@ function App() {
               <LanguageProvider>
                 <CartProvider user={user}>
                   <div className="app-container">
-                    <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
+                    <Toaster
+                      position="top-center"
+                      toastOptions={{
+                        className: 'passwala-toast',
+                        duration: 3000,
+                        style: {
+                          background: '#1e293b',
+                          color: '#fff',
+                          borderRadius: '12px',
+                          padding: '10px 18px',
+                          fontSize: '0.85rem',
+                          fontWeight: '600',
+                          boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
+                          maxWidth: '90vw'
+                        },
+                      }}
+                    />
                     <AppContent
                       effectiveUser={user}
                       isProfileComplete={isProfileComplete}

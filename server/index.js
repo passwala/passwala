@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import os from 'os';
 import userRoutes from './routes/users.js';
 import vendorRoutes from './routes/vendor.js';
 import adminRoutes from './routes/admin.js';
@@ -55,6 +56,21 @@ app.use((err, req, res, _next) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Passwala Server running on http://localhost:${PORT}`);
+// Helper to get local IP
+const getLocalIP = () => {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) return iface.address;
+    }
+  }
+  return 'localhost';
+};
+
+const HOST = '0.0.0.0';
+app.listen(PORT, HOST, () => {
+  const localIP = getLocalIP();
+  console.log(`🚀 Passwala Server running:`);
+  console.log(`   - Local:   http://localhost:${PORT}`);
+  console.log(`   - Network: http://${localIP}:${PORT}`);
 });

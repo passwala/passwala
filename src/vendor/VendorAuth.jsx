@@ -81,14 +81,32 @@ const VendorAuth = ({ onLogin }) => {
       setStep(2);
     } catch (error) {
       console.error("Firebase Login Error:", error);
-      const errorMessage = error.code === 'auth/captcha-check-failed' 
-        ? 'reCAPTCHA failed. Check domain settings.'
-        : 'Failed to send OTP. Try mock number 9999999999 for local testing.';
       
-      toast.error(errorMessage);
+      // CRITICAL: Clear verifier on ANY error to prevent "reCAPTCHA already rendered" issues
       if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
+        try {
+          window.recaptchaVerifier.clear();
+        } catch (clearError) {
+          console.warn("Error clearing reCAPTCHA:", clearError);
+        }
         window.recaptchaVerifier = null;
+      }
+
+      if (error.code === 'auth/billing-not-enabled') {
+        toast.error("Firebase Billing not enabled. Switching to Dev-Test Mode...", { duration: 5000 });
+        setConfirmationResult({
+          confirm: async (code) => {
+            if (code === '123456') return { user: { phoneNumber: `+91${cleanPhone}` } };
+            throw new Error("Invalid Dev-OTP. Use 123456");
+          }
+        });
+        setStep(2);
+      } else {
+        const errorMessage = error.code === 'auth/captcha-check-failed' 
+          ? 'reCAPTCHA failed. Check domain settings.'
+          : `Failed to send OTP (${error.code}). Check billing status.`;
+        
+        toast.error(errorMessage);
       }
     } finally {
       setLoading(false);

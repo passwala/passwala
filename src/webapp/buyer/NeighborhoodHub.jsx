@@ -9,48 +9,6 @@ import './NeighborhoodHub.css';
 
 const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
   const { t } = useTranslation();
-  const [hasAddress, setHasAddress] = useState(true);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const checkAddress = async () => {
-      if (!user) return;
-      try {
-        setLoading(true);
-        // 1. Try Firebase UID first (fallback/legacy)
-        let { data: addr } = await supabase
-          .from('addresses')
-          .select('id')
-          .eq('user_id', user.uid || user.id)
-          .maybeSingle();
-        
-        // 2. Try Database UUID lookup via Email if not found
-        if (!addr && user.email) {
-          const { data: dbUser } = await supabase
-            .from('users')
-            .select('id')
-            .eq('email', user.email)
-            .maybeSingle();
-          
-          if (dbUser) {
-            const { data: addr2 } = await supabase
-              .from('addresses')
-              .select('id')
-              .eq('user_id', dbUser.id)
-              .maybeSingle();
-            addr = addr2;
-          }
-        }
-
-        setHasAddress(isProfileComplete || !!addr);
-      } catch (err) {
-        console.error('Address Check Error:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    checkAddress();
-  }, [user, isProfileComplete]);
   
   const cards = [
     {
@@ -112,29 +70,12 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
   return (
     <motion.section 
       initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
-      viewport={{ once: true }}
       className="neighborhood-hub"
+      style={{ paddingBottom: '120px' }} // 🛡️ Added extra padding to clear BottomNav perfectly
     >
       <div className="hub-container">
-        {!hasAddress && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="completion-banner glass"
-            onClick={() => onNavigate('/complete-profile')}
-          >
-            <div className="banner-icon-box">
-              <MapPin size={24} color="var(--primary)" />
-            </div>
-            <div className="banner-text-content">
-               <h4>Add Your Delivery Address</h4>
-               <p>Complete your profile to start ordering from local shops!</p>
-            </div>
-            <button className="complete-now-btn">Add Now</button>
-          </motion.div>
-        )}
         <div className="hub-cards-grid">
           {cards.map((card, i) => (
             <motion.div 

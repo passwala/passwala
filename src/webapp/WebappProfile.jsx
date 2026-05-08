@@ -7,7 +7,6 @@ import {
   ChevronRight, 
   History, 
   Wallet, 
-  Bell, 
   ShieldCheck, 
   HelpCircle, 
   Settings, 
@@ -16,16 +15,14 @@ import {
   Sun,
   Moon,
   Globe,
-  ShoppingBag,
   Trash2,
   MapPin
 } from 'lucide-react';
 import { useTranslation } from './LanguageContext';
 import { auth } from '../firebase';
-import { updateProfile } from 'firebase/auth';
 import './WebappProfile.css';
 
-const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onVendorMode }) => {
+const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser }) => {
   const { t, changeLanguage, currentLanguage, languages } = useTranslation();
   const [localPhoto, setLocalPhoto] = React.useState(user?.photoURL);
   const [showDeleteModal, setShowDeleteModal] = React.useState(false);
@@ -37,21 +34,20 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onVendorMode
   const navigate = useNavigate();
 
   const profileItems = [
-    { id: 1, title: 'Order History', subtitle: 'View your past bookings', icon: <History size={20} />, color: '#f1f5f9', path: '/order-history' },
-    { id: 2, title: 'Passwala Wallet', subtitle: 'Manage your credits', icon: <Wallet size={20} />, color: '#f5f3ff', path: '/wallet' },
-    { id: 3, title: 'Delivery Address', subtitle: 'Manage your locations', icon: <MapPin size={20} />, color: '#fff7ed', path: '/complete-profile' },
-    { id: 4, title: 'Privacy & Security', subtitle: 'Manage your data', icon: <ShieldCheck size={20} />, color: '#f0fdf4', path: '/privacy-security' },
-    { id: 5, title: 'Help & Support', subtitle: '24/7 support available', icon: <HelpCircle size={20} />, color: '#fdf2f8', path: '/help-support' },
-    { id: 6, title: 'Settings', subtitle: 'App preferences', icon: <Settings size={20} />, color: '#f8fafc', path: '/settings' }
+    { id: 1, title: 'Order History', subtitle: 'View your past bookings', icon: <History size={20} />, class: 'history', path: '/order-history' },
+    { id: 2, title: 'Passwala Wallet', subtitle: 'Manage your credits', icon: <Wallet size={20} />, class: 'wallet', path: '/wallet' },
+    { id: 3, title: 'Delivery Address', subtitle: 'Manage your locations', icon: <MapPin size={20} />, class: 'address', path: '/complete-profile' },
+    { id: 4, title: 'Data Safety & Deletion', subtitle: 'Manage your data rights', icon: <Trash2 size={20} />, class: 'deletion', path: '/data-deletion' },
+    { id: 5, title: 'Privacy & Security', subtitle: 'Manage your security', icon: <ShieldCheck size={20} />, class: 'privacy', path: '/privacy-security' },
+    { id: 6, title: 'Help & Support', subtitle: '24/7 support available', icon: <HelpCircle size={20} />, class: 'help', path: '/help-support' },
+    { id: 7, title: 'Settings', subtitle: 'App preferences', icon: <Settings size={20} />, class: 'settings', path: '/settings' }
   ];
 
   React.useEffect(() => {
     setLocalPhoto(user?.photoURL);
   }, [user]);
 
-  const handleImageClick = () => {
-    fileInputRef.current.click();
-  };
+  const handleImageClick = () => fileInputRef.current.click();
 
   const handleUpdateName = async () => {
     if (!newName.trim()) return;
@@ -67,7 +63,7 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onVendorMode
       if (res.ok) {
         toast.success('Name updated!');
         setIsEditingName(false);
-        // Note: In a real app we'd refresh the user state globally
+        if (onUpdateUser) onUpdateUser({ ...user, displayName: newName });
       } else {
         throw new Error('Failed to update name');
       }
@@ -81,19 +77,14 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onVendorMode
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    // 1. Validation
     if (file.size > 2 * 1024 * 1024) {
       toast.error('Image too large (Max 2MB)');
       return;
     }
-
     const reader = new FileReader();
     reader.onloadstart = () => toast.loading('Uploading photo...', { id: 'upload' });
-    
     reader.onloadend = async () => {
       const base64String = reader.result;
-      
       try {
         const id = user?.phoneNumber || user?.email || user?.uid;
         const res = await fetch(`http://${window.location.hostname}:3004/api/users/${encodeURIComponent(id)}/photo`, {
@@ -101,66 +92,40 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onVendorMode
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ photoURL: base64String })
         });
-
-        if (!res.ok) {
-           const data = await res.json().catch(() => ({}));
-           throw new Error(data.error || 'Failed to update photo on server');
-        }
-
-        // Skip Firebase updateProfile since Firebase auth rejects large base64 strings for photoURL.
-        // Database update is sufficient.
-
+        if (!res.ok) throw new Error('Upload failed');
         setLocalPhoto(base64String);
+        if (onUpdateUser) onUpdateUser({ ...user, photoURL: base64String });
         toast.success('Profile Picture Updated!', { id: 'upload' });
       } catch (err) {
-        console.error('Upload Error:', err);
-        toast.error(err.message || 'Upload failed.', { id: 'upload' });
+        toast.error('Upload failed.', { id: 'upload' });
       }
     };
-
     reader.readAsDataURL(file);
   };
 
   const handleDeleteAccount = async () => {
     setShowDeleteModal(false);
-
     try {
       const currentUser = auth.currentUser;
       const searchId = user?.uid || user?.email || user?.phoneNumber;
-      
-      // 1. Delete from Supabase Database
       const res = await fetch(`http://${window.location.hostname}:3004/api/users/${encodeURIComponent(searchId)}`, {
         method: 'DELETE',
       });
-      
-      // 2. Delete from Firebase Auth (The "Golden Key")
-      if (currentUser) {
-        try {
-          await currentUser.delete();
-        } catch (firebaseErr) {
-          console.warn('Firebase user delete skipped (requires recent login):', firebaseErr);
-          // We continue anyway since the DB is cleared and onLogout will wipe the session
-        }
-      }
-
-      // 3. Complete Logout and UI Reset
+      if (currentUser) await currentUser.delete().catch(() => {});
       if (res.status === 200 || res.status === 404) {
-        toast.success('Account & Data Deleted Permanently.');
-        onLogout(true); // Pass true to skip the redundant "Signed Out" toast
-      } else {
-        const data = await res.json();
-        throw new Error(data.error || 'Server error');
+        toast.success('Account Deleted.');
+        localStorage.clear();
+        setTimeout(() => window.location.href = '/', 1500);
       }
     } catch (err) {
-      console.error(err);
-      toast.error('Failed to fully delete account. Please contact support.');
+      toast.error('Delete failed.');
     }
   };
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       className="webapp-profile-page"
     >
       <div className="profile-header-card">
@@ -169,83 +134,67 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onVendorMode
             {localPhoto ? (
               <img src={localPhoto} alt="User" />
             ) : (
-              <span className="avatar-initials">{user?.displayName?.charAt(0) || 'K'}</span>
+              <span className="avatar-initials">{user?.displayName?.charAt(0).toUpperCase() || (user?.phoneNumber ? '#' : 'U')}</span>
             )}
             <button className="edit-avatar-btn"><Camera size={14} /></button>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              style={{ display: 'none' }} 
-              accept="image/*" 
-              onChange={handleFileChange} 
-            />
-          </div>
-          <div className="profile-info-section-webapp">
-            {isEditingName ? (
-              <div className="edit-name-container-webapp">
-                <input 
-                  type="text" 
-                  value={newName} 
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="edit-name-input-webapp"
-                  autoFocus
-                />
-                <button onClick={handleUpdateName} disabled={isUpdatingName} className="save-name-btn-webapp">Save</button>
-                <button onClick={() => setIsEditingName(false)} className="cancel-name-btn-webapp">Cancel</button>
-              </div>
-            ) : (
-              <div className="name-display-container-webapp" onClick={() => setIsEditingName(true)}>
-                <h2 className="profile-name-webapp">{newName || user?.displayName || 'Passwala User'}</h2>
-                <button className="edit-name-icon-btn-webapp"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
-              </div>
-            )}
-            <p className="profile-membership-webapp">Premium Hero Member</p>
+            <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*" onChange={handleFileChange} />
           </div>
         </div>
+
+        {isEditingName ? (
+          <div className="edit-name-container-webapp">
+            <input 
+              type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
+              className="edit-name-input-webapp" autoFocus
+            />
+            <div className="edit-name-actions">
+              <button onClick={handleUpdateName} disabled={isUpdatingName} className="save-name-btn-webapp">Save</button>
+              <button onClick={() => setIsEditingName(false)} className="cancel-name-btn-webapp">Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div className="name-display-stack" onClick={() => setIsEditingName(true)}>
+            <h2 className="profile-name-webapp">{newName || user?.displayName || 'Passwala User'}</h2>
+            <div className="profile-membership-webapp">Premium Hero Member</div>
+          </div>
+        )}
       </div>
 
-      <div className="profile-sections">
-        {/* APPEARANCE SECTION - HIGH VISIBILITY */}
-        <h3 className="section-label">APPEARANCE</h3>
-        <div className="profile-menu-container glass theme-switcher-item">
-            <div className="profile-menu-item no-chevron" onClick={onToggleTheme}>
-              <div className="menu-item-left">
-                <div className="menu-icon-box theme-icon-bg">
-                  {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-                </div>
-                <div className="menu-text">
-                   <strong>Dark Mode</strong>
-                   <span>Switch between light and dark themes</span>
-                </div>
+      <div className="profile-scroll-content">
+        <h3 className="section-label">Appearance</h3>
+        <div className="profile-menu-container">
+          <div className="profile-menu-item" onClick={onToggleTheme}>
+            <div className="menu-item-left">
+              <div className="menu-icon-box appearance">
+                {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
               </div>
-              <div className={`theme-toggle-switch ${isDarkMode ? 'active' : ''}`}>
-                 <div className="switch-knob"></div>
+              <div className="menu-text">
+                <strong>Dark Mode</strong>
+                <span>Switch theme style</span>
               </div>
             </div>
-        </div>
-
-        {/* VERNACULAR SUPPORT - COMPACT SELECTION */}
-        <h3 className="section-label">LANGUAGE / ભાષા / भाषा</h3>
-        <div className="language-compact-wrapper">
-          <div className="language-pills-row">
-            {Object.entries(languages).map(([code, lang]) => (
-              <button 
-                key={code} 
-                className={`lang-pill-item ${currentLanguage === code ? 'active' : ''}`}
-                onClick={() => {
-                  changeLanguage(code);
-                  toast.success(`${lang.name} Selected`);
-                }}
-              >
-                <Globe size={14} className={currentLanguage === code ? 'rotating' : ''} />
-                <span>{lang.name}</span>
-              </button>
-            ))}
+            <div className={`theme-toggle-switch ${isDarkMode ? 'active' : ''}`}>
+              <div className="switch-knob"></div>
+            </div>
           </div>
         </div>
 
-        <h3 className="section-label">ACCOUNT & ACTIVITY</h3>
-        <div className="profile-menu-container glass">
+        <h3 className="section-label">Language / ભાષા / भाषा</h3>
+        <div className="language-pills-row">
+          {Object.entries(languages).map(([code, lang]) => (
+            <button 
+              key={code} 
+              className={`lang-pill-item ${currentLanguage === code ? 'active' : ''}`}
+              onClick={() => changeLanguage(code)}
+            >
+              <Globe size={16} />
+              <span>{lang.name}</span>
+            </button>
+          ))}
+        </div>
+
+        <h3 className="section-label">Account & Activity</h3>
+        <div className="profile-menu-container">
           {profileItems.map((item) => (
             <button 
               key={item.id} 
@@ -253,7 +202,7 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onVendorMode
               onClick={() => item.path ? navigate(item.path) : toast(`Opening ${item.title}...`)}
             >
               <div className="menu-item-left">
-                <div className="menu-icon-box" style={{ background: item.color }}>
+                <div className={`menu-icon-box ${item.class}`}>
                   {item.icon}
                 </div>
                 <div className="menu-text">
@@ -264,43 +213,37 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onVendorMode
               <ChevronRight size={18} className="chevron-right" />
             </button>
           ))}
+          <button className="profile-menu-item" onClick={onLogout}>
+            <div className="menu-item-left">
+              <div className="menu-icon-box logout">
+                <LogOut size={20} />
+              </div>
+              <div className="menu-text">
+                 <strong>Sign Out</strong>
+                 <span>Logout of your session</span>
+              </div>
+            </div>
+          </button>
         </div>
 
-        <button className="logout-button-webapp" onClick={onLogout}>
-           <LogOut size={20} />
-           <span>Sign Out</span>
-        </button>
-
-        <button className="delete-account-btn" onClick={() => setShowDeleteModal(true)}>
-           <Trash2 size={16} />
-           <span>Delete Account</span>
-        </button>
+        <div className="profile-actions-footer">
+          <button className="delete-account-btn" onClick={() => setShowDeleteModal(true)}>
+             <Trash2 size={16} />
+             <span>Delete Account Permanently</span>
+          </button>
+        </div>
       </div>
 
-      {/* --- CUSTOM DELETE MODAL --- */}
       {showDeleteModal && (
         <div className="custom-modal-overlay" onClick={() => setShowDeleteModal(false)}>
-          <motion.div 
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="custom-confirm-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-icon-header delete-bg">
-              <Trash2 size={32} />
-            </div>
+          <div className="custom-confirm-modal" onClick={(e) => e.stopPropagation()}>
             <h3>Delete Account?</h3>
-            <p>This will permanently remove your data, wallet balance, and order history. This action cannot be undone.</p>
-            
+            <p>This action is permanent and cannot be undone.</p>
             <div className="modal-actions-row">
-              <button className="modal-btn secondary" onClick={() => setShowDeleteModal(false)}>
-                Cancel
-              </button>
-              <button className="modal-btn delete" onClick={handleDeleteAccount}>
-                Yes, Delete
-              </button>
+              <button className="modal-btn secondary" onClick={() => setShowDeleteModal(false)}>Cancel</button>
+              <button className="modal-btn delete" onClick={handleDeleteAccount}>Delete</button>
             </div>
-          </motion.div>
+          </div>
         </div>
       )}
     </motion.div>

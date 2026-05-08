@@ -159,12 +159,21 @@
 
 /* webapp specific */
 .webapp-main {
-  padding-top: 1rem !important;
+  padding-top: 72px !important; /* Match fixed navbar height */
   padding-bottom: 90px !important; /* Space for BottomNav */
 }
 
 .webapp-main.profile-mode {
-  padding-top: 0 !important;
+  padding-top: 72px !important; /* Restore padding to prevent clipping by navbar */
+}
+
+@media (max-width: 500px) {
+  .webapp-main {
+    padding-top: 64px !important; /* Match mobile navbar height */
+  }
+  .webapp-main.profile-mode {
+    padding-top: 64px !important; 
+  }
 }
 
 .webapp-section-wrapper .services {

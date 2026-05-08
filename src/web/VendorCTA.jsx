@@ -47,7 +47,7 @@ const VendorCTA = () => {
                <strong>Why Passwala?</strong>
                <p>Unlike Nextdoor or Urban Company, we combine <strong>Community + AI + Essentials</strong> under one trusted local brand.</p>
             </div>
-            <button className="cta-button" onClick={() => window.open('http://localhost:3002', '_blank')}>Register as {selectedPlan} Vendor <ArrowRight size={18} /></button>
+            <button className="cta-button" onClick={() => window.open(`http://${window.location.hostname}:3002`, '_blank')}>Register as {selectedPlan} Vendor <ArrowRight size={18} /></button>
           </div>
           <div className="cta-visual animate-slide-in">
              <div className="gradient-circle"></div>

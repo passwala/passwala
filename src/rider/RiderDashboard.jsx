@@ -329,12 +329,16 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       iconAnchor: [21, 21]
     });
 
-    const riderLatLng = [mapCoords.lat, mapCoords.lon];
+    const riderLatLng = (mapCoords.lat && mapCoords.lon && !isNaN(mapCoords.lat) && !isNaN(mapCoords.lon))
+      ? [mapCoords.lat, mapCoords.lon]
+      : null;
 
     // 1. Draw Rider
-    L.marker(riderLatLng, { icon: createRiderIcon() })
-      .bindPopup(`<b>You (Rider)</b><br/>Status: ${isOnline ? 'Online' : 'Offline'}`)
-      .addTo(markerGroupRef.current);
+    if (riderLatLng) {
+      L.marker(riderLatLng, { icon: createRiderIcon() })
+        .bindPopup(`<b>You (Rider)</b><br/>Status: ${isOnline ? 'Online' : 'Offline'}`)
+        .addTo(markerGroupRef.current);
+    }
 
     if (activeOrder) {
       // Show Delivery Routing (Real Map, No fake streets)
@@ -393,8 +397,11 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
 
       // Automatically focus bounds to include all elements
       try {
-        const bounds = L.latLngBounds([riderLatLng, storeLatLng, customerLatLng]);
-        leafletMapRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+        const validCoords = [riderLatLng, storeLatLng, customerLatLng].filter(c => c && !isNaN(c[0]) && !isNaN(c[1]));
+        if (validCoords.length > 0) {
+          const bounds = L.latLngBounds(validCoords);
+          leafletMapRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+        }
       } catch (e) {
         console.warn('Map bounds fit error', e);
       }

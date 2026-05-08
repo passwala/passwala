@@ -39,8 +39,9 @@ const WebappNavbar = ({ user, onOpenProfile, onBack, title, location }) => {
                    className="brand-tagline-location live-address clickable-location" 
                    onClick={() => navigate('/select-location')}
                  >
-                    <MapPin size={14} className="tag-pin-icon" />
-                    <strong>{location || 'Detecting Location...'}</strong>
+                    <div className="location-dot-live"></div>
+                    <MapPin size={12} className="tag-pin-icon" />
+                    <strong>{location || 'Detecting Area...'}</strong>
                  </div>
               </div>
             </div>
@@ -99,15 +100,17 @@ const WebappNavbar = ({ user, onOpenProfile, onBack, title, location }) => {
             )}
           </div>
           
-          <button className="nav-profile-trigger" onClick={onOpenProfile}>
-             {user?.photoURL ? (
-               <img src={user.photoURL} alt="P" />
-             ) : (
-               <div className="nav-avatar-circle-v2">
-                  {user?.displayName?.charAt(0) || 'U'}
-               </div>
-             )}
-          </button>
+          {(title !== 'Profile' && !window.location.pathname.includes('/profile')) && (
+            <button className="nav-profile-trigger" onClick={onOpenProfile}>
+               {user?.photoURL ? (
+                 <img src={user.photoURL} alt="P" />
+               ) : (
+                 <div className="nav-avatar-circle-v2">
+                    {user?.displayName?.charAt(0).toUpperCase() || (user?.phoneNumber ? '#' : 'U')}
+                 </div>
+               )}
+            </button>
+          )}
         </div>
       </div>
     </nav>
