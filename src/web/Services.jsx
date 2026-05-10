@@ -8,7 +8,7 @@ import { MOCK_SERVICES } from '../data/mockData';
 import './Services.css';
 
 const Services = () => {
-  const { addToCart } = useCart();
+  const { cartItems, addToCart, updateQty } = useCart();
   const { searchQuery } = useSearch();
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -95,15 +95,26 @@ const Services = () => {
                     <span className="price-label">Starts from</span>
                     <span className="price-value">₹{service.price}</span>
                   </div>
-                  <button 
-                    className="service-action-btn"
-                    onClick={() => { 
-                      addToCart({ id: service.id, name: service.name, price: service.price, provider: service.provider, type: 'service' }); 
-                      toast.success(`${service.name} added to cart!`, { icon: '🛒' }); 
-                    }}
-                  >
-                    Add to Cart
-                  </button>
+                  {(() => {
+                    const cartItem = cartItems.find(i => i.id === service.id && i.type === 'service');
+                    return cartItem ? (
+                      <div className="service-qty-selector" style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'white', border: '1.5px solid var(--primary)', borderRadius: '8px', padding: '4px 8px', height: '38px', boxSizing: 'border-box' }}>
+                        <button onClick={(e) => { e.stopPropagation(); updateQty(service.id, 'service', -1); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>-</button>
+                        <span style={{ fontWeight: 'bold', color: '#0f172a', minWidth: '12px', textAlign: 'center', fontSize: '0.9rem' }}>{cartItem.qty}</span>
+                        <button onClick={(e) => { e.stopPropagation(); updateQty(service.id, 'service', 1); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>+</button>
+                      </div>
+                    ) : (
+                      <button 
+                        className="service-action-btn"
+                        onClick={() => { 
+                          addToCart({ id: service.id, name: service.name, price: service.price, provider: service.provider, type: 'service' }); 
+                          toast.success(`${service.name} added to cart!`, { icon: '🛒' }); 
+                        }}
+                      >
+                        Add to Cart
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

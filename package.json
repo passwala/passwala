@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "dev:web": "vite --config vite.config.web.js --mode web --port 3000 --host --force",
     "dev:webapp": "vite --config vite.config.webapp.js --mode webapp --port 3001 --host --force",
     "dev:vendor": "vite --config vite.config.vendor.js --mode vendor --port 3002 --host --force",
@@ -20,7 +20,6 @@
     "server:api": "node server/index.js --headless"
   },
   "dependencies": {
-    "@react-oauth/google": "^0.13.4",
     "@supabase/supabase-js": "^2.100.0",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
@@ -39,6 +38,7 @@
     "@eslint/js": "^9.39.4",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
     "@vitejs/plugin-react": "^6.0.1",
     "concurrently": "^9.2.1",
     "eslint": "^9.39.4",

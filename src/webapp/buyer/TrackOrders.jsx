@@ -399,7 +399,7 @@ const TrackOrders = ({ onBack, user }) => {
          </div>
       </div>
 
-      <div className="orders-list-v2">
+      <div className="orders-list-v2" style={{ paddingBottom: '120px' }}>
         {loading ? <p>Syncing neighborhood cloud...</p> : activeOrders.filter(o => o.status !== 'DELIVERED').map((order, i) => {
           const progress = getProgress(order.status);
           const firstItem = order.items?.[0] || { name: 'Order' };

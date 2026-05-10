@@ -71,6 +71,77 @@ You can run specific portals individually on their dedicated ports:
 
 ---
 
+## 📲 Testing on a Physical Mobile Phone (Same Wi-Fi Network with Firebase Auth)
+
+If you load the app on your phone using your laptop's local IP (e.g. `http://192.168.120.160:3001`), **Firebase Authentication will fail** (you won't be able to login, receive OTPs, or sync Google).
+
+This is a strict security restriction from Firebase:
+1. Firebase Auth **only allows** authentication on secure domains listed in your Firebase Console.
+2. Local IP addresses (like `192.168.x.x`) **cannot** be added to Firebase's Authorized Domains list.
+
+Here are the **two official ways** to test and login successfully on a real phone:
+
+### Method A: USB Port Forwarding (Recommended & Easiest)
+This allows your phone's browser to access your app via `http://localhost:3001`. Since it uses the `localhost` domain, Firebase allows it to run perfectly without any configuration!
+
+1. Connect your Android phone to your laptop using a USB cable.
+2. Turn on **USB Debugging** on your phone (found in Settings > Developer Options).
+3. Open Google Chrome on your **laptop** and navigate to: `chrome://inspect/#devices`
+4. Click the **Port forwarding...** button on the page.
+5. Add the following rules in the list:
+   - Port: `3001` -> IP/Port: `localhost:3001` (Frontend app)
+   - Port: `3004` -> IP/Port: `localhost:3004` (Backend API)
+6. Check **"Enable port forwarding"** and click **Done**.
+7. Now, open Google Chrome on your **phone** and go to:
+   👉 **`http://localhost:3001`**
+8. That's it! Your phone will load the app instantly, and Firebase Auth, Google Sync, and OTP logins will work 100% perfectly!
+
+---
+
+### Method B: HTTPS Tunnel (For Wireless Testing)
+If you prefer testing without a USB cable, you can use a secure tunnel:
+
+1. Create a secure HTTPS tunnel to your local frontend port:
+   ```bash
+   npx localtunnel --port 3001
+   ```
+2. Copy the generated HTTPS URL (e.g., `https://glowing-star.localtunnel.me`).
+3. Open your [Firebase Console](https://console.firebase.google.com/).
+4. Go to **Authentication** > **Settings** (tab) > **Authorized domains**.
+5. Click **Add domain** and paste your tunnel domain (e.g., `glowing-star.localtunnel.me`).
+6. Open that HTTPS URL on your phone's browser, and it will run and authenticate perfectly!
+
+---
+
+## 📱 Running Across Different Networks (e.g., Mobile Data)
+
+If you are running the frontend/backend on your laptop and want to access it from a mobile device that is **not on the same Wi-Fi network** (for example, on mobile data or remote networks), follow these simple steps to tunnel your local servers securely to the internet.
+
+### 1. Tunnel your Backend Server (Port 3004)
+Run this command in a new terminal window to expose your local Express server to a public URL:
+```bash
+npx localtunnel --port 3004
+```
+This will give you a public URL like `https://funny-sheep-sing.localtunnel.me`.
+
+### 2. Configure Frontend Environment Variables
+In your `.env` file in the root directory, specify this public URL as the backend endpoint:
+```env
+# Point your frontends to your public backend tunnel
+VITE_API_URL=https://funny-sheep-sing.localtunnel.me
+```
+
+### 3. Tunnel your Frontend App (e.g., Buyer Webapp on Port 3001)
+To access the Buyer Webapp on your phone from a different network, run a second tunnel for the frontend port:
+```bash
+npx localtunnel --port 3001
+```
+Open the generated public URL (e.g., `https://green-lion-jump.localtunnel.me`) in your mobile web browser.
+
+Now your mobile phone can load the app and communicate perfectly with your laptop's backend server, even when connected to completely different networks (such as 4G/5G mobile data)!
+
+---
+
 ## 🚀 Deployment (Render.com)
 
 To deploy Passwala to production on Render, follow these settings:

@@ -216,7 +216,11 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
       };
       if (resolvedUserId) orderPayload.user_id = resolvedUserId;
       if (resolvedStoreId) orderPayload.store_id = resolvedStoreId;
-      if (resolvedAddressId) orderPayload.address_id = resolvedAddressId;
+      if (userAddress?.id && userAddress.id.length === 36) {
+        orderPayload.address_id = userAddress.id;
+      } else if (resolvedAddressId) {
+        orderPayload.address_id = resolvedAddressId;
+      }
 
       const { data: newOrder, error } = await supabase
         .from('orders')

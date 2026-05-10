@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getMessaging, isSupported } from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCqjI8v3JaP14VBg4ygarxXlfjZfTvHlag",
@@ -15,5 +16,17 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// 🛡️ Safely initialize messaging only if supported (prevents crash on insecure IP origins)
+export const getMessagingInstance = async () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const supported = await isSupported();
+    return supported ? getMessaging(app) : null;
+  } catch (e) {
+    console.warn('Messaging not supported in this context');
+    return null;
+  }
+};
 
 export { RecaptchaVerifier, signInWithPhoneNumber };

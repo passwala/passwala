@@ -8,7 +8,7 @@ import { MOCK_DEALS } from '../data/mockData';
 import './NearbyDeals.css';
 
 const NearbyDeals = () => {
-  const { addToCart } = useCart();
+  const { cartItems, addToCart, updateQty } = useCart();
   const { searchQuery } = useSearch();
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -63,16 +63,27 @@ const NearbyDeals = () => {
                 <strong>{deal.name}</strong>
                 <span>{deal.store}</span>
               </div>
-              <button 
-                className="claim-btn" 
-                onClick={(e) => { 
-                  e.stopPropagation(); 
-                  addToCart({ id: deal.id, name: `${deal.name} (${deal.offer})`, price: deal.price, provider: deal.store, type: 'essential' });
-                  toast.success(`${deal.name} deal added to cart! 🛒`);
-                }}
-              >
-                Claim Deal
-              </button>
+              {(() => {
+                const cartItem = cartItems.find(i => i.id === deal.id && i.type === 'essential');
+                return cartItem ? (
+                  <div className="deal-qty-selector" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'white', border: '1.5px solid var(--primary)', borderRadius: '25px', padding: '4px 8px', height: '36px', boxSizing: 'border-box' }} onClick={(e) => e.stopPropagation()}>
+                    <button onClick={(e) => { e.stopPropagation(); updateQty(deal.id, 'essential', -1); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>-</button>
+                    <span style={{ fontWeight: 'bold', color: '#0f172a', minWidth: '12px', textAlign: 'center', fontSize: '0.85rem' }}>{cartItem.qty}</span>
+                    <button onClick={(e) => { e.stopPropagation(); updateQty(deal.id, 'essential', 1); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>+</button>
+                  </div>
+                ) : (
+                  <button 
+                    className="claim-btn" 
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      addToCart({ id: deal.id, name: `${deal.name} (${deal.offer})`, price: deal.price, provider: deal.store, type: 'essential' });
+                      toast.success(`${deal.name} deal added to cart! 🛒`);
+                    }}
+                  >
+                    Claim Deal
+                  </button>
+                );
+              })()}
             </div>
           ))}
         </div>

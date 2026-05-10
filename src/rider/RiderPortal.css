@@ -1,20 +1,20 @@
-/* RiderPortal.css - Passwala Orange & White Theme */
+/* RiderPortal.css - Passwala Nebula Cyber Dark Theme */
 
 :root {
-  --rider-primary: var(--primary);
-  --rider-primary-dark: var(--primary-hover);
-  --rider-primary-light: var(--bg-cream);
-  --rider-bg: var(--bg-surface);
-  --rider-card: var(--bg-card);
-  --rider-text: var(--text-primary);
-  --rider-text-secondary: var(--text-secondary);
-  --rider-border: var(--hairline);
+  --rider-primary: #00f2fe;
+  --rider-primary-dark: #4facfe;
+  --rider-primary-light: rgba(0, 242, 254, 0.08);
+  --rider-bg: #030014;
+  --rider-card: rgba(15, 12, 41, 0.7);
+  --rider-text: #f8fafc;
+  --rider-text-secondary: #94a3b8;
+  --rider-border: rgba(255, 255, 255, 0.08);
   --rider-success: #10b981;
-  --rider-success-light: #ecfdf5;
+  --rider-success-light: rgba(16, 185, 129, 0.1);
   --rider-danger: #ef4444;
-  --rider-danger-light: #fef2f2;
-  --rider-shadow: var(--shadow-md);
-  --rider-shadow-lg: var(--shadow-lg);
+  --rider-danger-light: rgba(239, 68, 68, 0.1);
+  --rider-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  --rider-shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.6);
 }
 
 .rider-app {
@@ -22,6 +22,10 @@
   height: 100dvh; /* for mobile browsers */
   overflow: hidden;
   background-color: var(--rider-bg);
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(0, 242, 254, 0.08) 0%, transparent 50%), 
+    radial-gradient(at 100% 100%, rgba(124, 58, 237, 0.08) 0%, transparent 50%);
+  background-attachment: fixed;
   color: var(--rider-text);
   font-family: var(--font-main);
   display: flex;
@@ -42,6 +46,8 @@
   width: 100%;
   max-width: 400px;
   background: var(--rider-card);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--rider-border);
   border-radius: 24px;
   overflow: hidden;
   box-shadow: var(--rider-shadow-lg);
@@ -118,17 +124,18 @@
   left: 1rem;
   top: 50%;
   transform: translateY(-50%);
-  color: #9ca3af;
-  border-right: 1px solid #e5e7eb;
+  color: var(--rider-text-secondary);
+  border-right: 1px solid var(--rider-border);
   padding-right: 0.5rem;
 }
 
 .rider-input {
   width: 100%;
   padding: 1rem 1rem 1rem 3rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--rider-border);
   border-radius: 16px;
-  background-color: #f9fafb;
+  background-color: rgba(255, 255, 255, 0.03);
+  color: var(--rider-text);
   font-size: 1.125rem;
   font-weight: 500;
   outline: none;
@@ -137,16 +144,17 @@
 
 .rider-input:focus {
   border-color: var(--rider-primary);
-  box-shadow: 0 0 0 2px var(--rider-primary-light);
-  background-color: white;
+  box-shadow: 0 0 20px rgba(0, 242, 254, 0.15);
+  background-color: rgba(255, 255, 255, 0.06);
 }
 
 .rider-input-otp {
   width: 100%;
   padding: 1rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--rider-border);
   border-radius: 16px;
-  background-color: #f9fafb;
+  background-color: rgba(255, 255, 255, 0.03);
+  color: var(--rider-text);
   font-size: 1.5rem;
   font-weight: 700;
   text-align: center;
@@ -157,8 +165,8 @@
 
 .rider-input-otp:focus {
   border-color: var(--rider-primary);
-  box-shadow: 0 0 0 2px var(--rider-primary-light);
-  background-color: white;
+  box-shadow: 0 0 20px rgba(0, 242, 254, 0.15);
+  background-color: rgba(255, 255, 255, 0.06);
 }
 
 .rider-btn-primary {
@@ -176,20 +184,20 @@
   align-items: center;
   gap: 0.5rem;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 6px -1px rgba(249, 115, 22, 0.4);
+  box-shadow: 0 4px 14px rgba(0, 242, 254, 0.3);
 }
 
 .rider-btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 10px -1px rgba(249, 115, 22, 0.5);
+  box-shadow: 0 6px 20px rgba(0, 242, 254, 0.5);
 }
 
 .rider-btn-secondary {
   width: 100%;
   padding: 0.875rem;
-  background: white;
+  background: rgba(255, 255, 255, 0.05);
   color: var(--rider-text);
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--rider-border);
   border-radius: 12px;
   font-size: 1rem;
   font-weight: 600;
@@ -213,7 +221,7 @@
 .rider-divider::before, .rider-divider::after {
   content: '';
   flex: 1;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--rider-border);
 }
 
 .rider-divider-text {
@@ -224,7 +232,8 @@
 
 /* Portal/Layout */
 .rider-header {
-  background: white;
+  background: rgba(15, 12, 41, 0.85);
+  backdrop-filter: blur(20px);
   padding: 1rem;
   border-bottom: 1px solid var(--rider-border);
   display: flex;
@@ -288,7 +297,8 @@
 
 /* Bottom Nav */
 .rider-bottom-nav {
-  background: white;
+  background: rgba(15, 12, 41, 0.85);
+  backdrop-filter: blur(20px);
   border-top: 1px solid var(--rider-border);
   padding: 0.5rem;
   display: flex;
@@ -297,7 +307,7 @@
   bottom: 0;
   width: 100%;
   z-index: 50;
-  box-shadow: 0 -4px 10px rgba(0,0,0,0.02);
+  box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.4);
 }
 
 .rider-nav-item {
@@ -305,7 +315,7 @@
   flex-direction: column;
   align-items: center;
   gap: 0.25rem;
-  color: #9ca3af;
+  color: var(--rider-text-secondary);
   background: none;
   border: none;
   cursor: pointer;
@@ -344,7 +354,8 @@
 }
 
 .rider-card {
-  background: white;
+  background: var(--rider-card);
+  backdrop-filter: blur(10px);
   border-radius: 16px;
   padding: 1rem;
   border: 1px solid var(--rider-border);
@@ -355,7 +366,7 @@
 /* Dashboard Map */
 .rider-map {
   height: 250px;
-  background: #eff6ff;
+  background: rgba(0, 242, 254, 0.04);
   position: relative;
   display: flex;
   align-items: center;
@@ -372,7 +383,9 @@
 .rider-map-overlay {
   position: absolute;
   top: 1rem;
-  background: white;
+  background: var(--rider-card);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--rider-border);
   padding: 0.5rem 1rem;
   border-radius: 999px;
   box-shadow: var(--rider-shadow);
@@ -401,9 +414,10 @@
 
 .rider-order-card {
   width: 100%;
-  background: white;
+  background: var(--rider-card);
+  backdrop-filter: blur(20px);
   border-radius: 24px;
-  border: 2px solid var(--rider-primary-light);
+  border: 1px solid var(--rider-border);
   overflow: hidden;
   animation: slideUp 0.3s ease-out;
 }
@@ -423,11 +437,12 @@
 .rider-order-amount {
   font-size: 1.5rem;
   font-weight: 800;
-  color: var(--rider-primary-dark);
+  color: var(--rider-primary);
 }
 
 .rider-order-time {
-  background: white;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--rider-border);
   padding: 0.25rem 0.5rem;
   border-radius: 8px;
   font-weight: 700;
@@ -457,8 +472,9 @@
 
 .rider-btn-reject {
   flex: 1;
-  background: white;
-  border: 1px solid #d1d5db;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--rider-border);
+  color: var(--rider-text);
   border-radius: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -511,7 +527,7 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: white;
+  background: var(--rider-bg);
   border: 2px solid var(--rider-border);
   z-index: 10;
   margin-left: -11px;
@@ -609,7 +625,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 1rem;
-  background: white;
+  background: var(--rider-card);
+  backdrop-filter: blur(10px);
   border: none;
   border-bottom: 1px solid var(--rider-border);
   cursor: pointer;
@@ -727,10 +744,11 @@ input:checked + .rider-slider:before {
 
 /* Customize Leaflet Popup styling */
 .leaflet-popup-content-wrapper {
-  background: white !important;
+  background: #111827 !important;
+  color: var(--rider-text) !important;
   border-radius: 16px !important;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
-  border: 1px solid rgba(0,0,0,0.05) !important;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
+  border: 1px solid var(--rider-border) !important;
   padding: 4px !important;
 }
 
@@ -738,10 +756,11 @@ input:checked + .rider-slider:before {
   margin: 8px 12px !important;
   font-size: 0.85rem !important;
   line-height: 1.4 !important;
+  color: var(--rider-text) !important;
 }
 
 .leaflet-popup-tip {
-  background: white !important;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+  background: #111827 !important;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
 }
 

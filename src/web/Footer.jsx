@@ -54,7 +54,7 @@ const Footer = () => {
             <h4>Partner</h4>
             <ul className="footer-links-list">
               <li><Link to="/vendor">Vendor Portal</Link></li>
-              <li><a href={`http://${window.location.hostname}:3005`} target="_blank" rel="noopener noreferrer">Admin Portal</a></li>
+              <li><a href={import.meta.env.VITE_ADMIN_PORTAL_URL || `http://${window.location.hostname}:3005`} target="_blank" rel="noopener noreferrer">Admin Portal</a></li>
               <li>Documentation</li>
               <li>Pricing</li>
               <li>Support</li>

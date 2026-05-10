@@ -45,6 +45,9 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
 
   React.useEffect(() => {
     setLocalPhoto(user?.photoURL);
+    if (user?.displayName) {
+      setNewName(user.displayName);
+    }
   }, [user]);
 
   const handleImageClick = () => fileInputRef.current.click();
@@ -54,7 +57,8 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
     setIsUpdatingName(true);
     try {
       const searchId = user?.uid || user?.email || user?.phoneNumber;
-      const res = await fetch(`http://${window.location.hostname}:3004/api/users/${encodeURIComponent(searchId)}/name`, {
+      const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      const res = await fetch(`${apiBase}/api/users/${encodeURIComponent(searchId)}/name`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayName: newName })
@@ -87,7 +91,8 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
       const base64String = reader.result;
       try {
         const id = user?.phoneNumber || user?.email || user?.uid;
-        const res = await fetch(`http://${window.location.hostname}:3004/api/users/${encodeURIComponent(id)}/photo`, {
+        const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+        const res = await fetch(`${apiBase}/api/users/${encodeURIComponent(id)}/photo`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ photoURL: base64String })
@@ -108,13 +113,19 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
     try {
       const currentUser = auth.currentUser;
       const searchId = user?.uid || user?.email || user?.phoneNumber;
-      const res = await fetch(`http://${window.location.hostname}:3004/api/users/${encodeURIComponent(searchId)}`, {
+      const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      const res = await fetch(`${apiBase}/api/users/${encodeURIComponent(searchId)}`, {
         method: 'DELETE',
       });
+      
+      // Explicitly sign out to clean Firebase state and prevent registration screen showing up on reload
+      await auth.signOut().catch(() => {});
       if (currentUser) await currentUser.delete().catch(() => {});
+      
       if (res.status === 200 || res.status === 404) {
         toast.success('Account Deleted.');
         localStorage.clear();
+        sessionStorage.clear();
         setTimeout(() => window.location.href = '/', 1500);
       }
     } catch (err) {

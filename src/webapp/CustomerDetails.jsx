@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { User, MapPin, Home, Building2, AlertCircle, Navigation, Phone, Search, ShieldCheck, Share2, ArrowRight } from 'lucide-react';
 import { supabase } from '../supabase';
 import { toast } from 'react-hot-toast';
+import { auth } from '../firebase';
+import { updateProfile } from 'firebase/auth';
 /* eslint-disable no-unused-vars */
 import { motion } from 'framer-motion';
 import './CustomerDetails.css';
@@ -200,6 +202,15 @@ const CustomerDetails = ({ user, onComplete }) => {
     try {
       const userId = user?.id || user?.uid;
       
+      // Update Firebase Auth displayName so it displays on header immediately
+      try {
+        if (auth.currentUser) {
+          await updateProfile(auth.currentUser, { displayName: formData.fullName });
+        }
+      } catch (fbErr) {
+        console.warn('Firebase profile update failed:', fbErr);
+      }
+
       // 1. Update/Upsert User Table
       const { data: updatedUser, error: userError } = await supabase
         .from('users')
@@ -215,7 +226,8 @@ const CustomerDetails = ({ user, onComplete }) => {
         .single();
 
       // Attempt Sync through Backend
-      const response = await fetch(`http://${window.location.hostname}:3004/api/users`, {
+      const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      const response = await fetch(`${apiBase}/api/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -261,11 +273,19 @@ const CustomerDetails = ({ user, onComplete }) => {
       }
 
       toast.success('Profile & Address saved! ✨');
-      if (onComplete) onComplete(savedAddr || {
+      
+      // 🛡️ Immediate State Sync for UI components (Navbar/Profile)
+      const freshProfile = {
+        fullName: formData.fullName,
         house_no: formData.houseNo,
         floor: formData.floor,
-        society: formData.society
-      });
+        society: formData.society,
+        address: `${formData.houseNo}, ${formData.society}`
+      };
+      localStorage.setItem('local_user_profile', JSON.stringify(freshProfile));
+      localStorage.setItem('passwala_profile_complete', 'true');
+
+      if (onComplete) onComplete(savedAddr || freshProfile, formData.fullName);
     } catch (error) {
       console.error('Update profile error:', error);
       const errorMsg = error.response?.data?.error || error.message || 'Failed to update profile. Please try again.';

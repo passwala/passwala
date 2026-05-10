@@ -293,7 +293,7 @@ const AdminPanel = ({ onLogout, location }) => {
 
   const currentTab = TABS.find(t => t.id === activeTab) || TABS[0];
 
-  const API_URL = `http://${window.location.hostname}:3004`;
+  const API_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
 
   const fetchStats = async () => {
     try {
@@ -1153,6 +1153,9 @@ const AdminPanel = ({ onLogout, location }) => {
                   zoom={13} 
                   scrollWheelZoom={true}
                   style={{ height: '100%', width: '100%', zIndex: 1 }}
+                  maxBounds={[[5.0, 65.0], [38.0, 98.0]]}
+                  minZoom={5}
+                  maxBoundsViscosity={1.0}
                 >
                   <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

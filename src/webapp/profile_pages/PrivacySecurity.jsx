@@ -34,13 +34,15 @@ const PrivacySecurity = () => {
       const searchId = user.uid || user.email || user.phoneNumber;
       
       // 1. Delete from Database
-      const res = await fetch(`http://${window.location.hostname}:3004/api/users/${encodeURIComponent(searchId)}`, {
+      const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      const res = await fetch(`${apiBase}/api/users/${encodeURIComponent(searchId)}`, {
         method: 'DELETE',
       });
       
-      // 2. Delete from Firebase
+      // 2. Sign out and Delete from Firebase
       try {
-        await user.delete();
+        await auth.signOut().catch(() => {});
+        await user.delete().catch(() => {});
       } catch (err) {
         console.warn('Firebase user delete skipped:', err);
       }

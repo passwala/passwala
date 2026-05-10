@@ -8,7 +8,7 @@ import { MOCK_ESSENTIALS } from '../data/mockData';
 import './Essentials.css';
 
 const Essentials = () => {
-  const { addToCart } = useCart();
+  const { cartItems, addToCart, updateQty } = useCart();
   const { searchQuery } = useSearch();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -73,7 +73,18 @@ const Essentials = () => {
                       <span className="store">{item.store} • {item.delivery_time}</span>
                       <span className="price">₹{item.price}</span>
                    </div>
-                   <button className="add-icon-btn" onClick={() => { addToCart({ id: item.id, name: item.name, price: item.price, store: item.store, type: 'essential' }); toast.success(`${item.name} added!`, { icon: '🛒' }); }}><Plus size={20} /></button>
+                   {(() => {
+                     const cartItem = cartItems.find(i => i.id === item.id && i.type === 'essential');
+                     return cartItem ? (
+                       <div className="quantity-selector-essentials" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--primary)', borderRadius: '50px', padding: '4px 10px', height: '36px', boxSizing: 'border-box' }}>
+                         <button onClick={(e) => { e.stopPropagation(); updateQty(item.id, 'essential', -1); }} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>-</button>
+                         <span style={{ fontWeight: 'bold', color: 'white', minWidth: '12px', textAlign: 'center', fontSize: '0.9rem' }}>{cartItem.qty}</span>
+                         <button onClick={(e) => { e.stopPropagation(); updateQty(item.id, 'essential', 1); }} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>+</button>
+                       </div>
+                     ) : (
+                       <button className="add-icon-btn" onClick={() => { addToCart({ id: item.id, name: item.name, price: item.price, store: item.store, type: 'essential' }); toast.success(`${item.name} added!`, { icon: '🛒' }); }}><Plus size={20} /></button>
+                     );
+                   })()}
                 </div>
              ))}
              <button className="view-all" onClick={() => toast('Fetching full essentials catalog...', { icon: '🛍️' })}>View All 50+ Items</button>

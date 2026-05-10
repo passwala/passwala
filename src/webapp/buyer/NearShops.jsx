@@ -58,7 +58,7 @@ const NearShops = ({ onBack, location, userCoords }) => {
   const [loading, setLoading] = useState(true);
   const currentArea = location?.split(',')[0] || 'Your Area';
   
-  const { addToCart, setCartOpen, totalItems } = useCart();
+  const { cartItems, addToCart, updateQty, setCartOpen, totalItems } = useCart();
   const [selectedShop, setSelectedShop] = useState(null);
   const [shopCatalog, setShopCatalog] = useState([]);
 
@@ -196,7 +196,7 @@ const NearShops = ({ onBack, location, userCoords }) => {
         </div>
       </header>
 
-      <main className="near-shops-content">
+      <main className="near-shops-content" style={{ paddingBottom: '120px' }}>
         {/* Map Section */}
         <div className="map-view-container">
           <div className="map-wrapper" style={{ height: '350px', position: 'relative' }}>
@@ -205,6 +205,9 @@ const NearShops = ({ onBack, location, userCoords }) => {
                zoom={14} 
                scrollWheelZoom={false}
                style={{ height: '100%', width: '100%', zIndex: 1 }}
+               maxBounds={[[5.0, 65.0], [38.0, 98.0]]}
+               minZoom={5}
+               maxBoundsViscosity={1.0}
              >
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -218,7 +221,7 @@ const NearShops = ({ onBack, location, userCoords }) => {
                   </Marker>
                 )}
 
-                {/* Shop Markers */}
+                 {/* Shop Markers */}
                  {filteredShops.map((shop) => {
                     // 🛡️ Safety Check: Prevent Map Crash on invalid coordinates
                     const lat = parseFloat(shop.lat);
@@ -276,52 +279,65 @@ const NearShops = ({ onBack, location, userCoords }) => {
         </div>
 
         {/* Shops List */}
-        <div className="shops-list">
+        <div className="shops-list" style={{ paddingBottom: '120px' }}>
            <AnimatePresence mode='popLayout'>
-           {filteredShops.map((shop, i) => (
-             <Motion.div 
-               layout
-               key={shop.id}
-               initial={{ opacity: 0, y: 20 }}
-               animate={{ opacity: 1, y: 0 }}
-               exit={{ opacity: 0, scale: 0.95 }}
-               transition={{ delay: i * 0.1 }}
-               className="shop-card-near"
-               onClick={() => handleOpenShop(shop)}
-             >
-                  <div className="shop-card-info">
-                     <div className="shop-card-header">
-                        <div className="neighbor-trust-row">
-                          <div className="shop-title-row">
-                            <h3>{shop.name}</h3>
-                            {shop.verified && (
-                              <div className="neighborhood-check-badge" title="Neighbor Verified">
-                                <CheckCircle2 size={12} color="#ff7622" fill="#ff7622" fillOpacity={0.2} />
-                              </div>
-                            )}
-                          </div>
-                          <div className="shop-card-meta">
-                            <span className="shop-category-near">{shop.category || 'General'}</span>
-                            <span className="shop-distance-near">
-                              <Navigation size={12} />
-                              {shop.distance} km from you
-                            </span>
-                            {shop.address && (
-                              <span className="shop-area-near">
-                                <MapPin size={12} />
-                                {shop.address}
+           {filteredShops.length > 0 ? (
+             filteredShops.map((shop, i) => (
+               <Motion.div 
+                 layout
+                 key={shop.id}
+                 initial={{ opacity: 0, y: 20 }}
+                 animate={{ opacity: 1, y: 0 }}
+                 exit={{ opacity: 0, scale: 0.95 }}
+                 transition={{ delay: i * 0.1 }}
+                 className="shop-card-near"
+                 onClick={() => handleOpenShop(shop)}
+               >
+                    <div className="shop-card-info">
+                       <div className="shop-card-header">
+                          <div className="neighbor-trust-row">
+                            <div className="shop-title-row">
+                              <h3>{shop.name}</h3>
+                              {shop.verified && (
+                                <div className="neighborhood-check-badge" title="Neighbor Verified">
+                                  <CheckCircle2 size={12} color="#ff7622" fill="#ff7622" fillOpacity={0.2} />
+                                </div>
+                              )}
+                            </div>
+                            <div className="shop-card-meta">
+                              <span className="shop-category-near">{shop.category || 'General'}</span>
+                              <span className="shop-distance-near">
+                                <Navigation size={12} />
+                                {shop.distance} km from you
                               </span>
-                            )}
+                              {shop.address && (
+                                <span className="shop-area-near">
+                                  <MapPin size={12} />
+                                  {shop.address}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                     </div>
-                  </div>
-                 <button 
-                   className="visit-shop-btn"
-                   onClick={(e) => { e.stopPropagation(); handleOpenShop(shop); }}
-                 >Order Now</button>
+                       </div>
+                    </div>
+                   <button 
+                     className="visit-shop-btn"
+                     onClick={(e) => { e.stopPropagation(); handleOpenShop(shop); }}
+                   >Order Now</button>
+               </Motion.div>
+             ))
+           ) : (
+             <Motion.div 
+               initial={{ opacity: 0 }}
+               animate={{ opacity: 1 }}
+               className="no-shops-found"
+               style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748b' }}
+             >
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛍️</div>
+                <h4 style={{ fontWeight: 800, color: '#0f172a' }}>No matching shops found</h4>
+                <p style={{ fontSize: '0.9rem' }}>Try searching for a different category or store name in your area.</p>
              </Motion.div>
-           ))}
+           )}
            </AnimatePresence>
         </div>
       </main>
@@ -408,27 +424,60 @@ const NearShops = ({ onBack, location, userCoords }) => {
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
                              <span style={{ fontWeight: 800, color: '#0f172a' }}>₹{product.price}</span>
-                             <button 
-                               onClick={(e) => handleAddToCart(e, product)} 
-                               style={{ 
-                                 background: 'var(--primary)', 
-                                 color: 'white', 
-                                 border: 'none', 
-                                 padding: '6px 14px', 
-                                 borderRadius: '10px', 
-                                 display: 'flex', 
-                                 alignItems: 'center', 
-                                 gap: '6px',
-                                 cursor: 'pointer',
-                                 fontWeight: 700,
-                                 fontSize: '0.8rem',
-                                 transition: 'transform 0.2s active'
-                               }}
-                               onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'}
-                               onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                             >
-                               <Plus size={16} /> ADD
-                             </button>
+                             {(() => {
+                                const cartItem = cartItems.find(item => item.id === product.id && item.type === 'product');
+                                return cartItem ? (
+                                  <div style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '10px', 
+                                    background: 'white', 
+                                    border: '1.5px solid var(--primary)',
+                                    borderRadius: '10px', 
+                                    padding: '4px 8px',
+                                    height: '32px',
+                                    boxSizing: 'border-box'
+                                  }}>
+                                     <button 
+                                       onClick={(e) => { e.stopPropagation(); updateQty(product.id, 'product', -1); }} 
+                                       style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 800, fontSize: '1.1rem', padding: '0 4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                     >
+                                       -
+                                     </button>
+                                     <span style={{ fontWeight: 800, color: '#0f172a', minWidth: '16px', textAlign: 'center', fontSize: '0.85rem' }}>
+                                       {cartItem.qty}
+                                     </span>
+                                     <button 
+                                       onClick={(e) => { e.stopPropagation(); updateQty(product.id, 'product', 1); }} 
+                                       style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 800, fontSize: '1.1rem', padding: '0 4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                     >
+                                       +
+                                     </button>
+                                  </div>
+                                ) : (
+                                  <button 
+                                    onClick={(e) => handleAddToCart(e, product)} 
+                                    style={{ 
+                                      background: 'var(--primary)', 
+                                      color: 'white', 
+                                      border: 'none', 
+                                      padding: '6px 14px', 
+                                      borderRadius: '10px', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      gap: '6px',
+                                      cursor: 'pointer',
+                                      fontWeight: 700,
+                                      fontSize: '0.8rem',
+                                      transition: 'transform 0.2s active'
+                                    }}
+                                    onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'}
+                                    onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                  >
+                                    <Plus size={16} /> ADD
+                                  </button>
+                                );
+                              })()}
                           </div>
                        </div>
                     </div>

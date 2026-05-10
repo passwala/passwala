@@ -198,6 +198,9 @@ const AppContent = ({
       console.error('Logout error:', error);
       localStorage.clear();
       window.location.href = '/';
+    } finally {
+      // 🛡️ Final Safety: Force hard refresh to clear Auth listeners
+      window.location.href = '/';
     }
   };
 
@@ -315,7 +318,7 @@ const AppContent = ({
                         <Essentials />
                         <NearbyDeals />
                         <Community />
-                        <VendorCTA onOpenVendor={() => window.open(`http://${window.location.hostname}:3002`, '_blank')} />
+                        <VendorCTA onOpenVendor={() => window.open(import.meta.env.VITE_VENDOR_PORTAL_URL || `http://${window.location.hostname}:3002`, '_blank')} />
                       </>
                     )}
                   </>
@@ -340,7 +343,7 @@ const AppContent = ({
                 <Route path="/help-support" element={effectiveUser ? <HelpSupport /> : <Navigate to="/" />} />
                 <Route path="/settings" element={effectiveUser ? <AppSettings isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/" />} />
                 <Route path="/select-location" element={effectiveUser ? <LocationSelector currentLocation={location} onLocationChange={setLocation} /> : <Navigate to="/" />} />
-                <Route path="/complete-profile" element={effectiveUser ? <CustomerDetails user={effectiveUser} onComplete={(addr) => { setIsProfileComplete(true); setUserAddress(addr); navigate('/'); }} /> : <Navigate to="/" />} />
+                <Route path="/complete-profile" element={effectiveUser ? <CustomerDetails user={effectiveUser} onComplete={(addr, name) => { setIsProfileComplete(true); setUserAddress(addr); if (name) { setUser(prev => ({ ...prev, displayName: name })); } navigate('/'); }} /> : <Navigate to="/" />} />
               </Routes>
             </main>
 
@@ -553,14 +556,21 @@ function App() {
         try {
           // 1. Fetch Supabase ID (UUID) for this user
           const phoneNo = u.phoneNumber?.replace('+91', '');
+          const rawPhone = u.phoneNumber;
+          
+          let orFilter = [];
+          if (u.email) orFilter.push(`email.eq.${u.email}`);
+          if (phoneNo) orFilter.push(`phone.eq.${phoneNo}`);
+          if (rawPhone) orFilter.push(`phone.eq.${rawPhone}`);
+          
           const { data: usr } = await supabase.from('users')
-            .select('id')
-            .or(`email.eq.${u.email}${phoneNo ? ',phone.eq.' + phoneNo : ''}`)
+            .select('id, full_name')
+            .or(orFilter.join(','))
             .maybeSingle();
 
           if (usr) {
             // Augment Firebase user with Supabase UUID
-            finalUser = { ...u, id: usr.id, uid: u.uid, email: u.email, phoneNumber: u.phoneNumber, displayName: u.displayName || manualUser?.displayName };
+            finalUser = { ...u, id: usr.id, uid: u.uid, email: u.email, phoneNumber: u.phoneNumber, displayName: usr.full_name || u.displayName || manualUser?.displayName };
 
             // 2. Fetch address using the UUID
             const { data: addr } = await supabase.from('addresses').select('*').eq('user_id', usr.id).maybeSingle();
@@ -586,12 +596,12 @@ function App() {
           setIsProfileComplete(wasComplete);
         }
       } else {
-        // Firebase user is null: ONLY set complete to false if there is NO manual user
+        // Firebase user is null
         if (!manualUser) {
           setIsProfileComplete(false);
           setUser(null);
         } else {
-          // Keep the manual user's completion status
+          // Keep manual user session
           setIsProfileComplete(wasComplete);
           setUser(manualUser);
         }

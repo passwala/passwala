@@ -7,7 +7,7 @@ import { MOCK_AI_RECOMMENDATIONS } from '../data/mockData';
 import './AIRecommendations.css';
 
 const AIRecommendations = () => {
-  const { addToCart } = useCart();
+  const { cartItems, addToCart, updateQty } = useCart();
   const { searchQuery } = useSearch();
   const [recs, setRecs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -65,10 +65,21 @@ const AIRecommendations = () => {
                   <div className="rec-badge">✨ Optimized</div>
                   <strong>{r.name}</strong>
                   <span>{r.reason}</span>
-                  <button className="book-btn-sm" onClick={() => {
-                    addToCart({ id: r.id, name: r.name, price: r.price, provider: r.provider, type: 'service' });
-                    toast.success(`${r.name} added to cart! 🛒`);
-                  }}>Book Now</button>
+                  {(() => {
+                    const cartItem = cartItems.find(item => item.id === r.id && item.type === 'service');
+                    return cartItem ? (
+                      <div className="rec-qty-selector" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'white', border: '1.5px solid var(--primary)', borderRadius: '25px', padding: '4px 8px', height: '36px', boxSizing: 'border-box', justifyContent: 'center', width: '100%', maxWidth: '120px', margin: '0 auto' }}>
+                        <button onClick={(e) => { e.stopPropagation(); updateQty(r.id, 'service', -1); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>-</button>
+                        <span style={{ fontWeight: 'bold', color: '#0f172a', minWidth: '12px', textAlign: 'center', fontSize: '0.85rem' }}>{cartItem.qty}</span>
+                        <button onClick={(e) => { e.stopPropagation(); updateQty(r.id, 'service', 1); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>+</button>
+                      </div>
+                    ) : (
+                      <button className="book-btn-sm" onClick={() => {
+                        addToCart({ id: r.id, name: r.name, price: r.price, provider: r.provider, type: 'service' });
+                        toast.success(`${r.name} added to cart! 🛒`);
+                      }}>Book Now</button>
+                    );
+                  })()}
                </div>
             </div>
           ))}

@@ -410,12 +410,28 @@
   border-radius: 16px;
   box-shadow: var(--card-shadow);
   border: 1px solid #e2e8f0;
+  overflow: hidden;
 }
 
 .table-scroll {
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+/* Elegant sleek scrollbar for table horizontal scrolls */
+.table-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.table-scroll::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+.table-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+.table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .table-actions {
@@ -467,29 +483,46 @@
   filter: brightness(1.1);
 }
 
+.add-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px rgba(249, 115, 22, 0.3);
+  filter: brightness(1.1);
+}
+
 .admin-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   white-space: nowrap;
 }
 
 .admin-table th {
   background: #f8fafc;
-  padding: 1rem 1.5rem;
+  padding: 1.15rem 1.5rem;
   text-align: left;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-weight: 700;
-  color: #64748b;
+  color: #475569;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .admin-table td {
-  padding: 1.25rem 1.5rem;
-  font-size: 0.9rem;
+  padding: 1.15rem 1.5rem;
+  font-size: 0.88rem;
+  color: #334155;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
+  transition: background-color 0.1s ease;
+}
+
+.admin-table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.admin-table tbody tr:hover {
+  background-color: #fafaf9;
 }
 
 .id-col { font-family: monospace; color: #94a3b8; font-weight: 600; }
