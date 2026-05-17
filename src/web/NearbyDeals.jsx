@@ -4,7 +4,6 @@ import { toast } from 'react-hot-toast';
 import { useCart } from '../context/CartContext';
 import { useSearch } from '../context/SearchContext';
 import { supabase } from '../supabase';
-import { MOCK_DEALS } from '../data/mockData';
 import './NearbyDeals.css';
 
 const NearbyDeals = () => {
@@ -18,10 +17,9 @@ const NearbyDeals = () => {
       try {
         const { data, error } = await supabase.from('deals').select('*').order('created_at', { ascending: false });
         
-        if (error || !data || data.length === 0) {
-          console.warn('Supabase fetch failed or returned empty, using mock data for deals.');
-          setDeals(MOCK_DEALS);
-        } else {
+        if (error) throw error;
+        
+        if (data) {
           // Filter unique names
           const uniqueData = data.reduce((acc, current) => {
             const x = acc.find(item => item.name === current.name);
@@ -32,7 +30,7 @@ const NearbyDeals = () => {
         }
       } catch (err) {
         console.error('Fetch deals error:', err);
-        setDeals(MOCK_DEALS);
+        setDeals([]);
       } finally {
         setLoading(false);
       }

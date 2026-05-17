@@ -359,14 +359,68 @@
   .shop-category-near { font-size: 0.7rem; }
 }
 
-/* --- PROPER ORANGE DARK MODE OVERRIDES (Minified) --- */
-.dark-mode .neighborhood-check-badge { background: #1e293b; border-color: #334155; }
-.dark-mode .marker-label {
-  background: #1e293b;
+/* --- UNIFIED TYPE TOGGLE (SHOPS VS SERVICES) --- */
+.type-toggle-container {
+  display: flex;
+  justify-content: center;
+  margin: 1.5rem 0;
+}
+
+.type-toggle-track {
+  background: var(--bg-card);
+  padding: 4px;
+  border-radius: 100px;
+  display: flex;
+  gap: 4px;
+  border: 1.5px solid var(--glass-border);
+  position: relative;
+  box-shadow: var(--shadow-sm);
+  width: 100%;
+  max-width: 400px;
+}
+
+.type-toggle-track button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0.8rem 1rem;
+  border-radius: 100px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 2;
+}
+
+.type-toggle-track button.active {
   color: white;
 }
 
-.dark-mode .mock-map {
-  filter: grayscale(1) invert(0.9) contrast(1.2);
-  opacity: 0.3;
+.type-toggle-track::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  height: calc(100% - 8px);
+  background: var(--primary);
+  border-radius: 100px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1;
+  box-shadow: 0 4px 15px rgba(255,118,34,0.3);
+}
+
+.type-toggle-track.SERVICES::before {
+  left: calc(50%);
+  background: #3b82f6; /* Blue for services */
+  box-shadow: 0 4px 15px rgba(59,130,246,0.3);
+}
+
+.type-toggle-track.SERVICES button.active {
+  color: white;
 }

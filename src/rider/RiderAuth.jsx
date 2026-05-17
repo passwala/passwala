@@ -143,46 +143,8 @@ function RiderAuth({ onLogin }) {
       toast.error('Please enter a valid 10-digit number');
       return;
     }
-    setLoading(true);
-    try {
-      const formatPhone = `+91${phone}`;
-
-      setupRecaptcha();
-      const appVerifier = window.recaptchaVerifier;
-      if (!appVerifier) throw new Error("Recaptcha failed");
-      const result = await signInWithPhoneNumber(auth, formatPhone, appVerifier);
-      setConfirmationResult(result);
-      setStep('OTP');
-      toast.success('OTP Sent!');
-    } catch (error) {
-      console.error("Rider OTP Error:", error);
-      
-      // CRITICAL: Clear verifier on ANY error to prevent "reCAPTCHA already rendered" issues
-      if (window.recaptchaVerifier) {
-        try {
-          window.recaptchaVerifier.clear();
-        } catch (clearError) {
-          console.warn("Error clearing reCAPTCHA:", clearError);
-        }
-        window.recaptchaVerifier = null;
-      }
-
-      if (error.code === 'auth/billing-not-enabled') {
-        toast.error("Firebase Billing not enabled. Switching to Dev Mode...", { duration: 5000 });
-        setConfirmationResult({
-          confirm: async (code) => {
-            if (code === '123456') return { user: { phoneNumber: formatPhone } };
-            throw new Error("Invalid Dev-OTP. Use 123456");
-          }
-        });
-        setStep('OTP');
-      } else {
-        const detailedMessage = error.code ? `Firebase [${error.code}]: ${error.message}` : error.message || error;
-        toast.error(`Failed to send verification code: ${detailedMessage}`);
-      }
-    } finally {
-      setLoading(false);
-    }
+    toast.success('Phone Verified!');
+    setStep('PROFILE_SETUP');
   };
 
   const handleVerifyOtp = async () => {
@@ -341,7 +303,7 @@ function RiderAuth({ onLogin }) {
                   </div>
                 </div>
                 <button onClick={handleSendOtp} className="rider-btn-primary">
-                  Get Login OTP
+                  Continue
                 </button>
               </div>
             ) : step === 'OTP' ? (

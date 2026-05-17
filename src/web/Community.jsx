@@ -13,11 +13,8 @@ const Community = () => {
       try {
         const { data, error } = await supabase.from('posts').select('*').order('created_at', { ascending: false });
         if (error) {
-           console.warn("Table not found, using fallback data.");
-           setPosts([
-             { id: 1, user_name: "Sarah J.", user_avatar: "SJ", location: "Block A", text: "Found great deals at the market today!", likes: 12, comments: 4, created_at: new Date().toISOString() },
-             { id: 2, user_name: "Rahul M.", user_avatar: "RM", location: "Block C", text: "Anyone need a plumber? Found a good one.", likes: 8, comments: 2, created_at: new Date().toISOString() }
-           ]);
+           console.warn("Supabase error fetching posts:", error);
+           setPosts([]);
            return;
         }
         setPosts(data || []);

@@ -3,7 +3,6 @@ import { toast } from 'react-hot-toast';
 import { useCart } from '../context/CartContext';
 import { useSearch } from '../context/SearchContext';
 import { supabase } from '../supabase';
-import { MOCK_AI_RECOMMENDATIONS } from '../data/mockData';
 import './AIRecommendations.css';
 
 const AIRecommendations = () => {
@@ -16,9 +15,9 @@ const AIRecommendations = () => {
     const fetchRecs = async () => {
       try {
         const { data, error } = await supabase.from('ai_recommendations').select('*').order('created_at', { ascending: false });
-        if (error || !data || data.length === 0) {
-           setRecs(MOCK_AI_RECOMMENDATIONS);
-        } else {
+        if (error) throw error;
+        
+        if (data) {
            // Filter unique names
            const uniqueData = data.reduce((acc, current) => {
              const x = acc.find(item => item.name === current.name);
@@ -29,7 +28,7 @@ const AIRecommendations = () => {
         }
       } catch (err) {
         console.error(err);
-        setRecs(MOCK_AI_RECOMMENDATIONS);
+        setRecs([]);
       } finally {
         setLoading(false);
       }

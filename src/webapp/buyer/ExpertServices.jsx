@@ -37,37 +37,74 @@ const ExpertServices = ({ onBack, location }) => {
 
   useEffect(() => {
     fetchExperts();
+    window.addEventListener('storage', fetchExperts);
+    return () => {
+      window.removeEventListener('storage', fetchExperts);
+    };
   }, []);
 
   useEffect(() => {
     setSelectedSub('All');
+    fetchExperts();
   }, [activeTab]);
 
   const fetchExperts = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('services')
-        .select('*')
-        .order('rating', { ascending: false });
-      
-      if (error) throw error;
-      
-      const uniqueExperts = [];
-      const seen = new Set();
-      
-      (data || []).forEach(item => {
-        const identifier = `${item.name}-${item.provider}`;
-        if (!seen.has(identifier)) {
-          seen.add(identifier);
-          uniqueExperts.push(item);
-        }
-      });
+      if (!supabase) return;
 
-      setExperts(uniqueExperts);
+      // 🔄 Join services with providers and users to get rich data
+      const { data: servicesData, error } = await supabase
+        .from('services')
+        .select(`
+          id, 
+          title, 
+          price, 
+          description,
+          duration_minutes,
+          service_providers (
+            id,
+            business_name,
+            rating,
+            is_verified,
+            about,
+            users (
+              full_name,
+              photo_url
+            )
+          ),
+          service_categories (
+            name
+          )
+        `);
+
+      if (error) throw error;
+
+      if (servicesData) {
+        const formatted = servicesData.map(s => {
+          const provider = s.service_providers || {};
+          const user = provider.users || {};
+          const category = s.service_categories?.name || 'Service';
+
+          return {
+            id: s.id,
+            name: user.full_name || provider.business_name || 'Expert Provider',
+            category: category,
+            price: s.price || 0,
+            image: user.photo_url || 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=500&q=80',
+            rating: provider.rating || 0,
+            recommendations: 0, // No simulation
+            experience: '',
+            verified: provider.is_verified || false,
+            description: s.description
+          };
+        });
+
+        setExperts(formatted);
+      }
     } catch (err) {
       console.error('Fetch experts error:', err);
-      setExperts([]);
+      toast.error('Could not load experts.');
     } finally {
       setLoading(false);
     }
@@ -134,22 +171,20 @@ const ExpertServices = ({ onBack, location }) => {
                   <div className="name-row">
                     <div className="title-stack">
                       <h3>{expert.name}</h3>
-                      <div className="neighbor-endorsement">
-                         <UserCheck size={12} color="var(--primary)" />
-                         <span>{t('trust_badge').replace('{n}', expert.recommendations || 0)} residents nearby</span>
-                      </div>
+                      {expert.recommendations > 0 && (
+                        <div className="neighbor-endorsement">
+                           <UserCheck size={12} color="var(--primary)" />
+                           <span>{t('trust_badge').replace('{n}', expert.recommendations)} residents nearby</span>
+                        </div>
+                      )}
                     </div>
                     <div className="rating-pill">
                       <Star size={12} fill="#FFB800" stroke="#FFB800" />
                       <span>{expert.rating}</span>
                     </div>
                   </div>
-                  <span className="expert-type">{expert.category} • {expert.experience || '5 yr+'} exp</span>
+                  <span className="expert-type">{expert.category}{expert.experience ? ` • ${expert.experience} exp` : ''}</span>
                   
-                  <div className="expert-features">
-                    <span className="feature"><Timer size={12} /> Live ETA: -- min</span>
-                    <span className="feature seconded"><CheckCircle size={12} /> Recommended locally</span>
-                  </div>
                </div>
             </div>
 

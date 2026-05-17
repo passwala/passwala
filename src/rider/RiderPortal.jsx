@@ -71,17 +71,17 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
             });
           }
         } catch (err) {
-          console.warn("Using mock stats for rider portal");
+          console.warn("Stats fetch failed, defaulting to zero");
           setStats({
-            earnings: 1250,
-            deliveries: 28
+            earnings: 0,
+            deliveries: 0
           });
         }
       } else {
-        // For demo or invalid IDs, use mock stats
+        // Default to zero for new or invalid riders
         setStats({
-          earnings: 1250,
-          deliveries: 28
+          earnings: 0,
+          deliveries: 0
         });
       }
     };

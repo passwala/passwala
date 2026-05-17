@@ -58,8 +58,12 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
     const fetchStats = async () => {
       try {
         if (!supabase) return;
-        const { count: sCount } = await supabase.from('services').select('*', { count: 'exact', head: true });
-        setLiveStats({ shops: sCount || 0, pro: Math.floor((sCount || 0) * 0.8) });
+        const { count: sCount } = await supabase.from('stores').select('*', { count: 'exact', head: true });
+        const { count: pCount } = await supabase.from('service_providers').select('*', { count: 'exact', head: true });
+        setLiveStats({ 
+          shops: sCount || 0, 
+          pro: pCount || 0 
+        });
       } catch (err) {
         setLiveStats({ shops: 0, pro: 0 });
       }

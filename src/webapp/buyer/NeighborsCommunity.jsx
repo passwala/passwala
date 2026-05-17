@@ -45,14 +45,28 @@ const NeighborsCommunity = ({ onBack, location }) => {
   const fetchPosts = async () => {
     try {
       setLoading(true);
+      if (!supabase) return;
+
       const { data, error } = await supabase
         .from('posts')
-        .select('*')
+        .select(`
+          *,
+          users (
+            full_name,
+            photo_url
+          )
+        `)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
       
-      setPosts(data || []);
+      const formatted = (data || []).map(p => ({
+        ...p,
+        user_name: p.users?.full_name || 'Passwala Resident',
+        user_photo: p.users?.photo_url
+      }));
+
+      setPosts(formatted);
     } catch (err) {
       console.error('Fetch posts error:', err);
       setPosts([]);
@@ -133,10 +147,12 @@ const NeighborsCommunity = ({ onBack, location }) => {
                 >
                   <div className="post-header">
                      <div className="post-user-info">
-                        <div className="post-avatar-initials">P</div>
+                        <div className="post-avatar-initials" style={{ overflow: 'hidden' }}>
+                           {post.user_photo ? <img src={post.user_photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : 'P'}
+                        </div>
                         <div className="name-time">
                            <div className="name-badge-row">
-                              <h3>Passwala Resident</h3>
+                              <h3>{post.user_name}</h3>
                               <div className="neighbor-verified-tag">VERIFIED</div>
                            </div>
                            <p>Satellite, Ahmedabad • <span>{new Date(post.created_at).toLocaleDateString()}</span></p>

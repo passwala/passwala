@@ -71,15 +71,15 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
 
       // --- SERVICE BOOKING FLOW ---
       else if (lowerInput.includes('leak') || lowerInput.includes('plumb') || lowerInput.includes('tap')) {
-        aiResponse = "I identify a Plumbing issue. 🚰 I've found 3 verified Plumbers in your neighborhood. Most residents prefer 'Ahmedabad Tap Experts' (4.9⭐). Should I book a inspection?";
+        aiResponse = "I identify a Plumbing issue. 🚰 I've found verified Plumbers in your neighborhood. Should I book a inspection with a top-rated professional?";
       }
       else if (lowerInput.includes('light') || lowerInput.includes('wire') || lowerInput.includes('fan') || lowerInput.includes('electric')) {
-        aiResponse = "Electrical issue detected. ⚡ I'm checking available 'Neighborhood Endorsed' electricians within 2km. One professional is just 15 mins away. Book now?";
+        aiResponse = "Electrical issue detected. ⚡ I'm checking available 'Neighborhood Endorsed' electricians. I've found a professional nearby. Book now?";
       }
 
       // --- ORDER TRACKING ---
       else if (lowerInput.includes('track') || lowerInput.includes('order status') || lowerInput.includes('kaha hai')) {
-        aiResponse = "I'm checking your active orders. 📦 Your 'Fresh Milk & Bread' order from Krishna Dairy is just 8 mins away. Ramesh Bhai is delivering it. You can see the live map in the 'Track' tab!";
+        aiResponse = "I'm checking your active orders. 📦 Your order is being prepared and will be with you shortly. You can see the live map in the 'Track' tab!";
       }
 
       // --- SCHEDULING & GROUPING ---

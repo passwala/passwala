@@ -160,11 +160,20 @@ router.delete('/:uid', async (req, res) => {
 
   try {
     // 1. Try finding by ID (UUID) first
-    let { data: user, error: findError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('id', identifier)
-      .maybeSingle();
+    let user = null;
+    let findError = null;
+    
+    // Only query by ID if the identifier is a valid UUID to prevent Postgres errors
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
+    if (isUuid) {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', identifier)
+        .maybeSingle();
+      user = data;
+      findError = error;
+    }
 
     // 2. Fallback to UID if not found by ID
     if (!user && !findError) {

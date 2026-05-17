@@ -59,8 +59,35 @@ const NearShops = ({ onBack, location, userCoords }) => {
   const currentArea = location?.split(',')[0] || 'Your Area';
   
   const { cartItems, addToCart, updateQty, setCartOpen, totalItems } = useCart();
-  const [selectedShop, setSelectedShop] = useState(null);
+  const [viewType, setViewType] = useState('SHOPS'); // 'SHOPS' or 'SERVICES'
   const [shopCatalog, setShopCatalog] = useState([]);
+
+  // Hash function for stable coordinates based on ID (fallback if lat/lng missing)
+  const getStableCoords = (id, type) => {
+    let hash = 0;
+    const inputStr = id || 'random-id';
+    for (let i = 0; i < inputStr.length; i++) {
+      hash = inputStr.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    let radius = 0.03;
+    let baseLat = userCoords?.lat || 23.0225;
+    let baseLng = userCoords?.lng || 72.5714;
+    
+    if (type === 'SERVICES') {
+      baseLat += 0.005; baseLng += 0.005; radius = 0.04;
+    }
+    
+    const latOffset = ((hash & 0xFF) / 255.0 - 0.5) * radius;
+    const lngOffset = (((hash >> 8) & 0xFF) / 255.0 - 0.5) * radius;
+    
+    return {
+      lat: baseLat + latOffset,
+      lng: baseLng + lngOffset
+    };
+  };
+
+  const [selectedShop, setSelectedShop] = useState(null);
 
   const handleOpenShop = async (shop) => {
     setSelectedShop(shop);
@@ -98,57 +125,73 @@ const NearShops = ({ onBack, location, userCoords }) => {
   };
 
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    if (!lat1 || !lon1 || !lat2 || !lon2) return (0.5 + Math.random() * 2).toFixed(1);
+    if (!lat1 || !lon1 || !lat2 || !lon2) return '0';
     const dist = getShortestPathDistance(lat1, lon1, lat2, lon2);
     return dist.toFixed(1);
   };
 
-  const fetchShops = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
+      const table = viewType === 'SHOPS' ? 'vendors' : 'service_providers';
       const { data, error } = await supabase
-        .from('vendors') 
+        .from(table) 
         .select('*');
       
       if (error) throw error;
       
-      const uniqueShops = [];
+      const uniqueItems = [];
       const seen = new Set();
       
       (data || []).forEach((item) => {
-        const title = item.business_name || item.name || 'Local Shop';
-        const identifier = `${title}-${item.category}`;
+        const title = item.business_name || item.name || (viewType === 'SHOPS' ? 'Local Shop' : 'Service Pro');
+        
+        // Quality Filter: Ignore if name is gibberish/too short
+        if (title.length < 3 || ['nnknn', 'nzbsh', 'asdf'].some(g => title.toLowerCase().includes(g))) return;
+
+        const identifier = `${title}-${item.id}`;
         if (!seen.has(identifier)) {
           seen.add(identifier);
-          uniqueShops.push({
+          
+          let lat = item.lat;
+          let lng = item.lng;
+          
+          // Fallback coords if missing
+          if (!lat || !lng) {
+            const fallback = getStableCoords(item.id, viewType);
+            lat = fallback.lat;
+            lng = fallback.lng;
+          }
+
+          uniqueItems.push({
             id: item.id,
             name: title,
-            category: item.category || 'General',
-            rating: 4.0 + Math.random(),
-            distance: calculateDistance(userCoords?.lat, userCoords?.lng, item.lat, item.lng),
-            lat: item.lat || 23.0225 + (Math.random() - 0.5) * 0.02, // Fallback near Ahmedabad
-            lng: item.lng || 72.5714 + (Math.random() - 0.5) * 0.02,
-            image: item.photo_url || "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80&w=800",
+            category: item.category || (viewType === 'SHOPS' ? 'General' : 'Professional Service'),
+            rating: item.rating || (viewType === 'SERVICES' ? 4.5 : 0),
+            distance: calculateDistance(userCoords?.lat, userCoords?.lng, lat, lng),
+            lat: lat,
+            lng: lng,
+            image: item.photo_url || (viewType === 'SHOPS' ? "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80&w=800" : "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=500&q=80"),
             isOpen: true,
-            verified: item.is_verified || true
+            verified: item.is_verified || false,
+            type: viewType
           });
         }
       });
-      setShops(uniqueShops);
+      setShops(uniqueItems);
     } catch (err) {
-      console.error("Failed to fetch shops:", err);
-      toast.error("Could not load nearby shops");
+      console.error("Failed to fetch data:", err);
+      toast.error(`Could not load nearby ${viewType.toLowerCase()}`);
     } finally {
       setLoading(false);
     }
-  }, [userCoords]);
+  }, [userCoords, viewType]);
 
   useEffect(() => {
-    fetchShops();
-    // Safety timeout to stop scanning after 3s
+    fetchData();
     const timer = setTimeout(() => setLoading(false), 3000);
     return () => clearTimeout(timer);
-  }, [location, fetchShops]);
+  }, [location, fetchData]);
 
   const filteredShops = shops.filter(shop => 
     shop.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -172,19 +215,38 @@ const NearShops = ({ onBack, location, userCoords }) => {
                 <Search size={20} className="search-icon-near" />
                 <input 
                   type="text" 
-                  placeholder="Search shops, categories..." 
+                  placeholder={viewType === 'SHOPS' ? "Search shops, items..." : "Search experts, services..."}
                   value={searchQuery}
-                  onFocus={() => toast('Searching locally in Ahmedabad...')}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
-                <Filter size={20} className="filter-icon-near" onClick={() => toast('Advanced filters enabled!')} />
              </div>
           </div>
+        </div>
+
+        {/* Unified Type Toggle */}
+        <div className="type-toggle-container">
+           <div className={`type-toggle-track ${viewType}`}>
+              <button 
+                className={viewType === 'SHOPS' ? 'active' : ''} 
+                onClick={() => setViewType('SHOPS')}
+              >
+                <ShoppingBag size={16} /> <span>Near Shops</span>
+              </button>
+              <button 
+                className={viewType === 'SERVICES' ? 'active' : ''} 
+                onClick={() => setViewType('SERVICES')}
+              >
+                <Star size={16} /> <span>Local Experts</span>
+              </button>
+           </div>
         </div>
         
         {/* New Category Tabs for Buyers */}
         <div className="category-scroll-near">
-           {['All', 'General Store', 'Grocery', 'Vegetables', 'Dairy', 'Bakery'].map(cat => (
+           {(viewType === 'SHOPS' 
+             ? ['All', 'General Store', 'Grocery', 'Vegetables', 'Dairy', 'Bakery']
+             : ['All', 'Plumbing', 'Electrical', 'AC Service', 'Cleaning', 'Carpentry']
+           ).map(cat => (
              <button 
                key={cat} 
                className={`cat-tab-near ${searchQuery.toLowerCase() === cat.toLowerCase() ? 'active' : ''}`}
@@ -221,46 +283,48 @@ const NearShops = ({ onBack, location, userCoords }) => {
                   </Marker>
                 )}
 
-                 {/* Shop Markers */}
-                 {filteredShops.map((shop) => {
-                    // 🛡️ Safety Check: Prevent Map Crash on invalid coordinates
-                    const lat = parseFloat(shop.lat);
-                    const lng = parseFloat(shop.lng);
+                  {/* Item Markers */}
+                  {filteredShops.map((item) => {
+                    const lat = parseFloat(item.lat);
+                    const lng = parseFloat(item.lng);
                     if (isNaN(lat) || isNaN(lng)) return null;
                     
+                    const isService = item.type === 'SERVICES';
+
                     return (
                       <Marker 
-                        key={shop.id} 
+                        key={item.id} 
                         position={[lat, lng]} 
-                        icon={orangeIcon}
+                        icon={isService ? blueIcon : orangeIcon}
                         eventHandlers={{
-                          click: () => handleOpenShop(shop),
+                          click: () => isService ? toast(`Connecting to ${item.name}...`) : handleOpenShop(item),
                         }}
                       >
-                     <Popup>
-                       <div style={{ padding: '4px' }}>
-                         <h4 style={{ margin: '0 0 4px 0', fontSize: '14px' }}>{shop.name}</h4>
-                         <p style={{ margin: 0, fontSize: '11px', color: '#666' }}>{shop.category}</p>
-                         <button 
-                           onClick={() => handleOpenShop(shop)}
-                           style={{ 
-                             marginTop: '8px', 
-                             background: 'var(--primary)', 
-                             color: 'white', 
-                             border: 'none', 
-                             padding: '4px 8px', 
-                             borderRadius: '4px', 
-                             fontSize: '11px', 
-                             width: '100%' 
-                           }}
-                         >
-                           View Catalog
-                         </button>
-                       </div>
-                     </Popup>
+                      <Popup>
+                        <div style={{ padding: '4px' }}>
+                          <h4 style={{ margin: '0 0 4px 0', fontSize: '14px' }}>{item.name}</h4>
+                          <p style={{ margin: 0, fontSize: '11px', color: '#666' }}>{item.category}</p>
+                          <button 
+                            onClick={() => isService ? toast.success(`Calling ${item.name}...`) : handleOpenShop(item)}
+                            style={{ 
+                              marginTop: '8px', 
+                              background: isService ? '#3b82f6' : 'var(--primary)', 
+                              color: 'white', 
+                              border: 'none', 
+                              padding: '4px 8px', 
+                              borderRadius: '4px', 
+                              fontSize: '11px', 
+                              width: '100%',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            {isService ? 'Book Service' : 'View Catalog'}
+                          </button>
+                        </div>
+                      </Popup>
                       </Marker>
                     );
-                 })}
+                  })}
                 
                 <RecenterMap coords={userCoords} />
              </MapContainer>
@@ -322,8 +386,17 @@ const NearShops = ({ onBack, location, userCoords }) => {
                     </div>
                    <button 
                      className="visit-shop-btn"
-                     onClick={(e) => { e.stopPropagation(); handleOpenShop(shop); }}
-                   >Order Now</button>
+                     onClick={(e) => { 
+                       e.stopPropagation(); 
+                       if (shop.type === 'SERVICES') {
+                         toast.loading(`Contacting ${shop.name}...`, { duration: 2000 });
+                       } else {
+                         handleOpenShop(shop); 
+                       }
+                     }}
+                   >
+                     {shop.type === 'SERVICES' ? 'Book Expert' : 'Order Now'}
+                   </button>
                </Motion.div>
              ))
            ) : (

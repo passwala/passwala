@@ -104,41 +104,8 @@ const Auth = ({ onLogin }) => {
     if (loading || phoneNumber.length !== 10) { toast.error('Enter valid 10-digit number'); return; }
     const formatPhone = `+91${phoneNumber}`;
 
-    try {
-      setLoading(true);
-
-      // -- ZEPTO STYLE: BACKGROUND TRUECALLER VERIFICATION --
-      // Step 2: Check Truecaller Installed (Mocked as true for demonstration)
-      const isTruecallerInstalled = true;
-
-      if (isTruecallerInstalled) {
-        toast.success('Authenticating via Truecaller...');
-
-        // Step 4: Call Truecaller verification SDK
-        await new Promise(res => setTimeout(res, 1200));
-
-        // Step 5 & 6: Backend verifies token & Generates JWT login session
-        // In production: const response = await fetch('/api/verify-truecaller', { method: 'POST', body: JSON.stringify({ token: truecallerToken }) });
-
-        toast.success('Verified automatically (No OTP)');
-        handleQuickLogin({ phoneNumber: formatPhone, uid: `tc-${phoneNumber}` }, 'truecaller');
-        return; // Step 6 complete: Stop execution, user logged in!
-      }
-      // -- END TRUECALLER LOGIC --
-
-      // Fallback: Proceed with custom mock OTP
-      toast.info("Dev Mode Active. Use: 123456");
-      setConfirmationResult({
-        confirm: async (code) => {
-          if (code === '123456') return { user: { phoneNumber: formatPhone, uid: `mock-${phoneNumber}` } };
-          throw new Error("Invalid Code");
-        }
-      });
-      setStep('OTP');
-      setTimer(30);
-    } catch (error) {
-      toast.error(`System Error: ${error?.message || 'Unknown error'}`);
-    } finally { setLoading(false); }
+    toast.success('Login Successful!');
+    handleQuickLogin({ phoneNumber: formatPhone, uid: `phone-${phoneNumber}` }, 'phone');
   };
 
   const handleVerifyOtp = async () => {
@@ -248,6 +215,18 @@ const Auth = ({ onLogin }) => {
   const finalizeLocation = (addressName, coords) => {
     localStorage.setItem('passwala_location', addressName);
     if (coords) localStorage.setItem('passwala_coords', JSON.stringify(coords));
+
+    const defaultAddr = {
+      address_line_1: addressName,
+      city: 'Ahmedabad',
+      state: 'Gujarat',
+      pincode: '380015',
+      society: addressName.split(',')[0],
+      house_no: 'Home',
+      floor: 'Ground',
+      is_default: true
+    };
+    localStorage.setItem('passwala_user_address', JSON.stringify(defaultAddr));
 
     const storedUser = localStorage.getItem('passwala_user');
     let currentUserToLog = syncedUser || (storedUser ? JSON.parse(storedUser) : null);
@@ -434,14 +413,6 @@ const Auth = ({ onLogin }) => {
                     <span className="see-all">See All &gt;</span>
                   </div>
 
-                  <div className="zepto-saved-card" onClick={() => finalizeLocation("Hive Hostel, Ahmedabad", { lat: 23.0225, lng: 72.5714 })}>
-                    <MapPin className="icon" size={20} />
-                    <div className="info">
-                      <span className="info-title">Hostel</span>
-                      <span className="info-desc">Hive Hostel, Mahalakshmi Cross Road, Shop No 12...</span>
-                    </div>
-                    <ChevronRight size={18} color="#cbd5e1" />
-                  </div>
 
                   <button className="zepto-search-btn" onClick={() => setShowSearch(true)}>
                     <Search size={18} />

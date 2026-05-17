@@ -57,18 +57,37 @@ router.post('/upsert', async (req, res) => {
         const userLinkedTables = ['riders', 'vendors', 'service_providers'];
         if (userLinkedTables.includes(table) && payload.phone) {
             console.log(`🔗 Linking user for ${table} via phone: ${payload.phone}`);
-            const { data: user, error: userError } = await supabase
+            // 1. Check if user exists by phone
+            const { data: existingUser } = await supabase
                 .from('users')
-                .upsert({ 
-                    phone: payload.phone, 
-                    full_name: payload.full_name || 'Admin Created'
-                }, { onConflict: 'phone' })
-                .select()
-                .single();
-            
-            if (userError) {
-                console.error('❌ Failed to link user:', userError.message);
+                .select('*')
+                .eq('phone', payload.phone)
+                .maybeSingle();
+
+            let user = existingUser;
+            const userPayload = {
+                phone: payload.phone,
+                full_name: payload.full_name || 'Admin Created'
+            };
+
+            if (existingUser) {
+                const { data, error } = await supabase
+                    .from('users')
+                    .update(userPayload)
+                    .eq('id', existingUser.id)
+                    .select()
+                    .single();
+                if (!error && data) user = data;
             } else {
+                const { data, error } = await supabase
+                    .from('users')
+                    .insert([userPayload])
+                    .select()
+                    .single();
+                if (!error && data) user = data;
+            }
+
+            if (user) {
                 finalPayload.user_id = user.id;
             }
         }

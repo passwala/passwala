@@ -51,7 +51,7 @@ const ScrollToTop = () => {
   const { pathname } = useLocation();
   useEffect(() => {
     window.scrollTo(0, 0);
-    const mainContent = document.querySelector('.webapp-main-content');
+    const mainContent = document.querySelector('.webapp-main');
     if (mainContent) mainContent.scrollTo(0, 0);
   }, [pathname]);
   return null;
@@ -171,9 +171,16 @@ const AppContent = ({
         await auth.signOut().catch(e => console.warn('Firebase Signout Skip:', e));
       }
 
+      // Preserve notification permission state across logouts
+      const notifStatus = localStorage.getItem('passwala_vendor_notifications');
+      
       // Clear ALL possible session markers
       localStorage.clear();
       sessionStorage.clear();
+
+      if (notifStatus) {
+        localStorage.setItem('passwala_vendor_notifications', notifStatus);
+      }
 
       // Clear React State
       setUser(null);
@@ -181,26 +188,18 @@ const AppContent = ({
 
       if (!skipToast) toast.success('Signed Out.');
 
-      // For Port 3000 (Webapp/Marketing) we can use navigate, 
-      // but for absolute certainty on deletion/logout, href is safer.
       if (window.location.port !== '3000') {
-        window.location.href = '/';
+        return;
       } else {
         navigate('/');
-        // Force a soft reload if still on dashboard
-        setTimeout(() => {
-          if (window.location.pathname === '/') {
-            // Ensure components re-render
-          }
-        }, 100);
       }
     } catch (error) {
       console.error('Logout error:', error);
+      const notifStatus = localStorage.getItem('passwala_vendor_notifications');
       localStorage.clear();
-      window.location.href = '/';
-    } finally {
-      // 🛡️ Final Safety: Force hard refresh to clear Auth listeners
-      window.location.href = '/';
+      if (notifStatus) {
+        localStorage.setItem('passwala_vendor_notifications', notifStatus);
+      }
     }
   };
 
@@ -215,7 +214,7 @@ const AppContent = ({
   const isAuthorizedAdmin = isAdmin || (effectiveUser && effectiveUser.role === 'ADMIN');
 
   return (
-    <div className="app-main-layout" style={(isVendorMode || locationPath === '/vendor' || isRiderMode || locationPath === '/rider' || isAdminMode) ? { width: '100%', margin: 0, padding: 0 } : {}}>
+    <div className="app-main-layout" style={(isVendorMode || locationPath === '/vendor' || isRiderMode || locationPath === '/rider' || isAdminMode) ? { width: '100%', height: '100vh', overflow: 'hidden', margin: 0, padding: 0 } : {}}>
       {/* 0. Admin Mode (Port 3005) - Strict Isolation */}
       {isAdminMode ? (
         !isAuthorizedAdmin ? (
@@ -227,7 +226,9 @@ const AppContent = ({
         (locationPath === '/vendor' || isVendorMode) ? (
           (!effectiveUser) ? (
             <VendorAuth onLogin={(phone, profile) => {
-              setUser({ ...profile, displayName: profile?.name || 'Vendor', phoneNumber: phone, role: 'VENDOR' });
+              const vendorObj = { ...profile, displayName: profile?.name || 'Vendor', phoneNumber: phone, role: 'VENDOR' };
+              setUser(vendorObj);
+              localStorage.setItem('passwala_user', JSON.stringify(vendorObj));
             }} />
           ) : (
             <VendorPortal user={effectiveUser} onLogout={handleLogout} />
@@ -244,7 +245,9 @@ const AppContent = ({
           /* Rider Mode (Port 3003) */
           (!effectiveUser) ? (
             <RiderAuth onLogin={(phone, profile) => {
-              setUser({ ...profile, displayName: profile.name, phoneNumber: phone, role: 'RIDER' });
+              const riderObj = { ...profile, displayName: profile.name, phoneNumber: phone, role: 'RIDER' };
+              setUser(riderObj);
+              localStorage.setItem('passwala_user', JSON.stringify(riderObj));
             }} />
           ) : (
             <RiderPortal
@@ -539,10 +542,24 @@ function App() {
 
     const unsub = onAuthStateChanged(auth, async (u) => {
       clearTimeout(authTimeout); // Firebase responded, clear timeout
-      // PROTECT: Don't overwrite a manual session (Rider/Vendor) with a null Firebase session
+      const isSpecialMode = window.location.port === '3002' || window.location.port === '3003' || window.location.port === '3005';
       const savedUser = localStorage.getItem('passwala_user');
       const manualUser = savedUser ? JSON.parse(savedUser) : null;
       const wasComplete = localStorage.getItem('passwala_profile_complete') === 'true';
+
+      if (isSpecialMode) {
+        if (!manualUser) {
+          setUser(null);
+          setIsProfileComplete(false);
+          setAuthLoading(false);
+          return;
+        } else {
+          setUser(manualUser);
+          setIsProfileComplete(wasComplete);
+          setAuthLoading(false);
+          return;
+        }
+      }
 
       if (!u && manualUser && manualUser.role && manualUser.role !== 'BUYER') {
         // Keep the manual session for non-buyers
@@ -578,7 +595,7 @@ function App() {
               setIsProfileComplete(true);
               setUserAddress(addr);
               // 📍 Update global location string to match the verified address
-              const displayLoc = addr.society || addr.city || location;
+              const displayLoc = addr.society || addr.city || localStorage.getItem('passwala_location') || 'Ahmedabad, Gujarat';
               setLocation(displayLoc);
               localStorage.setItem('passwala_location', displayLoc);
             } else {
@@ -604,6 +621,28 @@ function App() {
           // Keep manual user session
           setIsProfileComplete(wasComplete);
           setUser(manualUser);
+        }
+      }
+
+      if (wasComplete) {
+        setIsProfileComplete(true);
+        const savedAddr = localStorage.getItem('passwala_user_address');
+        if (savedAddr) {
+          setUserAddress(JSON.parse(savedAddr));
+        } else {
+          const savedLoc = localStorage.getItem('passwala_location') || 'Ahmedabad, Gujarat';
+          const fallbackAddr = {
+            address_line_1: savedLoc,
+            city: 'Ahmedabad',
+            state: 'Gujarat',
+            pincode: '380015',
+            society: savedLoc.split(',')[0],
+            house_no: 'Home',
+            floor: 'Ground',
+            is_default: true
+          };
+          setUserAddress(fallbackAddr);
+          localStorage.setItem('passwala_user_address', JSON.stringify(fallbackAddr));
         }
       }
 

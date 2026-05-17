@@ -1,38 +1,65 @@
 import React from 'react';
 import { toast } from 'react-hot-toast';
 import { PenTool, Zap, Droplets, Hammer, Trash2, Monitor } from 'lucide-react';
-import { useCart } from '../context/CartContext';
+import { supabase } from '../supabase';
 import './QuickServices.css';
 
-const services = [
-  { id: 301, name: 'AC Repair',    icon: <PenTool />, price: 999,  provider: 'Vikas Tech' },
-  { id: 302, name: 'Electrician', icon: <Zap />,      price: 299,  provider: 'Sparky' },
-  { id: 303, name: 'Plumber',     icon: <Droplets />, price: 399,  provider: 'AquaFix' },
-  { id: 304, name: 'Carpenter',   icon: <Hammer />,   price: 499,  provider: 'WoodWorks' },
-  { id: 305, name: 'Cleaning',    icon: <Trash2 />,   price: 2999, provider: 'CleanPro' },
-  { id: 306, name: 'Appliance',   icon: <Monitor />,  price: 599,  provider: 'FixIt Zone' },
-];
 
 const QuickServices = () => {
-  const { addToCart } = useCart();
+  const [categories, setCategories] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const fetchCats = async () => {
+      try {
+        const { data, error } = await supabase.from('service_categories').select('*').limit(6);
+        if (!error && data) {
+          setCategories(data);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCats();
+  }, []);
+
+  const getFallbackIcon = (name) => {
+    const n = name.toLowerCase();
+    if (n.includes('ac')) return <PenTool />;
+    if (n.includes('elect')) return <Zap />;
+    if (n.includes('plumb')) return <Droplets />;
+    if (n.includes('carp')) return <Hammer />;
+    if (n.includes('clean')) return <Trash2 />;
+    return <Monitor />;
+  };
+
   return (
     <section className="quick-services">
       <div className="container">
         <h3 className="section-title">Quick Services</h3>
         <div className="services-grid-icon">
-          {services.map(s => (
-            <div 
-              key={s.id} 
-              className="service-icon-card glass card-hover" 
-              onClick={() => {
-              addToCart({ id: s.id, name: s.name, price: s.price, provider: s.provider, type: 'service' });
-              toast.success(`${s.name} added to cart! 🛒`, { icon: '🛠️' });
-            }}
-            >
-              <div className="icon-box">{s.icon}</div>
-              <span>{s.name}</span>
-            </div>
-          ))}
+          {loading ? (
+            <div style={{ padding: '2rem', color: '#64748b', textAlign: 'center', width: '100%' }}>Loading services...</div>
+          ) : categories.length === 0 ? (
+            <div style={{ padding: '2rem', color: '#64748b', textAlign: 'center', width: '100%' }}>No services listed yet.</div>
+          ) : (
+            categories.map(s => (
+              <div 
+                key={s.id} 
+                className="service-icon-card glass card-hover" 
+                onClick={() => {
+                  toast(`Explore ${s.name} in the local hub!`, { icon: '🔍' });
+                }}
+              >
+                <div className="icon-box">
+                  {s.icon_url ? <img src={s.icon_url} alt={s.name} style={{ width: '24px', height: '24px' }} /> : getFallbackIcon(s.name)}
+                </div>
+                <span>{s.name}</span>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </section>

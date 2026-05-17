@@ -40,11 +40,12 @@ ADMIN_ACCESS_CODE=your_secure_admin_password
 ```
 
 ### 5. Database Setup (Supabase)
-To synchronize with the cloud architecture:
+To initialize your cloud database:
 1. Go to your [Supabase Dashboard](https://supabase.com/).
 2. Open the **SQL Editor**.
-3. Copy and run the contents of `supabase_schema.sql` to initialize tables.
-4. Copy and run the contents of `supabase_security_fix.sql` to apply the latest Row Level Security (RLS) policies.
+3. Create a **New Query**.
+4. Copy and run the entire contents of `database/schema/setup_complete.sql`.
+   - This single script will create all tables, set up security policies (RLS), and add initial neighborhood data for Satellite, Ahmedabad.
 
 ---
 

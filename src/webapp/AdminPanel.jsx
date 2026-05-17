@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   BarChart3,
   ShoppingBag,
@@ -39,7 +39,6 @@ import {
 } from 'lucide-react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@supabase/supabase-js';
-import { supabase } from '../supabase';
 import { toast } from 'react-hot-toast';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -51,13 +50,17 @@ const adminSupabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY
 );
+
+if (!import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY) {
+  console.warn('⚠️ Admin Panel is running with ANON_KEY. Some management functions may fail if RLS is enabled.');
+}
 const ActivityFeed = () => {
   const [recent, setRecent] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchRecent = async () => {
     try {
-      const { data: bData } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(5);
+      const { data: bData } = await adminSupabase.from('orders').select('*').order('created_at', { ascending: false }).limit(5);
       setRecent(bData || []);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -67,7 +70,7 @@ const ActivityFeed = () => {
     fetchRecent();
 
     // ⚡ REAL-TIME: Listen for any new orders platform-wide
-    const channel = supabase
+    const channel = adminSupabase
       .channel('admin-activity-pulse')
       .on('postgres_changes', {
         event: 'INSERT',
@@ -80,7 +83,7 @@ const ActivityFeed = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      adminSupabase.removeChannel(channel);
     };
   }, []);
 
@@ -113,6 +116,8 @@ const TABLE_SCHEMAS = {
   posts: { user_id: '', content: '', image_url: '', likes_count: 0 },
   notifications: { user_id: '', title: '', message: '', is_read: false },
   service_areas: { city: 'Ahmedabad', area_name: '', is_active: true },
+  stores: { vendor_id: '', name: '', description: '', address: '', is_open: true, rating: 0 },
+  service_categories: { name: '', icon_url: '' }
 };
 
 const DATABASE_SCHEMAS = {
@@ -153,7 +158,7 @@ const tabSections = [
   {
     label: 'Marketplace',
     items: [
-      { id: 'stores', label: 'Stores', icon: ShoppingBag, table: 'vendors' },
+      { id: 'stores', label: 'Stores', icon: ShoppingBag, table: 'stores' },
       { id: 'products', label: 'Products', icon: Package, table: 'products' },
       { id: 'payments', label: 'Payments', icon: CreditCard, table: 'service_bookings' },
       { id: 'deals', label: 'Deals & Offers', icon: Tag, table: 'deals' },
@@ -176,38 +181,7 @@ const tabSections = [
   }
 ];
 
-const MOCK_DATA = {
-  users: [
-    { id: 'u1', phone: '9876543210', full_name: 'Karan Kumar', email: 'karan@example.com', role: 'BUYER', created_at: new Date().toISOString() },
-    { id: 'u2', phone: '9988776655', full_name: 'Anita Sharma', email: 'anita@example.com', role: 'BUYER', created_at: new Date().toISOString() },
-    { id: 'u3', phone: '9123456789', full_name: 'Rahul Varma', email: 'rahul@example.com', role: 'BUYER', created_at: new Date().toISOString() }
-  ],
-  vendors: [
-    { id: 'v1', business_name: 'Satellite Bakers', phone: '9822110033', category: 'Bakery', is_verified: true, full_name: 'Vikram Singh' },
-    { id: 'v2', business_name: 'Fresh Fruits Hub', phone: '9766554433', category: 'Grocery', is_verified: false, full_name: 'Priya Patel' }
-  ],
-  riders: [
-    { id: 'r1', full_name: 'Suresh Express', vehicle_no: 'GJ-01-BK-1234', is_active: true, is_verified: true, phone: '9000111222' },
-    { id: 'r2', full_name: 'Amit Delivery', vehicle_no: 'GJ-01-CK-5678', is_active: false, is_verified: true, phone: '9111222333' }
-  ],
-  services: [
-    { id: 's1', title: 'AC Repairing', price: 499, duration_minutes: 60, description: 'Deep cleaning and gas refill' },
-    { id: 's2', title: 'Home Cleaning', price: 1200, duration_minutes: 180, description: 'Full 3BHK deep cleaning' }
-  ],
-  products: [
-    { id: 'p1', name: 'Premium Milk 1L', price: 65, discount_price: 60, is_active: true },
-    { id: 'p2', name: 'Brown Bread', price: 45, discount_price: 40, is_active: true }
-  ],
-  orders: [
-    { id: 'o1', total_amount: 1250, status: 'DELIVERED', created_at: new Date().toISOString() },
-    { id: 'o2', total_amount: 450, status: 'PLACED', created_at: new Date().toISOString() }
-  ],
-  service_areas: [
-    { id: 'sa1', city: 'Ahmedabad', area_name: 'Satellite', is_active: true },
-    { id: 'sa2', city: 'Ahmedabad', area_name: 'Bopal', is_active: true },
-    { id: 'sa3', city: 'Ahmedabad', area_name: 'Gota', is_active: false }
-  ]
-};
+// Mock data removed as platform is now fully integrated with Supabase.
 
 // --- Leaflet Colored Icons for Admin Map ---
 const mapRedIcon = new L.Icon({
@@ -269,12 +243,28 @@ function MapRecenter({ coords }) {
 const TABS = tabSections.flatMap(s => s.items);
 
 const AdminPanel = ({ onLogout, location }) => {
-  const [activeTab, setActiveTab] = useState(() => localStorage.getItem('admin_active_tab') || 'dashboard');
+  const [activeAdminTab, setActiveAdminTab] = useState(() => localStorage.getItem('admin_active_tab') || 'dashboard');
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [stats, setStats] = useState({ users: 0, services: 0, apps: 0, bookings: 0 });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const mainViewRef = useRef(null);
+
+  // Auto-scroll to top on tab change
+  useEffect(() => {
+    if (mainViewRef.current) {
+      mainViewRef.current.scrollTo({ top: 0 });
+    }
+    window.scrollTo(0, 0);
+  }, [activeAdminTab]);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    if (mainViewRef.current) {
+      mainViewRef.current.scrollTo(0, 0);
+    }
+  }, []);
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -291,31 +281,86 @@ const AdminPanel = ({ onLogout, location }) => {
   const [selectedPersonCoords, setSelectedPersonCoords] = useState(null);
   const [mapLoading, setMapLoading] = useState(false);
 
-  const currentTab = TABS.find(t => t.id === activeTab) || TABS[0];
+  const currentTab = useMemo(() => TABS.find(t => t.id === activeAdminTab) || TABS[0], [activeAdminTab]);
 
   const API_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
 
   const fetchStats = async () => {
     try {
-      if (!supabase) {
-        console.warn('Supabase not initialized for stats');
-        return;
-      }
-      const { count: uCount } = await supabase.from('users').select('*', { count: 'exact', head: true });
-      const { count: sCount } = await supabase.from('services').select('*', { count: 'exact', head: true });
-      const { count: unverifiedVendors } = await supabase.from('vendors').select('*', { count: 'exact', head: true }).eq('is_verified', false);
-      const { count: unverifiedRiders } = await supabase.from('riders').select('*', { count: 'exact', head: true }).eq('is_verified', false);
-      const { count: bCount } = await supabase.from('service_bookings').select('*', { count: 'exact', head: true });
-
-      const pendingTotal = (unverifiedVendors || 0) + (unverifiedRiders || 0);
+      const { count: userCount } = await adminSupabase.from('users').select('*', { count: 'exact', head: true });
+      const { count: vendorCount } = await adminSupabase.from('vendors').select('*', { count: 'exact', head: true });
+      const { count: orderCount } = await adminSupabase.from('orders').select('*', { count: 'exact', head: true });
+      const { count: productCount } = await adminSupabase.from('products').select('*', { count: 'exact', head: true });
 
       setStats({
-        users: uCount || 0,
-        services: sCount || 0,
-        apps: pendingTotal,
-        bookings: bCount || 0
+        users: userCount || 0,
+        vendors: vendorCount || 0,
+        orders: orderCount || 0,
+        activeItems: productCount || 0
       });
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error('Stats error:', err);
+    }
+  };
+
+  const handlePurgeMockData = async () => {
+    if (!window.confirm('This will permanently delete ALL mock data, test entries, and gibberish names (Super Plumber, nnknn, Test Vendor, etc.). Are you sure?')) return;
+    
+    try {
+      toast.loading('Performing deep purge of platform residue...', { id: 'purge' });
+      
+      const mockUserIds = [
+        '00000000-0000-0000-0000-000000000001', 
+        '00000000-0000-0000-0000-000000000002',
+        '00000000-0000-0000-0000-000000000003',
+        '00000000-0000-0000-0000-000000000004'
+      ];
+
+      // 1. Delete by specific IDs
+      await adminSupabase.from('services').delete().in('id', ['88888888-8888-8888-8888-888888888888']);
+      await adminSupabase.from('products').delete().in('id', ['55555555-5555-5555-5555-555555555555']);
+      await adminSupabase.from('product_categories').delete().in('id', ['44444444-4444-4444-4444-444444444444']);
+      await adminSupabase.from('service_categories').delete().in('id', ['77777777-7777-7777-7777-777777777777']);
+      await adminSupabase.from('stores').delete().in('id', ['22222222-2222-2222-2222-222222222222']);
+      await adminSupabase.from('service_providers').delete().in('id', ['66666666-6666-6666-6666-666666666666']);
+      await adminSupabase.from('riders').delete().in('id', ['33333333-3333-3333-3333-333333333333']);
+      await adminSupabase.from('vendors').delete().in('id', ['11111111-1111-1111-1111-111111111111']);
+      await adminSupabase.from('users').delete().in('id', mockUserIds);
+
+      // 2. Delete by suspicious names and gibberish patterns
+      const suspiciousWords = [
+        'test', 'fake', 'nnknn', 'nzbsh', 'dummy', 'asdf', 
+        'bjkb', 'mmmmm', 'nmnm', 'nmn', 'kevall', 'plumber',
+        '99999', '66666', '88888', '77777', '11111', '00000',
+        'sample', 'demo', 'example', 'xyz', 'test', 'admin'
+      ];
+      
+      const tablesToClean = ['vendors', 'users', 'service_providers', 'stores', 'riders', 'services', 'products'];
+      
+      for (const word of suspiciousWords) {
+        for (const table of tablesToClean) {
+          const nameField = (table === 'users') ? 'full_name' : (table === 'products' || table === 'services' || table === 'stores') ? 'name' : 'business_name';
+          await adminSupabase.from(table).delete().ilike(nameField, `%${word}%`);
+          
+          // Also check phone field if it exists
+          if (table !== 'products' && table !== 'services' && table !== 'product_categories' && table !== 'service_categories') {
+            await adminSupabase.from(table).delete().ilike('phone', `%${word}%`);
+          }
+        }
+      }
+
+      // 3. Delete exact duplicates or specific mock entries from the image
+      await adminSupabase.from('service_providers').delete().eq('business_name', 'Super Plumber');
+      await adminSupabase.from('service_providers').delete().eq('phone', '6666666666');
+      await adminSupabase.from('users').delete().eq('full_name', 'Kevallll');
+      await adminSupabase.from('users').delete().eq('phone', '9999999999');
+
+      toast.success('Platform is now clean and production-pure!', { id: 'purge' });
+      fetchStats();
+    } catch (err) {
+      console.error('Purge error:', err);
+      toast.error('Purge failed: ' + err.message, { id: 'purge' });
+    }
   };
 
   const fetchPeopleMapData = useCallback(async () => {
@@ -323,18 +368,27 @@ const AdminPanel = ({ onLogout, location }) => {
       setMapLoading(true);
       const combined = [];
 
-      // 1. Fetch Users, Vendors, Riders, Service Providers in parallel
+      // 1. Fetch Users, Vendors, Riders, Service Providers, and Stores in parallel
       const [
         { data: usersList, error: uErr },
         { data: vendorsList, error: vErr },
         { data: ridersList, error: rErr },
-        { data: providersList, error: pErr }
+        { data: providersList, error: pErr },
+        { data: storesList }
       ] = await Promise.all([
-        supabase.from('users').select('*'),
-        supabase.from('vendors').select('*'),
-        supabase.from('riders').select('*'),
-        supabase.from('service_providers').select('*')
+        adminSupabase.from('users').select('*'),
+        adminSupabase.from('vendors').select('*'),
+        adminSupabase.from('riders').select('*'),
+        adminSupabase.from('service_providers').select('*'),
+        adminSupabase.from('stores').select('*')
       ]);
+
+      const storeMap = {};
+      if (storesList) {
+        storesList.forEach(s => {
+          storeMap[s.vendor_id] = s;
+        });
+      }
 
       // Hash function for stable offsets in Ahmedabad
       const getStableCoords = (id, role) => {
@@ -386,21 +440,22 @@ const AdminPanel = ({ onLogout, location }) => {
         });
       }
 
-      // Map Vendors
+      // Map Vendors (joined with store locations)
       if (!vErr && vendorsList) {
         vendorsList.forEach(vendor => {
+          const store = storeMap[vendor.id];
           const coords = getStableCoords(vendor.id, 'Vendor');
           combined.push({
             id: vendor.id,
-            name: vendor.business_name || vendor.name || 'Merchant Partner',
+            name: vendor.business_name || vendor.name || (store ? store.name : 'Merchant Partner'),
             phone: vendor.phone,
             email: vendor.category || 'General Store',
             role: 'Vendor',
             status: vendor.is_verified ? 'Verified Partner' : 'Pending Verification',
             iconColor: 'orange',
-            lat: vendor.lat || coords.lat,
-            lng: vendor.lng || coords.lng,
-            meta: { category: vendor.category, license: vendor.license_no }
+            lat: (store && store.lat) ? store.lat : coords.lat,
+            lng: (store && store.lng) ? store.lng : coords.lng,
+            meta: { category: vendor.category, license: vendor.license_no, storeName: store?.name }
           });
         });
       }
@@ -453,12 +508,12 @@ const AdminPanel = ({ onLogout, location }) => {
   }, []);
 
   const fetchData = useCallback(async () => {
-    if (activeTab === 'dashboard') {
+    if (activeAdminTab === 'dashboard') {
       setLoading(false);
       return;
     }
     setLoading(true);
-    const currentTable = TABS.find(t => t.id === activeTab)?.table || activeTab;
+    const currentTable = TABS.find(t => t.id === activeAdminTab)?.table || activeAdminTab;
 
     try {
       if (!adminSupabase) throw new Error('Supabase client not initialized');
@@ -502,22 +557,22 @@ const AdminPanel = ({ onLogout, location }) => {
           }
         });
       } else {
-        setData(MOCK_DATA[currentTable] || []);
+        setData([]);
       }
     } finally {
       setLoading(false);
     }
-  }, [activeTab]);
+  }, [activeAdminTab]);
 
   useEffect(() => {
     fetchStats();
-    if (activeTab === 'people_map') {
+    if (activeAdminTab === 'people_map') {
       fetchPeopleMapData();
     } else {
       fetchData();
     }
-    localStorage.setItem('admin_active_tab', activeTab);
-  }, [activeTab, fetchData, fetchPeopleMapData]);
+    localStorage.setItem('admin_active_tab', activeAdminTab);
+  }, [activeAdminTab, fetchData, fetchPeopleMapData]);
 
   const handleExecuteDelete = async () => {
     if (!deleteConfirmId) return;
@@ -545,6 +600,15 @@ const AdminPanel = ({ onLogout, location }) => {
         (item.phone && item.phone !== deleteConfirmId)
       );
       localStorage.setItem(localKey, JSON.stringify(newLocal));
+
+      const cacheKey = `admin_cache_${currentTab.table}`;
+      const cached = JSON.parse(localStorage.getItem(cacheKey) || '[]');
+      const newCached = cached.filter(item =>
+        (item.id && item.id !== deleteConfirmId) &&
+        (item.uid && item.uid !== deleteConfirmId) &&
+        (item.phone && item.phone !== deleteConfirmId)
+      );
+      localStorage.setItem(cacheKey, JSON.stringify(newCached));
 
       setData(prev => prev.filter(item =>
         (item.id && item.id !== deleteConfirmId) &&
@@ -590,13 +654,17 @@ const AdminPanel = ({ onLogout, location }) => {
 
       const localKey = `admin_local_${currentTab.table}`;
       const localAdded = JSON.parse(localStorage.getItem(localKey) || '[]');
+      const cacheKey = `admin_cache_${currentTab.table}`;
+      const cachedList = JSON.parse(localStorage.getItem(cacheKey) || '[]');
 
       if (editingItem) {
         setData(data.map(item => item.id === editingItem.id ? { ...item, ...payload } : item));
+        localStorage.setItem(cacheKey, JSON.stringify(cachedList.map(item => item.id === editingItem.id ? { ...item, ...payload } : item)));
       } else {
         const newRecord = { ...payload, created_at: new Date().toISOString() };
         setData([newRecord, ...data]);
         localStorage.setItem(localKey, JSON.stringify([newRecord, ...localAdded]));
+        localStorage.setItem(cacheKey, JSON.stringify([newRecord, ...cachedList]));
       }
 
       // 2. Attempt Background Cloud Sync
@@ -619,15 +687,22 @@ const AdminPanel = ({ onLogout, location }) => {
           let user = null;
 
           if (finalPayload.user_id) {
-            // Update existing user to avoid INSERT NOT NULL constraint issues
-            const res = await adminSupabase.from('users').update(userPayload).eq('id', finalPayload.user_id).select().single();
+            // Update existing user
+            const res = await adminSupabase.from('users').update(userPayload).eq('id', finalPayload.user_id).select().maybeSingle();
             userError = res.error;
             user = res.data;
-          } else if (userPayload.phone) {
-            // New user, phone is required for insert
-            const res = await adminSupabase.from('users').upsert(userPayload, { onConflict: 'phone' }).select().single();
-            userError = res.error;
-            user = res.data;
+          } else if (finalPayload.phone) {
+            // 1. First check if user already exists by phone
+            const { data: existingUser } = await adminSupabase.from('users').select('*').eq('phone', finalPayload.phone).maybeSingle();
+            if (existingUser) {
+              const res = await adminSupabase.from('users').update(userPayload).eq('id', existingUser.id).select().single();
+              userError = res.error;
+              user = res.data || existingUser;
+            } else {
+              const res = await adminSupabase.from('users').insert([{ ...userPayload, phone: finalPayload.phone }]).select().single();
+              userError = res.error;
+              user = res.data;
+            }
           }
 
           if (userError) {
@@ -688,14 +763,18 @@ const AdminPanel = ({ onLogout, location }) => {
 
         if (returnedItem) {
           setData(prev => prev.map(item => item.id === payload.id ? returnedItem : item));
-          const localKey = `admin_local_${currentTab.table}`;
-          const localAdded = JSON.parse(localStorage.getItem(localKey) || '[]');
-          const newLocal = localAdded.map(item => item.id === payload.id ? returnedItem : item);
+          const localAddedCurrent = JSON.parse(localStorage.getItem(localKey) || '[]');
+          const newLocal = localAddedCurrent.map(item => item.id === payload.id ? returnedItem : item);
           localStorage.setItem(localKey, JSON.stringify(newLocal));
+
+          const cachedListCurrent = JSON.parse(localStorage.getItem(cacheKey) || '[]');
+          const newCached = cachedListCurrent.map(item => item.id === payload.id ? returnedItem : item);
+          localStorage.setItem(cacheKey, JSON.stringify(newCached));
         }
 
         toast.success('Synced with Cloud! ☁️', { id: 'offline-toast' });
         setSyncStatus('cloud');
+        fetchData(); // Instantly pull latest joined relations
       } catch (syncErr) {
         console.warn('Sync failed, record kept in Local Storage:', syncErr);
         setSyncStatus('offline');
@@ -765,6 +844,19 @@ const AdminPanel = ({ onLogout, location }) => {
       )
     );
 
+    // Client-side deduplication for "same data not a show" requirement
+    const uniqueEntries = [];
+    const seenSignatures = new Set();
+    filtered.forEach(item => {
+      const signature = `${item.phone || ''}_${item.full_name || item.business_name || item.name || ''}`.toLowerCase().trim();
+      if (!seenSignatures.has(signature)) {
+        uniqueEntries.push(item);
+        seenSignatures.add(signature);
+      }
+    });
+
+    const displayData = uniqueEntries;
+
     return (
       <div className="admin-table-container">
         <div className="table-actions">
@@ -799,7 +891,7 @@ const AdminPanel = ({ onLogout, location }) => {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((item) => {
+              {displayData.map((item) => {
                 const schema = TABLE_SCHEMAS[currentTab.table];
                 let keys = [];
                 if (schema) {
@@ -855,191 +947,7 @@ const AdminPanel = ({ onLogout, location }) => {
       </div>
     );
   };
-  const handleSeedData = async () => {
-    try {
-      toast.loading('Seeding platform data...', { id: 'seed' });
 
-      // 1. Create a Buyer
-      const buyerId = '00000000-0000-0000-0000-000000000001';
-      await supabase.from('users').upsert([{
-        id: buyerId,
-        phone: '9999999999',
-        full_name: 'John Doe',
-        email: 'john@example.com'
-      }]);
-
-      // 2. Create a Vendor User & Vendor Record
-      const vendorUserId = '00000000-0000-0000-0000-000000000002';
-      const vendorId = '11111111-1111-1111-1111-111111111111';
-      await supabase.from('users').upsert([{
-        id: vendorUserId,
-        phone: '8888888888',
-        full_name: 'Anita Owner',
-        email: 'anita@example.com'
-      }]);
-      await supabase.from('vendors').upsert([{
-        id: vendorId,
-        user_id: vendorUserId,
-        phone: '8888888888',
-        is_verified: true
-      }]);
-
-      // 3. Create a Store Record
-      const storeId = '22222222-2222-2222-2222-222222222222';
-      await supabase.from('stores').upsert([{
-        id: storeId,
-        vendor_id: vendorId,
-        name: 'Anita Bakers',
-        description: 'Delicious hot bread, pastries, and cakes baked daily.',
-        address: 'Downtown Street 10, Ahmedabad',
-        is_open: true,
-        rating: 4.8
-      }]);
-
-      // 4. Create a Rider User & Rider Record
-      const riderUserId = '00000000-0000-0000-0000-000000000003';
-      const riderId = '33333333-3333-3333-3333-333333333333';
-      await supabase.from('users').upsert([{
-        id: riderUserId,
-        phone: '7777777777',
-        full_name: 'Flash Rider',
-        email: 'flash@example.com'
-      }]);
-      await supabase.from('riders').upsert([{
-        id: riderId,
-        user_id: riderUserId,
-        vehicle_no: 'GJ-01-BK-9999',
-        license_no: 'DL-1234567890123',
-        id_proof: '123456789012',
-        is_active: true,
-        is_verified: true,
-        rating: 4.9,
-        total_deliveries: 120
-      }]);
-
-      // 5. Create a Service Provider User & Provider Record
-      const providerUserId = '00000000-0000-0000-0000-000000000004';
-      const providerId = '66666666-6666-6666-6666-666666666666';
-      await supabase.from('users').upsert([{
-        id: providerUserId,
-        phone: '6666666666',
-        full_name: 'Super Plumber',
-        email: 'plumber@example.com'
-      }]);
-      await supabase.from('service_providers').upsert([{
-        id: providerId,
-        user_id: providerUserId,
-        business_name: 'Plumbing Experts',
-        about: 'Pro plumbing services, leaks, pipe fixing and sanitary installations.',
-        rating: 4.7,
-        is_verified: true
-      }]);
-
-      // 6. Create Service Category & Service
-      const serviceCategoryId = '77777777-7777-7777-7777-777777777777';
-      const serviceId = '88888888-8888-8888-8888-888888888888';
-      await supabase.from('service_categories').upsert([{
-        id: serviceCategoryId,
-        name: 'Plumbing',
-        icon_url: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?auto=format&fit=crop&q=80&w=800'
-      }]);
-      await supabase.from('services').upsert([{
-        id: serviceId,
-        provider_id: providerId,
-        category_id: serviceCategoryId,
-        title: 'Leak Repair & Pipeline Fixing',
-        description: 'Quick repair of household water leaks and pipe replacements.',
-        price: 299.0,
-        duration_minutes: 45
-      }]);
-
-      // 7. Create a Product Category & Product
-      const productCategoryId = '44444444-4444-4444-4444-444444444444';
-      const productId = '55555555-5555-5555-5555-555555555555';
-      await supabase.from('product_categories').upsert([{
-        id: productCategoryId,
-        store_id: storeId,
-        name: 'Fresh Bread'
-      }]);
-      await supabase.from('products').upsert([{
-        id: productId,
-        store_id: storeId,
-        category_id: productCategoryId,
-        name: 'Whole Wheat Bread',
-        description: 'Healthy and fiber-rich whole wheat bread.',
-        price: 45.0,
-        discount_price: 40.0,
-        image_url: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&q=80&w=800',
-        is_active: true
-      }]);
-
-      toast.success('Platform seeded with real data!', { id: 'seed' });
-      fetchStats();
-    } catch (err) {
-      console.error('Seeding error details:', err);
-      toast.error('Seeding failed: ' + err.message, { id: 'seed' });
-    }
-  };
-
-  const handleAddSimulatedPerson = () => {
-    const names = [
-      'Rahul Sharma', 'Anjali Patel', 'Vikram Singh', 'Priya Mehta', 
-      'Amit Trivedi', 'Sneha Shah', 'Rohan Das', 'Deepak Verma'
-    ];
-    const roles = ['Buyer', 'Vendor', 'Rider', 'Provider'];
-    const categories = ['Grocery', 'Food Delivery', 'Electrical', 'Plumbing', 'Dairy'];
-    
-    const randomName = names[Math.floor(Math.random() * names.length)];
-    const randomRole = roles[Math.floor(Math.random() * roles.length)];
-    const randomCategory = categories[Math.floor(Math.random() * categories.length)];
-    const randomPhone = '9' + Math.floor(100000000 + Math.random() * 900000000);
-    
-    // Generate lat/lng offset near Ahmedabad center
-    const centerLat = 23.0225;
-    const centerLng = 72.5714;
-    const offsetLat = (Math.random() - 0.5) * 0.06;
-    const offsetLng = (Math.random() - 0.5) * 0.06;
-    
-    let iconColor = 'blue';
-    let status = 'Active';
-    let meta = {};
-    
-    if (randomRole === 'Buyer') {
-      iconColor = 'green';
-      status = 'Active';
-      meta = { role: 'BUYER', email: `${randomName.toLowerCase().replace(' ', '')}@example.com` };
-    } else if (randomRole === 'Vendor') {
-      iconColor = 'orange';
-      status = 'Verified Partner';
-      meta = { category: randomCategory, license: 'FSSAI-' + Math.floor(10000000000000 + Math.random() * 90000000000000) };
-    } else if (randomRole === 'Rider') {
-      iconColor = 'red';
-      status = 'On Duty';
-      meta = { rating: (4.0 + Math.random()).toFixed(1), deliveries: Math.floor(Math.random() * 200) + ' Deliveries' };
-    } else if (randomRole === 'Provider') {
-      iconColor = 'violet';
-      status = 'Verified Expert';
-      meta = { business: randomName + ' Services', rating: (4.2 + Math.random()).toFixed(1) };
-    }
-    
-    const newSimulated = {
-      id: 'sim_' + Date.now(),
-      name: randomName + ' (Simulated)',
-      phone: randomPhone,
-      email: randomRole === 'Rider' ? 'GJ01-A-' + Math.floor(1000 + Math.random() * 9000) : randomCategory,
-      role: randomRole,
-      status: status,
-      iconColor: iconColor,
-      lat: centerLat + offsetLat,
-      lng: centerLng + offsetLng,
-      meta: meta,
-      isSimulated: true
-    };
-    
-    setPeopleMapData(prev => [newSimulated, ...prev]);
-    setSelectedPersonCoords({ lat: newSimulated.lat, lng: newSimulated.lng });
-    toast.success(`Spawned live simulated ${randomRole} in Ahmedabad!`, { icon: '📍' });
-  };
 
   const renderPeopleMap = () => {
     const filteredPeople = peopleMapData.filter(p => {
@@ -1057,26 +965,28 @@ const AdminPanel = ({ onLogout, location }) => {
             <h1 className="admin-hero-title" style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>Live Community Locator</h1>
             <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '4px' }}>Real-time OpenStreetMap tracking of Users, Riders, and Merchant Partners across Ahmedabad.</p>
           </div>
-          <button 
-            type="button"
-            onClick={handleAddSimulatedPerson}
-            style={{ 
-              background: 'linear-gradient(135deg, #FF7622 0%, #FF9F66 100%)', 
-              color: 'white', 
-              border: 'none', 
-              padding: '12px 20px', 
-              borderRadius: '12px', 
-              fontWeight: 600, 
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 4px 14px rgba(255,118,34,0.35)',
-              transition: 'all 0.2s'
-            }}
-          >
-            <Plus size={18} /> Spawn Simulated Person
-          </button>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button 
+              type="button"
+              onClick={fetchPeopleMapData}
+              style={{ 
+                background: '#f1f5f9', 
+                color: '#475569', 
+                border: 'none', 
+                padding: '12px', 
+                borderRadius: '12px', 
+                fontWeight: 600, 
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.2s'
+              }}
+              title="Refresh Locations"
+            >
+              <History size={20} className={mapLoading ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </div>
 
         {/* Filters and Search Row */}
@@ -1335,10 +1245,9 @@ const AdminPanel = ({ onLogout, location }) => {
             <p>Active listing items</p>
           </div>
         </div>
-
         <div className="dashboard-actions-row" style={{ marginTop: '2rem' }}>
-          <button className="seed-btn" onClick={handleSeedData} style={{
-            background: 'linear-gradient(135deg, #FF7622 0%, #FF9F66 100%)',
+          <button className="purge-btn" onClick={handlePurgeMockData} style={{
+            background: 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)',
             color: 'white',
             padding: '12px 24px',
             borderRadius: '12px',
@@ -1348,9 +1257,9 @@ const AdminPanel = ({ onLogout, location }) => {
             alignItems: 'center',
             gap: '8px',
             cursor: 'pointer',
-            boxShadow: '0 4px 15px rgba(255, 118, 34, 0.3)'
+            boxShadow: '0 4px 15px rgba(239, 68, 68, 0.3)'
           }}>
-            <Database size={20} /> Seed Initial Platform Data
+            <Trash2 size={20} /> Purge Production Mock Residue
           </button>
         </div>
       </div>
@@ -1417,9 +1326,9 @@ const AdminPanel = ({ onLogout, location }) => {
               {section.items.map((tab) => (
                 <button
                   key={tab.id}
-                  className={`nav-item ${activeTab === tab.id ? 'active' : ''}`}
+                  className={`nav-item ${activeAdminTab === tab.id ? 'active' : ''}`}
                   onClick={() => {
-                    setActiveTab(tab.id);
+                    setActiveAdminTab(tab.id);
                     setIsSidebarOpen(false);
                   }}
                 >
@@ -1436,14 +1345,14 @@ const AdminPanel = ({ onLogout, location }) => {
         </button>
       </aside>
 
-      <main className="admin-main-view">
+      <main className="admin-main-view" ref={mainViewRef}>
         <header className="admin-top-bar">
           <div className="top-bar-left">
             <button className="mobile-menu-toggle" onClick={() => setIsSidebarOpen(true)}>
               <Menu size={24} />
             </button>
             <div className="breadcrumb">
-              <Database size={14} className="mobile-hide" /> <span className="mobile-hide">/ MASTER CONTROL /</span> <strong>{activeTab.toUpperCase()}</strong>
+              <Database size={14} className="mobile-hide" /> <span className="mobile-hide">/ MASTER CONTROL /</span> <strong>{activeAdminTab.toUpperCase()}</strong>
             </div>
           </div>
           <div className="admin-profile-pill">
@@ -1456,19 +1365,19 @@ const AdminPanel = ({ onLogout, location }) => {
         <div className="admin-scroll-content">
           <AnimatePresence mode='wait'>
             <Motion.div
-              key={activeTab}
+              key={activeAdminTab}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
             >
-              {activeTab === 'dashboard' ? (
+              {activeAdminTab === 'dashboard' ? (
                 <>
                   <h1 className="admin-hero-title">Platform Intelligence</h1>
                   <p style={{ color: '#64748b', marginBottom: '2rem' }}>Overview of your entire business ecosystem.</p>
                   {renderDashboard()}
                 </>
-              ) : activeTab === 'people_map' ? (
+              ) : activeAdminTab === 'people_map' ? (
                 renderPeopleMap()
               ) : syncStatus === 'missing_table' ? (
                 <div className="missing-table-notice animate-fade-in" style={{ padding: '3rem', background: '#fff1f2', borderRadius: '24px', border: '2px dashed #f43f5e', textAlign: 'center' }}>

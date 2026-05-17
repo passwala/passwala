@@ -152,6 +152,26 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
+  position: relative;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+
+/* Custom Scrollbar for Main Admin View */
+.admin-main-view::-webkit-scrollbar {
+  width: 8px;
+}
+.admin-main-view::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+.admin-main-view::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+.admin-main-view::-webkit-scrollbar-thumb:hover {
+  background: var(--sidebar-accent);
 }
 
 .admin-top-bar {
@@ -172,6 +192,14 @@
   display: flex;
   align-items: center;
   gap: 1rem;
+}
+
+.admin-scroll-content {
+  padding: 2rem;
+  padding-bottom: 5rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .mobile-menu-toggle {

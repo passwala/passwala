@@ -256,69 +256,9 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
       setShowConfirm(false);
       navigate('/track-orders');
     } catch (err) {
-      console.warn('Supabase checkout failed, applying high-fidelity client-side checkout fallback:', err);
-      
-      // Generate a mock order to bypass any offline or DB setup restrictions and succeed instantly
-      const fallbackOrderId = 'local_' + Math.random().toString(36).substring(2, 11);
-      
-      let localOrders = [];
-      try {
-        const stored = localStorage.getItem('passwala_local_orders');
-        if (stored) localOrders = JSON.parse(stored);
-      } catch (e) {
-        console.error("Failed to parse local orders:", e);
-      }
-      
-      const mockOrder = {
-        id: fallbackOrderId,
-        user_id: resolvedUserId || 'local_user',
-        store_id: resolvedStoreId || 'local_store',
-        address_id: resolvedAddressId || 'local_address',
-        status: 'PLACED',
-        subtotal: total,
-        delivery_fee: 0,
-        total_amount: total,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        stores: {
-          name: cartItems[0]?.store || 'Partner Store',
-          address: 'Ahmedabad Local Area',
-          lat: 23.0225,
-          lng: 72.5714
-        },
-        addresses: {
-          address_line_1: location || 'Ahmedabad, Gujarat',
-          lat: 23.0393,
-          lng: 72.5244
-        },
-        order_items: cartItems.map((item, idx) => ({
-          id: `item_${idx}`,
-          quantity: item.qty || 1,
-          price_at_purchase: item.price,
-          products: {
-            name: item.name,
-            type: item.type || 'essential'
-          }
-        })),
-        delivery_agent_name: 'Antigravity Delivery Partner',
-        eta: '12 mins'
-      };
-      
-      localOrders.unshift(mockOrder);
-      localStorage.setItem('passwala_local_orders', JSON.stringify(localOrders));
-      
-      const deliveryLoc = location ? location.split(',')[0] : 'Your Location';
-      toast.success(`Order placed (Offline Resilient Mode)! ₹${total.toLocaleString()} • Delivering to ${deliveryLoc}`, { icon: '✨', duration: 4500 });
-      addNotification({
-        icon: '📦',
-        title: 'Order Placed!',
-        body: `₹${total.toLocaleString()} • ${itemNames} • Your order has been received and will be delivered shortly to ${deliveryLoc}.`,
-        color: '#10b981',
-      });
-      clearCart();
-      setCartOpen(false);
+      console.error('Supabase checkout failed:', err);
+      toast.error(`Checkout failed: ${err.message || 'Please try again later'}`, { icon: '❌' });
       setShowConfirm(false);
-      navigate('/track-orders');
     }
   };
 

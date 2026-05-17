@@ -182,6 +182,19 @@ const CustomerDetails = ({ user, onComplete }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const newErrors = {};
+
+    if (view === 'identity') {
+      if (!formData.fullName) newErrors.fullName = 'Full Name is required';
+      if (!formData.phone) newErrors.phone = 'Phone Number is required';
+      if (Object.keys(newErrors).length > 0) {
+        setErrors(newErrors);
+        toast.error('Please fill in required fields', { id: 'form-validation' });
+        return;
+      }
+      setView('address_form');
+      return;
+    }
+
     if (!formData.fullName) newErrors.fullName = 'Full Name is required';
     if (!formData.phone) newErrors.phone = 'Phone Number is required';
     if (!formData.society) newErrors.society = 'Please select your area';
@@ -190,11 +203,6 @@ const CustomerDetails = ({ user, onComplete }) => {
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       toast.error('Please fill in required fields', { id: 'form-validation' });
-      return;
-    }
-
-    if (view === 'identity') {
-      setView('address_selection');
       return;
     }
 
@@ -284,6 +292,7 @@ const CustomerDetails = ({ user, onComplete }) => {
       };
       localStorage.setItem('local_user_profile', JSON.stringify(freshProfile));
       localStorage.setItem('passwala_profile_complete', 'true');
+      localStorage.setItem('passwala_user_address', JSON.stringify(savedAddr || freshProfile));
 
       if (onComplete) onComplete(savedAddr || freshProfile, formData.fullName);
     } catch (error) {
@@ -461,19 +470,17 @@ const CustomerDetails = ({ user, onComplete }) => {
             </div>
             <div className="footer-actions">
               {view !== 'identity' && (
-                <button type="button" className="back-btn-v5" onClick={() => setView(view === 'address_form' ? 'address_selection' : 'identity')}>
+                <button type="button" className="back-btn-v5" onClick={() => setView('identity')}>
                   Back
                 </button>
               )}
-              {view !== 'address_selection' && (
-                <button type="submit" className="save-btn-v5" disabled={loading}>
-                  {loading ? (
-                    <div className="details-spinner" />
-                  ) : (
-                    view === 'identity' ? "Next" : "Start Exploring"
-                  )}
-                </button>
-              )}
+              <button type="submit" className="save-btn-v5" disabled={loading}>
+                {loading ? (
+                  <div className="details-spinner" />
+                ) : (
+                  view === 'identity' ? "Next" : "Start Exploring"
+                )}
+              </button>
             </div>
           </div>
         </form>
