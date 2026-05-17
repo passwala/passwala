@@ -122,6 +122,9 @@ CREATE TABLE products (
     price DECIMAL(10,2) NOT NULL,
     discount_price DECIMAL(10,2),
     image_url TEXT,
+    barcode TEXT,
+    barcode_type VARCHAR(50) DEFAULT 'EAN-13',
+    stock_quantity INT DEFAULT 0,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
