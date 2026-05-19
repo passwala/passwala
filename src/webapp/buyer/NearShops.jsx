@@ -76,12 +76,44 @@ const NearShops = ({ onBack, location, userCoords }) => {
               .eq('provider_id', shop.id)
               .order('created_at', { ascending: false });
             if (!error && data) {
+                const getFallbackByName = (name = '') => {
+                  const norm = name.toLowerCase();
+                  if (norm.includes('ac') || norm.includes('appliance') || norm.includes('fridge') || norm.includes('washing')) {
+                    return 'https://images.unsplash.com/photo-1581578731522-aa02d681b94d?auto=format&fit=crop&q=80&w=400';
+                  }
+                  if (norm.includes('clean') || norm.includes('sanitize') || norm.includes('maid') || norm.includes('wash')) {
+                    return 'https://images.unsplash.com/photo-1581578731158-a5a3c262c1db?auto=format&fit=crop&q=80&w=400';
+                  }
+                  if (norm.includes('plumb') || norm.includes('leak') || norm.includes('pipe') || norm.includes('tap')) {
+                    return 'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&q=80&w=400';
+                  }
+                  if (norm.includes('electr') || norm.includes('wire') || norm.includes('fan') || norm.includes('switch')) {
+                    return 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&q=80&w=400';
+                  }
+                  if (norm.includes('carpenter') || norm.includes('wood') || norm.includes('door') || norm.includes('furniture')) {
+                    return 'https://images.unsplash.com/photo-1533090161767-e6ffed986c88?auto=format&fit=crop&q=80&w=400';
+                  }
+                  if (norm.includes('paint') || norm.includes('wall') || norm.includes('waterproof')) {
+                    return 'https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&q=80&w=400';
+                  }
+                  return 'https://images.unsplash.com/photo-1581578731522-aa02d681b94d?auto=format&fit=crop&q=80&w=400';
+                };
+
+                const getCleanImage = (imgSrc, name = '') => {
+                  if (!imgSrc || typeof imgSrc !== 'string') return getFallbackByName(name);
+                  const clean = imgSrc.trim();
+                  if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:') || clean.startsWith('/')) {
+                    return clean;
+                  }
+                  return getFallbackByName(name);
+                };
+
                 setShopCatalog(data.map(s => ({
                    id: s.id,
                    name: s.title || s.name,
                    detail: s.description,
                    price: s.price,
-                   image: s.image_url
+                   image: getCleanImage(s.image_url || s.image, s.title || s.name)
                 })));
             } else {
                 setShopCatalog([]);
@@ -93,12 +125,21 @@ const NearShops = ({ onBack, location, userCoords }) => {
               .eq('store_id', shop.id)
               .order('created_at', { ascending: false });
             if (!error && data) {
+                const getCleanProductImage = (imgSrc, name = '') => {
+                  if (!imgSrc || typeof imgSrc !== 'string') return 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=400'; // Default Premium Grocery
+                  const clean = imgSrc.trim();
+                  if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:') || clean.startsWith('/')) {
+                    return clean;
+                  }
+                  return 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=400';
+                };
+
                 setShopCatalog(data.map(p => ({
                    id: p.id,
                    name: p.name,
                    detail: p.description,
                    price: p.price,
-                   image: p.image_url
+                   image: getCleanProductImage(p.image_url || p.image, p.name)
                 })));
             } else {
                 setShopCatalog([]);

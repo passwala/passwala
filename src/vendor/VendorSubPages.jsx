@@ -7,6 +7,38 @@ import { motion, AnimatePresence } from 'framer-motion';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
+const getFallbackByName = (name = '') => {
+  const norm = name.toLowerCase();
+  if (norm.includes('ac') || norm.includes('appliance') || norm.includes('fridge') || norm.includes('washing')) {
+    return 'https://images.unsplash.com/photo-1581578731522-aa02d681b94d?auto=format&fit=crop&q=80&w=400';
+  }
+  if (norm.includes('clean') || norm.includes('sanitize') || norm.includes('maid') || norm.includes('wash')) {
+    return 'https://images.unsplash.com/photo-1581578731158-a5a3c262c1db?auto=format&fit=crop&q=80&w=400';
+  }
+  if (norm.includes('plumb') || norm.includes('leak') || norm.includes('pipe') || norm.includes('tap')) {
+    return 'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&q=80&w=400';
+  }
+  if (norm.includes('electr') || norm.includes('wire') || norm.includes('fan') || norm.includes('switch')) {
+    return 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&q=80&w=400';
+  }
+  if (norm.includes('carpenter') || norm.includes('wood') || norm.includes('door') || norm.includes('furniture')) {
+    return 'https://images.unsplash.com/photo-1533090161767-e6ffed986c88?auto=format&fit=crop&q=80&w=400';
+  }
+  if (norm.includes('paint') || norm.includes('wall') || norm.includes('waterproof')) {
+    return 'https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&q=80&w=400';
+  }
+  return 'https://images.unsplash.com/photo-1581578731522-aa02d681b94d?auto=format&fit=crop&q=80&w=400';
+};
+
+const getCleanImage = (imgSrc, name = '') => {
+  if (!imgSrc || typeof imgSrc !== 'string') return getFallbackByName(name);
+  const clean = imgSrc.trim();
+  if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:') || clean.startsWith('/')) {
+    return clean;
+  }
+  return getFallbackByName(name);
+};
+
 export const VendorInventory = ({ businessType, storeId }) => {
   const [items, setItems] = React.useState([]);
   const [showForm, setShowForm] = React.useState(false);
@@ -357,7 +389,7 @@ export const VendorInventory = ({ businessType, storeId }) => {
             className="v-data-card"
           >
             <div className="v-card-image-wrap">
-              <img src={item.image || 'https://images.unsplash.com/photo-1581578731522-aa02d681b94d?auto=format&fit=crop&q=80&w=400'} alt={item.name} className="v-card-img" />
+              <img src={getCleanImage(item.image, item.name)} alt={item.name} className="v-card-img" />
               <div className="v-card-overlay" />
               
               <div className="v-card-actions">
