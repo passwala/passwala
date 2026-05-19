@@ -17,7 +17,23 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
   const [rejectedOrderIds, setRejectedOrderIds] = useState([]);
   const [incomingOrder, setIncomingOrder] = useState(null);
   const [deliveryStep, setDeliveryStep] = useState(0);
-  const [mapCoords, setMapCoords] = useState({ lat: userCoords?.lat || 23.0225, lng: userCoords?.lng || 72.5714 }); // Default Ahmedabad
+  // Ahmedabad service boundary constraint (approx. 50km from Ahmedabad center 23.0225, 72.5714)
+  const constrainToAhmedabad = (coords) => {
+    if (!coords || isNaN(coords.lat) || isNaN(coords.lng)) {
+      return { lat: 23.0225, lng: 72.5714 };
+    }
+    const distToAhmedabad = Math.sqrt(Math.pow(coords.lat - 23.0225, 2) + Math.pow(coords.lng - 72.5714, 2)) * 111;
+    if (distToAhmedabad > 50) {
+      // If coordinates are outside Ahmedabad (e.g. Hyderabad / remote testing), automatically constrain to Ahmedabad
+      return { lat: 23.0225, lng: 72.5714 };
+    }
+    return coords;
+  };
+
+  const [mapCoords, setMapCoords] = useState(() => {
+    const initial = { lat: userCoords?.lat || 23.0225, lng: userCoords?.lng || 72.5714 };
+    return constrainToAhmedabad(initial);
+  });
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [isManualLocation, setIsManualLocation] = useState(false);
   const navigate = useNavigate();
@@ -99,7 +115,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
   // Sync coords on prop change
   useEffect(() => {
     if (userCoords && !isManualLocation) {
-      setMapCoords({ lat: userCoords.lat, lng: userCoords.lng });
+      setMapCoords(constrainToAhmedabad({ lat: userCoords.lat, lng: userCoords.lng }));
     }
   }, [userCoords, isManualLocation]);
 
@@ -143,7 +159,14 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     
     const handleFallback = () => {
        if (userCoords) {
-         setMapCoords({ lat: userCoords.lat, lng: userCoords.lng });
+         const constrained = constrainToAhmedabad({ lat: userCoords.lat, lng: userCoords.lng });
+         setMapCoords(constrained);
+         const dist = Math.sqrt(Math.pow(userCoords.lat - 23.0225, 2) + Math.pow(userCoords.lng - 72.5714, 2)) * 111;
+         if (dist > 50) {
+           setRiderLocation("Sindhu Bhavan Road, Ahmedabad");
+         } else {
+           setRiderLocation(riderLocation || "Ahmedabad, Gujarat");
+         }
        } else {
          setMapCoords({ lat: 23.0225, lng: 72.5714 });
          setRiderLocation("Ahmedabad, Gujarat");
@@ -155,34 +178,42 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       navigator.geolocation.getCurrentPosition(async (position) => {
         try {
           const { latitude, longitude } = position.coords;
-          setMapCoords({ lat: latitude, lng: longitude });
+          const distToAhmedabad = Math.sqrt(Math.pow(latitude - 23.0225, 2) + Math.pow(longitude - 72.5714, 2)) * 111;
           
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
-          if (!res.ok) throw new Error('Geocoding failed');
-          const data = await res.json();
-          const addr = data.address;
-          
-          const detectedCity = (addr.city || addr.town || addr.village || addr.state_district || addr.county || '').toLowerCase();
-          const addressSearchString = Object.values(addr).join(' ').toLowerCase();
-          
-          if (detectedCity.includes('ahmedabad')) {
-            const isServiceable = activeAreas.length === 0 || activeAreas.some(a => {
-              const areaName = a.area_name.toLowerCase();
-              return addressSearchString.includes(areaName) || areaName.includes(addressSearchString);
-            });
+          if (distToAhmedabad > 50) {
+            // Rider is physically outside Ahmedabad (e.g. Hyderabad / remote testing)
+            setMapCoords({ lat: 23.0225, lng: 72.5714 });
+            setRiderLocation("Sindhu Bhavan Road, Ahmedabad");
+            setIsDetecting(false);
+          } else {
+            setMapCoords({ lat: latitude, lng: longitude });
+            
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+            if (!res.ok) throw new Error('Geocoding failed');
+            const data = await res.json();
+            const addr = data.address;
+            
+            const detectedCity = (addr.city || addr.town || addr.village || addr.state_district || addr.county || '').toLowerCase();
+            const addressSearchString = Object.values(addr).join(' ').toLowerCase();
+            
+            if (detectedCity.includes('ahmedabad')) {
+              const isServiceable = activeAreas.length === 0 || activeAreas.some(a => {
+                const areaName = a.area_name.toLowerCase();
+                return addressSearchString.includes(areaName) || areaName.includes(addressSearchString);
+              });
 
-            if (isServiceable) {
-              const specificPart = addr.road || addr.suburb || addr.neighbourhood || addr.amenity || '';
-              const full = specificPart ? `${specificPart}, Ahmedabad` : 'Ahmedabad, Gujarat';
-              setRiderLocation(full.replace(/^,|,$/g, '').trim());
+              if (isServiceable) {
+                const specificPart = addr.road || addr.suburb || addr.neighbourhood || addr.amenity || '';
+                const full = specificPart ? `${specificPart}, Ahmedabad` : 'Ahmedabad, Gujarat';
+                setRiderLocation(full.replace(/^,|,$/g, '').trim());
+              } else {
+                setRiderLocation("Your area coming soon");
+              }
             } else {
               setRiderLocation("Your area coming soon");
             }
-          } else {
-            setRiderLocation("Your area coming soon");
+            setIsDetecting(false);
           }
-          
-          setIsDetecting(false);
         } catch(e) {
           handleFallback();
         }
