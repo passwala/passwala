@@ -243,7 +243,8 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           const validOrder = data.find(order => {
             const storeCoords = { lat: order.stores?.lat || 23.0225, lng: order.stores?.lng || 72.5714 };
             const dist = getShortestPathDistance(mapCoords.lat, mapCoords.lng, storeCoords.lat, storeCoords.lng);
-            return dist <= 15;
+            // Allow up to 10,000 km to support seamless local/deployed testing across different coordinates/cities (e.g. Hyderabad map vs Ahmedabad default)
+            return dist <= 10000;
           });
 
           if (!validOrder) return;
