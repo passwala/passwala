@@ -23,15 +23,15 @@ const VendorAuth = ({ onLogin }) => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fdfdfd', padding: '16px' }}>
-      <div className="glass slide-up" style={{ width: '100%', maxWidth: '420px', padding: '2.5rem 1.5rem', margin: '0 auto', textAlign: 'center', backgroundColor: 'white', borderRadius: '28px', boxShadow: '0 20px 40px -12px rgba(0, 0, 0, 0.1)', border: '1px solid #f1f5f9' }}>
+    <div className="vendor-auth-container">
+      <div className="vendor-auth-card glass slide-up">
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ width: '100%' }}>
-          <div className="auth-header" style={{ marginBottom: '1.75rem' }}>
-            <div className="auth-logo-wrapper" style={{ width: '64px', height: '64px', marginBottom: '1rem' }}>
-              <img src="/logo.png" alt="Passwala Logo" className="auth-logo" style={{ width: '42px', height: '42px' }} />
+          <div className="auth-header">
+            <div className="auth-logo-wrapper">
+              <img src="/logo.png" alt="Passwala Logo" className="auth-logo" />
             </div>
-            <h2 className="auth-title" style={{ fontSize: '1.5rem', marginBottom: '4px' }}>Passwala Partner</h2>
-            <p className="auth-subtitle" style={{ fontSize: '0.9rem' }}>Professional portal for vendors & experts</p>
+            <h2 className="auth-title">Passwala Partner</h2>
+            <p className="auth-subtitle">Professional portal for vendors & experts</p>
           </div>
 
           <form onSubmit={handleSendOTP} className="auth-form mt-4">

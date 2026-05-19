@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, FileText, IndianRupee, Wallet, Star, Bell, HelpCircle, CheckCircle, Clock, MapPin, Download, ArrowUpRight, ArrowDownRight, Tag, Trash2, PackagePlus, Camera } from 'lucide-react';
+import { Package, FileText, IndianRupee, Wallet, Star, Bell, HelpCircle, CheckCircle, Clock, MapPin, Download, ArrowUpRight, ArrowDownRight, Tag, Trash2, PackagePlus, Camera, Wrench } from 'lucide-react';
 import { supabase } from '../supabase';
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
@@ -18,7 +18,8 @@ export const VendorInventory = ({ businessType, storeId }) => {
        }
        
        let dbItems = [];
-       if (supabase) {
+       const isValidUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(storeId);
+       if (supabase && isValidUuid) {
          try {
            const targetTable = businessType === 'shop' ? 'products' : 'services';
            const idCol = businessType === 'shop' ? 'store_id' : 'provider_id';
@@ -60,7 +61,7 @@ export const VendorInventory = ({ businessType, storeId }) => {
          }
        });
 
-       if (unique.length === 0) {
+       if (false) {
          const demos = businessType === 'shop' ? [
            { id: 'd1', name: 'Fresh Farm Milk', detail: 'Organic A2 cow milk, delivered fresh every morning.', price: 75, image: 'https://images.unsplash.com/photo-1550583724-125581f7793d?auto=format&fit=crop&q=80&w=400', type: 'shop' },
            { id: 'd2', name: 'Artisan Brown Bread', detail: 'Freshly baked whole wheat bread with no preservatives.', price: 55, image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&q=80&w=400', type: 'shop' }
@@ -75,6 +76,14 @@ export const VendorInventory = ({ businessType, storeId }) => {
     };
     fetchCatalog();
   }, [storeId, businessType]);
+
+  // Synchronize react items state to localStorage automatically on state changes
+  React.useEffect(() => {
+    if (items.length > 0) {
+      const cleanItems = items.filter(i => !i.id.toString().startsWith('d') && !i.id.toString().startsWith('s'));
+      localStorage.setItem('vVendorItems', JSON.stringify(cleanItems));
+    }
+  }, [items]);
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -145,26 +154,26 @@ export const VendorInventory = ({ businessType, storeId }) => {
     setNewItem({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '' });
     setShowForm(false);
 
-    if (storeId) {
+    if (storeId && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(storeId)) {
       try {
          const targetTable = businessType === 'shop' ? 'products' : 'services';
          const payload = businessType === 'shop' ? {
            store_id: storeId,
-           name: newItem.name,
+           name: newProductObj.name,
            category_id: '44444444-4444-4444-4444-444444444444',
-           description: newItem.detail || 'Added Manually',
-           price: parseFloat(newItem.price),
-           image_url: newItem.image,
-           barcode: newItem.barcode || null,
-           barcode_type: newItem.barcode_type || 'EAN-13',
-           stock_quantity: newItem.stock_quantity ? parseInt(newItem.stock_quantity) : 0,
+           description: newProductObj.detail || 'Added Manually',
+           price: parseFloat(newProductObj.price),
+           image_url: newProductObj.image,
+           barcode: newProductObj.barcode || null,
+           barcode_type: newProductObj.barcode_type || 'EAN-13',
+           stock_quantity: newProductObj.stock_quantity ? parseInt(newProductObj.stock_quantity) : 0,
            is_active: true
          } : {
            provider_id: storeId,
-           title: newItem.name,
+           title: newProductObj.name,
            category_id: '77777777-7777-7777-7777-777777777777',
-           description: newItem.detail || 'Added Manually',
-           price: parseFloat(newItem.price),
+           description: newProductObj.detail || 'Added Manually',
+           price: parseFloat(newProductObj.price),
            duration_minutes: 60
          };
          const { data, error } = await supabase.from(targetTable).insert([payload]).select();
@@ -207,9 +216,15 @@ export const VendorInventory = ({ businessType, storeId }) => {
         <div className="v-hero-info">
           <div className="v-hero-badge">
             <div className="v-hero-badge-icon" style={{ background: '#fff7ed' }}>
-              <Package size={20} color="#f97316" />
+              {businessType === 'shop' ? (
+                <Package size={20} color="#f97316" />
+              ) : (
+                <Wrench size={20} color="#f97316" />
+              )}
             </div>
-            <span className="v-hero-badge-text" style={{ color: '#f97316' }}>Store Management</span>
+            <span className="v-hero-badge-text" style={{ color: '#f97316' }}>
+              {businessType === 'shop' ? 'Store Management' : 'Service Management'}
+            </span>
           </div>
           <h1 className="v-hero-title">{businessType === 'shop' ? 'Product Catalog' : 'Service Menu'}</h1>
           <p className="v-hero-subtitle">
@@ -234,21 +249,20 @@ export const VendorInventory = ({ businessType, storeId }) => {
             initial={{ opacity: 0, scale: 0.95, y: -20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -20 }}
-            className="v-data-card"
-            style={{ padding: '3rem', marginBottom: '4rem', border: '1px solid var(--v-primary)', boxShadow: '0 30px 60px -12px rgba(249, 115, 22, 0.1)' }}
+            className="v-data-card v-form-card"
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
+            <div className="v-form-header">
               <div>
-                <h3 style={{ margin: 0, fontWeight: 950, fontSize: '1.75rem', letterSpacing: '-0.8px' }}>
+                <h3 className="v-form-header-title">
                   {editingId ? 'Edit Listing' : 'Publish New Offering'}
                 </h3>
-                <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '1rem', fontWeight: 600 }}>Create a professional listing to attract more local orders.</p>
+                <p className="v-form-header-subtitle">Create a professional listing to attract more local orders.</p>
               </div>
               <button onClick={() => setShowForm(false)} className="v-action-btn delete"><Trash2 size={20} /></button>
             </div>
             
             <form style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }} onSubmit={handleAdd}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 240px', gap: '2rem' }}>
+              <div className="v-form-row-2col">
                 <div className="v-form-group">
                   <label>Title of the {businessType === 'shop' ? 'Product' : 'Service'}</label>
                   <input required type="text" className="v-input" placeholder="E.g. Full Home Sanitize" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} />
@@ -263,7 +277,7 @@ export const VendorInventory = ({ businessType, storeId }) => {
               </div>
               
               {businessType === 'shop' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: '1rem' }}>
+                <div className="v-form-row-3col">
                   <div className="v-form-group">
                     <label>Barcode Type</label>
                     <select className="v-input" value={newItem.barcode_type} onChange={e => setNewItem({...newItem, barcode_type: e.target.value})}>
@@ -275,7 +289,7 @@ export const VendorInventory = ({ businessType, storeId }) => {
                   </div>
                   <div className="v-form-group">
                     <label>Barcode Number</label>
-                    <input type="text" className="v-input" placeholder="E.g. 8901234567890" value={newItem.barcode} onChange={e => setNewItem({...newItem, barcode: e.target.value})} />
+                    <input type="text" maxLength={20} className="v-input" placeholder="E.g. 8901234567890" value={newItem.barcode} onChange={e => setNewItem({...newItem, barcode: e.target.value.replace(/\D/g, '')})} />
                   </div>
                   <div className="v-form-group">
                     <label>Stock</label>
@@ -292,8 +306,7 @@ export const VendorInventory = ({ businessType, storeId }) => {
               <div className="v-form-group">
                  <label>Visual Presentation</label>
                  <div 
-                   className="v-input"
-                   style={{ height: 'auto', padding: '3rem', textAlign: 'center', cursor: 'pointer', borderStyle: 'dashed' }}
+                   className="v-input v-upload-zone"
                    onClick={() => document.getElementById('inventory-upload').click()}
                  >
                    <input id="inventory-upload" type="file" hidden accept="image/*" onChange={(e) => {
@@ -319,10 +332,10 @@ export const VendorInventory = ({ businessType, storeId }) => {
                  </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '1.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                  <button type="button" onClick={() => setShowForm(false)} className="v-btn-outline" style={{ padding: '14px 32px' }}>Discard</button>
-                  <button type="submit" className="v-btn-primary" style={{ padding: '14px 40px' }}>
-                    {editingId ? 'Update Listing' : 'Publish to Store'}
+              <div className="v-form-actions">
+                  <button type="button" onClick={() => setShowForm(false)} className="v-btn-outline">Discard</button>
+                  <button type="submit" className="v-btn-primary">
+                    {editingId ? 'Update Listing' : (businessType === 'shop' ? 'Publish to Store' : 'Publish Service')}
                   </button>
                </div>
             </form>
@@ -852,7 +865,7 @@ export const VendorWallet = ({ storeId }) => {
   );
 };
 
-export const VendorReviews = ({ storeId }) => {
+export const VendorReviews = ({ storeId, businessType }) => {
   const [reviews, setReviews] = React.useState([]);
 
   React.useEffect(() => {
@@ -885,7 +898,9 @@ export const VendorReviews = ({ storeId }) => {
             <div className="v-hero-badge-icon" style={{ background: '#fffbeb' }}>
               <Star size={20} color="#f59e0b" fill="#f59e0b" />
             </div>
-            <span className="v-hero-badge-text" style={{ color: '#f59e0b' }}>Store Reputation</span>
+            <span className="v-hero-badge-text" style={{ color: '#f59e0b' }}>
+              {businessType === 'shop' ? 'Store Reputation' : 'Service Reputation'}
+            </span>
           </div>
           <h1 className="v-hero-title">Customer Feedback</h1>
           <p className="v-hero-subtitle">Monitor your ratings and build trust with your neighborhood</p>

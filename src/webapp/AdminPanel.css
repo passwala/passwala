@@ -654,16 +654,19 @@
   text-transform: capitalize;
 }
 
-.form-field input {
+.form-field input,
+.admin-select {
   padding: 12px;
   border-radius: 12px;
   border: 1.5px solid #e2e8f0;
   font-size: 0.9rem;
   outline: none;
+  background: white;
   transition: all 0.2s;
 }
 
-.form-field input:focus {
+.form-field input:focus,
+.admin-select:focus {
   border-color: var(--sidebar-accent);
   box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.1);
 }

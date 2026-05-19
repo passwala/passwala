@@ -225,30 +225,84 @@ router.put('/:uid/photo', async (req, res) => {
     // Normalize phone
     const identifier = rawId.includes('@') ? rawId : rawId.replace(/\s/g, '');
 
-    // 1. Try to find user by phone
-    let { data: user } = await supabase
-      .from('users')
-      .select('id')
-      .eq('phone', identifier)
-      .maybeSingle();
-
-    // 2. If not found by phone, try email
-    if (!user) {
-      const { data: emailUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('email', identifier)
-        .maybeSingle();
-      user = emailUser;
+    let user = null;
+    
+    // Try by ID (UUID)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
+    if (isUuid) {
+      const { data } = await supabase.from('users').select('id').eq('id', identifier).maybeSingle();
+      user = data;
     }
 
+    // Try by UID
     if (!user) {
-      return res.status(404).json({ error: 'User account not found' });
+      const { data } = await supabase.from('users').select('id').eq('uid', identifier).maybeSingle();
+      user = data;
+    }
+
+    // Try by phone
+    if (!user && !identifier.includes('@')) {
+      const { data, error } = await supabase.from('users').select('id').eq('phone', identifier).maybeSingle();
+      if (error) console.error("Phone error:", error);
+      user = data;
+      
+      // Fallback: try without plus if it has it
+      if (!user && identifier.startsWith('+')) {
+        const { data: noPlus } = await supabase.from('users').select('id').eq('phone', identifier.substring(1)).maybeSingle();
+        user = noPlus;
+      }
+
+      // Fallback: try without +91
+      if (!user && identifier.startsWith('+91')) {
+        const { data: noCountry } = await supabase.from('users').select('id').eq('phone', identifier.substring(3)).maybeSingle();
+        user = noCountry;
+      }
+    }
+
+    // Try by email
+    if (!user) {
+      const { data } = await supabase.from('users').select('id').eq('email', identifier).maybeSingle();
+      user = data;
+    }
+
+    console.log("PHOTO UPLOAD REQUEST:", { identifier, user });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User account not found', debug: { identifier, user } });
+    }
+
+    let finalPhotoUrl = photoURL;
+    if (photoURL && photoURL.startsWith('data:image')) {
+      const matches = photoURL.match(/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/);
+      if (matches) {
+        const ext = matches[1];
+        const base64Data = matches[2];
+        const buffer = Buffer.from(base64Data, 'base64');
+        
+        const filename = `${user.id}_${Date.now()}.${ext}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('user_profiles')
+          .upload(filename, buffer, {
+            contentType: `image/${ext}`,
+            upsert: true
+          });
+          
+        if (uploadError) {
+          console.error("Storage upload error:", uploadError);
+          return res.status(500).json({ error: 'Storage Error', details: uploadError });
+        }
+        
+        const { data: publicUrlData } = supabase.storage
+          .from('user_profiles')
+          .getPublicUrl(filename);
+          
+        finalPhotoUrl = publicUrlData.publicUrl;
+      }
     }
 
     const { error: updateError } = await supabase
       .from('users')
-      .update({ photo_url: photoURL })
+      .update({ photo_url: finalPhotoUrl })
       .eq('id', user.id);
     
     if (updateError) throw updateError;
@@ -266,19 +320,45 @@ router.put('/:uid/name', async (req, res) => {
     const rawId = decodeURIComponent(req.params.uid);
     const identifier = rawId.includes('@') ? rawId : rawId.replace(/\s/g, '');
 
-    // Normalize variations
-    const numericOnly = identifier.replace(/\D/g, '');
-
-    let orFilters = [`phone.eq.${identifier}`, `email.eq.${identifier}`, `uid.eq.${identifier}`];
-    if (numericOnly) {
-       orFilters.push(`phone.eq.${numericOnly}`);
+    let user = null;
+    
+    // Try by ID (UUID)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
+    if (isUuid) {
+      const { data } = await supabase.from('users').select('id').eq('id', identifier).maybeSingle();
+      user = data;
     }
 
-    const { data: user } = await supabase
-      .from('users')
-      .select('id')
-      .or(orFilters.join(','))
-      .maybeSingle();
+    // Try by UID
+    if (!user) {
+      const { data } = await supabase.from('users').select('id').eq('uid', identifier).maybeSingle();
+      user = data;
+    }
+
+    // Try by phone
+    if (!user && !identifier.includes('@')) {
+      const { data, error } = await supabase.from('users').select('id').eq('phone', identifier).maybeSingle();
+      if (error) console.error("Phone error:", error);
+      user = data;
+      
+      // Fallback: try without plus if it has it
+      if (!user && identifier.startsWith('+')) {
+        const { data: noPlus } = await supabase.from('users').select('id').eq('phone', identifier.substring(1)).maybeSingle();
+        user = noPlus;
+      }
+
+      // Fallback: try without +91
+      if (!user && identifier.startsWith('+91')) {
+        const { data: noCountry } = await supabase.from('users').select('id').eq('phone', identifier.substring(3)).maybeSingle();
+        user = noCountry;
+      }
+    }
+
+    // Try by email
+    if (!user) {
+      const { data } = await supabase.from('users').select('id').eq('email', identifier).maybeSingle();
+      user = data;
+    }
 
     if (!user) return res.status(404).json({ error: 'User not found' });
 

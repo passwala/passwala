@@ -29,7 +29,8 @@ import {
   Menu,
   ChevronRight,
   TrendingUp,
-  Settings
+  Settings,
+  Layers
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import './VendorPortal.css';
@@ -103,8 +104,8 @@ const VendorPortal = ({ user, onLogout }) => {
 
       let foundStoreId = vendorData?.id;
       if (!foundStoreId) {
-        const { data: st } = await supabase.from('stores').select('id').eq('phone', phone).maybeSingle();
-        if (st) foundStoreId = st.id;
+        const { data: vend } = await supabase.from('vendors').select('id').eq('phone', phone).maybeSingle();
+        if (vend) foundStoreId = vend.id;
       }
 
       if (!foundStoreId) {
@@ -199,6 +200,8 @@ const VendorPortal = ({ user, onLogout }) => {
           .eq('phone', phone)
           .maybeSingle();
 
+        let detectedType = 'shop';
+
         // If not found in vendors, check service_providers
         if (!data && !error) {
           const { data: sData, error: sError } = await supabase
@@ -206,15 +209,20 @@ const VendorPortal = ({ user, onLogout }) => {
             .select('*')
             .eq('phone', phone)
             .maybeSingle();
-          data = sData;
+          if (sData) {
+            data = sData;
+            detectedType = 'service';
+          }
           error = sError;
+        } else if (data) {
+          detectedType = 'shop';
         }
 
         if (error && !isLocallyCompleted) throw error;
 
         if (data) {
           setVendorData(data);
-          setBusinessType(data.category || localStorage.getItem('vBusinessType') || 'shop');
+          setBusinessType(detectedType);
           if (data.profile_completed || isLocallyCompleted) {
             setAppStatus('dashboard');
           } else {
@@ -300,14 +308,14 @@ const VendorPortal = ({ user, onLogout }) => {
             <span className="v-hero-badge-text" style={{ color: 'white' }}>Verified Partner</span>
           </div>
           <h1>Good {new Date().getHours() < 12 ? 'Morning' : (new Date().getHours() < 18 ? 'Afternoon' : 'Evening')}, {vendorData?.name?.split(' ')[0] || 'Partner'}!</h1>
-          <p>Your {businessType} is currently online and accepting orders. Here's your performance snapshot for today.</p>
+          <p>Your {businessType === 'shop' ? 'store' : 'service'} is currently online and accepting {businessType === 'shop' ? 'orders' : 'bookings'}. Here's your performance snapshot for today.</p>
           
           <div style={{ display: 'flex', gap: '1.25rem', marginTop: '2.5rem' }}>
             <button 
               onClick={() => setActiveTab('orders')}
               className="v-banner-btn-primary"
             >
-              View Active Orders <ChevronRight size={18} />
+              View Active {businessType === 'shop' ? 'Orders' : 'Bookings'} <ChevronRight size={18} />
             </button>
             <button 
               onClick={() => setActiveTab('inventory')}
@@ -393,7 +401,7 @@ const VendorPortal = ({ user, onLogout }) => {
             <div className="v-stat-badge-small" style={{ fontSize: '0.75rem', fontWeight: 800, padding: '4px 10px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb' }}>Top 5%</div>
           </div>
           <div className="v-stat-body" style={{ marginTop: '1rem' }}>
-            <span className="v-stat-label">Store Reputation</span>
+            <span className="v-stat-label">{businessType === 'shop' ? 'Store Reputation' : 'Service Reputation'}</span>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '4px' }}>
               <span className="v-stat-value">{stats.rating}</span>
               <span className="v-stat-trend" style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>customer rating</span>
@@ -407,7 +415,7 @@ const VendorPortal = ({ user, onLogout }) => {
         </motion.div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
+      <div className="v-dashboard-charts">
         <div className="v-chart-card" style={{ margin: 0 }}>
           <div className="v-chart-header">
             <div className="v-chart-info">
@@ -498,6 +506,7 @@ const VendorPortal = ({ user, onLogout }) => {
               business_name: editFormData.business_name,
               address: editFormData.address,
               license_no: editFormData.license_no,
+              category: editFormData.category,
               aadhar_no: editFormData.aadhar_no ? editFormData.aadhar_no.replace(/\s/g, '') : null
            };
            if (targetTable === 'vendors') {
@@ -540,39 +549,64 @@ const VendorPortal = ({ user, onLogout }) => {
       if (supabase && vendorData?.id) {
         const targetId = vendorData.id;
 
-        // 1. Find all order IDs for this vendor to clear their dependencies
+        // 1. Find all order IDs for this vendor to clear dependencies
         const { data: vendorOrders } = await supabase
           .from('orders')
           .select('id')
           .eq('store_id', targetId);
 
-        if (vendorOrders && vendorOrders.length > 0) {
-          const orderIds = vendorOrders.map(o => o.id);
-          
-          // 2. Clear rider earnings linked to these orders
+        const orderIds = vendorOrders && vendorOrders.length > 0 
+          ? vendorOrders.map(o => o.id) 
+          : [];
+
+        if (orderIds.length > 0) {
+          // A. Delete rider earnings linked to these orders
           await supabase.from('rider_earnings').delete().in('order_id', orderIds);
           
-          // 3. Clear order items (if they exist)
-          try {
-            await supabase.from('order_items').delete().in('order_id', orderIds);
-          } catch (itemErr) {
-            console.warn("Order items delete skipped:", itemErr);
-          }
+          // B. Delete order items linked to these orders
+          await supabase.from('order_items').delete().in('order_id', orderIds);
           
-          // 4. Clear orders themselves
+          // C. Delete the orders
           await supabase.from('orders').delete().in('id', orderIds);
         }
 
-        // 4. Delete products and deals
+        // 2. Delete any cart items or carts associated with this store
+        await supabase.from('cart').delete().eq('store_id', targetId);
+
+        // 3. Delete products and deals
         await supabase.from('products').delete().eq('store_id', targetId);
         await supabase.from('deals').delete().eq('store_id', targetId);
 
-        // 5. Delete the store
+        // 4. Delete the store
         await supabase.from('stores').delete().eq('vendor_id', targetId);
 
-        // 6. Finally delete the vendor profile
+        // 5. Delete service bookings and services if they exist
+        const { data: providerServices } = await supabase
+          .from('services')
+          .select('id')
+          .eq('provider_id', targetId);
+        
+        const serviceIds = providerServices && providerServices.length > 0
+          ? providerServices.map(s => s.id)
+          : [];
+
+        if (serviceIds.length > 0) {
+          await supabase.from('service_bookings').delete().in('service_id', serviceIds);
+        }
+        await supabase.from('service_bookings').delete().eq('provider_id', targetId);
+        await supabase.from('services').delete().eq('provider_id', targetId);
+
+        // 6. Delete vendor profile
         const { error: vendorError } = await supabase.from('vendors').delete().eq('id', targetId);
-        if (vendorError) throw vendorError;
+        if (vendorError) {
+          console.warn("Vendors table delete error/skip (could be service provider):", vendorError.message);
+        }
+
+        // 7. Delete service provider profile
+        const { error: providerError } = await supabase.from('service_providers').delete().eq('id', targetId);
+        if (providerError) {
+          console.warn("Service providers table delete error/skip (could be shop):", providerError.message);
+        }
       }
       
       toast.success('Account and associated records deleted.', { icon: '🗑️' });
@@ -642,7 +676,7 @@ const VendorPortal = ({ user, onLogout }) => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '2.5rem', position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2.5rem', position: 'relative', zIndex: 1 }}>
             <div className="v-form-group">
               <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: '#475569', marginBottom: '12px' }}>
                 <User size={16} color="var(--v-primary)" /> OWNER FULL NAME
@@ -684,6 +718,42 @@ const VendorPortal = ({ user, onLogout }) => {
                   }} 
                 /> :
                 <div className="v-input v-readonly" style={{ padding: '14px 18px', background: '#f8fafc', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>{currentData?.license_no || 'Pending Verification'}</div>
+              }
+            </div>
+
+            <div className="v-form-group">
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: '#475569', marginBottom: '12px' }}>
+                <Layers size={16} color="var(--v-primary)" /> BUSINESS CATEGORY
+              </label>
+              {isEditingProfile ? 
+                <select 
+                  className="v-input" 
+                  style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)', backgroundColor: 'white', fontWeight: 600, color: '#0f172a' }}
+                  value={currentData?.category || ''} 
+                  onChange={e => setEditFormData({...editFormData, category: e.target.value})}
+                >
+                  <option value="">Select Category</option>
+                  {businessType === 'shop' ? (
+                    <>
+                      <option value="Grocery & Essentials">Grocery & Essentials</option>
+                      <option value="Fruits & Vegetables">Fruits & Vegetables</option>
+                      <option value="Dairy, Bread & Eggs">Dairy, Bread & Eggs</option>
+                      <option value="Beverages & Munchies">Beverages & Munchies</option>
+                      <option value="Personal Care & Hygiene">Personal Care & Hygiene</option>
+                      <option value="Household & Pet Care">Household & Pet Care</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="Plumbing Services">Plumbing Services</option>
+                      <option value="Electrical Services">Electrical Services</option>
+                      <option value="Home Cleaning & Deep Clean">Home Cleaning & Deep Clean</option>
+                      <option value="AC & Appliance Repair">AC & Appliance Repair</option>
+                      <option value="Pest Control Services">Pest Control Services</option>
+                      <option value="Home Painting & Decor">Home Painting & Decor</option>
+                    </>
+                  )}
+                </select> :
+                <div className="v-input v-readonly" style={{ padding: '14px 18px', background: '#f8fafc', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>{currentData?.category || 'General Store'}</div>
               }
             </div>
 
@@ -756,7 +826,7 @@ const VendorPortal = ({ user, onLogout }) => {
             <p style={{color: '#64748b', fontSize: '1rem', fontWeight: 500}}>Choose your business model to get started</p>
           </div>
           
-          <div className="registration-type-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginTop: '2.5rem' }}>
+          <div className="registration-type-grid" style={{ marginTop: '2.5rem' }}>
             <motion.div 
               whileHover={{ scale: 1.02, y: -5 }}
               whileTap={{ scale: 0.98 }}
@@ -832,6 +902,55 @@ const VendorPortal = ({ user, onLogout }) => {
             </div>
 
             <div className="v-form-group">
+              <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', marginBottom: '8px' }}>BUSINESS CATEGORY</label>
+              <select 
+                className="v-input" 
+                style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)', backgroundColor: 'white', fontWeight: 600, color: '#0f172a' }}
+                value={formData.category || ''} 
+                onChange={e => setFormData({...formData, category: e.target.value})}
+              >
+                <option value="">Select Category</option>
+                {businessType === 'shop' ? (
+                  <>
+                    <option value="Grocery & Essentials">Grocery & Essentials</option>
+                    <option value="Fruits & Vegetables">Fruits & Vegetables</option>
+                    <option value="Dairy, Bread & Eggs">Dairy, Bread & Eggs</option>
+                    <option value="Beverages & Munchies">Beverages & Munchies</option>
+                    <option value="Personal Care & Hygiene">Personal Care & Hygiene</option>
+                    <option value="Household & Pet Care">Household & Pet Care</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="Plumbing Services">Plumbing Services</option>
+                    <option value="Electrical Services">Electrical Services</option>
+                    <option value="Home Cleaning & Deep Clean">Home Cleaning & Deep Clean</option>
+                    <option value="AC & Appliance Repair">AC & Appliance Repair</option>
+                    <option value="Pest Control Services">Pest Control Services</option>
+                    <option value="Home Painting & Decor">Home Painting & Decor</option>
+                  </>
+                )}
+              </select>
+            </div>
+
+            <div className="v-form-group">
+              <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', marginBottom: '8px' }}>LICENSE / REGISTRATION NO.</label>
+              <input 
+                type="text" 
+                placeholder="e.g. 2026-CITY-12345678" 
+                className="v-input" 
+                style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)' }}
+                value={formData.license_no || ''} 
+                onChange={e => {
+                  const clean = e.target.value.replace(/[^A-Z0-9]/ig, '').toUpperCase().slice(0, 16);
+                  let formatted = clean.slice(0, 4);
+                  if (clean.length > 4) formatted += '-' + clean.slice(4, 8);
+                  if (clean.length > 8) formatted += '-' + clean.slice(8, 16);
+                  setFormData({...formData, license_no: formatted});
+                }} 
+              />
+            </div>
+
+            <div className="v-form-group">
               <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', marginBottom: '8px' }}>STORE ADDRESS</label>
               <textarea 
                 placeholder="Full physical location of your business" 
@@ -851,6 +970,8 @@ const VendorPortal = ({ user, onLogout }) => {
                !formData.name || 
                formData.aadhar_no.replace(/\s/g, '').length !== 12 || 
                !formData.business_name ||
+               !formData.category ||
+               !formData.license_no ||
                !formData.address
              }
           >
@@ -886,13 +1007,40 @@ const VendorPortal = ({ user, onLogout }) => {
                 business_name: formData.business_name,
                 aadhar_no: formData.aadhar_no.replace(/\s/g, ''),
                 address: formData.address,
+                license_no: formData.license_no || '',
                 phone: currentPhone,
                 profile_completed: true,
                 name: formData.name
               };
+              if (businessType === 'shop') {
+                tablePayload.category = formData.category || 'Grocery';
+              }
 
               if (supabase) {
                 try {
+                  // A. First check if a user exists in the users table with currentPhone
+                  let userId = user?.id || user?.uid;
+                  if (!userId || String(userId).startsWith('temp_')) {
+                    const { data: existingUser } = await supabase.from('users').select('id').eq('phone', currentPhone).maybeSingle();
+                    if (existingUser) {
+                      userId = existingUser.id;
+                    } else {
+                      // Create user in the users table
+                      const { data: newUser, error: newUserErr } = await supabase.from('users').insert([{
+                        phone: currentPhone,
+                        full_name: formData.name,
+                        role: businessType === 'shop' ? 'VENDOR' : 'SERVICE_PROVIDER'
+                      }]).select().single();
+                      if (!newUserErr && newUser) {
+                        userId = newUser.id;
+                      }
+                    }
+                  }
+                  
+                  if (userId) {
+                    tablePayload.user_id = userId;
+                  }
+
                   let savedId = vendorData?.id;
                   if (savedId) {
                     const { error } = await supabase.from(targetTable).update(tablePayload).eq('id', savedId);
@@ -966,7 +1114,7 @@ const VendorPortal = ({ user, onLogout }) => {
 
   if (appStatus === 'onboarding') {
     return (
-      <div className="vendor-portal onboarding-mode" style={{ justifyContent: 'center', alignItems: 'center' }}>
+      <div className="vendor-portal onboarding-mode">
         {renderOnboarding()}
       </div>
     );
@@ -1038,13 +1186,13 @@ const VendorPortal = ({ user, onLogout }) => {
               <Menu size={20} />
             </button>
             <div className="v-status-badge">
-              <span>STORE ONLINE</span>
+              <span>{businessType === 'shop' ? 'STORE ONLINE' : 'SERVICE ONLINE'}</span>
             </div>
           </div>
 
           <div className="v-top-right">
              <div className="v-user-info" style={{ textAlign: 'right' }}>
-               <span style={{ fontSize: '0.95rem', fontWeight: 850, color: '#0f172a' }}>{vendorData?.business_name || 'My Store'}</span>
+               <span style={{ fontSize: '0.95rem', fontWeight: 850, color: '#0f172a' }}>{vendorData?.business_name || (businessType === 'shop' ? 'My Store' : 'My Service')}</span>
                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--v-text-muted)' }}>{vendorData?.id?.toString().slice(0, 10).toUpperCase()}</span>
              </div>
              <div className="v-avatar" style={{ width: '42px', height: '42px', borderRadius: '14px', background: 'linear-gradient(135deg, #f97316 0%, #ff8f3d 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', fontWeight: 900, boxShadow: '0 8px 20px rgba(249, 115, 22, 0.2)' }}>
@@ -1069,11 +1217,11 @@ const VendorPortal = ({ user, onLogout }) => {
             >
               {activeTab === 'dashboard' && renderDashboard()}
               {activeTab === 'profile' && renderProfile()}
-              {activeTab === 'inventory' && <VendorInventory vendorData={vendorData} businessType={businessType} />}
-              {activeTab === 'orders' && <VendorOrders vendorData={vendorData} businessType={businessType} />}
-              {activeTab === 'earnings' && <VendorEarnings vendorData={vendorData} businessType={businessType} />}
-              {activeTab === 'reviews' && <VendorReviews vendorData={vendorData} businessType={businessType} />}
-              {activeTab === 'notifications' && <VendorNotifications vendorData={vendorData} businessType={businessType} />}
+              {activeTab === 'inventory' && <VendorInventory vendorData={vendorData} businessType={businessType} storeId={storeId || vendorData?.id} />}
+              {activeTab === 'orders' && <VendorOrders vendorData={vendorData} businessType={businessType} storeId={storeId || vendorData?.id} />}
+              {activeTab === 'earnings' && <VendorEarnings vendorData={vendorData} businessType={businessType} storeId={storeId || vendorData?.id} />}
+              {activeTab === 'reviews' && <VendorReviews vendorData={vendorData} businessType={businessType} storeId={storeId || vendorData?.id} />}
+              {activeTab === 'notifications' && <VendorNotifications vendorData={vendorData} businessType={businessType} storeId={storeId || vendorData?.id} />}
               {activeTab === 'support' && <VendorSupport vendorData={vendorData} businessType={businessType} />}
             </motion.div>
           </AnimatePresence>

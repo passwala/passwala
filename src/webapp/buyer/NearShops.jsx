@@ -92,17 +92,40 @@ const NearShops = ({ onBack, location, userCoords }) => {
   const handleOpenShop = async (shop) => {
     setSelectedShop(shop);
     try {
-        const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
-        if (!error && data && data.length > 0) {
-            setShopCatalog(data.map(p => ({
-               id: p.id,
-               name: p.name,
-               detail: p.description,
-               price: p.price,
-               image: p.image_url
-            })));
+        if (shop.type === 'SERVICES') {
+            const { data, error } = await supabase
+              .from('services')
+              .select('*')
+              .eq('provider_id', shop.id)
+              .order('created_at', { ascending: false });
+            if (!error && data) {
+                setShopCatalog(data.map(s => ({
+                   id: s.id,
+                   name: s.title || s.name,
+                   detail: s.description,
+                   price: s.price,
+                   image: s.image_url
+                })));
+            } else {
+                setShopCatalog([]);
+            }
         } else {
-            setShopCatalog([]);
+            const { data, error } = await supabase
+              .from('products')
+              .select('*')
+              .eq('store_id', shop.id)
+              .order('created_at', { ascending: false });
+            if (!error && data) {
+                setShopCatalog(data.map(p => ({
+                   id: p.id,
+                   name: p.name,
+                   detail: p.description,
+                   price: p.price,
+                   image: p.image_url
+                })));
+            } else {
+                setShopCatalog([]);
+            }
         }
     } catch (err) {
         console.error("Failed to load catalog:", err);
@@ -117,7 +140,7 @@ const NearShops = ({ onBack, location, userCoords }) => {
       name: product.name,
       price: product.price,
       image: product.image,
-      type: 'product',
+      type: selectedShop.type === 'SERVICES' ? 'service' : 'product',
       store: selectedShop.name,
       shop_id: selectedShop.id
     });
@@ -388,11 +411,7 @@ const NearShops = ({ onBack, location, userCoords }) => {
                      className="visit-shop-btn"
                      onClick={(e) => { 
                        e.stopPropagation(); 
-                       if (shop.type === 'SERVICES') {
-                         toast.loading(`Contacting ${shop.name}...`, { duration: 2000 });
-                       } else {
-                         handleOpenShop(shop); 
-                       }
+                       handleOpenShop(shop); 
                      }}
                    >
                      {shop.type === 'SERVICES' ? 'Book Expert' : 'Order Now'}
@@ -425,7 +444,7 @@ const NearShops = ({ onBack, location, userCoords }) => {
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
             style={{
               position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-              background: '#f8fafc', zIndex: 1000, overflowY: 'auto'
+              background: '#f8fafc', zIndex: 2500, overflowY: 'auto'
             }}
           >
             <div style={{ position: 'sticky', top: 0, background: 'white', padding: '1rem', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', zIndex: 10 }}>
@@ -434,7 +453,7 @@ const NearShops = ({ onBack, location, userCoords }) => {
                </button>
                <div style={{ flex: 1 }}>
                  <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800 }}>{selectedShop.name}</h2>
-                 <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>{selectedShop.distance} km • Digital Catalog</p>
+                 <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>{selectedShop.distance} km • {selectedShop.type === 'SERVICES' ? 'Service Portfolio' : 'Digital Catalog'}</p>
                </div>
                
                <button 
@@ -478,7 +497,9 @@ const NearShops = ({ onBack, location, userCoords }) => {
             </div>
 
             <div style={{ padding: '1rem' }}>
-               <h3 style={{ margin: '0 0 1rem 0', fontWeight: 700, color: '#0f172a' }}>Available Products</h3>
+               <h3 style={{ margin: '0 0 1rem 0', fontWeight: 700, color: '#0f172a' }}>
+                 {selectedShop.type === 'SERVICES' ? 'Available Services' : 'Available Products'}
+               </h3>
                
                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '1rem' }}>
                   {shopCatalog.map(product => (
@@ -498,7 +519,7 @@ const NearShops = ({ onBack, location, userCoords }) => {
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
                              <span style={{ fontWeight: 800, color: '#0f172a' }}>₹{product.price}</span>
                              {(() => {
-                                const cartItem = cartItems.find(item => item.id === product.id && item.type === 'product');
+                                const cartItem = cartItems.find(item => item.id === product.id && item.type === (selectedShop.type === 'SERVICES' ? 'service' : 'product'));
                                 return cartItem ? (
                                   <div style={{ 
                                     display: 'flex', 
@@ -512,7 +533,7 @@ const NearShops = ({ onBack, location, userCoords }) => {
                                     boxSizing: 'border-box'
                                   }}>
                                      <button 
-                                       onClick={(e) => { e.stopPropagation(); updateQty(product.id, 'product', -1); }} 
+                                       onClick={(e) => { e.stopPropagation(); updateQty(product.id, selectedShop.type === 'SERVICES' ? 'service' : 'product', -1); }} 
                                        style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 800, fontSize: '1.1rem', padding: '0 4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                      >
                                        -
@@ -521,7 +542,7 @@ const NearShops = ({ onBack, location, userCoords }) => {
                                        {cartItem.qty}
                                      </span>
                                      <button 
-                                       onClick={(e) => { e.stopPropagation(); updateQty(product.id, 'product', 1); }} 
+                                       onClick={(e) => { e.stopPropagation(); updateQty(product.id, selectedShop.type === 'SERVICES' ? 'service' : 'product', 1); }} 
                                        style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 800, fontSize: '1.1rem', padding: '0 4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                      >
                                        +
@@ -560,7 +581,7 @@ const NearShops = ({ onBack, location, userCoords }) => {
                {shopCatalog.length === 0 && (
                  <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#94a3b8' }}>
                    <Package size={48} style={{ margin: '0 auto 1rem auto', opacity: 0.5 }} />
-                   <p>No products available right now.</p>
+                   <p>{selectedShop.type === 'SERVICES' ? 'No services available right now.' : 'No products available right now.'}</p>
                  </div>
                )}
             </div>

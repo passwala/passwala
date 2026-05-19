@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, Lock } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import './Auth.css'; // Reusing styles
 
@@ -29,29 +29,38 @@ const AdminAuth = ({ onAdminLogin }) => {
     }
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleAdminAuth();
+    }
+  };
+
   return (
     <div className="auth-page admin-only-page">
       <div className="auth-container glass admin-auth-card">
         <div className="auth-illustration">
-           <ShieldCheck size={80} color="var(--primary)" strokeWidth={1.5} />
+          <div className="admin-shield-glow"></div>
+          <ShieldCheck size={80} color="#f97316" strokeWidth={1.5} style={{ zIndex: 2 }} />
         </div>
 
         <div className="auth-content">
-          <h2 style={{ color: 'var(--primary)' }}>Admin Portal</h2>
+          <h2>Admin Portal</h2>
           <p>Restricted strictly for Passwala staff</p>
 
-          <div className="phone-login" style={{ marginTop: '2rem' }}>
+          <div className="phone-login" style={{ marginTop: '1.5rem', width: '100%' }}>
             <div className="input-group">
-               <input
-                 type="password"
-                 placeholder="Enter Admin Access Code"
-                 value={adminCode}
-                 onChange={(e) => setAdminCode(e.target.value)}
-                 autoFocus
-               />
+              <input
+                type="password"
+                placeholder="Enter Admin Access Code"
+                value={adminCode}
+                onChange={(e) => setAdminCode(e.target.value)}
+                onKeyDown={handleKeyDown}
+                autoFocus
+              />
+              <Lock className="input-icon" size={20} />
             </div>
             <button className="auth-submit-btn" onClick={handleAdminAuth} disabled={loading}>
-               {loading ? 'Authorizing...' : 'Enter System'}
+              {loading ? 'Authorizing...' : 'Enter System'}
             </button>
           </div>
         </div>

@@ -56,7 +56,7 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
     if (!newName.trim()) return;
     setIsUpdatingName(true);
     try {
-      const searchId = user?.uid || user?.email || user?.phoneNumber;
+      const searchId = user?.id || user?.phoneNumber || user?.email || user?.uid;
       const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
       const res = await fetch(`${apiBase}/api/users/${encodeURIComponent(searchId)}/name`, {
         method: 'PUT',
@@ -90,7 +90,7 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
     reader.onloadend = async () => {
       const base64String = reader.result;
       try {
-        const id = user?.phoneNumber || user?.email || user?.uid;
+        const id = user?.id || user?.phoneNumber || user?.email || user?.uid;
         const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
         const res = await fetch(`${apiBase}/api/users/${encodeURIComponent(id)}/photo`, {
           method: 'PUT',

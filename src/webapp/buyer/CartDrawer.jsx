@@ -241,6 +241,31 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
         }));
         const { error: itemError } = await supabase.from('order_items').insert(orderItems);
         if (itemError) console.warn("Order items save error:", itemError);
+
+        // Decrement product stock in database
+        try {
+          for (const item of cartItems) {
+            const isProd = typeof item.id === 'string' && item.id.length === 36;
+            if (isProd && item.type !== 'service') {
+              const { data: prodData } = await supabase
+                .from('products')
+                .select('stock_quantity')
+                .eq('id', item.id)
+                .maybeSingle();
+
+              if (prodData) {
+                const currentStock = prodData.stock_quantity || 0;
+                const newStock = Math.max(0, currentStock - (item.qty || 1));
+                await supabase
+                  .from('products')
+                  .update({ stock_quantity: newStock })
+                  .eq('id', item.id);
+              }
+            }
+          }
+        } catch (stockErr) {
+          console.warn("Could not decrement stock:", stockErr);
+        }
       }
 
       const deliveryLoc = location ? location.split(',')[0] : 'Your Location';
