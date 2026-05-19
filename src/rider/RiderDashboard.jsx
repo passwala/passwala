@@ -17,13 +17,79 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
   const [rejectedOrderIds, setRejectedOrderIds] = useState([]);
   const [incomingOrder, setIncomingOrder] = useState(null);
   const [deliveryStep, setDeliveryStep] = useState(0);
-  const [mapCoords, setMapCoords] = useState({ lat: userCoords?.lat || 23.0225, lon: userCoords?.lng || 72.5714 }); // Default Ahmedabad
+  const [mapCoords, setMapCoords] = useState({ lat: userCoords?.lat || 23.0225, lng: userCoords?.lng || 72.5714 }); // Default Ahmedabad
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [isManualLocation, setIsManualLocation] = useState(false);
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
   const [activeAreas, setActiveAreas] = useState([]);
   const [nearbyStores, setNearbyStores] = useState([]);
+
+  // OSRM Routing Engine States (For fastest route, bicycle, walking)
+  const [routeMode, setRouteMode] = useState('driving'); // 'driving' | 'cycling' | 'foot'
+  const [osrmRoutePoints, setOsrmRoutePoints] = useState([]);
+  const [routeStats, setRouteStats] = useState(null); // { distanceKm, durationMins }
+  const [isFetchingRoute, setIsFetchingRoute] = useState(false);
+
+  // Fetch real street coordinates from OSRM Engine
+  useEffect(() => {
+    if (!activeOrder) {
+      setOsrmRoutePoints([]);
+      setRouteStats(null);
+      return;
+    }
+
+    const fetchOSRMRoute = async () => {
+      const riderLatLng = [mapCoords.lat, mapCoords.lng];
+      const targetCoords = deliveryStep < 2 
+        ? (activeOrder.storeCoords || { lat: 23.0305, lng: 72.5075 })
+        : (activeOrder.customerCoords || { lat: 23.0393, lng: 72.5244 });
+
+      if (!riderLatLng[0] || !riderLatLng[1] || !targetCoords.lat || !targetCoords.lng) return;
+
+      setIsFetchingRoute(true);
+      try {
+        // Map UI route mode to OSRM profiles
+        const profile = routeMode === 'driving' ? 'driving' : routeMode === 'cycling' ? 'cycling' : 'foot';
+        const url = `https://router.project-osrm.org/route/v1/${profile}/${riderLatLng[1]},${riderLatLng[0]};${targetCoords.lng},${targetCoords.lat}?overview=full&geometries=geojson`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('OSRM routing request failed');
+        const data = await res.json();
+        
+        if (data.routes && data.routes.length > 0) {
+          const route = data.routes[0];
+          // Convert from [lng, lat] to [lat, lng] for Leaflet compatibility
+          const coords = route.geometry.coordinates.map(pt => [pt[1], pt[0]]);
+          setOsrmRoutePoints(coords);
+          
+          setRouteStats({
+            distanceKm: (route.distance / 1000).toFixed(1),
+            durationMins: Math.round(route.duration / 60)
+          });
+        }
+      } catch (err) {
+        console.warn("OSRM routing API failed, drawing straight line fallback:", err);
+        setOsrmRoutePoints([]);
+        
+        // Calculate dynamic fallback route stats using Leaflet's distance metric or direct formula
+        try {
+          const startLatLng = L.latLng(riderLatLng[0], riderLatLng[1]);
+          const endLatLng = L.latLng(targetCoords.lat, targetCoords.lng);
+          const directDistanceKm = startLatLng.distanceTo(endLatLng) / 1000;
+          setRouteStats({
+            distanceKm: directDistanceKm.toFixed(1),
+            durationMins: Math.max(1, Math.round(directDistanceKm * 4 + 2)) // average 15km/h for city delivery
+          });
+        } catch (calcErr) {
+          setRouteStats(null);
+        }
+      } finally {
+        setIsFetchingRoute(false);
+      }
+    };
+
+    fetchOSRMRoute();
+  }, [activeOrder, deliveryStep, routeMode, mapCoords.lat, mapCoords.lng]);
 
   // Map elements refs
   const mapRef = useRef(null);
@@ -33,7 +99,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
   // Sync coords on prop change
   useEffect(() => {
     if (userCoords && !isManualLocation) {
-      setMapCoords({ lat: userCoords.lat, lon: userCoords.lng });
+      setMapCoords({ lat: userCoords.lat, lng: userCoords.lng });
     }
   }, [userCoords, isManualLocation]);
 
@@ -77,9 +143,9 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     
     const handleFallback = () => {
        if (userCoords) {
-         setMapCoords({ lat: userCoords.lat, lon: userCoords.lng });
+         setMapCoords({ lat: userCoords.lat, lng: userCoords.lng });
        } else {
-         setMapCoords({ lat: 23.0225, lon: 72.5714 });
+         setMapCoords({ lat: 23.0225, lng: 72.5714 });
          setRiderLocation("Ahmedabad, Gujarat");
        }
        setIsDetecting(false);
@@ -89,7 +155,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       navigator.geolocation.getCurrentPosition(async (position) => {
         try {
           const { latitude, longitude } = position.coords;
-          setMapCoords({ lat: latitude, lon: longitude });
+          setMapCoords({ lat: latitude, lng: longitude });
           
           const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
           if (!res.ok) throw new Error('Geocoding failed');
@@ -160,7 +226,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         let query = supabase
           .from('orders')
           .select('*, stores(name, address, lat, lng), addresses(*), users(full_name), order_items(id)')
-          .eq('status', 'PLACED')
+          .in('status', ['PLACED', 'PREPARING'])
           .gt('total_amount', 0)
           .gt('created_at', yesterday.toISOString())
           .order('created_at', { ascending: false });
@@ -176,7 +242,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         if (data && data.length > 0) {
           const validOrder = data.find(order => {
             const storeCoords = { lat: order.stores?.lat || 23.0225, lng: order.stores?.lng || 72.5714 };
-            const dist = getShortestPathDistance(mapCoords.lat, mapCoords.lon, storeCoords.lat, storeCoords.lng);
+            const dist = getShortestPathDistance(mapCoords.lat, mapCoords.lng, storeCoords.lat, storeCoords.lng);
             return dist <= 15;
           });
 
@@ -194,7 +260,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           }
 
           const storeCoords = { lat: parseFloat(order.stores?.lat) || 23.0225, lng: parseFloat(order.stores?.lng) || 72.5714 };
-          const distToStore = getShortestPathDistance(mapCoords.lat, mapCoords.lon, storeCoords.lat, storeCoords.lng);
+          const distToStore = getShortestPathDistance(mapCoords.lat, mapCoords.lng, storeCoords.lat, storeCoords.lng);
           const distToCustomer = getShortestPathDistance(storeCoords.lat, storeCoords.lng, customerCoords.lat, customerCoords.lng);
           const totalDist = distToStore + distToCustomer;
 
@@ -230,7 +296,16 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         schema: 'public', 
         table: 'orders' 
       }, (payload) => {
-        if (payload.new.status === 'PLACED') {
+        if (payload.new.status === 'PLACED' || payload.new.status === 'PREPARING') {
+          fetchPendingOrder();
+        }
+      })
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'orders' 
+      }, (payload) => {
+        if (payload.new.status === 'PLACED' || payload.new.status === 'PREPARING') {
           fetchPendingOrder();
         }
       })
@@ -253,7 +328,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         table: 'orders', 
         filter: `id=eq.${incomingOrder.dbId}` 
       }, (payload) => {
-        if (payload.new.status !== 'PLACED') {
+        if (payload.new.status !== 'PLACED' && payload.new.status !== 'PREPARING') {
           setIncomingOrder(null);
           toast('Order taken by another rider', { icon: '🤝' });
         }
@@ -273,7 +348,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       leafletMapRef.current = L.map(mapRef.current, {
         zoomControl: false,
         attributionControl: false
-      }).setView([mapCoords.lat, mapCoords.lon], 14);
+      }).setView([mapCoords.lat, mapCoords.lng], 14);
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
@@ -329,8 +404,8 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       iconAnchor: [21, 21]
     });
 
-    const riderLatLng = (mapCoords.lat && mapCoords.lon && !isNaN(mapCoords.lat) && !isNaN(mapCoords.lon))
-      ? [mapCoords.lat, mapCoords.lon]
+    const riderLatLng = (mapCoords.lat && mapCoords.lng && !isNaN(mapCoords.lat) && !isNaN(mapCoords.lng))
+      ? [mapCoords.lat, mapCoords.lng]
       : null;
 
     // 1. Draw Rider
@@ -359,24 +434,39 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         .addTo(markerGroupRef.current);
 
       // Draw interactive path depending on active phase
+      const leg1Color = '#f97316'; // orange (to store)
+      const leg2Color = '#3b82f6'; // blue (to customer)
+
       if (deliveryStep < 2) {
-        // Leg 1 (Rider -> Store) is active SOLID orange route
-        L.polyline([riderLatLng, storeLatLng], {
-          color: '#f97316',
-          weight: 6,
-          opacity: 0.9,
-          lineJoin: 'round'
-        }).addTo(markerGroupRef.current);
+        // Active Phase: Rider navigating to Store
+        if (osrmRoutePoints && osrmRoutePoints.length > 0) {
+          // Draw high-fidelity turn-by-turn road route from OSRM
+          L.polyline(osrmRoutePoints, {
+            color: leg1Color,
+            weight: 6,
+            opacity: 0.95,
+            lineJoin: 'round'
+          }).addTo(markerGroupRef.current);
+        } else {
+          // Fallback to straight line
+          L.polyline([riderLatLng, storeLatLng], {
+            color: leg1Color,
+            weight: 6,
+            opacity: 0.9,
+            lineJoin: 'round'
+          }).addTo(markerGroupRef.current);
+        }
 
         // Leg 2 (Store -> Customer) is DASHED upcoming blue route
         L.polyline([storeLatLng, customerLatLng], {
-          color: '#3b82f6',
+          color: leg2Color,
           weight: 4,
           opacity: 0.5,
           dashArray: '8, 8',
           lineJoin: 'round'
         }).addTo(markerGroupRef.current);
       } else {
+        // Active Phase: Rider delivering to Customer
         // Leg 1 (Store -> Rider) is faded completed dashed route
         L.polyline([storeLatLng, riderLatLng], {
           color: '#94a3b8',
@@ -386,20 +476,40 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           lineJoin: 'round'
         }).addTo(markerGroupRef.current);
 
-        // Leg 2 (Rider -> Customer) is active SOLID blue route
-        L.polyline([riderLatLng, customerLatLng], {
-          color: '#3b82f6',
-          weight: 6,
-          opacity: 0.9,
-          lineJoin: 'round'
-        }).addTo(markerGroupRef.current);
+        if (osrmRoutePoints && osrmRoutePoints.length > 0) {
+          // Draw high-fidelity turn-by-turn road route from OSRM
+          L.polyline(osrmRoutePoints, {
+            color: leg2Color,
+            weight: 6,
+            opacity: 0.95,
+            lineJoin: 'round'
+          }).addTo(markerGroupRef.current);
+        } else {
+          // Fallback to straight line
+          L.polyline([riderLatLng, customerLatLng], {
+            color: leg2Color,
+            weight: 6,
+            opacity: 0.9,
+            lineJoin: 'round'
+          }).addTo(markerGroupRef.current);
+        }
       }
 
       // Automatically focus bounds to include all elements
       try {
-        const validCoords = [riderLatLng, storeLatLng, customerLatLng].filter(c => c && !isNaN(c[0]) && !isNaN(c[1]));
-        if (validCoords.length > 0) {
-          const bounds = L.latLngBounds(validCoords);
+        let validCoords = [];
+        if (osrmRoutePoints && osrmRoutePoints.length > 0) {
+          validCoords = [...osrmRoutePoints];
+        } else {
+          validCoords = [riderLatLng, storeLatLng, customerLatLng];
+        }
+        
+        validCoords.push(storeLatLng);
+        validCoords.push(customerLatLng);
+
+        const filteredCoords = validCoords.filter(c => c && !isNaN(c[0]) && !isNaN(c[1]));
+        if (filteredCoords.length > 0) {
+          const bounds = L.latLngBounds(filteredCoords);
           leafletMapRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
         }
       } catch (e) {
@@ -412,7 +522,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         nearbyStores.forEach(store => {
           if (!store.lat || !store.lng) return;
           const storeLatLng = [parseFloat(store.lat), parseFloat(store.lng)];
-          const dist = getShortestPathDistance(mapCoords.lat, mapCoords.lon, storeLatLng[0], storeLatLng[1]);
+          const dist = getShortestPathDistance(mapCoords.lat, mapCoords.lng, storeLatLng[0], storeLatLng[1]);
           
           L.marker(storeLatLng, { icon: createStoreIcon(store.name) })
             .bindPopup(`
@@ -432,7 +542,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       // Re-center on Rider smoothly
       leafletMapRef.current.setView(riderLatLng, 14);
     }
-  }, [mapCoords, activeOrder, deliveryStep, nearbyStores, isOnline]);
+  }, [mapCoords, activeOrder, deliveryStep, nearbyStores, isOnline, osrmRoutePoints]);
 
   const handleToggleOnline = async () => {
     let id = user?.id || user?.uid;
@@ -473,26 +583,36 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
 
   const handleAccept = async () => {
     const orderToStart = incomingOrder;
-    setActiveOrder(orderToStart);
-    setIncomingOrder(null);
-    setDeliveryStep(0);
-    toast.success('Order Accepted!');
     
     if (orderToStart?.dbId) {
        try {
-         const updatePayload = { status: 'ACCEPTED' };
-         // Only append rider_id if it looks like a valid UUID (length > 20)
+         // Step 1: Claim the order strictly by updating its status
+         const { data, error } = await supabase
+           .from('orders')
+           .update({ status: 'ACCEPTED' })
+           .eq('id', orderToStart.dbId)
+           .select('id');
+           
+         if (error || !data || data.length === 0) {
+           console.error("Error accepting order:", error);
+           toast.error("Failed to accept. It may have been claimed by another rider.");
+           setIncomingOrder(null);
+           return; // DO NOT PROCEED LOCALLY
+         }
+
+         // Step 2: Safely attempt to link the rider ID (ignoring foreign key errors if test account)
          if (riderId && riderId.length > 20) {
-           updatePayload.rider_id = riderId;
+           await supabase.from('orders').update({ rider_id: riderId }).eq('id', orderToStart.dbId);
          }
          
-         const { error } = await supabase.from('orders').update(updatePayload).eq('id', orderToStart.dbId);
-         if (error) {
-           console.error("Error accepting order:", error);
-           toast.error("Database update failed, but proceeding locally.");
-         }
+         // Step 3: Only proceed locally once the database absolutely confirms the claim
+         setActiveOrder(orderToStart);
+         setIncomingOrder(null);
+         setDeliveryStep(0);
+         toast.success('Order Accepted!');
        } catch (err) {
          console.error("Exception accepting order:", err);
+         toast.error("Network error while accepting order.");
        }
     }
   };
@@ -515,7 +635,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
          try {
            let newDbStatus = 'ACCEPTED';
            if (nextIdx === 1) newDbStatus = 'PREPARING'; // Reached Store
-           if (nextIdx === 2) newDbStatus = 'PREPARING'; // Order Picked
+           if (nextIdx === 2) newDbStatus = 'SHIPPED'; // Order Picked
            if (nextIdx === 3) newDbStatus = 'DISPATCHED'; // Out for Delivery
            const { error } = await supabase.from('orders').update({ status: newDbStatus }).eq('id', activeOrder.dbId);
            if (error) console.error("Error updating order step:", error);
@@ -527,7 +647,11 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       if (activeOrder?.dbId) {
          try {
            const { error: completeErr } = await supabase.from('orders').update({ status: 'DELIVERED', updated_at: new Date().toISOString() }).eq('id', activeOrder.dbId);
-           if (completeErr) console.error("Error completing order:", completeErr);
+           if (completeErr) {
+             console.error("Error completing order:", completeErr);
+             toast.error("Failed to complete delivery. Please try again.");
+             return; // Stop execution, don't clear active order
+           }
            
            if (riderId) {
              const earningsAmount = Number(activeOrder.earnings.replace('₹', '')) || 50;
@@ -547,12 +671,17 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                }));
              }
            }
+           
+           setActiveOrder(null);
+           setDeliveryStep(0);
          } catch (err) {
            console.error("Error completing delivery in DB:", err);
+           toast.error("Network error while completing delivery.");
          }
+      } else {
+        setActiveOrder(null);
+        setDeliveryStep(0);
       }
-      setActiveOrder(null);
-      setDeliveryStep(0);
       toast.success('Delivery Completed Successfully!', { duration: 4000, icon: '🎉' });
     }
   };
@@ -685,19 +814,54 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
             )}
           </div>
         ) : (
-          /* ETA Floating Card */
-          <div style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'white', padding: '0.5rem 1rem', borderRadius: '12px', boxShadow: 'var(--rider-shadow-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 10 }}>
-             <span style={{ fontSize: '0.7rem', color: 'var(--rider-text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>
-               ETA to {deliveryStep < 2 ? 'Store' : 'Customer'}
-             </span>
-             <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--rider-primary)' }}>
-               {deliveryStep === 0 ? (() => { let d = new Date(); d.setMinutes(d.getMinutes() + 5); return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); })() 
-                : deliveryStep === 1 ? 'Arrived' 
-                : deliveryStep === 2 ? (() => { let d = new Date(); d.setMinutes(d.getMinutes() + 15); return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); })()
-                : deliveryStep === 3 ? (() => { let d = new Date(); d.setMinutes(d.getMinutes() + 4); return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); })()
-                : 'Delivered'}
-             </span>
-          </div>
+          <>
+            {/* OSRM Route Mode UI Selector */}
+            <div style={{
+              position: 'absolute', top: '1rem', left: '1rem', background: 'white', padding: '0.6rem 0.8rem',
+              borderRadius: '16px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', display: 'flex', flexDirection: 'column',
+              gap: '6px', zIndex: 10, maxWidth: 'calc(100% - 140px)', pointerEvents: 'auto'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Route:</span>
+              </div>
+              <div style={{ display: 'flex', gap: '2px', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '2px', background: '#f8fafc' }}>
+                {['driving', 'cycling', 'foot'].map(mode => (
+                  <button
+                    key={mode} onClick={() => setRouteMode(mode)}
+                    style={{
+                      border: 'none', background: routeMode === mode ? 'var(--rider-primary)' : 'transparent',
+                      color: routeMode === mode ? 'white' : '#64748b', padding: '4px 8px', borderRadius: '6px',
+                      fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s'
+                    }}
+                  >
+                    {mode === 'driving' ? '🚗 Fast' : mode === 'cycling' ? '🚴 Bike' : '🚶 Walk'}
+                  </button>
+                ))}
+              </div>
+              {routeStats && (
+                <div style={{ display: 'flex', gap: '8px', fontSize: '0.75rem', fontWeight: 800, color: 'var(--rider-text)' }}>
+                  <span>🛣️ {routeStats.distanceKm} km</span>
+                  <span style={{ color: 'var(--rider-success)' }}>⏱️ {routeStats.durationMins} m</span>
+                </div>
+              )}
+            </div>
+
+            {/* ETA Floating Card */}
+            <div style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'white', padding: '0.5rem 1rem', borderRadius: '12px', boxShadow: 'var(--rider-shadow-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 10 }}>
+               <span style={{ fontSize: '0.7rem', color: 'var(--rider-text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>
+                 ETA to {deliveryStep < 2 ? 'Store' : 'Customer'}
+               </span>
+               <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--rider-primary)' }}>
+                 {deliveryStep === 1 ? 'Arrived' 
+                  : deliveryStep === 4 ? 'Delivered'
+                  : routeStats && routeStats.durationMins !== undefined ? `${routeStats.durationMins} min`
+                  : deliveryStep === 0 ? (() => { let d = new Date(); d.setMinutes(d.getMinutes() + 5); return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); })() 
+                  : deliveryStep === 2 ? (() => { let d = new Date(); d.setMinutes(d.getMinutes() + 15); return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); })()
+                  : deliveryStep === 3 ? (() => { let d = new Date(); d.setMinutes(d.getMinutes() + 4); return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); })()
+                  : 'Delivered'}
+               </span>
+            </div>
+          </>
         )}
       </div>
 

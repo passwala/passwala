@@ -12,8 +12,31 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3004;
 
-// Middleware
-app.use(cors({ origin: '*' }));
+// CORS Security Whitelist
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  'https://passwala.vercel.app',
+  'https://passwala.onrender.com'
+];
+
+app.use(cors({ 
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, or Postman during dev)
+    if (!origin) return callback(null, true);
+    
+    // Allow exact matches or any Vercel preview deployments
+    const isAllowed = allowedOrigins.includes(origin) || origin.endsWith('.vercel.app');
+                      
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(new Error('Blocked by CORS strategy'));
+    }
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
@@ -26,6 +49,8 @@ app.get('/', (req, res) => {
     endpoints: {
       users: '/api/users',
       vendor: '/api/vendor',
+      riders: '/api/riders',
+      admin: '/api/admin',
       status: '/health'
     }
   });

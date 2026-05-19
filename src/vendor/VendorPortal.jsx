@@ -87,7 +87,7 @@ const VendorPortal = ({ user, onLogout }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showSuccessPop, setShowSuccessPop] = useState(false);
   const [storeId, setStoreId] = useState(null);
-  const [stats, setStats] = useState({ orders: 0, earnings: 0, pending: 0, rating: 4.8 }); 
+  const [stats, setStats] = useState({ orders: 0, earnings: 0, pending: 0, rating: 0 });
 
   // ⚡ REAL-TIME STATS ENGINE
   const fetchLiveStats = async () => {
@@ -123,12 +123,18 @@ const VendorPortal = ({ user, onLogout }) => {
 
       const totalEarnings = deliveredToday.reduce((sum, o) => sum + (o.total_amount || 0), 0);
 
+      // Fetch Real Rating from Stores Table
+      let realRating = 4.8;
+      const { data: storeData } = await supabase.from('stores').select('rating').eq('vendor_id', foundStoreId).maybeSingle();
+      if (storeData && typeof storeData.rating === 'number') {
+        realRating = storeData.rating;
+      }
+
       setStats({
         pending: pendingList.length,
         earnings: totalEarnings,
         orders: deliveredToday.length,
-        rating: 4.8 
-
+        rating: realRating 
       });
     } catch (err) {
       console.error("Stats fetch failed:", err);

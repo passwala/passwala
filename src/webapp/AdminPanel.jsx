@@ -45,11 +45,13 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './AdminPanel.css';
 
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
 // Create a highly privileged admin client that bypasses RLS
-const adminSupabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+const adminSupabase = (supabaseUrl && supabaseKey)
+  ? createClient(supabaseUrl, supabaseKey)
+  : null;
 
 if (!import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY) {
   console.warn('⚠️ Admin Panel is running with ANON_KEY. Some management functions may fail if RLS is enabled.');
@@ -60,14 +62,34 @@ const ActivityFeed = () => {
 
   const fetchRecent = async () => {
     try {
-      const { data: bData } = await adminSupabase.from('orders').select('*').order('created_at', { ascending: false }).limit(5);
-      setRecent(bData || []);
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
+      const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
+      const res = await fetch('/api/admin/fetch?table=orders', { headers: { 'x-admin-key': adminKey } });
+      const json = await res.json();
+      if (json.success && json.data) {
+        setRecent(json.data.slice(0, 5));
+      } else {
+        // Fallback to local cache if offline
+        const cached = localStorage.getItem('admin_cache_orders');
+        if (cached) {
+          setRecent(JSON.parse(cached).slice(0, 5));
+        }
+      }
+    } catch (err) { 
+      console.error(err); 
+      // Fallback to local cache if offline
+      const cached = localStorage.getItem('admin_cache_orders');
+      if (cached) {
+        setRecent(JSON.parse(cached).slice(0, 5));
+      }
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   useEffect(() => {
     fetchRecent();
+
+    if (!adminSupabase) return;
 
     // ⚡ REAL-TIME: Listen for any new orders platform-wide
     const channel = adminSupabase
@@ -294,24 +316,23 @@ const AdminPanel = ({ onLogout, location }) => {
 
   const fetchReferences = useCallback(async () => {
     try {
-      if (!adminSupabase) return;
-      const [
-        { data: u },
-        { data: v },
-        { data: s },
-        { data: p },
-        { data: pc },
-        { data: sc },
-        { data: sv }
-      ] = await Promise.all([
-        adminSupabase.from('users').select('id, full_name, phone'),
-        adminSupabase.from('vendors').select('id, name, business_name'),
-        adminSupabase.from('stores').select('id, name'),
-        adminSupabase.from('service_providers').select('id, business_name'),
-        adminSupabase.from('product_categories').select('id, name'),
-        adminSupabase.from('service_categories').select('id, name'),
-        adminSupabase.from('services').select('id, title')
+      const fetchTable = async (table) => {
+        const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
+        const res = await fetch(`/api/admin/fetch?table=${table}`, { headers: { 'x-admin-key': adminKey } });
+        const json = await res.json();
+        return json.success ? json.data : [];
+      };
+
+      const [u, v, s, p, pc, sc, sv] = await Promise.all([
+        fetchTable('users'),
+        fetchTable('vendors'),
+        fetchTable('stores'),
+        fetchTable('service_providers'),
+        fetchTable('product_categories'),
+        fetchTable('service_categories'),
+        fetchTable('services')
       ]);
+
       if (u) setUsersList(u);
       if (v) setVendorsList(v);
       if (s) setStoresList(s);
@@ -337,17 +358,12 @@ const AdminPanel = ({ onLogout, location }) => {
 
   const fetchStats = async () => {
     try {
-      const { count: userCount } = await adminSupabase.from('users').select('*', { count: 'exact', head: true });
-      const { count: vendorCount } = await adminSupabase.from('vendors').select('*', { count: 'exact', head: true });
-      const { count: orderCount } = await adminSupabase.from('orders').select('*', { count: 'exact', head: true });
-      const { count: productCount } = await adminSupabase.from('products').select('*', { count: 'exact', head: true });
-
-      setStats({
-        users: userCount || 0,
-        vendors: vendorCount || 0,
-        orders: orderCount || 0,
-        activeItems: productCount || 0
-      });
+      const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
+      const res = await fetch('/api/admin/stats', { headers: { 'x-admin-key': adminKey } });
+      const json = await res.json();
+      if (json.success && json.stats) {
+        setStats(json.stats);
+      }
     } catch (err) {
       console.error('Stats error:', err);
     }
@@ -359,51 +375,9 @@ const AdminPanel = ({ onLogout, location }) => {
     try {
       toast.loading('Performing deep purge of platform residue...', { id: 'purge' });
       
-      const mockUserIds = [
-        '00000000-0000-0000-0000-000000000001', 
-        '00000000-0000-0000-0000-000000000002',
-        '00000000-0000-0000-0000-000000000003',
-        '00000000-0000-0000-0000-000000000004'
-      ];
-
-      // 1. Delete by specific IDs
-      await adminSupabase.from('services').delete().in('id', ['88888888-8888-8888-8888-888888888888']);
-      await adminSupabase.from('products').delete().in('id', ['55555555-5555-5555-5555-555555555555']);
-      await adminSupabase.from('product_categories').delete().in('id', ['44444444-4444-4444-4444-444444444444']);
-      await adminSupabase.from('service_categories').delete().in('id', ['77777777-7777-7777-7777-777777777777']);
-      await adminSupabase.from('stores').delete().in('id', ['22222222-2222-2222-2222-222222222222']);
-      await adminSupabase.from('service_providers').delete().in('id', ['66666666-6666-6666-6666-666666666666']);
-      await adminSupabase.from('riders').delete().in('id', ['33333333-3333-3333-3333-333333333333']);
-      await adminSupabase.from('vendors').delete().in('id', ['11111111-1111-1111-1111-111111111111']);
-      await adminSupabase.from('users').delete().in('id', mockUserIds);
-
-      // 2. Delete by suspicious names and gibberish patterns
-      const suspiciousWords = [
-        'test', 'fake', 'nnknn', 'nzbsh', 'dummy', 'asdf', 
-        'bjkb', 'mmmmm', 'nmnm', 'nmn', 'kevall', 'plumber',
-        '99999', '66666', '88888', '77777', '11111', '00000',
-        'sample', 'demo', 'example', 'xyz', 'test', 'admin'
-      ];
-      
-      const tablesToClean = ['vendors', 'users', 'service_providers', 'stores', 'riders', 'services', 'products'];
-      
-      for (const word of suspiciousWords) {
-        for (const table of tablesToClean) {
-          const nameField = (table === 'users') ? 'full_name' : (table === 'products' || table === 'services' || table === 'stores') ? 'name' : 'business_name';
-          await adminSupabase.from(table).delete().ilike(nameField, `%${word}%`);
-          
-          // Also check phone field if it exists
-          if (table !== 'products' && table !== 'services' && table !== 'product_categories' && table !== 'service_categories') {
-            await adminSupabase.from(table).delete().ilike('phone', `%${word}%`);
-          }
-        }
-      }
-
-      // 3. Delete exact duplicates or specific mock entries from the image
-      await adminSupabase.from('service_providers').delete().eq('business_name', 'Super Plumber');
-      await adminSupabase.from('service_providers').delete().eq('phone', '6666666666');
-      await adminSupabase.from('users').delete().eq('full_name', 'Kevallll');
-      await adminSupabase.from('users').delete().eq('phone', '9999999999');
+      const res = await fetch('/api/admin/purge', { method: 'POST' });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Failed to purge data');
 
       toast.success('Platform is now clean and production-pure!', { id: 'purge' });
       fetchStats();
@@ -418,20 +392,11 @@ const AdminPanel = ({ onLogout, location }) => {
       setMapLoading(true);
       const combined = [];
 
-      // 1. Fetch Users, Vendors, Riders, Service Providers, and Stores in parallel
-      const [
-        { data: usersList, error: uErr },
-        { data: vendorsList, error: vErr },
-        { data: ridersList, error: rErr },
-        { data: providersList, error: pErr },
-        { data: storesList }
-      ] = await Promise.all([
-        adminSupabase.from('users').select('*'),
-        adminSupabase.from('vendors').select('*'),
-        adminSupabase.from('riders').select('*'),
-        adminSupabase.from('service_providers').select('*'),
-        adminSupabase.from('stores').select('*')
-      ]);
+      const res = await fetch('/api/admin/people_map');
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Failed to fetch people map data');
+
+      const { usersList, vendorsList, ridersList, providersList, storesList } = json.data;
 
       const storeMap = {};
       if (storesList) {
@@ -470,7 +435,7 @@ const AdminPanel = ({ onLogout, location }) => {
       };
 
       // Map Users (Buyers)
-      if (!uErr && usersList) {
+      if (usersList) {
         usersList.forEach(user => {
           if (user.role === 'BUYER' || !user.role) {
             const coords = getStableCoords(user.id, 'Buyer');
@@ -491,7 +456,7 @@ const AdminPanel = ({ onLogout, location }) => {
       }
 
       // Map Vendors (joined with store locations)
-      if (!vErr && vendorsList) {
+      if (vendorsList) {
         vendorsList.forEach(vendor => {
           const store = storeMap[vendor.id];
           const coords = getStableCoords(vendor.id, 'Vendor');
@@ -511,7 +476,7 @@ const AdminPanel = ({ onLogout, location }) => {
       }
 
       // Map Riders
-      if (!rErr && ridersList) {
+      if (ridersList) {
         ridersList.forEach(rider => {
           const coords = getStableCoords(rider.id, 'Rider');
           combined.push({
@@ -530,7 +495,7 @@ const AdminPanel = ({ onLogout, location }) => {
       }
 
       // Map Service Providers
-      if (!pErr && providersList) {
+      if (providersList) {
         providersList.forEach(provider => {
           const coords = getStableCoords(provider.id, 'Provider');
           combined.push({
@@ -566,71 +531,11 @@ const AdminPanel = ({ onLogout, location }) => {
     const currentTable = TABS.find(t => t.id === activeAdminTab)?.table || activeAdminTab;
 
     try {
-      if (!adminSupabase) throw new Error('Supabase client not initialized');
-
-      // Fetch directly from Supabase using admin client to bypass RLS
-      let query = adminSupabase.from(currentTable).select(
-        currentTable === 'riders' || currentTable === 'vendors' || currentTable === 'service_providers'
-          ? '*, users(phone, full_name)'
-          : '*'
-      );
-
-      const { data: suData, error: suError } = await query.order('created_at', { ascending: false });
-      if (suError) throw suError;
-
-      // Self-Healing: For any row missing user_id, check if user exists by phone
-      if (suData && (currentTable === 'vendors' || currentTable === 'service_providers' || currentTable === 'riders')) {
-        for (let i = 0; i < suData.length; i++) {
-          const row = suData[i];
-          if (!row.user_id && row.phone) {
-            try {
-              // 1. Check if user exists in the users table
-              let { data: existingUser } = await adminSupabase
-                .from('users')
-                .select('id, full_name')
-                .eq('phone', row.phone)
-                .maybeSingle();
-
-              if (!existingUser) {
-                // Create user if not exists
-                const userPayload = {
-                  phone: row.phone,
-                  full_name: row.name || row.business_name || 'Partner',
-                  role: currentTable === 'vendors' ? 'VENDOR' : (currentTable === 'riders' ? 'RIDER' : 'SERVICE_PROVIDER')
-                };
-                const { data: newUser, error: insErr } = await adminSupabase
-                  .from('users')
-                  .insert([userPayload])
-                  .select()
-                  .single();
-
-                if (!insErr && newUser) {
-                  existingUser = newUser;
-                }
-              }
-
-              if (existingUser) {
-                // Update row in the database
-                const { error: updErr } = await adminSupabase
-                  .from(currentTable)
-                  .update({ user_id: existingUser.id })
-                  .eq('id', row.id);
-
-                if (!updErr) {
-                  row.user_id = existingUser.id;
-                  row.users = {
-                    id: existingUser.id,
-                    phone: row.phone,
-                    full_name: existingUser.full_name
-                  };
-                }
-              }
-            } catch (healErr) {
-              console.error('Self-healing failed for row', row.id, healErr);
-            }
-          }
-        }
-      }
+      const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
+      const res = await fetch(`/api/admin/fetch?table=${currentTable}`, { headers: { 'x-admin-key': adminKey } });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Failed to fetch cloud data');
+      const suData = json.data;
 
       // Update State & Cache
       setData(suData || []);
@@ -686,14 +591,16 @@ const AdminPanel = ({ onLogout, location }) => {
       const isTemp = typeof deleteConfirmId === 'string' && deleteConfirmId.startsWith('temp_');
 
       if (!isTemp) {
-        if (!adminSupabase) throw new Error('Supabase client not initialized');
-
-        const { error } = await adminSupabase
-          .from(currentTab.table)
-          .delete()
-          .eq('id', deleteConfirmId);
-
-        if (error) throw error;
+        const res = await fetch('/api/admin/delete', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            table: currentTab.table,
+            id: deleteConfirmId
+          })
+        });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error || 'Failed to delete via cloud');
       }
 
       // Remove from local storage to clean up any stuck items
@@ -776,96 +683,20 @@ const AdminPanel = ({ onLogout, location }) => {
       let finalPayload = { ...payload };
 
       try {
-        if (!adminSupabase) throw new Error('Supabase client not initialized');
-
-        // A. Handle User-Linked Tables (riders, vendors, service_providers)
-        const userLinkedTables = ['riders', 'vendors', 'service_providers'];
-        if (userLinkedTables.includes(currentTab.table)) {
-          const userPayload = {
-            full_name: finalPayload.full_name || 'Admin Created'
-          };
-          if (finalPayload.phone) userPayload.phone = finalPayload.phone;
-          if (finalPayload.email) userPayload.email = finalPayload.email;
-          if (finalPayload.role) userPayload.role = finalPayload.role;
-
-          let userError = null;
-          let user = null;
-
-          if (finalPayload.user_id) {
-            // Update existing user
-            const res = await adminSupabase.from('users').update(userPayload).eq('id', finalPayload.user_id).select().maybeSingle();
-            userError = res.error;
-            user = res.data;
-          } else if (finalPayload.phone) {
-            // 1. First check if user already exists by phone
-            const { data: existingUser } = await adminSupabase.from('users').select('*').eq('phone', finalPayload.phone).maybeSingle();
-            if (existingUser) {
-              const res = await adminSupabase.from('users').update(userPayload).eq('id', existingUser.id).select().single();
-              userError = res.error;
-              user = res.data || existingUser;
-            } else {
-              const res = await adminSupabase.from('users').insert([{ ...userPayload, phone: finalPayload.phone }]).select().single();
-              userError = res.error;
-              user = res.data;
-            }
-          }
-
-          if (userError) {
-            console.error('❌ Failed to link user:', userError.message);
-          } else if (user) {
-            finalPayload.user_id = user.id;
-          }
+        const response = await fetch('/api/admin/upsert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            table: currentTab.table,
+            payload: finalPayload
+          })
+        });
+        const result = await response.json();
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to sync with backend');
         }
 
-        // B. Clear temporary/local id
-        if (finalPayload.id && finalPayload.id.startsWith('temp_')) {
-          delete finalPayload.id;
-        }
-
-        // C. Clean payload according to database schema
-        const dbSchema = DATABASE_SCHEMAS[currentTab.table];
-        let cleanedPayload = {};
-        if (dbSchema) {
-          const allowedKeys = [...dbSchema, 'id'];
-          Object.keys(finalPayload).forEach(key => {
-            if (allowedKeys.includes(key)) {
-              if (finalPayload[key] === '' && (key.endsWith('_id') || key === 'uid')) {
-                cleanedPayload[key] = null;
-              } else {
-                cleanedPayload[key] = finalPayload[key];
-              }
-            }
-          });
-        } else {
-          cleanedPayload = { ...finalPayload };
-        }
-
-        // D. Perform Upsert/Update directly on Supabase
-        let suError;
-        let returnedItem = null;
-        if (cleanedPayload.id) {
-          const { data: updatedData, error } = await adminSupabase
-            .from(currentTab.table)
-            .update(cleanedPayload)
-            .eq('id', cleanedPayload.id)
-            .select();
-          suError = error;
-          if (updatedData && updatedData.length > 0) {
-            returnedItem = updatedData[0];
-          }
-        } else {
-          const { data: insertedData, error } = await adminSupabase
-            .from(currentTab.table)
-            .insert(cleanedPayload)
-            .select();
-          suError = error;
-          if (insertedData && insertedData.length > 0) {
-            returnedItem = insertedData[0];
-          }
-        }
-
-        if (suError) throw suError;
-
+        const returnedItem = result.data;
         if (returnedItem) {
           setData(prev => prev.map(item => item.id === payload.id ? returnedItem : item));
           const localAddedCurrent = JSON.parse(localStorage.getItem(localKey) || '[]');
@@ -875,23 +706,6 @@ const AdminPanel = ({ onLogout, location }) => {
           const cachedListCurrent = JSON.parse(localStorage.getItem(cacheKey) || '[]');
           const newCached = cachedListCurrent.map(item => item.id === payload.id ? returnedItem : item);
           localStorage.setItem(cacheKey, JSON.stringify(newCached));
-
-          // Auto-sync / auto-create stores when a vendor is created or updated
-          if (currentTab.table === 'vendors') {
-            try {
-              await adminSupabase.from('stores').upsert({
-                id: returnedItem.id,
-                vendor_id: returnedItem.id,
-                name: returnedItem.business_name || returnedItem.name || 'Store of ' + (returnedItem.name || 'Partner'),
-                address: returnedItem.address || '',
-                is_open: true,
-                rating: 0
-              });
-              console.log('Auto-created/synced store for vendor:', returnedItem.id);
-            } catch (storeSyncErr) {
-              console.error('Failed to auto-upsert store for vendor:', storeSyncErr);
-            }
-          }
         }
 
         toast.success('Synced with Cloud! ☁️', { id: 'offline-toast' });
@@ -915,14 +729,19 @@ const AdminPanel = ({ onLogout, location }) => {
 
   const handleToggleVerify = async (item) => {
     try {
-      if (!adminSupabase) throw new Error('Supabase client not initialized');
       const nextVerified = !item.is_verified;
-      const { error } = await adminSupabase
-        .from(currentTab.table)
-        .update({ is_verified: nextVerified })
-        .eq('id', item.id);
-
-      if (error) throw error;
+      const response = await fetch('/api/admin/upsert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table: currentTab.table,
+          payload: { id: item.id, is_verified: nextVerified }
+        })
+      });
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update verification status');
+      }
 
       toast.success(nextVerified ? 'Verified partner successfully! ✅' : 'Unverified partner successfully!');
       

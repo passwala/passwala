@@ -10,16 +10,19 @@ import { supabase } from '../../supabase';
 import { useNotifications } from '../../context/NotificationContext';
 
 // High-end Sub-component for individual order tracking maps to safely manage isolated instances
-function OrderTrackingMap({ order, riderCoords }) {
+function OrderTrackingMap({ order, riderCoords, userCoords }) {
   const mapRef = useRef(null);
   const leafletMapRef = useRef(null);
   const markerGroupRef = useRef(null);
+  const [routePoints, setRoutePoints] = useState([]);
 
   useEffect(() => {
     if (!mapRef.current) return;
 
     // Initialize map
-    const defaultCenter = [23.0225, 72.5714]; // Ahmedabad center
+    const defaultCenter = userCoords?.lat && userCoords?.lng 
+      ? [userCoords.lat, userCoords.lng] 
+      : [23.0225, 72.5714]; // Fallback to Ahmedabad center
     leafletMapRef.current = L.map(mapRef.current, {
       zoomControl: false,
       attributionControl: false
@@ -40,6 +43,7 @@ function OrderTrackingMap({ order, riderCoords }) {
         markerGroupRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fix for Leaflet rendering issues in dynamic CSS layouts
@@ -53,6 +57,60 @@ function OrderTrackingMap({ order, riderCoords }) {
       return () => clearTimeout(timer);
     }
   }, []);
+
+  // Fetch routing coordinates from OSRM dynamic engine
+  useEffect(() => {
+    const storeLatLng = order.stores?.lat && order.stores?.lng 
+      ? [parseFloat(order.stores.lat), parseFloat(order.stores.lng)]
+      : [23.0305, 72.5075];
+
+    const customerLatLng = order.addresses?.lat && order.addresses?.lng
+      ? [parseFloat(order.addresses.lat), parseFloat(order.addresses.lng)]
+      : [23.0393, 72.5244];
+
+    let riderLatLng = (riderCoords && riderCoords.lat && riderCoords.lng) 
+      ? [parseFloat(riderCoords.lat), parseFloat(riderCoords.lng)] 
+      : null;
+
+    if (!riderLatLng && ['ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED'].includes(order.status)) {
+       if (order.status === 'ACCEPTED' || order.status === 'PREPARING') {
+         riderLatLng = storeLatLng;
+       } else if (order.status === 'SHIPPED' || order.status === 'DISPATCHED') {
+         riderLatLng = [
+           (storeLatLng[0] + customerLatLng[0]) / 2,
+           (storeLatLng[1] + customerLatLng[1]) / 2
+         ];
+       }
+    }
+
+    if (!riderLatLng) {
+      setRoutePoints([]);
+      return;
+    }
+
+    const start = riderLatLng;
+    const end = ['ACCEPTED', 'PREPARING'].includes(order.status) ? storeLatLng : customerLatLng;
+
+    const fetchOSRMRoute = async () => {
+      try {
+        const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.routes && data.routes.length > 0) {
+            const coords = data.routes[0].geometry.coordinates.map(pt => [pt[1], pt[0]]);
+            setRoutePoints(coords);
+            return;
+          }
+        }
+        setRoutePoints([]);
+      } catch (err) {
+        setRoutePoints([]);
+      }
+    };
+
+    fetchOSRMRoute();
+  }, [order, riderCoords]);
 
   useEffect(() => {
     if (!leafletMapRef.current || !markerGroupRef.current) return;
@@ -132,12 +190,21 @@ function OrderTrackingMap({ order, riderCoords }) {
     // Connect them with smart routing polylines
     if (order.status === 'ACCEPTED' || order.status === 'PREPARING') {
       if (riderLatLng) {
-        L.polyline([riderLatLng, storeLatLng], {
-          color: '#f97316',
-          weight: 6,
-          opacity: 0.9,
-          lineJoin: 'round'
-        }).addTo(markerGroupRef.current);
+        if (routePoints.length > 0) {
+          L.polyline(routePoints, {
+            color: '#f97316',
+            weight: 6,
+            opacity: 0.9,
+            lineJoin: 'round'
+          }).addTo(markerGroupRef.current);
+        } else {
+          L.polyline([riderLatLng, storeLatLng], {
+            color: '#f97316',
+            weight: 6,
+            opacity: 0.9,
+            lineJoin: 'round'
+          }).addTo(markerGroupRef.current);
+        }
       }
 
       L.polyline([storeLatLng, customerLatLng], {
@@ -157,12 +224,21 @@ function OrderTrackingMap({ order, riderCoords }) {
           lineJoin: 'round'
         }).addTo(markerGroupRef.current);
 
-        L.polyline([riderLatLng, customerLatLng], {
-          color: '#3b82f6',
-          weight: 6,
-          opacity: 0.9,
-          lineJoin: 'round'
-        }).addTo(markerGroupRef.current);
+        if (routePoints.length > 0) {
+          L.polyline(routePoints, {
+            color: '#3b82f6',
+            weight: 6,
+            opacity: 0.9,
+            lineJoin: 'round'
+          }).addTo(markerGroupRef.current);
+        } else {
+          L.polyline([riderLatLng, customerLatLng], {
+            color: '#3b82f6',
+            weight: 6,
+            opacity: 0.9,
+            lineJoin: 'round'
+          }).addTo(markerGroupRef.current);
+        }
       } else {
         // Fallback if no rider position at all
         L.polyline([storeLatLng, customerLatLng], {
@@ -180,13 +256,17 @@ function OrderTrackingMap({ order, riderCoords }) {
         leafletMapRef.current.invalidateSize();
       }
       const bounds = L.latLngBounds([storeLatLng, customerLatLng]);
-      if (riderLatLng && !isNaN(riderLatLng[0]) && !isNaN(riderLatLng[1])) bounds.extend(riderLatLng);
+      if (routePoints.length > 0) {
+        bounds.extend(routePoints);
+      } else if (riderLatLng && !isNaN(riderLatLng[0]) && !isNaN(riderLatLng[1])) {
+        bounds.extend(riderLatLng);
+      }
       leafletMapRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
     } catch (e) {
       console.warn('Map boundary fit failed', e);
     }
 
-  }, [order, riderCoords]);
+  }, [order, riderCoords, routePoints]);
 
   return (
     <div 
@@ -196,7 +276,7 @@ function OrderTrackingMap({ order, riderCoords }) {
   );
 }
 
-const TrackOrders = ({ onBack, user }) => {
+const TrackOrders = ({ onBack, user, userCoords }) => {
   const [activeOrders, setActiveOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
@@ -443,8 +523,9 @@ const TrackOrders = ({ onBack, user }) => {
               </div>
 
               <div className="live-tracking-map-v4" style={{ height: '240px', overflow: 'hidden', borderRadius: '20px', position: 'relative', zIndex: 1, border: '1px solid rgba(0,0,0,0.05)' }}>
-                {/* Embedded Fully Interactive Custom Leaflet Map Component */}
-                <OrderTrackingMap order={order} riderCoords={riderCoords} />
+                <div className="tom-map-container" style={{ position: 'relative', width: '100%', height: '220px', zIndex: 0, isolation: 'isolate' }}>
+                  <OrderTrackingMap order={order} riderCoords={riderCoords} userCoords={userCoords} />
+                </div>
                 
                 {/* Floating Overlay Info */}
                 <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'white', padding: '8px 12px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 10 }}>

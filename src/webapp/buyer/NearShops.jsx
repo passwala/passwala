@@ -62,30 +62,7 @@ const NearShops = ({ onBack, location, userCoords }) => {
   const [viewType, setViewType] = useState('SHOPS'); // 'SHOPS' or 'SERVICES'
   const [shopCatalog, setShopCatalog] = useState([]);
 
-  // Hash function for stable coordinates based on ID (fallback if lat/lng missing)
-  const getStableCoords = (id, type) => {
-    let hash = 0;
-    const inputStr = id || 'random-id';
-    for (let i = 0; i < inputStr.length; i++) {
-      hash = inputStr.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    
-    let radius = 0.03;
-    let baseLat = userCoords?.lat || 23.0225;
-    let baseLng = userCoords?.lng || 72.5714;
-    
-    if (type === 'SERVICES') {
-      baseLat += 0.005; baseLng += 0.005; radius = 0.04;
-    }
-    
-    const latOffset = ((hash & 0xFF) / 255.0 - 0.5) * radius;
-    const lngOffset = (((hash >> 8) & 0xFF) / 255.0 - 0.5) * radius;
-    
-    return {
-      lat: baseLat + latOffset,
-      lng: baseLng + lngOffset
-    };
-  };
+
 
   const [selectedShop, setSelectedShop] = useState(null);
 
@@ -148,7 +125,7 @@ const NearShops = ({ onBack, location, userCoords }) => {
   };
 
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    if (!lat1 || !lon1 || !lat2 || !lon2) return '0';
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 'N/A';
     const dist = getShortestPathDistance(lat1, lon1, lat2, lon2);
     return dist.toFixed(1);
   };
@@ -178,13 +155,6 @@ const NearShops = ({ onBack, location, userCoords }) => {
           
           let lat = item.lat;
           let lng = item.lng;
-          
-          // Fallback coords if missing
-          if (!lat || !lng) {
-            const fallback = getStableCoords(item.id, viewType);
-            lat = fallback.lat;
-            lng = fallback.lng;
-          }
 
           uniqueItems.push({
             id: item.id,
@@ -395,7 +365,7 @@ const NearShops = ({ onBack, location, userCoords }) => {
                               <span className="shop-category-near">{shop.category || 'General'}</span>
                               <span className="shop-distance-near">
                                 <Navigation size={12} />
-                                {shop.distance} km from you
+                                {shop.distance === 'N/A' ? 'Distance Unknown' : `${shop.distance} km from you`}
                               </span>
                               {shop.address && (
                                 <span className="shop-area-near">

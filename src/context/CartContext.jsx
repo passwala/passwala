@@ -1,4 +1,3 @@
-/* eslint-disable */
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 
@@ -7,37 +6,49 @@ const CartContext = createContext();
 export const CartProvider = ({ children, user }) => {
   const [cartItems, setCartItems] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   // Load cart from Supabase on login
   useEffect(() => {
-    if (user?.uid) {
+    const userId = user?.id || user?.uid;
+    if (userId) {
       const loadCart = async () => {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('carts')
           .select('items')
-          .eq('user_id', user.uid)
+          .eq('user_id', userId)
           .single();
         if (data?.items) setCartItems(data.items);
+        setIsLoaded(true);
       };
       loadCart();
     } else {
-      setCartItems([]);
+      const timer = setTimeout(() => {
+        setCartItems([]);
+        setIsLoaded(true);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [user]);
 
   // Sync cart to Supabase on change
   useEffect(() => {
-    if (user?.uid && cartItems.length > 0) {
+    const userId = user?.id || user?.uid;
+    if (userId && isLoaded) {
       const syncCart = async () => {
-        await supabase.from('carts').upsert({
-          user_id: user.uid,
-          items: cartItems,
-          updated_at: new Date()
-        });
+        if (cartItems.length === 0) {
+          await supabase.from('carts').delete().eq('user_id', userId);
+        } else {
+          await supabase.from('carts').upsert({
+            user_id: userId,
+            items: cartItems,
+            updated_at: new Date()
+          });
+        }
       };
       syncCart();
     }
-  }, [cartItems, user]);
+  }, [cartItems, user, isLoaded]);
 
   const addToCart = (item) => {
     setCartItems(prev => {
@@ -82,4 +93,5 @@ export const CartProvider = ({ children, user }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useCart = () => useContext(CartContext);

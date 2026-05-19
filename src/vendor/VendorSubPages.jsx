@@ -1,8 +1,11 @@
 import React from 'react';
 import { Package, FileText, IndianRupee, Wallet, Star, Bell, HelpCircle, CheckCircle, Clock, MapPin, Download, ArrowUpRight, ArrowDownRight, Tag, Trash2, PackagePlus, Camera, Wrench } from 'lucide-react';
 import { supabase } from '../supabase';
+import { toast } from 'react-hot-toast';
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 export const VendorInventory = ({ businessType, storeId }) => {
   const [items, setItems] = React.useState([]);
@@ -61,6 +64,7 @@ export const VendorInventory = ({ businessType, storeId }) => {
          }
        });
 
+       // eslint-disable-next-line no-constant-condition
        if (false) {
          const demos = businessType === 'shop' ? [
            { id: 'd1', name: 'Fresh Farm Milk', detail: 'Organic A2 cow milk, delivered fresh every morning.', price: 75, image: 'https://images.unsplash.com/photo-1550583724-125581f7793d?auto=format&fit=crop&q=80&w=400', type: 'shop' },
@@ -386,6 +390,308 @@ export const VendorInventory = ({ businessType, storeId }) => {
   );
 };
 
+// Premium High-Fidelity Custom Leaflet Map Component with OSRM Turn-by-Turn Road Routing
+function VendorOrderTrackingMap({ order, riderCoords }) {
+  const mapRef = React.useRef(null);
+  const leafletMapRef = React.useRef(null);
+  const markerGroupRef = React.useRef(null);
+  const [osrmRoutePoints, setOsrmRoutePoints] = React.useState([]);
+
+  // Initialize Map
+  React.useEffect(() => {
+    if (!mapRef.current) return;
+
+    const defaultCenter = [23.0225, 72.5714]; // Ahmedabad center
+    leafletMapRef.current = L.map(mapRef.current, {
+      zoomControl: false,
+      attributionControl: false
+    }).setView(defaultCenter, 14);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      className: 'map-tiles'
+    }).addTo(leafletMapRef.current);
+
+    L.control.zoom({ position: 'topright' }).addTo(leafletMapRef.current);
+    markerGroupRef.current = L.featureGroup().addTo(leafletMapRef.current);
+
+    return () => {
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+        markerGroupRef.current = null;
+      }
+    };
+  }, []);
+
+  // Force size invalidation to resolve Leaflet dynamic layout rendering bugs
+  React.useEffect(() => {
+    if (leafletMapRef.current) {
+      const timer = setTimeout(() => {
+        if (leafletMapRef.current) {
+          leafletMapRef.current.invalidateSize();
+        }
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  // Fetch real-time OSRM turn-by-turn road paths dynamically
+  React.useEffect(() => {
+    const storeLatLng = order.stores?.lat && order.stores?.lng 
+      ? [parseFloat(order.stores.lat), parseFloat(order.stores.lng)]
+      : [23.0305, 72.5075];
+
+    const customerLatLng = order.addresses?.lat && order.addresses?.lng
+      ? [parseFloat(order.addresses.lat), parseFloat(order.addresses.lng)]
+      : [23.0393, 72.5244];
+
+    const riderLatLng = (riderCoords && riderCoords.lat && riderCoords.lng) 
+      ? [parseFloat(riderCoords.lat), parseFloat(riderCoords.lng)] 
+      : null;
+
+    const fetchOSRMRoute = async () => {
+      // Direct route segment selection based on current delivery status
+      const start = riderLatLng || storeLatLng;
+      const end = (order.status === 'ACCEPTED' || order.status === 'PREPARING') ? storeLatLng : customerLatLng;
+
+      if (!start[0] || !start[1] || !end[0] || !end[1] || (start[0] === end[0] && start[1] === end[1])) {
+        setOsrmRoutePoints([]);
+        return;
+      }
+
+      try {
+        const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.routes && data.routes.length > 0) {
+            const coords = data.routes[0].geometry.coordinates.map(pt => [pt[1], pt[0]]);
+            setOsrmRoutePoints(coords);
+          }
+        }
+      } catch (err) {
+        console.warn("OSRM routing fetch failed for vendor map, falling back to direct line:", err);
+        setOsrmRoutePoints([]);
+      }
+    };
+
+    fetchOSRMRoute();
+  }, [order, riderCoords]);
+
+  // Plot and synchronize markers + dynamic route lines on changes
+  React.useEffect(() => {
+    if (!leafletMapRef.current || !markerGroupRef.current) return;
+
+    markerGroupRef.current.clearLayers();
+
+    // Premium vectorized DivIcon markers matching the platform branding
+    const createRiderIcon = () => L.divIcon({
+      className: 'custom-leaflet-marker rider-marker',
+      html: `<div class="marker-container" style="background: #10b981; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative;">
+               <span class="pulse-ring" style="position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 3px solid #10b981; animation: marker-pulse 1.8s infinite; opacity: 0.6;"></span>
+               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(45deg);"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+             </div>`,
+      iconSize: [42, 42],
+      iconAnchor: [21, 21]
+    });
+
+    const createStoreIcon = () => L.divIcon({
+      className: 'custom-leaflet-marker store-marker',
+      html: `<div class="marker-container" style="background: #f97316; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; position: relative;">
+               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 17H2"/></svg>
+             </div>`,
+      iconSize: [42, 42],
+      iconAnchor: [21, 21]
+    });
+
+    const createCustomerIcon = () => L.divIcon({
+      className: 'custom-leaflet-marker customer-marker',
+      html: `<div class="marker-container" style="background: #3b82f6; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative;">
+               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+             </div>`,
+      iconSize: [42, 42],
+      iconAnchor: [21, 21]
+    });
+
+    const storeLatLng = order.stores?.lat && order.stores?.lng 
+      ? [parseFloat(order.stores.lat), parseFloat(order.stores.lng)]
+      : [23.0305, 72.5075];
+
+    const customerLatLng = order.addresses?.lat && order.addresses?.lng
+      ? [parseFloat(order.addresses.lat), parseFloat(order.addresses.lng)]
+      : [23.0393, 72.5244];
+
+    let riderLatLng = (riderCoords && riderCoords.lat && riderCoords.lng) 
+      ? [parseFloat(riderCoords.lat), parseFloat(riderCoords.lng)] 
+      : null;
+
+    // Simulated/Fallback rider movement if the device does not have live active coordinates yet
+    if (!riderLatLng && ['ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED'].includes(order.status)) {
+       if (order.status === 'ACCEPTED' || order.status === 'PREPARING') {
+         riderLatLng = storeLatLng;
+       } else if (order.status === 'SHIPPED' || order.status === 'DISPATCHED') {
+         riderLatLng = [
+           (storeLatLng[0] + customerLatLng[0]) / 2,
+           (storeLatLng[1] + customerLatLng[1]) / 2
+         ];
+       }
+    }
+
+    // Plot Markers
+    L.marker(storeLatLng, { icon: createStoreIcon() })
+      .bindPopup(`<b>Your Store Hub</b>`)
+      .addTo(markerGroupRef.current);
+
+    L.marker(customerLatLng, { icon: createCustomerIcon() })
+      .bindPopup(`<b>Customer Destination</b><br/>${order.addresses?.society || 'Delivery Location'}`)
+      .addTo(markerGroupRef.current);
+
+    if (riderLatLng) {
+      L.marker(riderLatLng, { icon: createRiderIcon() })
+        .bindPopup(`<b>Assigned Rider</b>`)
+        .addTo(markerGroupRef.current);
+    }
+
+    // Connect them with smart routing polylines
+    const leg1Color = '#f97316'; // store path
+    const leg2Color = '#3b82f6'; // customer path
+
+    if (order.status === 'ACCEPTED' || order.status === 'PREPARING') {
+      if (osrmRoutePoints && osrmRoutePoints.length > 0) {
+        L.polyline(osrmRoutePoints, { color: leg1Color, weight: 6, opacity: 0.95, lineJoin: 'round' }).addTo(markerGroupRef.current);
+      } else if (riderLatLng) {
+        L.polyline([riderLatLng, storeLatLng], { color: leg1Color, weight: 6, opacity: 0.9, lineJoin: 'round' }).addTo(markerGroupRef.current);
+      }
+      L.polyline([storeLatLng, customerLatLng], { color: leg2Color, weight: 4, opacity: 0.5, dashArray: '8, 8', lineJoin: 'round' }).addTo(markerGroupRef.current);
+    } else {
+      if (riderLatLng) {
+        L.polyline([storeLatLng, riderLatLng], { color: '#94a3b8', weight: 3, opacity: 0.4, dashArray: '4, 4', lineJoin: 'round' }).addTo(markerGroupRef.current);
+      }
+      if (osrmRoutePoints && osrmRoutePoints.length > 0) {
+        L.polyline(osrmRoutePoints, { color: leg2Color, weight: 6, opacity: 0.95, lineJoin: 'round' }).addTo(markerGroupRef.current);
+      } else if (riderLatLng) {
+        L.polyline([riderLatLng, customerLatLng], { color: leg2Color, weight: 6, opacity: 0.9, lineJoin: 'round' }).addTo(markerGroupRef.current);
+      } else {
+        L.polyline([storeLatLng, customerLatLng], { color: leg2Color, weight: 6, opacity: 0.9, lineJoin: 'round' }).addTo(markerGroupRef.current);
+      }
+    }
+
+    // Auto-fit bounds
+    try {
+      const validPoints = [storeLatLng, customerLatLng];
+      if (riderLatLng && !isNaN(riderLatLng[0]) && !isNaN(riderLatLng[1])) {
+        validPoints.push(riderLatLng);
+      }
+      if (osrmRoutePoints && osrmRoutePoints.length > 0) {
+        osrmRoutePoints.forEach(pt => validPoints.push(pt));
+      }
+      const bounds = L.latLngBounds(validPoints);
+      leafletMapRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+    } catch (e) {
+      console.warn('Map boundary fit failed:', e);
+    }
+  }, [order, riderCoords, osrmRoutePoints]);
+
+  return (
+    <div ref={mapRef} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 1 }} />
+  );
+}
+
+// Map Wrapper Component to Manage isolated Supabase state per active order
+function VendorOrderMapWrapper({ order }) {
+  const [riderCoords, setRiderCoords] = React.useState(null);
+
+  React.useEffect(() => {
+    // Inject custom animation styles for Leaflet pulse effects if not already present
+    const styleId = 'leaflet-custom-pulse-styles';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = `
+        @keyframes marker-pulse {
+          0% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+          }
+          70% {
+            transform: scale(1);
+            box-shadow: 0 0 0 12px rgba(16, 185, 129, 0);
+          }
+          100% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+          }
+        }
+        .map-tiles {
+          filter: grayscale(1) invert(0.05) sepia(0.05) brightness(0.95) contrast(1.05);
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!order || !order.rider_id) {
+      setRiderCoords(null);
+      return;
+    }
+
+    const targetRiderId = order.rider_id;
+
+    // Fetch Initial Location
+    const getInitialPos = async () => {
+      try {
+        const { data } = await supabase
+          .from('rider_locations')
+          .select('lat, lng, status')
+          .eq('rider_id', targetRiderId)
+          .maybeSingle();
+
+        if (data && data.status === 'ONLINE') {
+          setRiderCoords({ lat: parseFloat(data.lat), lng: parseFloat(data.lng) });
+        }
+      } catch (err) {
+        console.warn("Error getting initial rider position:", err);
+      }
+    };
+    getInitialPos();
+
+    // Listen to real-time coordinate updates
+    const channel = supabase
+      .channel(`vendor-rider-tracking-${order.id}`)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'rider_locations',
+        filter: `rider_id=eq.${targetRiderId}`
+      }, (payload) => {
+        if (payload.new && payload.new.status === 'ONLINE') {
+          setRiderCoords({ lat: parseFloat(payload.new.lat), lng: parseFloat(payload.new.lng) });
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [order]);
+
+  return (
+    <div style={{ position: 'relative', height: '260px', borderRadius: '20px', overflow: 'hidden', border: '1px solid #e2e8f0', marginTop: '0.75rem', zIndex: 1 }}>
+      <VendorOrderTrackingMap order={order} riderCoords={riderCoords} />
+      
+      {/* Floating Info Overlay */}
+      <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'white', padding: '6px 12px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 10 }}>
+        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: riderCoords ? '#22c55e' : '#94a3b8', animation: riderCoords ? 'pulse 2s infinite' : 'none' }}></div>
+        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155' }}>
+          {(riderCoords || ['ACCEPTED', 'PREPARING', 'DISPATCHED', 'SHIPPED'].includes(order.status)) ? 'Rider / Order In Progress' : (order.rider_id ? 'Rider Assigned' : 'Waiting for Rider Assignment')}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export const VendorOrders = ({ storeId }) => {
   const [activeTab, setActiveTab] = React.useState('active');
   const [orders, setOrders] = React.useState([]);
@@ -404,7 +710,8 @@ export const VendorOrders = ({ storeId }) => {
         .select(`
           *,
           users(full_name, phone),
-          addresses(society),
+          addresses(*),
+          stores(name, address, lat, lng),
           order_items(quantity, price_at_purchase, products(name))
         `)
         .eq('store_id', storeId)
@@ -431,6 +738,54 @@ export const VendorOrders = ({ storeId }) => {
     return () => { supabase.removeChannel(channel); };
   }, [fetchOrders]);
 
+  // Offline / Online detection
+  React.useEffect(() => {
+    const handleOnline = () => {
+      toast.success("Internet restored. Syncing orders...", { icon: '🟢' });
+      fetchOrders(false);
+    };
+    const handleOffline = () => {
+      toast.error("You are offline! Live orders paused.", { duration: 6000, icon: '🔴' });
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [fetchOrders]);
+
+  // Audio Notification Loop for New Orders
+  React.useEffect(() => {
+    const hasNewOrders = orders.some(o => o.status === 'PLACED');
+    if (!hasNewOrders) return;
+
+    const playNotificationSound = () => {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime); // A5
+        osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.1); // A6
+        gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.5);
+      } catch (e) {
+        // Browser might block audio until user interacts with the page
+      }
+    };
+
+    playNotificationSound();
+    const intervalId = setInterval(playNotificationSound, 4000);
+    return () => clearInterval(intervalId);
+  }, [orders]);
+
   const updateStatus = async (orderId, newStatus) => {
     const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
     if (!error) {
@@ -441,6 +796,7 @@ export const VendorOrders = ({ storeId }) => {
   const getStatusStyle = (status) => {
     switch(status) {
       case 'PLACED': return { bg: '#fff7ed', text: '#f97316', dot: '#f97316', label: 'New Order', icon: <Bell size={14} /> };
+      case 'ACCEPTED': return { bg: '#e0f2fe', text: '#0ea5e9', dot: '#0ea5e9', label: 'Rider Accepted', icon: <CheckCircle size={14} /> };
       case 'PREPARING': return { bg: '#eff6ff', text: '#3b82f6', dot: '#3b82f6', label: 'In Progress', icon: <Clock size={14} /> };
       case 'SHIPPED': return { bg: '#faf5ff', text: '#a855f7', dot: '#a855f7', label: 'Out for Delivery', icon: <MapPin size={14} /> };
       case 'DELIVERED': return { bg: '#f0fdf4', text: '#22c55e', dot: '#22c55e', label: 'Completed', icon: <CheckCircle size={14} /> };
@@ -504,7 +860,7 @@ export const VendorOrders = ({ storeId }) => {
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
                     <span style={{ fontWeight: 950, color: '#0f172a', fontSize: '1.25rem', letterSpacing: '-0.5px' }}>#ORD-{order.id.substring(0, 8).toUpperCase()}</span>
-                    {order.status === 'PLACED' && (
+                    {['PLACED', 'ACCEPTED'].includes(order.status) && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#fef2f2', color: '#ef4444', padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 900 }}>
                         <div className="v-pulse-dot" style={{ background: '#ef4444' }}></div>
                         ACTION REQUIRED
@@ -567,8 +923,15 @@ export const VendorOrders = ({ storeId }) => {
                  </div>
               </div>
 
+              {activeTab === 'active' && ['PLACED', 'PREPARING', 'SHIPPED', 'DISPATCHED'].includes(order.status) && (
+                <div style={{ marginBottom: '2rem' }}>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase' }}>Rider Delivery Path & Live Tracking</p>
+                  <VendorOrderMapWrapper order={order} />
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: '1.25rem' }}>
-                {order.status === 'PLACED' && (
+                {['PLACED', 'ACCEPTED'].includes(order.status) && (
                   <motion.button 
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
@@ -590,9 +953,23 @@ export const VendorOrders = ({ storeId }) => {
                     Confirm Ready for Pickup
                   </motion.button>
                 )}
-                <button className="v-btn-outline" style={{ padding: '14px 32px', fontWeight: 800 }}>
-                  Order Protocol
-                </button>
+                {['PLACED', 'ACCEPTED', 'PREPARING'].includes(order.status) ? (
+                  <button 
+                    onClick={() => {
+                      if (window.confirm("EMERGENCY OVERRIDE: Are you sure you want to CANCEL this order? This cannot be undone and the customer will be notified.")) {
+                        updateStatus(order.id, 'CANCELLED');
+                      }
+                    }}
+                    className="v-btn-outline" 
+                    style={{ padding: '14px 32px', fontWeight: 800, color: '#ef4444', borderColor: '#fecaca', background: '#fef2f2' }}
+                  >
+                    Cancel Order
+                  </button>
+                ) : (
+                  <button className="v-btn-outline" style={{ padding: '14px 32px', fontWeight: 800 }}>
+                    Order Protocol
+                  </button>
+                )}
               </div>
             </motion.div>
           );

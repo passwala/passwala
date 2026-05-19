@@ -4,13 +4,13 @@ import { getFirestore } from "firebase/firestore";
 import { getMessaging, isSupported } from "firebase/messaging";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCqjI8v3JaP14VBg4ygarxXlfjZfTvHlag",
-  authDomain: "passwala-75faa.firebaseapp.com",
-  projectId: "passwala-75faa",
-  storageBucket: "passwala-75faa.firebasestorage.app",
-  messagingSenderId: "301031527282",
-  appId: "1:301031527282:web:b97b08afb9eafc41fa43eb",
-  measurementId: "G-M3X75CXNW4"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 const app = initializeApp(firebaseConfig);

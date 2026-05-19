@@ -1,20 +1,20 @@
-/* RiderPortal.css - Passwala Nebula Cyber Dark Theme */
+/* RiderPortal.css - Passwala Orange & White Light Theme */
 
 :root {
-  --rider-primary: #00f2fe;
-  --rider-primary-dark: #4facfe;
-  --rider-primary-light: rgba(0, 242, 254, 0.08);
-  --rider-bg: #030014;
-  --rider-card: rgba(15, 12, 41, 0.7);
-  --rider-text: #f8fafc;
-  --rider-text-secondary: #94a3b8;
-  --rider-border: rgba(255, 255, 255, 0.08);
-  --rider-success: #10b981;
-  --rider-success-light: rgba(16, 185, 129, 0.1);
-  --rider-danger: #ef4444;
-  --rider-danger-light: rgba(239, 68, 68, 0.1);
-  --rider-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-  --rider-shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.6);
+  --rider-primary: #ff6b00; /* vibrant primary orange */
+  --rider-primary-dark: #e65c00; /* deeper sunset orange */
+  --rider-primary-light: rgba(255, 107, 0, 0.06); /* soft orange tint */
+  --rider-bg: #f8fafc; /* elegant slate white background */
+  --rider-card: #ffffff; /* crisp white card */
+  --rider-text: #0f172a; /* deep slate black */
+  --rider-text-secondary: #64748b; /* medium slate gray */
+  --rider-border: #e2e8f0; /* clean light-mode border */
+  --rider-success: #16a34a; /* success green */
+  --rider-success-light: rgba(22, 163, 74, 0.08);
+  --rider-danger: #dc2626; /* error red */
+  --rider-danger-light: rgba(220, 38, 38, 0.08);
+  --rider-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --rider-shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
 }
 
 .rider-app {
@@ -23,8 +23,8 @@
   overflow: hidden;
   background-color: var(--rider-bg);
   background-image: 
-    radial-gradient(at 0% 0%, rgba(0, 242, 254, 0.08) 0%, transparent 50%), 
-    radial-gradient(at 100% 100%, rgba(124, 58, 237, 0.08) 0%, transparent 50%);
+    radial-gradient(at 0% 0%, rgba(255, 107, 0, 0.04) 0%, transparent 50%), 
+    radial-gradient(at 100% 100%, rgba(255, 107, 0, 0.02) 0%, transparent 50%);
   background-attachment: fixed;
   color: var(--rider-text);
   font-family: var(--font-main);
@@ -34,12 +34,16 @@
 
 /* Auth Screens */
 .rider-auth-container {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   background-color: var(--rider-bg);
-  padding: 1rem;
+  padding: 2rem 1rem;
+  -webkit-overflow-scrolling: touch;
 }
 
 .rider-auth-card {
@@ -51,6 +55,8 @@
   border-radius: 24px;
   overflow: hidden;
   box-shadow: var(--rider-shadow-lg);
+  margin: auto 0;
+  flex-shrink: 0;
 }
 
 .rider-auth-banner {
@@ -63,13 +69,13 @@
 .rider-auth-banner-icon {
   width: 64px;
   height: 64px;
-  background: rgba(255, 255, 255, 0.2);
+  background: white;
   border-radius: 16px;
   margin: 0 auto 1rem auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
 .rider-auth-banner-title {
@@ -132,9 +138,9 @@
 .rider-input {
   width: 100%;
   padding: 1rem 1rem 1rem 3rem;
-  border: 1px solid var(--rider-border);
+  border: 1.5px solid var(--rider-border);
   border-radius: 16px;
-  background-color: rgba(255, 255, 255, 0.03);
+  background-color: #f8fafc;
   color: var(--rider-text);
   font-size: 1.125rem;
   font-weight: 500;
@@ -144,16 +150,16 @@
 
 .rider-input:focus {
   border-color: var(--rider-primary);
-  box-shadow: 0 0 20px rgba(0, 242, 254, 0.15);
-  background-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.15);
+  background-color: #ffffff;
 }
 
 .rider-input-otp {
   width: 100%;
   padding: 1rem;
-  border: 1px solid var(--rider-border);
+  border: 1.5px solid var(--rider-border);
   border-radius: 16px;
-  background-color: rgba(255, 255, 255, 0.03);
+  background-color: #f8fafc;
   color: var(--rider-text);
   font-size: 1.5rem;
   font-weight: 700;
@@ -165,8 +171,8 @@
 
 .rider-input-otp:focus {
   border-color: var(--rider-primary);
-  box-shadow: 0 0 20px rgba(0, 242, 254, 0.15);
-  background-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.15);
+  background-color: #ffffff;
 }
 
 .rider-btn-primary {
@@ -184,18 +190,18 @@
   align-items: center;
   gap: 0.5rem;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 14px rgba(0, 242, 254, 0.3);
+  box-shadow: 0 4px 14px rgba(255, 107, 0, 0.3);
 }
 
 .rider-btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(0, 242, 254, 0.5);
+  box-shadow: 0 6px 20px rgba(255, 107, 0, 0.4);
 }
 
 .rider-btn-secondary {
   width: 100%;
   padding: 0.875rem;
-  background: rgba(255, 255, 255, 0.05);
+  background: #f8fafc;
   color: var(--rider-text);
   border: 1px solid var(--rider-border);
   border-radius: 12px;
@@ -232,7 +238,7 @@
 
 /* Portal/Layout */
 .rider-header {
-  background: rgba(15, 12, 41, 0.85);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(20px);
   padding: 1rem;
   border-bottom: 1px solid var(--rider-border);
@@ -283,9 +289,9 @@
 }
 
 @keyframes pulse {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
 }
 
 .rider-main-scroll {
@@ -297,7 +303,7 @@
 
 /* Bottom Nav */
 .rider-bottom-nav {
-  background: rgba(15, 12, 41, 0.85);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(20px);
   border-top: 1px solid var(--rider-border);
   padding: 0.5rem;
@@ -307,7 +313,7 @@
   bottom: 0;
   width: 100%;
   z-index: 50;
-  box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.05);
 }
 
 .rider-nav-item {
@@ -366,7 +372,7 @@
 /* Dashboard Map */
 .rider-map {
   height: 250px;
-  background: rgba(0, 242, 254, 0.04);
+  background: rgba(255, 107, 0, 0.04);
   position: relative;
   display: flex;
   align-items: center;
@@ -405,7 +411,7 @@
 .rider-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.4);
+  background: rgba(0, 0, 0, 0.3);
   z-index: 100;
   display: flex;
   align-items: flex-end;
@@ -441,7 +447,7 @@
 }
 
 .rider-order-time {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.9);
   border: 1px solid var(--rider-border);
   padding: 0.25rem 0.5rem;
   border-radius: 8px;
@@ -472,12 +478,17 @@
 
 .rider-btn-reject {
   flex: 1;
-  background: rgba(255, 255, 255, 0.05);
+  background: #f1f5f9;
   border: 1px solid var(--rider-border);
   color: var(--rider-text);
   border-radius: 12px;
   font-weight: 700;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rider-btn-reject:hover {
+  background: #e2e8f0;
 }
 
 .rider-btn-accept {
@@ -744,10 +755,10 @@ input:checked + .rider-slider:before {
 
 /* Customize Leaflet Popup styling */
 .leaflet-popup-content-wrapper {
-  background: #111827 !important;
+  background: #ffffff !important;
   color: var(--rider-text) !important;
   border-radius: 16px !important;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.06) !important;
   border: 1px solid var(--rider-border) !important;
   padding: 4px !important;
 }
@@ -760,7 +771,7 @@ input:checked + .rider-slider:before {
 }
 
 .leaflet-popup-tip {
-  background: #111827 !important;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
+  background: #ffffff !important;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.06) !important;
 }
 

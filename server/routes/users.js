@@ -280,7 +280,7 @@ router.put('/:uid/photo', async (req, res) => {
         const buffer = Buffer.from(base64Data, 'base64');
         
         const filename = `${user.id}_${Date.now()}.${ext}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('user_profiles')
           .upload(filename, buffer, {
             contentType: `image/${ext}`,

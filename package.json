@@ -20,6 +20,7 @@
     "server:api": "node server/index.js --headless"
   },
   "dependencies": {
+    "@reduxjs/toolkit": "^2.12.0",
     "@supabase/supabase-js": "^2.100.0",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",

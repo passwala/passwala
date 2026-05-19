@@ -14,21 +14,16 @@ import passwalaServices from '../assets/passwala_services.png';
 import passwalaLogistics from '../assets/passwala_logistics.png';
 
 
-const ahmedabadAreas = [
+const popularAreas = [
   { name: 'Satellite, Ahmedabad', lat: 23.0305, lng: 72.5075 },
-  { name: 'Prahlad Nagar, Ahmedabad', lat: 23.0120, lng: 72.5108 },
+  { name: 'Bandra, Mumbai', lat: 19.0596, lng: 72.8295 },
+  { name: 'Connaught Place, Delhi', lat: 28.6304, lng: 77.2177 },
+  { name: 'Koramangala, Bengaluru', lat: 12.9352, lng: 77.6245 },
+  { name: 'Viman Nagar, Pune', lat: 18.5679, lng: 73.9143 },
   { name: 'Bopal, Ahmedabad', lat: 23.0350, lng: 72.4397 },
-  { name: 'South Bopal, Ahmedabad', lat: 23.0158, lng: 72.4566 },
-  { name: 'Vastrapur, Ahmedabad', lat: 23.0393, lng: 72.5244 },
-  { name: 'Bodakdev, Ahmedabad', lat: 23.0416, lng: 72.5133 },
-  { name: 'S.G. Highway, Ahmedabad', lat: 23.0257, lng: 72.5033 },
-  { name: 'Thaltej, Ahmedabad', lat: 23.0497, lng: 72.5107 },
-  { name: 'Gota, Ahmedabad', lat: 23.0753, lng: 72.5258 },
-  { name: 'Ghatlodia, Ahmedabad', lat: 23.0645, lng: 72.5413 },
-  { name: 'Chandkheda, Ahmedabad', lat: 23.1119, lng: 72.5854 },
-  { name: 'Maninagar, Ahmedabad', lat: 22.9972, lng: 72.6014 },
-  { name: 'Navrangpura, Ahmedabad', lat: 23.0333, lng: 72.5621 },
-  { name: 'C.G. Road, Ahmedabad', lat: 23.0269, lng: 72.5599 }
+  { name: 'Gachibowli, Hyderabad', lat: 17.4401, lng: 78.3489 },
+  { name: 'Salt Lake, Kolkata', lat: 22.5865, lng: 88.4146 },
+  { name: 'Navrangpura, Ahmedabad', lat: 23.0333, lng: 72.5621 }
 ];
 
 const Auth = ({ onLogin }) => {
@@ -52,6 +47,7 @@ const Auth = ({ onLogin }) => {
   const [syncedUser, setSyncedUser] = useState(null);
   const [showSearch, setShowSearch] = useState(false);
   const [manualAddress, setManualAddress] = useState('');
+  const [searchResults, setSearchResults] = useState(popularAreas);
   const [activeSlide, setActiveSlide] = useState(0);
   const [rememberMe, setRememberMe] = useState(true);
   const canResend = timer === 0;
@@ -207,6 +203,29 @@ const Auth = ({ onLogin }) => {
     } catch (e) {
       setShowSearch(true);
       toast.info("Please select your area manually.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearchLocation = async () => {
+    if (!manualAddress.trim()) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(manualAddress)}&countrycodes=in`);
+      const data = await res.json();
+      if (data && data.length > 0) {
+        setSearchResults(data.map(place => ({
+          name: place.display_name,
+          lat: parseFloat(place.lat),
+          lng: parseFloat(place.lon)
+        })));
+      } else {
+        toast.error('No locations found. Try a different search.');
+        setSearchResults([]);
+      }
+    } catch (err) {
+      toast.error('Search failed. Try again.');
     } finally {
       setLoading(false);
     }
@@ -428,16 +447,28 @@ const Auth = ({ onLogin }) => {
                   <p>Enter your delivery neighborhood to start exploring:</p>
                 </div>
 
-                <div className="profile-input-box" style={{ margin: '0' }}>
+                <div className="profile-input-box" style={{ margin: '0', display: 'flex', padding: '4px' }}>
                   <input
                     type="text"
-                    placeholder="Search Ahmedabad area..."
+                    placeholder="Search any city or area..."
                     value={manualAddress}
-                    onChange={(e) => setManualAddress(e.target.value)}
+                    onChange={(e) => {
+                      setManualAddress(e.target.value);
+                      if (e.target.value.trim() === '') setSearchResults(popularAreas);
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSearchLocation(); }}
+                    style={{ flex: 1, border: 'none', background: 'transparent', padding: '8px' }}
                   />
+                  <button 
+                    onClick={handleSearchLocation}
+                    disabled={loading}
+                    style={{ background: 'var(--auth-action-color)', color: 'white', border: 'none', borderRadius: '8px', padding: '0 16px', fontWeight: 'bold', cursor: 'pointer' }}
+                  >
+                    {loading ? '...' : 'Search'}
+                  </button>
                 </div>
 
-                {/* Scrollable list of Ahmedabad Areas */}
+                {/* Scrollable list of Areas */}
                 <div style={{
                   maxHeight: '180px',
                   overflowY: 'auto',
@@ -451,13 +482,15 @@ const Auth = ({ onLogin }) => {
                   textAlign: 'left'
                 }} className="area-scroll-list">
                   {(() => {
-                    const filtered = ahmedabadAreas.filter(area =>
-                      area.name.toLowerCase().includes(manualAddress.toLowerCase())
-                    );
+                    const isShowingPopular = searchResults === popularAreas;
+                    const filtered = isShowingPopular && manualAddress.trim()
+                      ? searchResults.filter(area => area.name.toLowerCase().includes(manualAddress.toLowerCase()))
+                      : searchResults;
+
                     return filtered.length > 0 ? (
-                      filtered.map(area => (
+                      filtered.map((area, idx) => (
                         <button
-                          key={area.name}
+                          key={`${area.name}-${idx}`}
                           onClick={() => {
                             finalizeLocation(area.name, { lat: area.lat, lng: area.lng });
                             toast.success(`Location set to ${area.name.split(',')[0]}`);

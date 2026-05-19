@@ -338,7 +338,7 @@ const AppContent = ({
                 <Route path="/near-shops" element={effectiveUser ? <NearShops onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/" />} />
                 <Route path="/expert-services" element={effectiveUser ? <ExpertServices onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
                 <Route path="/neighbors" element={effectiveUser ? <NeighborsCommunity onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
-                <Route path="/track-orders" element={effectiveUser ? <TrackOrders user={effectiveUser} onBack={() => navigate('/')} /> : <Navigate to="/" />} />
+                <Route path="/track-orders" element={effectiveUser ? <TrackOrders user={effectiveUser} userCoords={userCoords} onBack={() => navigate('/')} /> : <Navigate to="/" />} />
                 <Route path="/profile" element={effectiveUser ? <WebappProfile user={effectiveUser} onLogout={handleLogout} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} onUpdateUser={(updated) => setUser(updated)} /> : <Navigate to="/" />} />
                 <Route path="/order-history" element={effectiveUser ? <OrderHistory /> : <Navigate to="/" />} />
                 <Route path="/wallet" element={effectiveUser ? <Wallet /> : <Navigate to="/" />} />
@@ -403,7 +403,9 @@ function App() {
     const saved = localStorage.getItem('passwala_user_address');
     return saved ? JSON.parse(saved) : null;
   });
-  const [minSplashDone, setMinSplashDone] = useState(false);
+  const [minSplashDone, setMinSplashDone] = useState(() => {
+    return !!localStorage.getItem('passwala_user') || sessionStorage.getItem('v_initial_splash_done') === 'true';
+  });
   const [isAdmin, setIsAdmin] = useState(() => {
     const isAdminApp = window.location.port === '3005';
     const hasAdminSession = localStorage.getItem('admin_session') === 'true';
@@ -498,11 +500,11 @@ function App() {
         }
       } catch (e) {
         try {
-          const res2 = await fetch('http://ip-api.com/json/');
+          const res2 = await fetch('https://freeipapi.com/api/json');
           const data2 = await res2.json();
-          if (data2 && data2.status === 'success') {
-            updateLocation(`${data2.city}, ${data2.regionName}`);
-            updateCoords({ lat: data2.lat, lng: data2.lon });
+          if (data2 && data2.cityName) {
+            updateLocation(`${data2.cityName}, ${data2.regionName}`);
+            updateCoords({ lat: data2.latitude, lng: data2.longitude });
           }
         } catch (err2) {
           console.warn('All IP Location fallbacks failed');
@@ -527,8 +529,10 @@ function App() {
     const alreadyShown = sessionStorage.getItem('v_initial_splash_done');
     const isRedirect = localStorage.getItem('google_login_pending') === 'true';
     
-    // 🚀 Fast-Track: If we are returning from a Google Redirect, skip the heavy splash
-    const delay = (alreadyShown || isRedirect) ? 100 : 800; 
+    const hasUser = !!localStorage.getItem('passwala_user');
+    
+    // 🚀 Fast-Track: If we have a cached user, Google redirect, or already showed splash, skip it
+    const delay = (alreadyShown || isRedirect || hasUser) ? 0 : 800; 
     
     const splashTimer = setTimeout(() => {
       setMinSplashDone(true);
