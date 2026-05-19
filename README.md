@@ -175,6 +175,33 @@ Create separate **Static Sites** on Render for each portal, substituting the spe
 
 ---
 
+## ✨ Recent Technical Enhancements
+
+The platform has recently undergone a major round of stabilization and feature expansions:
+
+### 📦 Retail Inventory & Barcode Expansion
+- **Multi-Format Barcodes**: Integrated native dropdown selectors in the vendor dashboard to support industry-standard barcode variations: `EAN-13`, `UPCA-2`, `UPC-A`, and `EAN-8`.
+- **Database Schema Sync**: Bound the state directly to the Supabase database model, mapping inputs automatically to `barcode`, `barcode_type`, and `stock_quantity`.
+- **State Preservation**: Guaranteed full catalog synchrony across local React states, browser storage, and PostgreSQL instances.
+
+### 🛡️ Core Stabilization & Data Consistency
+- **Vendor Payload Integrity**: Corrected the service/product creation handler (`handleAdd`) to provide mandatory backend columns (like `category_id`), eliminating relational schema anomalies.
+- **Instant Admin Dashboard Sync**: Verified that newly inserted vendor items instantly populate across all micro-frontends (Vendor Dashboard, Buyer Storefront, and Admin Portal).
+
+### 🚀 Smart Backend User Resolver & Storage Engine
+- **Multi-Identifier Matching**: Refactored the `/api/users/:uid` middleware to support complex user lookup patterns:
+  - Strict UUID & Firebase UID validation.
+  - Smart phone number normalization (safely parsing variations with/without leading `+` or country prefix `+91`).
+  - Seamless fallback checks matching user email accounts.
+- **Profile Image Bucket Uplink**: Added a backend Base64 image parser that decodes client photos in real-time and uploads them directly to the Supabase `user_profiles` storage bucket, providing permanent public URLs.
+
+### 🎨 Premium Orange & White UI Refinements
+- **Unified Glassmorphism**: Standardized dark and light modal backdrops with smooth translucent gradients and premium orange accent lines.
+- **Richer Micro-Interactions**: Polished the Customer web `CartDrawer` with reactive dynamic updates and physics-based checkout indicators.
+- **Admin telemetry telemetry dashboard**: Revamped statistics, data sheets, and merchant control panels with sleek styling (`AdminPanel.css`).
+
+---
+
 ## 🏙️ Neighborhood Context
 Passwala is specifically optimized for localized contexts, currently featuring high-fidelity data and services for the **Satellite / Ahmedabad** region.
 
