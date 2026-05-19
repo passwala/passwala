@@ -112,4 +112,19 @@ export const NotificationProvider = ({ children }) => {
   );
 };
 
-export const useNotifications = () => useContext(NotificationContext);
+export const useNotifications = () => {
+  const context = useContext(NotificationContext);
+  if (!context) {
+    console.warn("⚠️ useNotifications was called outside of NotificationProvider. Returning mock fallbacks.");
+    return {
+      notifications: [],
+      addNotification: () => {},
+      markAllRead: () => {},
+      dismiss: () => {},
+      unreadCount: 0,
+      requestNotificationPermission: async () => {},
+      fcmToken: null
+    };
+  }
+  return context;
+};
