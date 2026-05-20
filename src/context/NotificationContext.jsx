@@ -40,7 +40,7 @@ export const NotificationProvider = ({ children }) => {
       const msg = await getMessagingInstance();
       if (!msg) return;
       const token = await getToken(msg, {
-        vapidKey: 'BMD-80e3q2p-l0w5uYvG4O6u9v_M_E_J_D_A_Y_K_L_M_N_O_P' // Replace with your real VAPID key
+        vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY
       });
       if (token) {
         setFcmToken(token);

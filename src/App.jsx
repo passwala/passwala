@@ -341,7 +341,7 @@ const AppContent = ({
                 <Route path="/track-orders" element={effectiveUser ? <TrackOrders user={effectiveUser} userCoords={userCoords} onBack={() => navigate('/')} /> : <Navigate to="/" />} />
                 <Route path="/profile" element={effectiveUser ? <WebappProfile user={effectiveUser} onLogout={handleLogout} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} onUpdateUser={(updated) => setUser(updated)} /> : <Navigate to="/" />} />
                 <Route path="/order-history" element={effectiveUser ? <OrderHistory /> : <Navigate to="/" />} />
-                <Route path="/wallet" element={effectiveUser ? <Wallet /> : <Navigate to="/" />} />
+                <Route path="/wallet" element={effectiveUser ? <Wallet user={effectiveUser} /> : <Navigate to="/" />} />
                 <Route path="/privacy-security" element={effectiveUser ? <PrivacySecurity /> : <Navigate to="/" />} />
                 <Route path="/help-support" element={effectiveUser ? <HelpSupport /> : <Navigate to="/" />} />
                 <Route path="/settings" element={effectiveUser ? <AppSettings isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/" />} />

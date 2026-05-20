@@ -65,6 +65,7 @@ const ExpertServices = ({ onBack, location }) => {
           service_providers (
             id,
             business_name,
+            name,
             rating,
             is_verified,
             about,
@@ -94,23 +95,11 @@ const ExpertServices = ({ onBack, location }) => {
 
       const getStableRating = (id, baseRating) => {
         if (baseRating && parseFloat(baseRating) > 0) return parseFloat(baseRating).toFixed(1);
-        if (!id) return '4.8';
-        let hash = 0;
-        for (let i = 0; i < id.length; i++) {
-          hash = id.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        const diffs = [4.7, 4.8, 4.9, 5.0];
-        const idx = Math.abs(hash) % diffs.length;
-        return diffs[idx].toFixed(1);
+        return null;
       };
 
       const getStableRecommendations = (id) => {
-        if (!id) return 12;
-        let hash = 0;
-        for (let i = 0; i < id.length; i++) {
-          hash = id.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        return (Math.abs(hash) % 21) + 8; // 8 to 28 recommendations
+        return 0;
       };
 
       if (servicesData) {
@@ -127,14 +116,15 @@ const ExpertServices = ({ onBack, location }) => {
 
           return {
             id: s.id,
-            name: user.full_name || provider.business_name || 'Expert Provider',
+            title: s.title,
+            name: provider.business_name || provider.name || user.full_name || 'Expert Provider',
             category: category,
             price: s.price || 0,
             image: expertPhoto,
             rating: getStableRating(provider.id || s.id, provider.rating),
-            recommendations: getStableRecommendations(provider.id || s.id),
-            experience: '4+ years',
-            verified: provider.is_verified || true, // Trust verified
+            recommendations: provider.recommendations || 0,
+            experience: provider.experience ? `${provider.experience} years exp` : null,
+            verified: provider.is_verified || false,
             description: s.description
           };
         });
@@ -151,7 +141,10 @@ const ExpertServices = ({ onBack, location }) => {
 
   const filteredExperts = experts.filter(e => {
     const mainMatch = activeTab === 'All' || (e.category || '').toLowerCase().includes(activeTab.toLowerCase());
-    const subMatch = selectedSub === 'All' || (e.name || '').toLowerCase().includes(selectedSub.toLowerCase()) || (e.category || '').toLowerCase().includes(selectedSub.toLowerCase());
+    const subMatch = selectedSub === 'All' || 
+      (e.name || '').toLowerCase().includes(selectedSub.toLowerCase()) || 
+      (e.title || '').toLowerCase().includes(selectedSub.toLowerCase()) || 
+      (e.category || '').toLowerCase().includes(selectedSub.toLowerCase());
     return mainMatch && subMatch;
   });
   return (
@@ -199,7 +192,15 @@ const ExpertServices = ({ onBack, location }) => {
           >
             <div className="expert-main-info">
                <div className="expert-avatar-container">
-                  <img src={expert.image} alt={expert.name} className="expert-avatar" />
+                  <div className="expert-avatar-fallback">
+                    {expert.name ? expert.name.charAt(0).toUpperCase() : 'E'}
+                  </div>
+                  <img 
+                    src={expert.image} 
+                    alt={expert.name} 
+                    className="expert-avatar" 
+                    onError={(e) => { e.target.style.display = 'none'; }} 
+                  />
                   {expert.verified && (
                     <div className="verified-badge-premium" title="Neighborhood Verified Resident">
                        <ShieldCheck size={12} fill="#ff7622" stroke="white" />
@@ -209,7 +210,8 @@ const ExpertServices = ({ onBack, location }) => {
                <div className="expert-details">
                   <div className="name-row">
                     <div className="title-stack">
-                      <h3>{expert.name}</h3>
+                      <h3>{expert.title || 'Expert Service'}</h3>
+                       <span className="expert-provider-name">by {expert.name}</span>
                       {expert.recommendations > 0 && (
                         <div className="neighbor-endorsement">
                            <UserCheck size={12} color="var(--primary)" />
@@ -217,12 +219,17 @@ const ExpertServices = ({ onBack, location }) => {
                         </div>
                       )}
                     </div>
-                    <div className="rating-pill">
-                      <Star size={12} fill="#FFB800" stroke="#FFB800" />
-                      <span>{expert.rating}</span>
-                    </div>
+                    {expert.rating && (
+                      <div className="rating-pill">
+                        <Star size={12} fill="#FFB800" stroke="#FFB800" />
+                        <span>{expert.rating}</span>
+                      </div>
+                    )}
                   </div>
-                  <span className="expert-type">{expert.category}{expert.experience ? ` • ${expert.experience} exp` : ''}</span>
+                  <span className="expert-type">{expert.category}{expert.experience ? ` • ${expert.experience}` : ''}</span>
+                   {expert.description && (
+                     <p className="expert-description-snippet">{expert.description}</p>
+                   )}
                   
                </div>
             </div>

@@ -3,6 +3,7 @@
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
+  overflow-x: hidden;
 }
 
 .hub-container {
@@ -87,7 +88,7 @@
 
 .hub-cards-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 2rem;
 }
 
@@ -294,13 +295,13 @@ body:not(.dark-mode) .hub-card.green {
 }
 
 .ai-hub-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 1.5rem;
   width: 100%;
 }
 
 .ai-feature-card {
-  flex: 1;
   background: var(--bg-surface);
   border: 1px solid var(--glass-border);
   border-radius: 24px;
@@ -361,18 +362,6 @@ body:not(.dark-mode) .hub-card.green {
 }
 
 /* Responsiveness */
-@media (max-width: 1100px) {
-  .hub-cards-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .ai-hub-row {
-     flex-wrap: wrap;
-  }
-  .ai-feature-card {
-     flex: 1 1 calc(50% - 1.5rem);
-  }
-}
-
 @media (max-width: 768px) {
   .neighborhood-hub { padding: 2rem 1rem; }
   .hub-cards-grid {
@@ -380,11 +369,8 @@ body:not(.dark-mode) .hub-card.green {
     gap: 1.25rem;
   }
   .ai-hub-row {
-    flex-direction: column;
+    grid-template-columns: 1fr;
     gap: 1rem;
-  }
-  .ai-feature-card {
-     width: 100%;
   }
   .hub-banner {
     padding: 2.5rem 1.5rem;

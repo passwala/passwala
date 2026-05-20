@@ -43,6 +43,7 @@ import {
   VendorNotifications, 
   VendorSupport 
 } from './VendorSubPages';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 const formatAadhar = (val) => {
   const cleanVal = val.replace(/\D/g, '').slice(0, 12);
@@ -433,24 +434,30 @@ const VendorPortal = ({ user, onLogout }) => {
               <button className="v-chart-select">Month</button>
             </div>
           </div>
-          <div className="v-chart-placeholder" style={{ height: '300px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '1rem 0' }}>
-             <div className="v-chart-visual" style={{ height: '240px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '12px', padding: '0 1rem' }}>
-               {[40, 70, 45, 90, 65, 85, 60].map((h, i) => (
-                 <motion.div 
-                   key={i}
-                   className="v-chart-bar" 
-                   style={{ flex: 1, background: 'linear-gradient(to top, var(--v-primary), #ff8f3d)', borderRadius: '8px 8px 0 0', position: 'relative' }}
-                   initial={{ height: 0 }}
-                   animate={{ height: `${h}%` }}
-                   transition={{ delay: 0.5 + (i * 0.1), duration: 0.8, ease: "backOut" }}
-                 >
-                   <div className="v-chart-tooltip" style={{ position: 'absolute', top: '-35px', left: '50%', transform: 'translateX(-50%)', background: '#0f172a', color: 'white', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700, opacity: 0, transition: 'opacity 0.2s' }}>₹{h*100}</div>
-                 </motion.div>
-               ))}
-             </div>
-             <div className="v-chart-labels" style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem', padding: '0 1rem' }}>
-               {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(l => <span key={l} style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8' }}>{l}</span>)}
-             </div>
+          <div className="v-chart-container" style={{ height: '300px', width: '100%', marginTop: '1rem' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={[
+                { name: 'Mon', revenue: 4000 },
+                { name: 'Tue', revenue: 7000 },
+                { name: 'Wed', revenue: 4500 },
+                { name: 'Thu', revenue: 9000 },
+                { name: 'Fri', revenue: 6500 },
+                { name: 'Sat', revenue: 8500 },
+                { name: 'Sun', revenue: 6000 }
+              ]}>
+                <defs>
+                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dx={-10} tickFormatter={(val) => `₹${val}`} />
+                <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}} />
+                <Area type="monotone" dataKey="revenue" stroke="#f97316" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </div>
 

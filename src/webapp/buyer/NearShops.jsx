@@ -52,7 +52,7 @@ function RecenterMap({ coords }) {
   return null;
 }
 
-const NearShops = ({ onBack, location, userCoords }) => {
+const NearShops = ({ location, userCoords }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -125,7 +125,7 @@ const NearShops = ({ onBack, location, userCoords }) => {
               .eq('store_id', shop.id)
               .order('created_at', { ascending: false });
             if (!error && data) {
-                const getCleanProductImage = (imgSrc, name = '') => {
+                const getCleanProductImage = (imgSrc) => {
                   if (!imgSrc || typeof imgSrc !== 'string') return 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=400'; // Default Premium Grocery
                   const clean = imgSrc.trim();
                   if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:') || clean.startsWith('/')) {
@@ -139,7 +139,7 @@ const NearShops = ({ onBack, location, userCoords }) => {
                    name: p.name,
                    detail: p.description,
                    price: p.price,
-                   image: getCleanProductImage(p.image_url || p.image, p.name)
+                   image: getCleanProductImage(p.image_url || p.image)
                 })));
             } else {
                 setShopCatalog([]);
@@ -240,11 +240,8 @@ const NearShops = ({ onBack, location, userCoords }) => {
       className="near-shops-page"
     >
       <header className="near-shops-header no-border">
-        <div className="header-top-row-near">
-          <button onClick={onBack} className="back-btn-near">
-            <ArrowLeft size={24} />
-          </button>
-          <div className="search-container-near">
+        <div className="header-top-row-near" style={{ display: 'flex', width: '100%' }}>
+          <div className="search-container-near" style={{ width: '100%' }}>
              <div className="search-box-near">
                 <Search size={20} className="search-icon-near" />
                 <input 

@@ -302,6 +302,7 @@ const AdminPanel = ({ onLogout, location }) => {
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [showPurgeConfirm, setShowPurgeConfirm] = useState(false);
   const [isSaving, setSaving] = useState(false);
   const [syncStatus, setSyncStatus] = useState('cloud'); // 'cloud' or 'offline'
 
@@ -369,9 +370,12 @@ const AdminPanel = ({ onLogout, location }) => {
     }
   };
 
-  const handlePurgeMockData = async () => {
-    if (!window.confirm('This will permanently delete ALL mock data, test entries, and gibberish names (Super Plumber, nnknn, Test Vendor, etc.). Are you sure?')) return;
-    
+  const handlePurgeMockData = () => {
+    setShowPurgeConfirm(true);
+  };
+
+  const executePurge = async () => {
+    setShowPurgeConfirm(false);
     try {
       toast.loading('Performing deep purge of platform residue...', { id: 'purge' });
       
@@ -591,9 +595,13 @@ const AdminPanel = ({ onLogout, location }) => {
       const isTemp = typeof deleteConfirmId === 'string' && deleteConfirmId.startsWith('temp_');
 
       if (!isTemp) {
+        const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
         const res = await fetch('/api/admin/delete', {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-admin-key': adminKey 
+          },
           body: JSON.stringify({
             table: currentTab.table,
             id: deleteConfirmId
@@ -683,9 +691,13 @@ const AdminPanel = ({ onLogout, location }) => {
       let finalPayload = { ...payload };
 
       try {
+        const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
         const response = await fetch('/api/admin/upsert', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-admin-key': adminKey 
+          },
           body: JSON.stringify({
             table: currentTab.table,
             payload: finalPayload
@@ -730,9 +742,13 @@ const AdminPanel = ({ onLogout, location }) => {
   const handleToggleVerify = async (item) => {
     try {
       const nextVerified = !item.is_verified;
+      const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
       const response = await fetch('/api/admin/upsert', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey 
+        },
         body: JSON.stringify({
           table: currentTab.table,
           payload: { id: item.id, is_verified: nextVerified }
@@ -1733,14 +1749,45 @@ CREATE TABLE IF NOT EXISTS service_areas (
             </div>
             <div style={{ padding: '1.5rem', paddingTop: 0, display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
               <button
+                type="button"
                 onClick={() => setDeleteConfirmId(null)}
                 style={{ padding: '10px 16px', borderRadius: '8px', fontWeight: 600, color: '#475569', background: '#f1f5f9', border: 'none', cursor: 'pointer' }}>
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleExecuteDelete}
                 style={{ padding: '10px 16px', borderRadius: '8px', fontWeight: 600, color: 'white', background: '#ef4444', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.39)' }}>
                 Delete Permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Purge Confirmation Modal */}
+      {showPurgeConfirm && (
+        <div className="admin-modal-overlay">
+          <div className="admin-modal" style={{ maxWidth: '450px' }}>
+            <div className="modal-header" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Trash2 color="#ef4444" size={24} /> Confirm Deep Purge</h3>
+            </div>
+            <div style={{ padding: '1.5rem', color: '#64748b', fontSize: '0.9rem', lineHeight: '1.5' }}>
+              This will permanently delete ALL mock data, test entries, and gibberish names (Super Plumber, nnknn, Test Vendor, etc.) from the platform database. <br /><br />
+              <strong style={{ color: '#ef4444' }}>Warning: This action cannot be undone and affects production state.</strong>
+            </div>
+            <div style={{ padding: '1.5rem', paddingTop: 0, display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setShowPurgeConfirm(false)}
+                style={{ padding: '10px 16px', borderRadius: '8px', fontWeight: 600, color: '#475569', background: '#f1f5f9', border: 'none', cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={executePurge}
+                style={{ padding: '10px 16px', borderRadius: '8px', fontWeight: 600, color: 'white', background: '#ef4444', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.39)' }}>
+                Purge Database
               </button>
             </div>
           </div>
