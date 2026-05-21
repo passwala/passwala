@@ -18,6 +18,21 @@ const SUPPORTED_SOCIETIES = [
   'vastrapur'
 ];
 
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -26,6 +41,8 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
   const [showConfirm, setShowConfirm] = React.useState(false);
   const [supportedAreas, setSupportedAreas] = React.useState([]);
   const [isPlacingOrder, setIsPlacingOrder] = React.useState(false);
+  const [showMockPayment, setShowMockPayment] = React.useState(false);
+  const [mockPaymentDetails, setMockPaymentDetails] = React.useState(null);
 
   React.useEffect(() => {
     const fetchAreas = async () => {
@@ -294,7 +311,8 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
       const orderPayload = {
         total_amount: total,
         subtotal: total,
-        status: 'PLACED',
+        status: 'PENDING', // Initial status before payment confirmation
+        payment_status: 'PENDING',
         delivery_fee: 0
       };
       if (resolvedUserId) orderPayload.user_id = resolvedUserId;
@@ -418,24 +436,231 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
         } catch (stockErr) {
           console.warn("Could not decrement stock:", stockErr);
         }
-      }
 
-      const deliveryLoc = location ? location.split(',')[0] : 'Your Location';
-      toast.success(`Order placed! ₹${total.toLocaleString()} • Delivering to ${deliveryLoc}`, { icon: '🎉', duration: 4000 });
-      addNotification({
-        icon: '📦',
-        title: 'Order Placed Successfully!',
-        body: `₹${total.toLocaleString()} • ${itemNames} • Your neighbor-verified delivery is starting at ${deliveryLoc}.`,
-        color: '#22c55e',
-      });
-      clearCart();
-      setCartOpen(false);
-      setShowConfirm(false);
-      navigate('/track-orders');
+        // --- PAYMENT GATEWAY INTEGRATION ---
+        toast.loading("Initiating secure payment...", { id: "payment_loader" });
+
+        const createPayOrderRes = await fetch('/api/orders/payment/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            amount: total,
+            orderId: newOrder.id
+          })
+        });
+
+        toast.dismiss("payment_loader");
+
+        if (!createPayOrderRes.ok) {
+          throw new Error("Could not create gateway transaction order.");
+        }
+
+        const razorpayOrder = await createPayOrderRes.json();
+
+        if (razorpayOrder.is_mock) {
+          // Launch custom sandbox payment dashboard
+          setMockPaymentDetails({
+            order: newOrder,
+            razorpayOrder,
+            total,
+            itemNames,
+            resolvedStoreId,
+            userObj
+          });
+          setShowMockPayment(true);
+          setShowConfirm(false);
+          setIsPlacingOrder(false);
+        } else {
+          // Real Razorpay integration
+          const scriptLoaded = await loadRazorpayScript();
+          if (!scriptLoaded) {
+            throw new Error("Failed to load Razorpay SDK. Please check your internet connection.");
+          }
+
+          const options = {
+            key: razorpayOrder.key_id,
+            amount: razorpayOrder.amount,
+            currency: razorpayOrder.currency || 'INR',
+            name: 'Passwala Ahmedabad',
+            description: 'Ahmedabad Neighborhood Delivery',
+            order_id: razorpayOrder.id,
+            handler: async function (response) {
+              try {
+                setIsPlacingOrder(true);
+                toast.loading("Verifying payment...", { id: "payment_verify_loader" });
+
+                const verifyRes = await fetch('/api/orders/payment/verify', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    razorpay_payment_id: response.razorpay_payment_id,
+                    razorpay_order_id: response.razorpay_order_id,
+                    razorpay_signature: response.razorpay_signature,
+                    orderId: newOrder.id
+                  })
+                });
+
+                toast.dismiss("payment_verify_loader");
+
+                if (!verifyRes.ok) {
+                  throw new Error("Payment signature verification failed");
+                }
+
+                const verifyData = await verifyRes.json();
+                if (verifyData.success) {
+                  // Fire backend notifications
+                  try {
+                    await fetch('/api/orders/notify-new-order', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify({
+                        orderId: newOrder.id,
+                        storeId: resolvedStoreId
+                      })
+                    });
+                  } catch (notifErr) {
+                    console.warn("⚠️ Notification dispatch failed:", notifErr);
+                  }
+
+                  const deliveryLoc = location ? location.split(',')[0] : 'Your Location';
+                  toast.success(`Payment successful! Order placed! ₹${total.toLocaleString()}`, { icon: '🎉', duration: 4000 });
+                  addNotification({
+                    icon: '📦',
+                    title: 'Order Paid & Placed!',
+                    body: `₹${total.toLocaleString()} • ${itemNames} • Payment verified. Delivery starting at ${deliveryLoc}.`,
+                    color: '#22c55e',
+                  });
+                  clearCart();
+                  setCartOpen(false);
+                  setShowConfirm(false);
+                  navigate('/track-orders');
+                } else {
+                  throw new Error("Signature verification rejected");
+                }
+              } catch (err) {
+                console.error("Payment verification failed:", err);
+                toast.error(`Verification Failed: ${err.message || 'Payment not verified'}`);
+              } finally {
+                setIsPlacingOrder(false);
+              }
+            },
+            prefill: {
+              name: userObj?.displayName || 'Passwala Customer',
+              email: userObj?.email || 'customer@passwala.com',
+              contact: userObj?.phoneNumber || ''
+            },
+            theme: {
+              color: '#ff7622'
+            },
+            modal: {
+              ondismiss: function () {
+                toast.error('Payment cancelled');
+                setIsPlacingOrder(false);
+              }
+            }
+          };
+
+          const rzp = new window.Razorpay(options);
+          rzp.open();
+          setShowConfirm(false);
+        }
+      }
     } catch (err) {
-      console.error('Supabase checkout failed:', err);
+      console.error('Supabase checkout/payment failed:', err);
       toast.error(`Checkout failed: ${err.message || 'Please try again later'}`, { icon: '❌' });
       setShowConfirm(false);
+      setIsPlacingOrder(false);
+    }
+  };
+
+  const handleMockPaymentVerify = async (success) => {
+    if (!mockPaymentDetails) return;
+    const { order, razorpayOrder, total, itemNames, resolvedStoreId } = mockPaymentDetails;
+
+    setIsPlacingOrder(true);
+    toast.loading("Simulating payment authorization...", { id: "mock_loader" });
+
+    try {
+      if (success) {
+        // Send a post request to verify endpoint with fake tokens
+        const verifyRes = await fetch('/api/orders/payment/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            razorpay_payment_id: `pay_mock_${Math.random().toString(36).substring(2, 10)}`,
+            razorpay_order_id: razorpayOrder.id,
+            razorpay_signature: 'mock_signature',
+            orderId: order.id
+          })
+        });
+
+        toast.dismiss("mock_loader");
+
+        if (!verifyRes.ok) {
+          throw new Error('Sandbox payment signature verification failed');
+        }
+
+        const verifyData = await verifyRes.json();
+        if (verifyData.success) {
+          // Trigger notifications
+          try {
+            await fetch('/api/orders/notify-new-order', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                orderId: order.id,
+                storeId: resolvedStoreId
+              })
+            });
+          } catch (notifErr) {
+            console.warn('⚠️ Dispatch notification failure in mock:', notifErr);
+          }
+
+          const deliveryLoc = location ? location.split(',')[0] : 'Your Location';
+          toast.success(`Sandbox payment successful! ₹${total.toLocaleString()}`, { icon: '🎉', duration: 4000 });
+          addNotification({
+            icon: '📦',
+            title: 'Order Paid & Placed! (Sandbox)',
+            body: `₹${total.toLocaleString()} • ${itemNames} • Sandbox payment verified. Delivering to ${deliveryLoc}.`,
+            color: '#22c55e',
+          });
+          clearCart();
+          setCartOpen(false);
+          setShowMockPayment(false);
+          navigate('/track-orders');
+        } else {
+          throw new Error('Sandbox signature verification rejected');
+        }
+      } else {
+        toast.dismiss("mock_loader");
+        // Simulated failure
+        await supabase
+          .from('orders')
+          .update({
+            payment_status: 'FAILED',
+            status: 'CANCELLED'
+          })
+          .eq('id', order.id);
+
+        toast.error('Sandbox payment failed! Order cancelled.', { icon: '❌' });
+        setShowMockPayment(false);
+      }
+    } catch (err) {
+      toast.dismiss("mock_loader");
+      console.error('Sandbox verification failed:', err);
+      toast.error(`Sandbox verification failed: ${err.message || 'Payment not verified'}`);
+      setShowMockPayment(false);
+    } finally {
       setIsPlacingOrder(false);
     }
   };
@@ -668,6 +893,131 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
                   ) : 'Confirm & Deliver'}
                 </button>
              </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sandbox Payment Modal */}
+      {showMockPayment && mockPaymentDetails && (
+        <div className="order-confirm-overlay-v4" style={{ zIndex: 1100 }}>
+          <div className="order-confirm-modal-v4" style={{
+            background: 'rgba(30, 41, 59, 0.95)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            color: 'white',
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4)',
+            maxWidth: '420px',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justify: 'center',
+              margin: '0 auto 16px',
+              boxShadow: '0 0 20px rgba(139, 92, 246, 0.5)'
+            }}>
+              <span style={{ fontSize: '1.8rem' }}>💳</span>
+            </div>
+            
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0 0 8px 0', letterSpacing: '-0.025em', color: '#f8fafc' }}>
+              Passwala Sandbox Pay
+            </h2>
+            <div style={{
+              display: 'inline-block',
+              padding: '2px 8px',
+              borderRadius: '9999px',
+              background: 'rgba(139, 92, 246, 0.2)',
+              border: '1px solid rgba(139, 92, 246, 0.4)',
+              fontSize: '0.7rem',
+              color: '#a78bfa',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              marginBottom: '16px'
+            }}>
+              Simulation Active
+            </div>
+
+            <div style={{
+              background: 'rgba(15, 23, 42, 0.6)',
+              borderRadius: '12px',
+              padding: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.05)',
+              textAlign: 'left',
+              marginBottom: '20px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.8rem', color: '#94a3b8' }}>
+                <span>Order Reference:</span>
+                <span style={{ fontFamily: 'monospace', color: '#e2e8f0', fontWeight: 600 }}>
+                  #{mockPaymentDetails.order.id.substring(0, 8).toUpperCase()}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.8rem', color: '#94a3b8' }}>
+                <span>Items:</span>
+                <span style={{ color: '#e2e8f0', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
+                  {mockPaymentDetails.itemNames}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '10px', marginTop: '10px' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#94a3b8' }}>Amount to Pay:</span>
+                <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#10b981' }}>
+                  ₹{mockPaymentDetails.total.toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.75rem', color: '#94a3b8', lineHeight: '1.4', margin: '0 0 20px 0' }}>
+              We detected simulated keys or local developer environment. You can authorize a mock success signature or trigger a cancel fail state.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button 
+                onClick={() => handleMockPaymentVerify(true)}
+                disabled={isPlacingOrder}
+                style={{
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  border: 'none',
+                  color: 'white',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  cursor: isPlacingOrder ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justify: 'center',
+                  gap: '8px',
+                  transition: 'transform 0.1s, opacity 0.2s',
+                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
+                  opacity: isPlacingOrder ? 0.7 : 1
+                }}
+              >
+                <span>Authorize & Pay Success</span>
+              </button>
+              
+              <button 
+                onClick={() => handleMockPaymentVerify(false)}
+                disabled={isPlacingOrder}
+                style={{
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#f87171',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
+                  cursor: isPlacingOrder ? 'not-allowed' : 'pointer',
+                  transition: 'background 0.2s, opacity 0.2s',
+                  opacity: isPlacingOrder ? 0.7 : 1
+                }}
+              >
+                Simulate Payment Decline
+              </button>
+            </div>
           </div>
         </div>
       )}

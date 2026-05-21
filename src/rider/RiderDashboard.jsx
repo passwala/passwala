@@ -1,8 +1,6 @@
-/* eslint-disable */
 // Location Fixed with Real Premium Leaflet Mapping
 import React, { useState, useEffect, useRef } from 'react';
 import { MapPin, Navigation, Phone, CheckCircle, Package, Clock, ChevronRight, Check, RefreshCw, IndianRupee } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../supabase'; // Import supabase client
 import { getOSRMRoute, getStraightLineDistance } from '../utils/dijkstra';
@@ -36,8 +34,6 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
   });
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [isManualLocation, setIsManualLocation] = useState(false);
-  const navigate = useNavigate();
-  const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
   const [activeAreas, setActiveAreas] = useState([]);
   const [nearbyStores, setNearbyStores] = useState([]);
 
@@ -45,7 +41,6 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
   const [routeMode, setRouteMode] = useState('cycling'); // 'cycling'
   const [osrmRoutePoints, setOsrmRoutePoints] = useState([]);
   const [routeStats, setRouteStats] = useState(null); // { distanceKm, durationMins }
-  const [isFetchingRoute, setIsFetchingRoute] = useState(false);
 
   // Fetch real street coordinates from OSRM Engine
   useEffect(() => {
@@ -63,11 +58,12 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
 
       if (!riderLatLng[0] || !riderLatLng[1] || !targetCoords.lat || !targetCoords.lng) return;
 
-      setIsFetchingRoute(true);
+
       try {
         // Map UI route mode to OSRM profiles
+        const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
         const profile = routeMode === 'driving' ? 'driving' : routeMode === 'cycling' ? 'cycling' : 'foot';
-        const url = `https://router.project-osrm.org/route/v1/${profile}/${riderLatLng[1]},${riderLatLng[0]};${targetCoords.lng},${targetCoords.lat}?overview=full&geometries=geojson`;
+        const url = `${apiBase}/api/route?startLat=${riderLatLng[0]}&startLng=${riderLatLng[1]}&endLat=${targetCoords.lat}&endLng=${targetCoords.lng}&profile=${profile}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error('OSRM routing request failed');
         const data = await res.json();
@@ -99,8 +95,6 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         } catch (calcErr) {
           setRouteStats(null);
         }
-      } finally {
-        setIsFetchingRoute(false);
       }
     };
 
@@ -137,19 +131,14 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     fetchAreasAndStores();
   }, []);
 
-  // Update current time clock
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+
 
   // Auto-detect location on start
   useEffect(() => {
     if (activeAreas.length > 0 && (!riderLocation || riderLocation === 'Location Not Set' || riderLocation.includes('coming soon'))) {
       if (!isManualLocation) requestLiveLocation();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAreas.length]);
 
   // Handle GPS location tracking
@@ -243,6 +232,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     return () => {
       if (interval) clearInterval(interval);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline]);
 
   // Real-time order dispatch and polling mechanism
@@ -380,6 +370,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline, activeOrder, incomingOrder, rejectedOrderIds]);
 
   // Sync and clean up order real-time updates
@@ -432,6 +423,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         markerGroupRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Sync Leaflet markers and route polylines dynamically
@@ -452,7 +444,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       iconAnchor: [21, 21]
     });
 
-    const createStoreIcon = (name) => L.divIcon({
+    const createStoreIcon = (_name) => L.divIcon({
       className: 'custom-leaflet-marker store-marker',
       html: `<div class="marker-container" style="background: #f97316; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; position: relative;">
                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 17H2"/></svg>
@@ -461,7 +453,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       iconAnchor: [21, 21]
     });
 
-    const createCustomerIcon = (name) => L.divIcon({
+    const createCustomerIcon = (_name) => L.divIcon({
       className: 'custom-leaflet-marker customer-marker',
       html: `<div class="marker-container" style="background: #3b82f6; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative;">
                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>

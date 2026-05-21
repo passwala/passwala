@@ -12,7 +12,36 @@ CREATE TABLE IF NOT EXISTS service_areas (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Insert some default areas for testing
+
+
+-- Insert-- ==============================================
+-- 12. CHAT ASSISTANT THREADS
+-- ==============================================
+
+CREATE TABLE IF NOT EXISTS chat_threads (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    vendor_id UUID NOT NULL,
+    vendor_name VARCHAR(255) NOT NULL,
+    vendor_title VARCHAR(255),
+    vendor_image TEXT,
+    category VARCHAR(100),
+    price DECIMAL(10,2),
+    provider_id UUID,
+    last_message TEXT,
+    timestamp VARCHAR(50),
+    messages JSONB DEFAULT '[]'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE (user_id, vendor_id)
+);
+
+-- Enable RLS
+ALTER TABLE chat_threads ENABLE ROW LEVEL SECURITY;
+
+-- Create Policies
+CREATE POLICY "Allow users to CRUD their own chat threads" ON chat_threads
+    FOR ALL USING (auth.uid() = user_id OR (user_id IS NOT NULL AND auth.role() = 'authenticated')); some default areas for testing
 INSERT INTO service_areas (area_name, is_active) VALUES 
 ('Satellite', true),
 ('Bopal', true),

@@ -3,36 +3,45 @@ import { ShieldCheck, Lock } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import './Auth.css'; // Reusing styles
 
+const API_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+
 const AdminAuth = ({ onAdminLogin }) => {
   const [adminCode, setAdminCode] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleAdminAuth = async () => {
+  const handleAdminAuth = async (e) => {
+    if (e) e.preventDefault();
+    if (!adminCode.trim()) {
+      toast.error('Please enter the access code');
+      return;
+    }
     setLoading(true);
     try {
-      // 🛡️ Use environment variable or a secure default for local development
-      const secureCode = import.meta.env.VITE_ADMIN_ACCESS_CODE || 'PASSWALA99';
+      const res = await fetch(`${API_URL}/api/admin/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ accessCode: adminCode })
+      });
       
-      if (adminCode === secureCode) {
+      const json = await res.json();
+      
+      if (res.ok && json.success) {
         toast.success('Admin Authorized!');
         // Persist admin session locally
-        localStorage.setItem('admin_session', 'active');
-        localStorage.setItem('admin_code', adminCode);
+        localStorage.setItem('admin_session', 'true');
+        sessionStorage.setItem('admin_token', json.token);
+        localStorage.removeItem('admin_code');
         onAdminLogin();
       } else {
-        toast.error('Invalid Credentials');
+        toast.error(json.error || 'Invalid Credentials');
       }
     } catch (err) {
       console.error(err);
-      toast.error('Authentication failed');
+      toast.error('Server connection failed');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      handleAdminAuth();
     }
   };
 
@@ -48,22 +57,21 @@ const AdminAuth = ({ onAdminLogin }) => {
           <h2>Admin Portal</h2>
           <p>Restricted strictly for Passwala staff</p>
 
-          <div className="phone-login" style={{ marginTop: '1.5rem', width: '100%' }}>
+          <form onSubmit={handleAdminAuth} className="phone-login" style={{ marginTop: '1.5rem', width: '100%' }}>
             <div className="input-group">
               <input
                 type="password"
                 placeholder="Enter Admin Access Code"
                 value={adminCode}
                 onChange={(e) => setAdminCode(e.target.value)}
-                onKeyDown={handleKeyDown}
                 autoFocus
               />
               <Lock className="input-icon" size={20} />
             </div>
-            <button className="auth-submit-btn" onClick={handleAdminAuth} disabled={loading}>
+            <button type="submit" className="auth-submit-btn" disabled={loading}>
               {loading ? 'Authorizing...' : 'Enter System'}
             </button>
-          </div>
+          </form>
         </div>
       </div>
     </div>

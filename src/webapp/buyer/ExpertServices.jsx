@@ -241,7 +241,7 @@ const ExpertServices = ({ onBack, location }) => {
                 <div className="expert-actions">
                    <button className="chat-btn" onClick={() => {
                      toast.dismiss();
-                     toast.success(`Opening Passwala AI for ${expert.name}...`);
+                     toast.success(`Opening Passwala Help Bot for ${expert.name}...`);
                      window.dispatchEvent(new CustomEvent('open-ai-chat', { detail: { expert } }));
                    }}><MessageCircle size={18} /></button>
                    <button 

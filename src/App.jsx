@@ -46,6 +46,14 @@ import CartDrawer from './webapp/buyer/CartDrawer'
 import { NotificationProvider, useNotifications } from './context/NotificationContext'
 import { SearchProvider } from './context/SearchContext'
 import { LanguageProvider } from './webapp/LanguageContext'
+import { parseAddressLine } from './utils/address'
+
+const appMode = import.meta.env.MODE || '';
+const isWebMode = appMode === 'web' || (appMode !== 'webapp' && appMode !== 'vendor' && appMode !== 'rider' && appMode !== 'admin' && window.location.port === '3000');
+const isWebappMode = appMode === 'webapp' || (appMode === 'development' && window.location.port === '3001');
+const isVendorMode = appMode === 'vendor' || (appMode === 'development' && window.location.port === '3002');
+const isRiderMode = appMode === 'rider' || (appMode === 'development' && window.location.port === '3003');
+const isAdminMode = appMode === 'admin' || (appMode === 'development' && window.location.port === '3005');
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -80,14 +88,10 @@ const RoleGuard = ({ children, allowedRoles, user, loading }) => {
 
 const AppContent = ({
   effectiveUser, isProfileComplete, setIsProfileComplete,
-  isWebappMode, isAdmin, setIsAdmin, location, userCoords, setLocation, userAddress, setUserAddress, setUser
+  isAdmin, setIsAdmin, location, userCoords, setLocation, userAddress, setUserAddress, setUser
 }) => {
   const navigate = useNavigate();
   const locationPath = useLocation().pathname;
-  const isWebMode = window.location.port === '3000';
-  const isVendorMode = window.location.port === '3002';
-  const isRiderMode = window.location.port === '3003';
-  const isAdminMode = window.location.port === '3005';
 
   useEffect(() => {
     if (isAdminMode) {
@@ -101,17 +105,22 @@ const AppContent = ({
     } else {
       document.title = 'Passwala | Local Services & Community Hub';
     }
-  }, [isAdminMode, isVendorMode, isRiderMode, isWebappMode]);
+  }, []);
 
   // Admin Persistence
   useEffect(() => {
     localStorage.setItem('admin_session', isAdmin);
-    if (isAdmin) sessionStorage.setItem('admin_active', 'true');
-    else sessionStorage.removeItem('admin_active');
+    if (isAdmin) {
+      sessionStorage.setItem('admin_active', 'true');
+    } else {
+      sessionStorage.removeItem('admin_active');
+      sessionStorage.removeItem('admin_token');
+      localStorage.removeItem('admin_code');
+    }
   }, [isAdmin]);
 
   // Global Notification Listener for Buyer
-  const { addNotification } = useNotifications();
+  const { addNotification, fcmToken } = useNotifications();
   useEffect(() => {
     if (!effectiveUser?.id || isVendorMode || isRiderMode || isAdminMode) return;
 
@@ -135,7 +144,50 @@ const AppContent = ({
       .subscribe();
 
     return () => supabase.removeChannel(sub);
-  }, [effectiveUser, addNotification, isVendorMode, isRiderMode, isAdminMode]);
+  }, [effectiveUser, addNotification]);
+
+  // Sync FCM Token to Supabase & Express Backend
+  useEffect(() => {
+    const syncToken = async () => {
+      if (!effectiveUser?.id || !fcmToken) return;
+      console.log('🔄 Syncing FCM token to database:', fcmToken);
+      try {
+        // Direct Supabase update
+        if (supabase) {
+          const { error } = await supabase
+            .from('users')
+            .update({ fcm_token: fcmToken })
+            .eq('id', effectiveUser.id);
+          if (error) {
+            console.warn('⚠️ Supabase FCM Token sync failed:', error.message);
+          } else {
+            console.log('✅ FCM Token synced directly to Supabase');
+          }
+        }
+        
+        // Express Backend update
+        const port = window.location.port === '3001' ? '3004' : '3004'; // use standard local Express server port
+        const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+          ? `http://${window.location.hostname}:3004` 
+          : 'https://passwala.onrender.com';
+        
+        const response = await fetch(`${baseUrl}/api/users/${effectiveUser.id}/fcm-token`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fcmToken })
+        });
+        if (!response.ok) {
+          console.warn('⚠️ Server endpoint FCM Token sync failed:', response.statusText);
+        } else {
+          console.log('✅ FCM Token synced to Express Backend');
+        }
+      } catch (err) {
+        console.warn('⚠️ Error during FCM token synchronization:', err);
+      }
+    };
+    
+    syncToken();
+  }, [effectiveUser, fcmToken]);
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('theme');
@@ -186,7 +238,7 @@ const AppContent = ({
       // Redirecting to profile completion
       navigate('/complete-profile');
     }
-  }, [isWebappMode, isRiderMode, effectiveUser, isProfileComplete, location, locationPath, navigate]);
+  }, [effectiveUser, isProfileComplete, location, locationPath, navigate]);
 
   const handleLogout = async (skipToast = false) => {
     try {
@@ -211,7 +263,7 @@ const AppContent = ({
 
       if (!skipToast) toast.success('Signed Out.');
 
-      if (window.location.port !== '3000') {
+      if (!isWebMode) {
         return;
       } else {
         navigate('/');
@@ -243,7 +295,7 @@ const AppContent = ({
         !isAuthorizedAdmin ? (
           <AdminAuth onAdminLogin={() => setIsAdmin(true)} />
         ) : (
-          <AdminPanel location={location} onLogout={() => { setIsAdmin(false); localStorage.removeItem('admin_session'); sessionStorage.removeItem('admin_active'); }} />
+          <AdminPanel location={location} onLogout={() => { setIsAdmin(false); localStorage.removeItem('admin_session'); sessionStorage.removeItem('admin_active'); sessionStorage.removeItem('admin_token'); localStorage.removeItem('admin_code'); }} />
         )
       ) : /* 1. Vendor Mode (Port 3002) - High level takeover */
         (locationPath === '/vendor' || isVendorMode) ? (
@@ -328,13 +380,33 @@ const AppContent = ({
                         onLogout={handleLogout}
                         onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')}
                       /> : <Auth onLogin={(userData) => {
-                        setUser(userData);
-                        setIsProfileComplete(true);
+                        // Persist user and complete profile state
                         localStorage.setItem('passwala_user', JSON.stringify(userData));
                         localStorage.setItem('passwala_profile_complete', 'true');
+                        
+                        // Sync location, coordinates, and address from localStorage to React states reactively
+                        const newLoc = localStorage.getItem('passwala_location') || 'Ahmedabad, Gujarat';
+                        const savedCoords = localStorage.getItem('passwala_coords');
+                        const newCoords = savedCoords ? JSON.parse(savedCoords) : { lat: 23.0225, lng: 72.5714 };
+                        const savedAddr = localStorage.getItem('passwala_user_address');
+                        const newAddr = savedAddr ? JSON.parse(savedAddr) : {
+                          address_line_1: newLoc,
+                          city: 'Ahmedabad',
+                          state: 'Gujarat',
+                          pincode: '380015',
+                          society: newLoc.split(',')[0],
+                          house_no: 'Home',
+                          floor: 'Ground',
+                          is_default: true
+                        };
+
+                        setLocation(newLoc, newCoords);
+                        setUserAddress(newAddr);
+                        setUser(userData);
+                        setIsProfileComplete(true);
+
+                        // Navigate home safely
                         navigate('/');
-                        // Small delay before reload to ensure storage is flushed
-                        setTimeout(() => window.location.reload(), 200);
                       }} />
                     ) : (
                       /* Marketing Logic (Hub on top if logged in, then standard homepage) */
@@ -387,7 +459,7 @@ const AppContent = ({
 
             {/* 5. Drawers / Modals */}
             <CartDrawer location={location} isProfileComplete={isProfileComplete} userAddress={userAddress} />
-            <AIAssistant isOpen={isAiChatOpen} onClose={() => setIsAiChatOpen(false)} />
+            <AIAssistant isOpen={isAiChatOpen} onClose={() => setIsAiChatOpen(false)} user={effectiveUser} />
           </>
         )}
     </div>
@@ -435,10 +507,11 @@ function App() {
     return !!localStorage.getItem('passwala_user') || sessionStorage.getItem('v_initial_splash_done') === 'true';
   });
   const [isAdmin, setIsAdmin] = useState(() => {
-    const isAdminApp = window.location.port === '3005';
+    const isAdminApp = isAdminMode;
     const hasAdminSession = localStorage.getItem('admin_session') === 'true';
+    const hasAdminToken = sessionStorage.getItem('admin_token');
     if (!isAdminApp) return false;
-    return hasAdminSession;
+    return !!(hasAdminSession && hasAdminToken);
   });
   const [location, setLocation] = useState(() => localStorage.getItem('passwala_location') || 'Ahmedabad, Gujarat');
   const [userCoords, setUserCoords] = useState(() => {
@@ -456,7 +529,6 @@ function App() {
     setUserCoords(newCoords);
     localStorage.setItem('passwala_coords', JSON.stringify(newCoords));
   };
-  const isWebappMode = window.location.port === '3001';
 
   // Authentication state logic
 
@@ -480,10 +552,10 @@ function App() {
                 const city = data.address.city || data.address.town || data.address.state_district || '';
 
                 if (area && city) {
+                  const preUpdateLoc = localStorage.getItem('passwala_location');
                   updateLocation(`${area}, ${city}`);
                   // 📍 Only show toast if we don't have a verified address yet
-                  const savedLoc = localStorage.getItem('passwala_location');
-                  if (!savedLoc || savedLoc === 'Detecting Location...' || savedLoc === 'Ahmedabad, Gujarat') {
+                  if (!preUpdateLoc || preUpdateLoc === 'Detecting Location...' || preUpdateLoc === 'Ahmedabad, Gujarat') {
                     toast.success(`Located: ${area}`, { icon: '📍', id: 'auto-geo' });
                   }
                   return;
@@ -574,7 +646,7 @@ function App() {
 
     const unsub = onAuthStateChanged(auth, async (u) => {
       clearTimeout(authTimeout); // Firebase responded, clear timeout
-      const isSpecialMode = window.location.port === '3002' || window.location.port === '3003' || window.location.port === '3005';
+      const isSpecialMode = isVendorMode || isRiderMode || isAdminMode;
       const savedUser = localStorage.getItem('passwala_user');
       const manualUser = savedUser ? JSON.parse(savedUser) : null;
       const wasComplete = localStorage.getItem('passwala_profile_complete') === 'true';
@@ -613,43 +685,32 @@ function App() {
           if (rawPhone) orFilter.push(`phone.eq.${rawPhone}`);
           
           const { data: usr } = await supabase.from('users')
-            .select('id, full_name')
+            .select('id, full_name, role')
             .or(orFilter.join(','))
             .maybeSingle();
 
           if (usr) {
-            // Augment Firebase user with Supabase UUID
-            finalUser = { ...u, id: usr.id, uid: u.uid, email: u.email, phoneNumber: u.phoneNumber, displayName: usr.full_name || u.displayName || manualUser?.displayName };
+            // Augment Firebase user with Supabase UUID and role
+            finalUser = {
+              ...u,
+              id: usr.id,
+              uid: u.uid,
+              email: u.email,
+              phoneNumber: u.phoneNumber,
+              displayName: usr.full_name || u.displayName || manualUser?.displayName,
+              role: usr.role || 'BUYER'
+            };
 
             // 2. Fetch address using the UUID
             const { data: addr } = await supabase.from('addresses').select('*').eq('user_id', usr.id).maybeSingle();
             if (addr) {
               setIsProfileComplete(true);
               
-              // Parse society, house_no, floor from address_line_1
-              const parts = (addr.address_line_1 || '').split(', ').map(p => p.trim());
-              let hName = '';
-              let hNo = '';
-              let fl = '';
-              let soc = '';
-              if (parts.length === 4) {
-                [hName, hNo, fl, soc] = parts;
-                fl = fl.replace('Floor ', '');
-              } else if (parts.length === 3) {
-                if (parts[1].startsWith('Floor ')) {
-                  [hNo, fl, soc] = parts;
-                  fl = fl.replace('Floor ', '');
-                } else {
-                  [hName, hNo, soc] = parts;
-                }
-              } else if (parts.length === 2) {
-                [hNo, soc] = parts;
-              } else {
-                soc = parts[0] || '';
-              }
-              addr.house_no = hNo || hName || 'Home';
-              addr.floor = fl || 'Ground';
-              addr.society = soc || addr.address_line_1;
+              // Parse society, house_no, floor from address_line_1 using robust utility
+              const parsed = parseAddressLine(addr.address_line_1);
+              addr.house_no = parsed.house_no;
+              addr.floor = parsed.floor;
+              addr.society = parsed.society;
 
               setUserAddress(addr);
               localStorage.setItem('passwala_user_address', JSON.stringify(addr));
@@ -663,30 +724,11 @@ function App() {
               const { data: addrLegacy } = await supabase.from('addresses').select('*').eq('user_id', u.uid).maybeSingle();
               setIsProfileComplete(!!addrLegacy || wasComplete);
               if (addrLegacy) {
-                // Parse society, house_no, floor from address_line_1
-                const parts = (addrLegacy.address_line_1 || '').split(', ').map(p => p.trim());
-                let hName = '';
-                let hNo = '';
-                let fl = '';
-                let soc = '';
-                if (parts.length === 4) {
-                  [hName, hNo, fl, soc] = parts;
-                  fl = fl.replace('Floor ', '');
-                } else if (parts.length === 3) {
-                  if (parts[1].startsWith('Floor ')) {
-                    [hNo, fl, soc] = parts;
-                    fl = fl.replace('Floor ', '');
-                  } else {
-                    [hName, hNo, soc] = parts;
-                  }
-                } else if (parts.length === 2) {
-                  [hNo, soc] = parts;
-                } else {
-                  soc = parts[0] || '';
-                }
-                addrLegacy.house_no = hNo || hName || 'Home';
-                addrLegacy.floor = fl || 'Ground';
-                addrLegacy.society = soc || addrLegacy.address_line_1;
+                // Parse society, house_no, floor from address_line_1 using robust utility
+                const parsed = parseAddressLine(addrLegacy.address_line_1);
+                addrLegacy.house_no = parsed.house_no;
+                addrLegacy.floor = parsed.floor;
+                addrLegacy.society = parsed.society;
 
                 setUserAddress(addrLegacy);
                 localStorage.setItem('passwala_user_address', JSON.stringify(addrLegacy));

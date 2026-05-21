@@ -1,34 +1,136 @@
 import express from 'express';
+import crypto from 'crypto';
 import supabase from '../supabase.js';
+import { authLimiter } from '../utils/rateLimiter.js';
 
 const router = express.Router();
 
+const ADMIN_SECRET = process.env.ADMIN_ACCESS_CODE || 'PASSWALA99';
+
+const ALLOWED_ADMIN_TABLES = [
+  'users',
+  'vendors',
+  'riders',
+  'service_providers',
+  'service_bookings',
+  'services',
+  'products',
+  'stores',
+  'deals',
+  'notifications',
+  'posts',
+  'orders',
+  'product_categories',
+  'service_categories',
+  'addresses',
+  'comments',
+  'ai_recommendations',
+  'wallet_transactions',
+  'reports'
+];
+
+function base64urlEncode(strOrBuffer) {
+  const buffer = Buffer.isBuffer(strOrBuffer) ? strOrBuffer : Buffer.from(strOrBuffer, 'utf8');
+  return buffer.toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+}
+
+function base64urlDecode(str) {
+  let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (base64.length % 4) {
+    base64 += '=';
+  }
+  return Buffer.from(base64, 'base64').toString('utf8');
+}
+
+export function signAdminToken(payload) {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const headerB64 = base64urlEncode(JSON.stringify(header));
+  
+  const now = Math.floor(Date.now() / 1000);
+  const fullPayload = {
+    ...payload,
+    iat: now,
+    exp: now + (8 * 3600) // 8 hours expiration
+  };
+  const payloadB64 = base64urlEncode(JSON.stringify(fullPayload));
+  
+  const hmac = crypto.createHmac('sha256', ADMIN_SECRET);
+  hmac.update(`${headerB64}.${payloadB64}`);
+  const signatureB64 = base64urlEncode(hmac.digest());
+  
+  return `${headerB64}.${payloadB64}.${signatureB64}`;
+}
+
+export function verifyAdminToken(token) {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    
+    const [headerB64, payloadB64, signatureB64] = parts;
+    
+    const hmac = crypto.createHmac('sha256', ADMIN_SECRET);
+    hmac.update(`${headerB64}.${payloadB64}`);
+    const expectedSignatureB64 = base64urlEncode(hmac.digest());
+    
+    if (signatureB64 !== expectedSignatureB64) {
+      return null;
+    }
+    
+    const payload = JSON.parse(base64urlDecode(payloadB64));
+    
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp < now) {
+      return null;
+    }
+    
+    return payload;
+  } catch (e) {
+    return null;
+  }
+}
+
 // POST /api/admin/login
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   const { accessCode } = req.body;
   
-  // In a real production app, this would query the `admins` table and compare hashed passwords.
-  // For now, we use a secure environment variable.
-  const secureCode = process.env.ADMIN_ACCESS_CODE || 'PASSWALA_SECURE_99';
+  const secureCode = process.env.ADMIN_ACCESS_CODE || 'PASSWALA99';
   
   if (accessCode === secureCode) {
-    // Return a simple session token (could be a JWT)
-    res.status(200).json({ success: true, token: 'admin_session_token' });
+    // Generate a secure JWT session token
+    const token = signAdminToken({ role: 'admin' });
+    res.status(200).json({ success: true, token });
   } else {
     res.status(401).json({ success: false, error: 'Invalid Access Code' });
   }
 });
 
 // Admin Authentication Middleware
-const adminAuth = (req, res, next) => {
+export const adminAuth = (req, res, next) => {
     const key = req.headers['x-admin-key'];
-    const validKey = process.env.ADMIN_SECRET || process.env.VITE_ADMIN_ACCESS_CODE || 'PASSWALA99';
+    const validKey = process.env.ADMIN_ACCESS_CODE || 'PASSWALA99';
     
-    if (!key || key !== validKey) {
-        console.warn('Unauthorized admin access attempt from IP:', req.ip);
-        return res.status(401).json({ success: false, error: 'Unauthorized: Invalid Admin Key' });
+    if (!key) {
+        console.warn('Unauthorized admin access attempt from IP: Missing key', req.ip);
+        return res.status(401).json({ success: false, error: 'Unauthorized: Missing Admin Key' });
     }
-    next();
+
+    // 1. Backwards compatibility: raw ADMIN_ACCESS_CODE
+    if (key === validKey) {
+        return next();
+    }
+
+    // 2. JWT Cryptographic session validation
+    const decoded = verifyAdminToken(key);
+    if (decoded) {
+        req.adminSession = decoded;
+        return next();
+    }
+
+    console.warn('Unauthorized admin access attempt from IP: Invalid key/token', req.ip);
+    return res.status(401).json({ success: false, error: 'Unauthorized: Invalid Admin Key' });
 };
 
 // Apply to all admin routes
@@ -38,6 +140,10 @@ router.use(adminAuth);
 router.get('/fetch', async (req, res) => {
     const { table } = req.query;
     if (!table) return res.status(400).json({ error: 'Table name is required' });
+
+    if (!ALLOWED_ADMIN_TABLES.includes(table)) {
+        return res.status(400).json({ error: `Invalid table: ${table} is not whitelisted` });
+    }
 
     try {
         let selectStr = '*';
@@ -157,17 +263,86 @@ router.get('/stats', async (req, res) => {
         const { count: productCount } = await supabase.from('products').select('*', { count: 'exact', head: true });
 
         // Calculate real revenue and order stats
-        const { data: allOrders } = await supabase.from('orders').select('total_amount, status, created_at');
+        const { data: allOrders } = await supabase
+            .from('orders')
+            .select(`
+                id,
+                total_amount,
+                status,
+                created_at,
+                stores (
+                    id,
+                    name,
+                    vendors (
+                        id,
+                        business_name,
+                        category
+                    )
+                )
+            `);
+
         let totalRevenue = 0;
         let ordersCompleted = 0;
         let weeklyMap = { 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0, 'Sat': 0, 'Sun': 0 };
+
+        let groceryRevenue = 0;
+        let servicesRevenue = 0;
+        let foodRevenue = 0;
         
         if (allOrders) {
             allOrders.forEach(order => {
                 if (order.status === 'DELIVERED') {
-                    totalRevenue += (order.total_amount || 0);
+                    const amount = order.total_amount || 0;
+                    totalRevenue += amount;
                     ordersCompleted++;
+
+                    // Categorize the order based on its store / vendor category
+                    let category = 'Grocery & Essentials'; // Default fallback
+
+                    const store = order.stores;
+                    if (store) {
+                        const vendor = store.vendors;
+                        if (!vendor) {
+                            // No vendor info means it's a service provider store
+                            category = 'Expert Services';
+                        } else {
+                            const rawCat = vendor.category || '';
+                            const storeName = store.name || '';
+                            const bizName = vendor.business_name || '';
+                            
+                            const foodKeywords = ['restaurant', 'cafe', 'pizza', 'bakery', 'sweets', 'burger', 'food', 'kitchen', 'canteen', 'dhaba', 'dining', 'eats', 'munchies', 'beverage', 'beverages', 'bites', 'grill'];
+                            const isFood = rawCat.toLowerCase().includes('beverages') || 
+                                           rawCat.toLowerCase().includes('munchies') ||
+                                           rawCat.toLowerCase().includes('food') ||
+                                           foodKeywords.some(keyword => storeName.toLowerCase().includes(keyword) || bizName.toLowerCase().includes(keyword));
+
+                            const isService = rawCat.toLowerCase().includes('service') || 
+                                              rawCat.toLowerCase().includes('repair') || 
+                                              rawCat.toLowerCase().includes('cleaning') || 
+                                              rawCat.toLowerCase().includes('plumbing') || 
+                                              rawCat.toLowerCase().includes('electrical') || 
+                                              rawCat.toLowerCase().includes('pest') || 
+                                              rawCat.toLowerCase().includes('painting');
+
+                            if (isService) {
+                                category = 'Expert Services';
+                            } else if (isFood) {
+                                category = 'Food Delivery';
+                            } else {
+                                category = 'Grocery & Essentials';
+                            }
+                        }
+                    }
+
+                    if (category === 'Expert Services') {
+                        servicesRevenue += amount;
+                    } else if (category === 'Food Delivery') {
+                        foodRevenue += amount;
+                    } else {
+                        groceryRevenue += amount;
+                    }
                 }
+                
                 // Weekly trend (simplified to day of week mapping)
                 const d = new Date(order.created_at);
                 const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
@@ -183,12 +358,16 @@ router.get('/stats', async (req, res) => {
             label: key,
             val: weeklyMap[key]
         }));
+
+        const totalCategorizedRevenue = groceryRevenue + servicesRevenue + foodRevenue;
+        const groceryPercent = totalCategorizedRevenue > 0 ? Math.round((groceryRevenue / totalCategorizedRevenue) * 100) : 0;
+        const servicesPercent = totalCategorizedRevenue > 0 ? Math.round((servicesRevenue / totalCategorizedRevenue) * 100) : 0;
+        const foodPercent = totalCategorizedRevenue > 0 ? Math.round((foodRevenue / totalCategorizedRevenue) * 100) : 0;
         
-        // Mocking category breakdown until order_items are queried properly
         const salesByCategory = [
-            { name: 'Grocery & Essentials', percent: totalRevenue > 0 ? 65 : 0, color: '#10b981' },
-            { name: 'Expert Services', percent: totalRevenue > 0 ? 20 : 0, color: '#6366f1' },
-            { name: 'Food Delivery', percent: totalRevenue > 0 ? 15 : 0, color: '#f59e0b' }
+            { name: 'Grocery & Essentials', percent: groceryPercent, color: '#10b981' },
+            { name: 'Expert Services', percent: servicesPercent, color: '#6366f1' },
+            { name: 'Food Delivery', percent: foodPercent, color: '#f59e0b' }
         ];
 
         res.status(200).json({
@@ -314,6 +493,10 @@ router.post('/upsert', async (req, res) => {
         return res.status(400).json({ error: 'Table name and payload are required' });
     }
 
+    if (!ALLOWED_ADMIN_TABLES.includes(table)) {
+        return res.status(400).json({ error: `Invalid table: ${table} is not whitelisted` });
+    }
+
     try {
         let finalPayload = { ...payload };
 
@@ -432,6 +615,10 @@ router.delete('/delete', async (req, res) => {
     
     if (!table || !id) {
         return res.status(400).json({ error: 'Table name and ID are required' });
+    }
+
+    if (!ALLOWED_ADMIN_TABLES.includes(table)) {
+        return res.status(400).json({ error: `Invalid table: ${table} is not whitelisted` });
     }
 
     try {

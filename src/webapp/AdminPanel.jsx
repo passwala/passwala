@@ -46,26 +46,26 @@ import 'leaflet/dist/leaflet.css';
 import './AdminPanel.css';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-// Create a highly privileged admin client that bypasses RLS
+// Create a secure client using the public anon key for real-time order updates
 const adminSupabase = (supabaseUrl && supabaseKey)
   ? createClient(supabaseUrl, supabaseKey)
   : null;
 
-if (!import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY) {
-  console.warn('⚠️ Admin Panel is running with ANON_KEY. Some management functions may fail if RLS is enabled.');
-}
-
 const API_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
-const ActivityFeed = () => {
+const ActivityFeed = ({ onLogout }) => {
   const [recent, setRecent] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchRecent = async () => {
     try {
-      const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
+      const adminKey = sessionStorage.getItem('admin_token') || '';
       const res = await fetch(`${API_URL}/api/admin/fetch?table=orders`, { headers: { 'x-admin-key': adminKey } });
+      if (res.status === 401) {
+        if (onLogout) onLogout();
+        return;
+      }
       const json = await res.json();
       if (json.success && json.data) {
         setRecent(json.data.slice(0, 5));
@@ -311,6 +311,15 @@ const AdminPanel = ({ onLogout, location }) => {
     }
   }, []);
 
+  // Validate Session Token existence on mount
+  useEffect(() => {
+    const adminKey = sessionStorage.getItem('admin_token');
+    if (!adminKey) {
+      toast.error('Session expired or missing. Please login.');
+      onLogout();
+    }
+  }, [onLogout]);
+
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -333,8 +342,13 @@ const AdminPanel = ({ onLogout, location }) => {
   const fetchReferences = useCallback(async () => {
     try {
       const fetchTable = async (table) => {
-        const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
+        const adminKey = sessionStorage.getItem('admin_token') || '';
         const res = await fetch(`${API_URL}/api/admin/fetch?table=${table}`, { headers: { 'x-admin-key': adminKey } });
+        if (res.status === 401) {
+          toast.error('Session expired. Please login again.');
+          onLogout();
+          return [];
+        }
         const json = await res.json();
         return json.success ? json.data : [];
       };
@@ -361,7 +375,7 @@ const AdminPanel = ({ onLogout, location }) => {
     } catch (err) {
       console.error('Failed to fetch references:', err);
     }
-  }, []);
+  }, [onLogout]);
 
   // --- People Map States ---
   const [peopleMapData, setPeopleMapData] = useState([]);
@@ -374,8 +388,13 @@ const AdminPanel = ({ onLogout, location }) => {
 
   const fetchStats = async () => {
     try {
-      const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
+      const adminKey = sessionStorage.getItem('admin_token') || '';
       const res = await fetch(`${API_URL}/api/admin/stats`, { headers: { 'x-admin-key': adminKey } });
+      if (res.status === 401) {
+        toast.error('Session expired. Please login again.');
+        onLogout();
+        return;
+      }
       const json = await res.json();
       if (json.success && json.stats) {
         setStats(json.stats);
@@ -394,11 +413,17 @@ const AdminPanel = ({ onLogout, location }) => {
     try {
       toast.loading('Performing deep purge of platform residue...', { id: 'purge' });
       
-      const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
+      const adminKey = sessionStorage.getItem('admin_token') || '';
       const res = await fetch(`${API_URL}/api/admin/purge`, { 
         method: 'POST',
         headers: { 'x-admin-key': adminKey }
       });
+      if (res.status === 401) {
+        toast.dismiss('purge');
+        toast.error('Session expired. Please login again.');
+        onLogout();
+        return;
+      }
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to purge data');
 
@@ -415,10 +440,15 @@ const AdminPanel = ({ onLogout, location }) => {
       setMapLoading(true);
       const combined = [];
 
-      const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
+      const adminKey = sessionStorage.getItem('admin_token') || '';
       const res = await fetch(`${API_URL}/api/admin/people_map`, {
         headers: { 'x-admin-key': adminKey }
       });
+      if (res.status === 401) {
+        toast.error('Session expired. Please login again.');
+        onLogout();
+        return;
+      }
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to fetch people map data');
 
@@ -546,7 +576,7 @@ const AdminPanel = ({ onLogout, location }) => {
     } finally {
       setMapLoading(false);
     }
-  }, []);
+  }, [onLogout]);
 
   const fetchData = useCallback(async () => {
     if (['dashboard', 'people_map', 'reports', 'settings'].includes(activeAdminTab)) {
@@ -557,8 +587,13 @@ const AdminPanel = ({ onLogout, location }) => {
     const currentTable = TABS.find(t => t.id === activeAdminTab)?.table || activeAdminTab;
 
     try {
-      const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
+      const adminKey = sessionStorage.getItem('admin_token') || '';
       const res = await fetch(`${API_URL}/api/admin/fetch?table=${currentTable}`, { headers: { 'x-admin-key': adminKey } });
+      if (res.status === 401) {
+        toast.error('Session expired. Please login again.');
+        onLogout();
+        return;
+      }
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to fetch cloud data');
       const suData = json.data;
@@ -601,7 +636,7 @@ const AdminPanel = ({ onLogout, location }) => {
     } finally {
       setLoading(false);
     }
-  }, [activeAdminTab]);
+  }, [activeAdminTab, onLogout]);
 
   useEffect(() => {
     fetchStats();
@@ -621,7 +656,7 @@ const AdminPanel = ({ onLogout, location }) => {
       const isTemp = typeof deleteConfirmId === 'string' && deleteConfirmId.startsWith('temp_');
 
       if (!isTemp) {
-        const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
+        const adminKey = sessionStorage.getItem('admin_token') || '';
         const res = await fetch(`${API_URL}/api/admin/delete`, {
           method: 'DELETE',
           headers: { 
@@ -633,6 +668,11 @@ const AdminPanel = ({ onLogout, location }) => {
             id: deleteConfirmId
           })
         });
+        if (res.status === 401) {
+          toast.error('Session expired. Please login again.');
+          onLogout();
+          return;
+        }
         const json = await res.json();
         if (!json.success) throw new Error(json.error || 'Failed to delete via cloud');
       }
@@ -717,7 +757,7 @@ const AdminPanel = ({ onLogout, location }) => {
       let finalPayload = { ...payload };
 
       try {
-        const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
+        const adminKey = sessionStorage.getItem('admin_token') || '';
         const response = await fetch(`${API_URL}/api/admin/upsert`, {
           method: 'POST',
           headers: { 
@@ -729,6 +769,11 @@ const AdminPanel = ({ onLogout, location }) => {
             payload: finalPayload
           })
         });
+        if (response.status === 401) {
+          toast.error('Session expired. Please login again.');
+          onLogout();
+          return;
+        }
         const result = await response.json();
         if (!result.success) {
           throw new Error(result.error || 'Failed to sync with backend');
@@ -768,7 +813,7 @@ const AdminPanel = ({ onLogout, location }) => {
   const handleToggleVerify = async (item) => {
     try {
       const nextVerified = !item.is_verified;
-      const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
+      const adminKey = sessionStorage.getItem('admin_token') || '';
       const response = await fetch(`${API_URL}/api/admin/upsert`, {
         method: 'POST',
         headers: { 
@@ -780,6 +825,11 @@ const AdminPanel = ({ onLogout, location }) => {
           payload: { ...item, is_verified: nextVerified }
         })
       });
+      if (response.status === 401) {
+        toast.error('Session expired. Please login again.');
+        onLogout();
+        return;
+      }
       const result = await response.json();
       if (!result.success) {
         throw new Error(result.error || 'Failed to update verification status');
@@ -1341,7 +1391,7 @@ const AdminPanel = ({ onLogout, location }) => {
           <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><History size={18} /> Recent Logs</h4>
         </div>
         <div className="trend-content">
-          <ActivityFeed />
+          <ActivityFeed onLogout={onLogout} />
         </div>
 
         <div className="notification-preview" style={{ marginTop: '1.5rem', padding: '1rem', background: '#f8fafc', borderRadius: '12px' }}>

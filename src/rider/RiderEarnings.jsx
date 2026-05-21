@@ -3,6 +3,7 @@ import { IndianRupee, Crown, Clock } from 'lucide-react';
 import './RiderPortal.css'; // Import custom styles
 
 import { supabase } from '../supabase';
+import { getStraightLineDistance } from '../utils/dijkstra';
 
 function RiderEarnings({ _user, riderId, stats, isOnline, sessionStartTime }) {
     const [deliveries, setDeliveries] = React.useState([]);
@@ -34,7 +35,7 @@ function RiderEarnings({ _user, riderId, stats, isOnline, sessionStartTime }) {
                 setLoading(true);
                 let query = supabase
                     .from('orders')
-                    .select('id, created_at, total_amount, stores (name), addresses (address_line_1, city)')
+                    .select('id, created_at, total_amount, delivery_fee, stores (name, lat, lng), addresses (address_line_1, city, lat, lng), rider_earnings (amount)')
                     .eq('rider_id', riderId)
                     .eq('status', 'DELIVERED');
                 
@@ -56,12 +57,30 @@ function RiderEarnings({ _user, riderId, stats, isOnline, sessionStartTime }) {
                     .limit(20);
                 
                 if (data) {
-                    setDeliveries(data.map(d => ({
-                        id: `#ORD-${d.id.toString().substring(0, 6).toUpperCase()}`,
-                        amount: 50, // Standard delivery earning fallback
-                        time: new Date(d.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                        distance: '1.2 km'
-                    })));
+                    setDeliveries(data.map(d => {
+                        const storeLat = d.stores?.lat ? parseFloat(d.stores.lat) : null;
+                        const storeLng = d.stores?.lng ? parseFloat(d.stores.lng) : null;
+                        const addrLat = d.addresses?.lat ? parseFloat(d.addresses.lat) : null;
+                        const addrLng = d.addresses?.lng ? parseFloat(d.addresses.lng) : null;
+
+                        let distanceStr = '1.2 km';
+                        if (storeLat !== null && storeLng !== null && addrLat !== null && addrLng !== null) {
+                            const dist = getStraightLineDistance(storeLat, storeLng, addrLat, addrLng);
+                            distanceStr = `${dist.toFixed(1)} km`;
+                        }
+
+                        // Earning precedence: 1) rider_earnings amount, 2) delivery_fee, 3) fallback default of 50
+                        const earnAmount = d.rider_earnings?.[0]?.amount 
+                            ? Number(d.rider_earnings[0].amount) 
+                            : (d.delivery_fee ? Number(d.delivery_fee) : 50);
+
+                        return {
+                            id: `#ORD-${d.id.toString().substring(0, 6).toUpperCase()}`,
+                            amount: earnAmount,
+                            time: new Date(d.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            distance: distanceStr
+                        };
+                    }));
                 } else {
                     setDeliveries([]);
                 }

@@ -144,7 +144,8 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
 
     const fetchOSRMRoute = async () => {
       try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
+        const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+        const url = `${apiBase}/api/route?startLat=${start[0]}&startLng=${start[1]}&endLat=${end[0]}&endLng=${end[1]}&profile=driving`;
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();

@@ -1,4 +1,4 @@
-/* eslint-disable */
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getMessagingInstance } from '../firebase';
 import { getToken, onMessage } from 'firebase/messaging';
@@ -6,20 +6,23 @@ import { toast } from 'react-hot-toast';
 
 const NotificationContext = createContext();
 
+const appMode = import.meta.env.MODE || '';
+const isWebappMode = appMode === 'webapp' || (appMode === 'development' && window.location.port === '3001');
+
 export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [fcmToken, setFcmToken] = useState(null);
 
   // 🛡️ Request Notification Permission (Only once-per-choice logic)
   const requestNotificationPermission = async () => {
+    if (!isWebappMode) return;
+    
     if (!('Notification' in window)) {
       console.warn('This browser does not support notifications.');
       return;
     }
 
     try {
-      const hasAsked = localStorage.getItem('passwala_notif_asked');
-      
       if (Notification.permission === 'default') {
         const permission = await Notification.requestPermission();
         localStorage.setItem('passwala_notif_asked', 'true');
@@ -52,7 +55,16 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
+  const addNotification = (notif) => {
+    setNotifications(prev => [
+      { id: Date.now(), read: false, time: 'Just now', ...notif },
+      ...prev,
+    ]);
+  };
+
   useEffect(() => {
+    if (!isWebappMode) return;
+
     const initNotifications = async () => {
       // 🛡️ 1. Register Service Worker Safely
       if ('serviceWorker' in navigator) {
@@ -81,13 +93,6 @@ export const NotificationProvider = ({ children }) => {
     initNotifications().then(u => unsub = u);
     return () => unsub && unsub();
   }, []);
-
-  const addNotification = (notif) => {
-    setNotifications(prev => [
-      { id: Date.now(), read: false, time: 'Just now', ...notif },
-      ...prev,
-    ]);
-  };
 
   const markAllRead = () =>
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));

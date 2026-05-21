@@ -2,9 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, X, MessageSquare, Bot, User, Loader2, ArrowLeft } from 'lucide-react';
 // eslint-disable-next-line no-unused-vars
 import { AnimatePresence, motion } from 'framer-motion';
+import { supabase } from '../supabase';
 import './AIAssistant.css';
 
-const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
+const AIAssistant = ({ isOpen, onClose, onRegisterVendor, user }) => {
   const [activeTab, setActiveTab] = useState('AI'); // 'AI' or 'CHATS'
   const [selectedVendor, setSelectedVendor] = useState(null); // null or expert object
   const [chatThreads, setChatThreads] = useState(() => {
@@ -13,7 +14,7 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
   });
 
   const [messages, setMessages] = useState([
-    { id: 1, text: "Jai Shree Krishna! I'm your Ahmedabad Community AI. 🙏 How can I help you today? (I support Hindi, Gujarati & English)", sender: 'ai', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
+    { id: 1, text: "Jai Shree Krishna! I'm your Ahmedabad Community Help Bot. 🙏 How can I help you today? (I support Hindi, Gujarati & English)", sender: 'ai', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -27,8 +28,199 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
     localStorage.setItem('passwala_chat_threads', JSON.stringify(newThreads));
   };
 
+  // Helper to find or create chat thread in Supabase
+  const findOrCreateChat = async (expert) => {
+    if (!user?.id || !supabase) return null;
+    try {
+      const { data: existing, error } = await supabase
+        .from('chats')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('vendor_id', expert.id)
+        .maybeSingle();
+        
+      if (existing) return existing;
+      
+      const payload = {
+        user_id: user.id,
+        vendor_id: expert.id,
+        vendor_name: expert.name,
+        vendor_title: expert.title || 'Expert Service',
+        vendor_image: expert.image || null,
+        category: expert.category || 'Service',
+        price: expert.price || 199,
+        provider_id: expert.providerId || expert.id,
+        last_message: `Namaste! I am the provider from "${expert.name}". How can I help you today?`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      
+      const { data: created, error: insErr } = await supabase
+        .from('chats')
+        .insert([payload])
+        .select()
+        .single();
+        
+      if (insErr) throw insErr;
+
+      // Seed the first welcome message
+      await supabase
+        .from('chat_messages')
+        .insert([{
+          chat_id: created.id,
+          sender: 'vendor',
+          text: `Namaste! I am the service provider from "${expert.name}". How can I help you today with our "${expert.title}" service?`
+        }]);
+
+      return created;
+    } catch (err) {
+      console.warn('⚠️ Error finding/creating chat in Supabase:', err);
+      return null;
+    }
+  };
+
+  // 1. Fetch remote threads and messages from Supabase when user logs in
   useEffect(() => {
-    const handleOpenChatEvent = (e) => {
+    const fetchRemoteThreads = async () => {
+      if (!user?.id || !supabase) return;
+      try {
+        const { data, error } = await supabase
+          .from('chats')
+          .select('*, chat_messages(*)')
+          .eq('user_id', user.id)
+          .order('updated_at', { ascending: false });
+
+        if (error) {
+          console.warn('⚠️ Supabase chat fetch failed or table missing, falling back to localStorage:', error.message);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          // Map DB columns back to UI structure
+          const mapped = data.map(t => {
+            const sortedMsgs = (t.chat_messages || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            const uiMessages = sortedMsgs.map((m, idx) => ({
+              id: m.id || idx,
+              text: m.text,
+              sender: m.sender,
+              time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            }));
+
+            return {
+              id: t.id,
+              vendorId: t.vendor_id,
+              vendorName: t.vendor_name,
+              vendorTitle: t.vendor_title,
+              vendorImage: t.vendor_image,
+              category: t.category,
+              price: t.price ? Number(t.price) : 199,
+              providerId: t.provider_id,
+              lastMessage: t.last_message,
+              timestamp: t.timestamp,
+              messages: uiMessages.length > 0 ? uiMessages : [
+                {
+                  id: 1,
+                  text: `Namaste! I am the service provider from "${t.vendor_name}". How can I help you today with our "${t.vendor_title}" service?`,
+                  sender: 'vendor',
+                  time: t.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                }
+              ]
+            };
+          });
+          
+          setChatThreads(mapped);
+          localStorage.setItem('passwala_chat_threads', JSON.stringify(mapped));
+        }
+      } catch (err) {
+        console.warn('⚠️ Error fetching chat threads from Supabase:', err);
+      }
+    };
+
+    fetchRemoteThreads();
+  }, [user]);
+
+  // 2. Real-time delivery via Supabase Channel subscription
+  useEffect(() => {
+    if (!user?.id || !supabase) return;
+
+    const channel = supabase
+      .channel('realtime-chat-messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_messages'
+        },
+        async (payload) => {
+          const newMsg = payload.new;
+          
+          // Verify if this message belongs to one of our active chats
+          const { data: chatRow } = await supabase
+            .from('chats')
+            .select('*')
+            .eq('id', newMsg.chat_id)
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (!chatRow) return;
+
+          setChatThreads(prevThreads => {
+            const uiMsg = {
+              id: newMsg.id,
+              text: newMsg.text,
+              sender: newMsg.sender,
+              time: new Date(newMsg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+
+            const threadExists = prevThreads.find(t => t.vendorId === chatRow.vendor_id);
+            if (threadExists) {
+              const msgAlreadyExists = threadExists.messages.some(m => m.id === newMsg.id || (m.text === newMsg.text && m.sender === newMsg.sender));
+              if (msgAlreadyExists) return prevThreads;
+
+              const updatedMessages = [...threadExists.messages, uiMsg];
+              const updated = prevThreads.map(t => {
+                if (t.vendorId === chatRow.vendor_id) {
+                  return {
+                    ...t,
+                    lastMessage: newMsg.text,
+                    timestamp: uiMsg.time,
+                    messages: updatedMessages
+                  };
+                }
+                return t;
+              });
+              localStorage.setItem('passwala_chat_threads', JSON.stringify(updated));
+              return updated;
+            } else {
+              const newThread = {
+                id: chatRow.id,
+                vendorId: chatRow.vendor_id,
+                vendorName: chatRow.vendor_name,
+                vendorTitle: chatRow.vendor_title,
+                vendorImage: chatRow.vendor_image,
+                category: chatRow.category,
+                price: chatRow.price ? Number(chatRow.price) : 199,
+                providerId: chatRow.provider_id,
+                lastMessage: newMsg.text,
+                timestamp: uiMsg.time,
+                messages: [uiMsg]
+              };
+              const updated = [newThread, ...prevThreads];
+              localStorage.setItem('passwala_chat_threads', JSON.stringify(updated));
+              return updated;
+            }
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  useEffect(() => {
+    const handleOpenChatEvent = async (e) => {
       const expert = e.detail?.expert;
       if (expert) {
         // Switch to CHATS tab and select this vendor
@@ -39,7 +231,6 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
         setChatThreads(prevThreads => {
           const exists = prevThreads.find(t => t.vendorId === expert.id);
           if (exists) {
-            // Put it at the beginning of the list
             const filtered = prevThreads.filter(t => t.vendorId !== expert.id);
             const updated = [exists, ...filtered];
             localStorage.setItem('passwala_chat_threads', JSON.stringify(updated));
@@ -68,11 +259,14 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
           localStorage.setItem('passwala_chat_threads', JSON.stringify(updated));
           return updated;
         });
+
+        // Trigger remote persistence in the background
+        await findOrCreateChat(expert);
       }
     };
     window.addEventListener('open-ai-chat', handleOpenChatEvent);
     return () => window.removeEventListener('open-ai-chat', handleOpenChatEvent);
-  }, []);
+  }, [chatThreads, user]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -94,10 +288,10 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
 
       // --- VERNACULAR GREETINGS ---
       if (lowerInput.includes('kem cho') || lowerInput.includes('kevu')) {
-        aiResponse = "Maja ma! 🙏 Hoon tamari Ahmedabad Community AI chhu. Su madad karu? (I can help in Gujarati, Hindi & English)";
+        aiResponse = "Maja ma! 🙏 Hoon tamari Ahmedabad Community Help Bot chhu. Su madad karu? (I can help in Gujarati, Hindi & English)";
       }
       else if (lowerInput.includes('kaise ho') || lowerInput.includes('namaste')) {
-        aiResponse = "Main bilkul theek hoon! 🙏 Aapki Ahmedabad neighborhood AI sahayta ke liye taiyar hai. Kya madad karu?";
+        aiResponse = "Main bilkul theek hoon! 🙏 Aapki Ahmedabad neighborhood Help Bot sahayta ke liye taiyar hai. Kya madad karu?";
       }
 
       // --- VENDOR ONBOARDING FLOW (WA STYLE) ---
@@ -114,7 +308,7 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
         } else if (onboardingStep === 2) {
           setOnboardingData({ ...onboardingData, category: userInput });
           setOnboardingStep(3);
-          aiResponse = "Perfect! 🎯 Almost there. \n\nPlease share your **Shop Location** or Landmark in Ahmedabad (e.g. Near Shivam Residency, Satellite). \n\nOur AI will auto-create your digital catalog for you!";
+          aiResponse = "Perfect! 🎯 Almost there. \n\nPlease share your **Shop Location** or Landmark in Ahmedabad (e.g. Near Shivam Residency, Satellite). \n\nOur Help Bot will auto-create your digital catalog for you!";
         } else if (onboardingStep === 3) {
           setSessionState('IDLE');
           setOnboardingStep(0);
@@ -151,7 +345,7 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
         aiResponse = "Main aapki sahayta kar sakti hoon! Aapko plumber chahiye ya grocery ki dukaan? Mujhe batayein.";
       }
       else {
-        aiResponse = "Passwala AI at your service! 🏙️ I can help you find groceries, book home services, or register your local business. Just ask me!";
+        aiResponse = "Passwala Help Bot at your service! 🏙️ I can help you find groceries, book home services, or register your local business. Just ask me!";
       }
 
       setMessages(prev => [...prev, { id: Date.now() + 1, text: aiResponse, sender: 'ai', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
@@ -159,7 +353,7 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
     }, 1200);
   };
 
-  const handleSendVendorMessage = (text) => {
+  const handleSendVendorMessage = async (text) => {
     if (!text.trim() || !selectedVendor) return;
     const msgText = text.trim();
     
@@ -170,25 +364,60 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     
-    // Update thread with user message
-    let updatedThreads = chatThreads.map(t => {
-      if (t.vendorId === selectedVendor.id) {
-        return {
-          ...t,
-          lastMessage: msgText,
-          timestamp: userMsg.time,
-          messages: [...t.messages, userMsg]
-        };
-      }
-      return t;
-    });
-    
-    saveThreads(updatedThreads);
     setInput('');
     setIsTyping(true);
+
+    // Attempt to persist in database if user is logged in
+    let dbSuccess = false;
+    let activeChat = null;
+
+    if (user?.id && supabase) {
+      try {
+        activeChat = await findOrCreateChat(selectedVendor);
+        if (activeChat) {
+          const { error: msgErr } = await supabase
+            .from('chat_messages')
+            .insert([{
+              chat_id: activeChat.id,
+              sender: 'user',
+              text: msgText
+            }]);
+            
+          if (!msgErr) {
+            await supabase
+              .from('chats')
+              .update({
+                last_message: msgText,
+                timestamp: userMsg.time
+              })
+              .eq('id', activeChat.id);
+              
+            dbSuccess = true;
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ Supabase message save failed, falling back to local:', err);
+      }
+    }
+
+    // Fallback: if DB save was not successful, update state locally
+    if (!dbSuccess) {
+      const updatedThreads = chatThreads.map(t => {
+        if (t.vendorId === selectedVendor.id) {
+          return {
+            ...t,
+            lastMessage: msgText,
+            timestamp: userMsg.time,
+            messages: [...t.messages, userMsg]
+          };
+        }
+        return t;
+      });
+      saveThreads(updatedThreads);
+    }
     
     // Simulated reply from the vendor
-    setTimeout(() => {
+    setTimeout(async () => {
       let replyText = "";
       const lower = msgText.toLowerCase();
       const cat = (selectedVendor.category || '').toLowerCase();
@@ -229,20 +458,49 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
         sender: 'vendor',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
-      
-      updatedThreads = chatThreads.map(t => {
-        if (t.vendorId === selectedVendor.id) {
-          return {
-            ...t,
-            lastMessage: replyText,
-            timestamp: vendorReply.time,
-            messages: [...t.messages, vendorReply]
-          };
+
+      let vendorDbSuccess = false;
+      if (dbSuccess && activeChat && supabase) {
+        try {
+          const { error: replyErr } = await supabase
+            .from('chat_messages')
+            .insert([{
+              chat_id: activeChat.id,
+              sender: 'vendor',
+              text: replyText
+            }]);
+
+          if (!replyErr) {
+            await supabase
+              .from('chats')
+              .update({
+                last_message: replyText,
+                timestamp: vendorReply.time
+              })
+              .eq('id', activeChat.id);
+              
+            vendorDbSuccess = true;
+          }
+        } catch (err) {
+          console.warn('⚠️ Supabase vendor reply save failed, falling back to local:', err);
         }
-        return t;
-      });
+      }
+
+      if (!vendorDbSuccess) {
+        const updatedThreads = chatThreads.map(t => {
+          if (t.vendorId === selectedVendor.id) {
+            return {
+              ...t,
+              lastMessage: replyText,
+              timestamp: vendorReply.time,
+              messages: [...t.messages, vendorReply]
+            };
+          }
+          return t;
+        });
+        saveThreads(updatedThreads);
+      }
       
-      saveThreads(updatedThreads);
       setIsTyping(false);
     }, 1200);
   };
@@ -286,7 +544,7 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
                       <Bot size={20} color="white" />
                     </div>
                     <div>
-                      <h3>Passwala Assistant</h3>
+                      <h3>Passwala Help Bot</h3>
                       <span>Online • Ready to help</span>
                     </div>
                   </>
@@ -314,7 +572,7 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
                     fontSize: '0.85rem'
                   }}
                 >
-                  Passwala AI
+                  Passwala Help Bot
                 </button>
                 <button 
                   onClick={() => setActiveTab('CHATS')}
@@ -352,7 +610,7 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
                     <div className="message-wrapper ai">
                       <div className="message-bubble typing">
                         <Loader2 size={16} className="animate-spin" /> 
-                        <span>Passwala AI is thinking...</span>
+                        <span>Passwala Help Bot is thinking...</span>
                       </div>
                     </div>
                   )}
@@ -361,7 +619,7 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
                 <div className="ai-chat-input">
                   <input 
                     type="text" 
-                    placeholder="Ask AI anything..." 
+                    placeholder="Ask Help Bot anything..." 
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSend()}

@@ -27,5 +27,8 @@ dist-ssr
 *.sw?
 
 # Scratch logs/dumps
-scratch/*.txt
+scratch/
+
+# Agent Configuration Directories
+.antigravitycli/
 

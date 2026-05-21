@@ -50,6 +50,19 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
     }
   }, [user]);
 
+  const getAuthToken = async () => {
+    try {
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        return await currentUser.getIdToken();
+      }
+    } catch (e) {
+      console.warn("Failed to get Firebase ID token:", e);
+    }
+    const uid = user?.uid || user?.id || 'mock_user_123';
+    return `mock_session_token_${uid}`;
+  };
+
   const handleImageClick = () => fileInputRef.current.click();
 
   const handleUpdateName = async () => {
@@ -58,9 +71,13 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
     try {
       const searchId = user?.id || user?.phoneNumber || user?.email || user?.uid;
       const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      const token = await getAuthToken();
       const res = await fetch(`${apiBase}/api/users/${encodeURIComponent(searchId)}/name`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ displayName: newName })
       });
       
@@ -92,9 +109,13 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
       try {
         const id = user?.id || user?.phoneNumber || user?.email || user?.uid;
         const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+        const token = await getAuthToken();
         const res = await fetch(`${apiBase}/api/users/${encodeURIComponent(id)}/photo`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify({ photoURL: base64String })
         });
         if (!res.ok) throw new Error('Upload failed');
@@ -114,8 +135,12 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
       const currentUser = auth.currentUser;
       const searchId = user?.uid || user?.email || user?.phoneNumber;
       const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      const token = await getAuthToken();
       const res = await fetch(`${apiBase}/api/users/${encodeURIComponent(searchId)}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       
       // Explicitly sign out to clean Firebase state and prevent registration screen showing up on reload

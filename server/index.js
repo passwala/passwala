@@ -6,6 +6,8 @@ import userRoutes from './routes/users.js';
 import vendorRoutes from './routes/vendor.js';
 import adminRoutes from './routes/admin.js';
 import ridersRoutes from './routes/riders.js';
+import orderRoutes from './routes/orders.js';
+import { apiLimiter } from './utils/rateLimiter.js';
 
 dotenv.config();
 
@@ -67,10 +69,14 @@ app.get('/', (req, res) => {
 
 app.get('/health', (req, res) => res.json({ status: 'healthy', database: 'connected' }));
 
+// Apply Global Rate Limiting to all /api endpoints
+app.use('/api', apiLimiter);
+
 app.use('/api/users', userRoutes);
 app.use('/api/vendor', vendorRoutes);
 app.use('/api/riders', ridersRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/orders', orderRoutes);
 
 app.get('/api/route', async (req, res) => {
   try {

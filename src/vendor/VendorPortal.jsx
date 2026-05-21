@@ -1,5 +1,5 @@
-/* eslint-disable */
 import React, { useState, useEffect } from 'react';
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { 
@@ -81,7 +81,7 @@ const VendorPortal = ({ user, onLogout }) => {
     localStorage.setItem('vBusinessType', businessType);
     localStorage.setItem('vFormData', JSON.stringify(formData));
   }, [onboardingSubStep, businessType, formData]);
-  const [bankData, setBankData] = useState({ account_no: '', ifsc: '', holder_name: '' });
+
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editFormData, setEditFormData] = useState({});
   const [isUpdating, setIsUpdating] = useState(false);
@@ -197,6 +197,7 @@ const VendorPortal = ({ user, onLogout }) => {
         supabase.removeChannel(channel);
       };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appStatus, vendorData?.id, businessType]);
 
   useEffect(() => {
@@ -212,6 +213,7 @@ const VendorPortal = ({ user, onLogout }) => {
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const checkVendorStatus = async () => {
@@ -1092,6 +1094,10 @@ const VendorPortal = ({ user, onLogout }) => {
                     const { data: existingUser } = await supabase.from('users').select('id').eq('phone', currentPhone).maybeSingle();
                     if (existingUser) {
                       userId = existingUser.id;
+                      // Update existing user role to VENDOR or SERVICE_PROVIDER
+                      await supabase.from('users').update({
+                        role: businessType === 'shop' ? 'VENDOR' : 'SERVICE_PROVIDER'
+                      }).eq('id', existingUser.id);
                     } else {
                       // Create user in the users table
                       const { data: newUser, error: newUserErr } = await supabase.from('users').insert([{

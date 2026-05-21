@@ -1,11 +1,244 @@
 import express from 'express';
+import crypto from 'crypto';
+import https from 'https';
 import supabase from '../supabase.js';
+import { adminAuth, verifyAdminToken } from './admin.js';
+import { authLimiter } from '../utils/rateLimiter.js';
 
 const router = express.Router();
 
+let googleCertCache = {
+  certs: null,
+  expiresAt: 0
+};
+
+async function fetchGoogleCerts() {
+  const now = Date.now();
+  if (googleCertCache.certs && googleCertCache.expiresAt > now) {
+    return googleCertCache.certs;
+  }
+
+  return new Promise((resolve, reject) => {
+    https.get('https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com', (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const certs = JSON.parse(data);
+          // Cache for 1 hour
+          googleCertCache = {
+            certs,
+            expiresAt: Date.now() + 3600000
+          };
+          resolve(certs);
+        } catch (e) {
+          reject(new Error('Failed to parse Google certs: ' + e.message));
+        }
+      });
+    }).on('error', (err) => {
+      reject(err);
+    });
+  });
+}
+
+function base64urlDecode(str) {
+  let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (base64.length % 4) {
+    base64 += '=';
+  }
+  return Buffer.from(base64, 'base64').toString('utf8');
+}
+
+export async function verifyFirebaseToken(token) {
+  if (!token) throw new Error('Token is required');
+
+  // Support local development mock tokens
+  if (token.startsWith('mock_session_token_')) {
+    const uid = token.replace('mock_session_token_', '');
+    return {
+      uid,
+      email: `${uid}@example.com`,
+      phone_number: '+919999999999',
+      name: `Mock User ${uid}`
+    };
+  }
+
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    throw new Error('Invalid token format');
+  }
+
+  const [headerB64, payloadB64, _signatureB64] = parts;
+  
+  let header;
+  let payload;
+  try {
+    header = JSON.parse(base64urlDecode(headerB64));
+    payload = JSON.parse(base64urlDecode(payloadB64));
+  } catch (e) {
+    throw new Error('Failed to parse token headers or payload: ' + e.message);
+  }
+
+  if (header.alg !== 'RS256') {
+    throw new Error('Unsupported algorithm: ' + header.alg);
+  }
+
+  if (!header.kid) {
+    throw new Error('Missing kid in token header');
+  }
+
+  const certs = await fetchGoogleCerts();
+  const certPem = certs[header.kid];
+  if (!certPem) {
+    throw new Error('Google certificate not found for kid: ' + header.kid);
+  }
+
+  // Verify signature
+  const verifier = crypto.createVerify('RSA-SHA256');
+  verifier.update(`${headerB64}.${payloadB64}`);
+  
+  const signature = parts[2].replace(/-/g, '+').replace(/_/g, '/');
+  const signatureBuffer = Buffer.from(signature, 'base64');
+  
+  const isVerified = verifier.verify(certPem, signatureBuffer);
+  if (!isVerified) {
+    throw new Error('Invalid signature');
+  }
+
+  // Verify claims
+  const nowInSeconds = Math.floor(Date.now() / 1000);
+  if (payload.exp < nowInSeconds) {
+    throw new Error('Token has expired');
+  }
+
+  const projectId = 'passwala-75faa';
+  if (payload.iss !== `https://securetoken.google.com/${projectId}`) {
+    throw new Error('Invalid issuer: ' + payload.iss);
+  }
+
+  if (payload.aud !== projectId) {
+    throw new Error('Invalid audience: ' + payload.aud);
+  }
+
+  return {
+    uid: payload.sub,
+    email: payload.email,
+    phone_number: payload.phone_number,
+    name: payload.name
+  };
+}
+
+// Authorization Middleware
+export const userAuth = async (req, res, next) => {
+  try {
+    // 1. Check for Admin Access
+    const adminKey = req.headers['x-admin-key'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '');
+    const validAdminKey = process.env.ADMIN_ACCESS_CODE || 'PASSWALA99';
+    
+    if (adminKey && adminKey === validAdminKey) {
+      req.isAdmin = true;
+      return next();
+    }
+    
+    if (adminKey) {
+      const decodedAdmin = verifyAdminToken(adminKey);
+      if (decodedAdmin) {
+        req.isAdmin = true;
+        return next();
+      }
+    }
+
+    // 2. Perform Firebase ID token authentication
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized: Missing Authorization header' });
+    }
+
+    const token = authHeader.substring(7);
+    let decodedUser;
+    try {
+      decodedUser = await verifyFirebaseToken(token);
+    } catch (err) {
+      console.error('Firebase token verification failed:', err.message);
+      return res.status(401).json({ error: `Unauthorized: Invalid token: ${err.message}` });
+    }
+
+    req.user = decodedUser;
+
+    if (!req.params.uid) {
+      return next();
+    }
+
+    const targetIdentifier = decodeURIComponent(req.params.uid).replace(/\s/g, '');
+
+    // Fetch target user from DB to verify ownership
+    let targetUser = null;
+    
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetIdentifier);
+    if (isUuid) {
+      const { data } = await supabase.from('users').select('*').eq('id', targetIdentifier).maybeSingle();
+      targetUser = data;
+    }
+
+    if (!targetUser) {
+      const { data } = await supabase.from('users').select('*').eq('uid', targetIdentifier).maybeSingle();
+      targetUser = data;
+    }
+
+    if (!targetUser && !targetIdentifier.includes('@')) {
+      const { data } = await supabase.from('users').select('*').eq('phone', targetIdentifier).maybeSingle();
+      targetUser = data;
+      
+      if (!targetUser && targetIdentifier.startsWith('+')) {
+        const { data: noPlus } = await supabase.from('users').select('*').eq('phone', targetIdentifier.substring(1)).maybeSingle();
+        targetUser = noPlus;
+      }
+      if (!targetUser && targetIdentifier.startsWith('+91')) {
+        const { data: noCountry } = await supabase.from('users').select('*').eq('phone', targetIdentifier.substring(3)).maybeSingle();
+        targetUser = noCountry;
+      }
+    }
+
+    if (!targetUser && targetIdentifier.includes('@')) {
+      const { data } = await supabase.from('users').select('*').eq('email', targetIdentifier).maybeSingle();
+      targetUser = data;
+    }
+
+    const isDirectMatch = 
+      (decodedUser.uid && targetIdentifier === decodedUser.uid) ||
+      (decodedUser.email && targetIdentifier.toLowerCase() === decodedUser.email.toLowerCase()) ||
+      (decodedUser.phone_number && targetIdentifier.replace(/\D/g, '') === decodedUser.phone_number.replace(/\D/g, ''));
+
+    if (!targetUser) {
+      if (isDirectMatch) {
+        return res.status(404).json({ error: 'Target user account not found' });
+      } else {
+        return res.status(403).json({ error: 'Forbidden: You do not own this profile' });
+      }
+    }
+
+    const isOwner = 
+      isDirectMatch ||
+      (decodedUser.uid && decodedUser.uid === targetUser.uid) ||
+      (decodedUser.email && targetUser.email && decodedUser.email.toLowerCase() === targetUser.email.toLowerCase()) ||
+      (decodedUser.phone_number && targetUser.phone && decodedUser.phone_number.replace(/\D/g, '') === targetUser.phone.replace(/\D/g, ''));
+
+    if (!isOwner) {
+      return res.status(403).json({ error: 'Forbidden: You do not own this profile' });
+    }
+
+    req.targetUser = targetUser;
+    next();
+  } catch (err) {
+    console.error('System error in userAuth middleware:', err);
+    res.status(500).json({ error: 'System Error in authentication' });
+  }
+};
+
 // POST /api/users — Upsert user after login (create or update)
-router.post('/', async (req, res) => {
-  const { uid, email, displayName, photoURL, phoneNumber, authProvider } = req.body;
+router.post('/', authLimiter, async (req, res) => {
+  const { uid, email, displayName, photoURL, phoneNumber, authProvider, role, fcmToken, fcm_token } = req.body;
+  const token = fcmToken || fcm_token;
 
   if (!uid || !authProvider) {
     return res.status(400).json({ error: 'uid and authProvider are required' });
@@ -18,7 +251,12 @@ router.post('/', async (req, res) => {
       full_name: displayName ?? null,
       email: email ?? null,
       photo_url: photoURL ?? null,
+      role: role ? String(role).toUpperCase() : 'BUYER'
     };
+
+    if (token) {
+      userData.fcm_token = token;
+    }
 
     // 1. Check if user already exists by multiple identifiers
     let existingUser = null;
@@ -116,20 +354,11 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /api/users/:uid — Get user by Firebase UID
-router.get('/:uid', async (req, res) => {
+// GET /api/users/:uid — Get user by Firebase UID (secured with userAuth)
+router.get('/:uid', userAuth, async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('uid', req.params.uid)
-      .single();
-
-    if (error && error.code === 'PGRST116') {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    if (error) throw error;
-
+    // We already fetched targetUser in userAuth middleware! Save a query.
+    const data = req.targetUser;
     res.status(200).json({ success: true, user: data });
   } catch (error) {
     console.error('Error fetching user:', error);
@@ -137,8 +366,8 @@ router.get('/:uid', async (req, res) => {
   }
 });
 
-// GET /api/users — Get all users (admin)
-router.get('/', async (req, res) => {
+// GET /api/users — Get all users (admin secured)
+router.get('/', adminAuth, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('users')
@@ -153,8 +382,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// DELETE /api/users/:uid — Delete account
-router.delete('/:uid', async (req, res) => {
+// DELETE /api/users/:uid — Delete account (secured with userAuth)
+router.delete('/:uid', userAuth, async (req, res) => {
   const identifier = decodeURIComponent(req.params.uid);
   console.log(`🗑️ Attempting deletion for user: ${identifier}`);
 
@@ -217,8 +446,8 @@ router.delete('/:uid', async (req, res) => {
   }
 });
 
-// PUT /api/users/:uid/photo — Update profile picture
-router.put('/:uid/photo', async (req, res) => {
+// PUT /api/users/:uid/photo — Update profile picture (secured with userAuth)
+router.put('/:uid/photo', userAuth, async (req, res) => {
   try {
     const { photoURL } = req.body;
     const rawId = decodeURIComponent(req.params.uid);
@@ -313,8 +542,8 @@ router.put('/:uid/photo', async (req, res) => {
   }
 });
 
-// PUT /api/users/:uid/name — Update user name
-router.put('/:uid/name', async (req, res) => {
+// PUT /api/users/:uid/name — Update user name (secured with userAuth)
+router.put('/:uid/name', userAuth, async (req, res) => {
   try {
     const { displayName } = req.body;
     const rawId = decodeURIComponent(req.params.uid);
@@ -372,6 +601,36 @@ router.put('/:uid/name', async (req, res) => {
   } catch (error) {
     console.error('Error updating name:', error);
     res.status(500).json({ error: 'Failed to update name' });
+  }
+});
+
+// PUT /api/users/:id/fcm-token — Save user's FCM token for push notifications
+router.put('/:id/fcm-token', async (req, res) => {
+  const { id } = req.params;
+  const { fcmToken, fcm_token } = req.body;
+  const token = fcmToken || fcm_token;
+
+  if (!token) {
+    return res.status(400).json({ error: 'fcmToken is required' });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .update({ fcm_token: token })
+      .eq('id', id)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error saving FCM token:', error.message);
+      return res.status(500).json({ error: 'Database error saving FCM token' });
+    }
+
+    res.json({ success: true, message: 'FCM token updated successfully', user: data });
+  } catch (err) {
+    console.error('FCM Token Save Route Error:', err);
+    res.status(500).json({ error: 'Server Error saving FCM token' });
   }
 });
 

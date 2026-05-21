@@ -31,10 +31,12 @@ export const CartProvider = ({ children, user }) => {
     }
   }, [user]);
 
-  // Sync cart to Supabase on change
+  // Sync cart to Supabase on change (debounced to avoid rapid DB writes)
   useEffect(() => {
     const userId = user?.id || user?.uid;
-    if (userId && isLoaded) {
+    if (!userId || !isLoaded) return;
+
+    const timer = setTimeout(() => {
       const syncCart = async () => {
         if (cartItems.length === 0) {
           await supabase.from('carts').delete().eq('user_id', userId);
@@ -47,7 +49,9 @@ export const CartProvider = ({ children, user }) => {
         }
       };
       syncCart();
-    }
+    }, 800);
+
+    return () => clearTimeout(timer);
   }, [cartItems, user, isLoaded]);
 
   const addToCart = (item) => {
