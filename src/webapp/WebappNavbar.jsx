@@ -26,14 +26,14 @@ const WebappNavbar = ({ user, onOpenProfile, onBack, title, location }) => {
       <div className="navbar-top-main">
         <div className="navbar-left">
           {onBack && (
-            <button className="nav-back-btn" onClick={onBack}>
-               <ArrowLeft size={22} />
+            <button className="nav-back-btn" onClick={onBack} aria-label="Go back">
+               <ArrowLeft size={20} />
             </button>
           )}
           
           {!title ? (
             <div className="webapp-brand-group-v3">
-              <img src="/logo.png" alt="Passwala" className="navbar-logo-v3" style={{ width: '40px', height: '40px' }} />
+              <img src="/logo.png" alt="Passwala" className="navbar-logo-v3" />
               <div className="brand-text-stack">
                  <span className="brand-name-navy mobile-hide-text">Passwala</span>
                  <div 

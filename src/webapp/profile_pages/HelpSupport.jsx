@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ArrowLeft, 
   HelpCircle, 
   MessageSquare, 
   Phone, 
@@ -55,13 +54,6 @@ const HelpSupport = () => {
       exit={{ opacity: 0, x: -20 }}
       className="profile-sub-page"
     >
-      <header className="sub-page-header">
-        <button className="back-btn-profile" onClick={() => navigate('/profile')}>
-          <ArrowLeft size={20} />
-        </button>
-        <h1>Help & Support</h1>
-      </header>
-
       <main className="help-support-content">
         <div className="search-bar-help glass">
            <Search size={18} className="search-icon-help" />

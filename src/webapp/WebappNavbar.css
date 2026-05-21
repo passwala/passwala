@@ -3,15 +3,17 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 72px;
-  background: var(--bg-surface);
+  height: 60px;
+  background: var(--glass-bg);
   display: flex;
   align-items: center;
-  padding: 0 1.25rem;
+  padding: 0 1rem;
   z-index: 2000;
   box-shadow: var(--shadow-sm);
-  border-bottom: 1px solid var(--glass-border);
-  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-light);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .navbar-top-main {
@@ -19,33 +21,42 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .navbar-left {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.5rem;
   min-width: 0;
   flex: 1;
 }
 
 .navbar-title-text {
-  font-size: 1.35rem;
-  font-weight: 900;
+  font-size: 1.15rem;
+  font-weight: 800;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.3px;
+  margin: 0;
 }
 
 .webapp-brand-group-v3 {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
   max-width: 100%;
+}
+
+.navbar-logo-v3 {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .brand-text-stack {
@@ -57,26 +68,26 @@
 }
 
 .brand-name-navy {
-  font-size: 1.3rem;
-  font-weight: 900;
+  font-size: 1.15rem;
+  font-weight: 800;
   color: var(--text-primary);
-  letter-spacing: -0.5px;
-  line-height: 1;
-  margin-bottom: 2px;
+  letter-spacing: -0.3px;
+  line-height: 1.1;
+  margin-bottom: 1px;
 }
 
 .brand-tagline-location {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-secondary);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
 }
 
 .brand-tagline-location strong {
-  font-weight: 800;
+  font-weight: 700;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -96,86 +107,122 @@
 .navbar-right-actions {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.5rem;
   flex-shrink: 0;
 }
 
 .nav-action-btn-v2,
-.nav-back-btn,
 .nav-profile-trigger {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: var(--bg-card);
-  border: 1px solid var(--glass-border);
+  background: transparent;
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-secondary);
   position: relative;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   flex-shrink: 0;
 }
 
+.nav-action-btn-v2:hover,
+.nav-profile-trigger:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+  transform: scale(1.05);
+}
+
+.nav-action-btn-v2:active,
+.nav-profile-trigger:active {
+  transform: scale(0.95);
+}
+
 .nav-back-btn {
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+  margin-left: -4px;
+}
+
+.nav-back-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  transform: translateX(-2px);
+}
+
+.dark-mode .nav-back-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.nav-back-btn:active {
+  transform: translateX(-2px) scale(0.92);
 }
 
 .notif-dot {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 7px;
-  height: 7px;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
   background: #ff4d4f;
   border-radius: 50%;
-  border: 2px solid white;
+  border: 1.5px solid var(--bg-soft);
 }
 
 .nav-cart-badge {
   position: absolute;
-  top: -5px;
-  right: -5px;
+  top: -2px;
+  right: -2px;
   background: var(--primary);
   color: white;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 800;
-  min-width: 18px;
-  height: 18px;
-  border-radius: 9px;
+  min-width: 15px;
+  height: 15px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid white;
+  border: 1.5px solid var(--bg-soft);
+  padding: 1px;
 }
 
 .nav-profile-trigger img {
-  width: 100%;
-  height: 100%;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   object-fit: cover;
 }
 
 .nav-avatar-circle-v2 {
-  width: 100%;
-  height: 100%;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: rgba(255, 118, 34, 0.1);
+  background: var(--primary-light);
   color: var(--primary);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
-  font-size: 1.1rem;
+  font-size: 0.85rem;
 }
 
 /* Responsiveness */
 @media (max-width: 500px) {
   .webapp-navbar {
-    height: 64px;
-    padding: 0 0.75rem;
+    height: 56px;
+    padding: 0 0.5rem;
   }
 
   .navbar-top-main {
@@ -183,19 +230,12 @@
   }
 
   .navbar-left {
-    gap: 0.5rem;
+    gap: 0.25rem;
   }
 
   .navbar-logo-v3 {
-    width: 30px !important;
-    height: 30px !important;
-  }
-
-  .nav-action-btn-v2,
-  .nav-profile-trigger {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
+    width: 30px;
+    height: 30px;
   }
 
   .brand-name-navy {
@@ -203,31 +243,17 @@
   }
 
   .brand-tagline-location {
-    max-width: 140px; /* Increased a bit to show more city name */
+    max-width: 140px;
   }
 
   .navbar-right-actions {
-    gap: 0.4rem;
+    gap: 0.25rem;
   }
 }
 
 @media (max-width: 380px) {
-  .webapp-navbar {
-    padding: 0 0.5rem;
-  }
-  
   .brand-tagline-location {
-    max-width: 100px; /* Tighter for very small phones */
-  }
-
-  .nav-action-btn-v2,
-  .nav-profile-trigger {
-    width: 34px;
-    height: 34px;
-  }
-  
-  .navbar-right-actions {
-    gap: 0.3rem;
+    max-width: 100px;
   }
 }
 

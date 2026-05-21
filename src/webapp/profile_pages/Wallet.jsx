@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  ArrowLeft, 
   Wallet as WalletIcon, 
   Plus, 
   ChevronRight, 
@@ -75,13 +74,6 @@ const Wallet = ({ user }) => {
       exit={{ opacity: 0, x: -20 }}
       className="profile-sub-page"
     >
-      <header className="sub-page-header">
-        <button className="back-btn-profile" onClick={() => navigate('/profile')}>
-          <ArrowLeft size={20} />
-        </button>
-        <h1>Passwala Wallet</h1>
-      </header>
-
       <main className="wallet-content">
         <div className="wallet-card premium-orange-gradient">
            <div className="wallet-card-overlay"></div>

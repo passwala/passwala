@@ -298,11 +298,16 @@ const AppContent = ({
                   onOpenProfile={() => navigate('/profile')}
                   onBack={locationPath !== '/' ? () => navigate(-1) : null}
                   title={
-                    currentView === 'PROFILE' ? 'Profile' :
-                      currentView === 'NEAR_SHOPS' ? 'Near Shops' :
-                        currentView === 'EXPERT_SERVICES' ? 'Local Experts' :
-                          currentView === 'TRACKING' ? 'Active Orders' :
-                            currentView === 'NEIGHBORS' ? 'Community' : null
+                    locationPath === '/profile' ? 'Profile' :
+                      locationPath === '/near-shops' ? 'Near Shops' :
+                        locationPath === '/expert-services' ? 'Local Experts' :
+                          locationPath === '/track-orders' ? 'Active Orders' :
+                            locationPath === '/neighbors' ? 'Community' :
+                              locationPath === '/order-history' ? 'Order History' :
+                                locationPath === '/wallet' ? 'Passwala Wallet' :
+                                  locationPath === '/privacy-security' ? 'Privacy & Security' :
+                                    locationPath === '/help-support' ? 'Help & Support' :
+                                      locationPath === '/settings' ? 'Settings' : null
                   }
                 />
               )

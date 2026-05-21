@@ -2,7 +2,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { 
-  ArrowLeft, 
   ShieldCheck, 
   Lock, 
   Eye, 
@@ -78,13 +77,6 @@ const PrivacySecurity = () => {
       exit={{ opacity: 0, x: -20 }}
       className="profile-sub-page"
     >
-      <header className="sub-page-header">
-        <button className="back-btn-profile" onClick={() => navigate('/profile')}>
-          <ArrowLeft size={20} />
-        </button>
-        <h1>Privacy & Security</h1>
-      </header>
-
       <main className="privacy-security-content">
         <div className="security-banner glass">
            <ShieldAlert size={32} color="#f59e0b" />

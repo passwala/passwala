@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  ArrowLeft, 
   ShoppingBag, 
   ChevronRight, 
   Clock, 
@@ -155,13 +154,6 @@ const OrderHistory = () => {
       exit={{ opacity: 0, x: -20 }}
       className="profile-sub-page"
     >
-      <header className="sub-page-header">
-        <button className="back-btn-profile" onClick={() => navigate('/profile')}>
-          <ArrowLeft size={20} />
-        </button>
-        <h1>Order History</h1>
-      </header>
-
       <main className="sub-page-content">
         {loading ? (
           <div className="discovery-loading">
@@ -198,7 +190,7 @@ const OrderHistory = () => {
                             </span>
                          )}
                       </div>
-                      <div className="order-status-badge">
+                      <div className={`order-status-badge status-${order.status?.toLowerCase() || 'pending'}`}>
                          {getStatusIcon(order.status)}
                          <span>{order.status || 'Processing'}</span>
                       </div>

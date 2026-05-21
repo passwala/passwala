@@ -195,20 +195,20 @@
 
 /* Webapp layout structure spacing overrides */
 .webapp-main {
-  padding-top: 84px !important; /* Spacing for clean fixed navbar */
+  padding-top: 72px !important; /* Spacing for clean fixed navbar */
   padding-bottom: 104px !important; /* Space for glass bottomnav */
 }
 
 .webapp-main.profile-mode {
-  padding-top: 84px !important;
+  padding-top: 72px !important;
 }
 
 @media (max-width: 500px) {
   .webapp-main {
-    padding-top: 76px !important;
+    padding-top: 64px !important;
   }
   .webapp-main.profile-mode {
-    padding-top: 76px !important;
+    padding-top: 64px !important;
   }
 }
 

@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  ArrowLeft, 
   Settings, 
   Bell, 
   Moon, 
@@ -43,13 +42,6 @@ const AppSettings = ({ isDarkMode, onToggleTheme }) => {
       exit={{ opacity: 0, x: -20 }}
       className="profile-sub-page"
     >
-      <header className="sub-page-header">
-        <button className="back-btn-profile" onClick={() => navigate('/profile')}>
-          <ArrowLeft size={20} />
-        </button>
-        <h1>App Settings</h1>
-      </header>
-
       <main className="app-settings-content">
         <div className="section-header-compact">
            <h3>NOTIFICATIONS</h3>
