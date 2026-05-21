@@ -338,7 +338,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
         let isService = false;
         setActiveOrders(prev => {
           const matched = prev.find(o => o.id === payload.new.id);
-          if (matched && matched.items?.[0]?.type === 'service') {
+          if (matched && (matched.items?.[0]?.type === 'service' || (matched.stores && !matched.stores.vendor_id))) {
             isService = true;
           }
           return prev.map(o => {
@@ -515,13 +515,20 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
 
         return {
           ...order,
-          items: order.order_items?.map(oi => ({
-            name: oi.products?.name || serviceNamesMap[oi.product_id] || 'Service Booking',
-            type: oi.products?.type || (serviceNamesMap[oi.product_id] ? 'service' : 'essential'),
-            qty: oi.quantity,
-            price: oi.price_at_purchase,
-            store: order.stores?.name
-          })) || []
+          items: order.order_items?.map(oi => {
+            const isServiceItem = (oi.products?.type === 'service') || 
+                                  (oi.products?.description === 'Service item auto-registered') ||
+                                  (oi.products?.description?.toLowerCase().includes('service')) ||
+                                  (serviceNamesMap[oi.product_id] ? true : false) ||
+                                  (order.stores && !order.stores.vendor_id);
+            return {
+              name: oi.products?.name || serviceNamesMap[oi.product_id] || 'Service Booking',
+              type: isServiceItem ? 'service' : (oi.products?.type || 'essential'),
+              qty: oi.quantity,
+              price: oi.price_at_purchase,
+              store: order.stores?.name
+            };
+          }) || []
         };
       });
 
@@ -609,7 +616,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
           const progress = getProgress(order.status);
           const firstItem = order.items?.[0] || { name: 'Order' };
           const itemCount = order.items?.length || 0;
-          const isService = firstItem.type === 'service';
+          const isService = firstItem.type === 'service' || (order.stores && !order.stores.vendor_id);
 
           return (
             <motion.div 
@@ -622,7 +629,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
               <div className="card-top">
                  <div className="shop-info">
                     <div className="shop-logo-box">
-                       {firstItem.type === 'service' ? <Truck size={20} /> : <Package size={20} />}
+                       {isService ? <Truck size={20} /> : <Package size={20} />}
                     </div>
                      <div>
                         <h4>{firstItem.provider || firstItem.store || 'Partner'}</h4>
@@ -771,7 +778,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
             {/* Address Section */}
             <div style={{ marginBottom: '24px' }}>
               <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                {selectedOrderDetails.items?.[0]?.type === 'service' ? 'Service Address' : 'Delivery Address'}
+                {(selectedOrderDetails.items?.[0]?.type === 'service' || (selectedOrderDetails.stores && !selectedOrderDetails.stores.vendor_id)) ? 'Service Address' : 'Delivery Address'}
               </h4>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
                 <MapPin size={20} color="#4f46e5" style={{ marginTop: '2px', flexShrink: 0 }} />
