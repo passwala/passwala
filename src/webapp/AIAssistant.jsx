@@ -1,10 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, X, MessageSquare, Bot, User, Loader2 } from 'lucide-react';
+import { Send, X, MessageSquare, Bot, User, Loader2, ArrowLeft } from 'lucide-react';
 // eslint-disable-next-line no-unused-vars
 import { AnimatePresence, motion } from 'framer-motion';
 import './AIAssistant.css';
 
 const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
+  const [activeTab, setActiveTab] = useState('AI'); // 'AI' or 'CHATS'
+  const [selectedVendor, setSelectedVendor] = useState(null); // null or expert object
+  const [chatThreads, setChatThreads] = useState(() => {
+    const saved = localStorage.getItem('passwala_chat_threads');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [messages, setMessages] = useState([
     { id: 1, text: "Jai Shree Krishna! I'm your Ahmedabad Community AI. 🙏 How can I help you today? (I support Hindi, Gujarati & English)", sender: 'ai', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
   ]);
@@ -15,11 +22,63 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
   const [onboardingData, setOnboardingData] = useState({});
   const scrollRef = useRef(null);
 
+  const saveThreads = (newThreads) => {
+    setChatThreads(newThreads);
+    localStorage.setItem('passwala_chat_threads', JSON.stringify(newThreads));
+  };
+
+  useEffect(() => {
+    const handleOpenChatEvent = (e) => {
+      const expert = e.detail?.expert;
+      if (expert) {
+        // Switch to CHATS tab and select this vendor
+        setActiveTab('CHATS');
+        setSelectedVendor(expert);
+        
+        // Find or create chat thread
+        setChatThreads(prevThreads => {
+          const exists = prevThreads.find(t => t.vendorId === expert.id);
+          if (exists) {
+            // Put it at the beginning of the list
+            const filtered = prevThreads.filter(t => t.vendorId !== expert.id);
+            const updated = [exists, ...filtered];
+            localStorage.setItem('passwala_chat_threads', JSON.stringify(updated));
+            return updated;
+          }
+          const newThread = {
+            vendorId: expert.id,
+            vendorName: expert.name,
+            vendorTitle: expert.title || 'Expert Service',
+            vendorImage: expert.image || null,
+            category: expert.category || 'Service',
+            price: expert.price || 199,
+            providerId: expert.providerId || expert.id,
+            lastMessage: `Namaste! I am the provider from "${expert.name}". How can I help you today?`,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            messages: [
+              {
+                id: 1,
+                text: `Namaste! I am the service provider from "${expert.name}". How can I help you today with our "${expert.title}" service?`,
+                sender: 'vendor',
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              }
+            ]
+          };
+          const updated = [newThread, ...prevThreads];
+          localStorage.setItem('passwala_chat_threads', JSON.stringify(updated));
+          return updated;
+        });
+      }
+    };
+    window.addEventListener('open-ai-chat', handleOpenChatEvent);
+    return () => window.removeEventListener('open-ai-chat', handleOpenChatEvent);
+  }, []);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isTyping]);
+  }, [messages, isTyping, selectedVendor, activeTab, chatThreads]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -88,9 +147,8 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
       }
 
       // --- LANGUAGE & GENERAL ---
-
       else if (lowerInput.includes('kaise') || lowerInput.includes('baat')) {
-        aiResponse = "Main aapki sahayata kar sakti hoon! Aapko plumber chahiye ya grocery ki dukaan? Mujhe batayein.";
+        aiResponse = "Main aapki sahayta kar sakti hoon! Aapko plumber chahiye ya grocery ki dukaan? Mujhe batayein.";
       }
       else {
         aiResponse = "Passwala AI at your service! 🏙️ I can help you find groceries, book home services, or register your local business. Just ask me!";
@@ -100,6 +158,97 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
       setIsTyping(false);
     }, 1200);
   };
+
+  const handleSendVendorMessage = (text) => {
+    if (!text.trim() || !selectedVendor) return;
+    const msgText = text.trim();
+    
+    const userMsg = {
+      id: Date.now(),
+      text: msgText,
+      sender: 'user',
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    
+    // Update thread with user message
+    let updatedThreads = chatThreads.map(t => {
+      if (t.vendorId === selectedVendor.id) {
+        return {
+          ...t,
+          lastMessage: msgText,
+          timestamp: userMsg.time,
+          messages: [...t.messages, userMsg]
+        };
+      }
+      return t;
+    });
+    
+    saveThreads(updatedThreads);
+    setInput('');
+    setIsTyping(true);
+    
+    // Simulated reply from the vendor
+    setTimeout(() => {
+      let replyText = "";
+      const lower = msgText.toLowerCase();
+      const cat = (selectedVendor.category || '').toLowerCase();
+      
+      if (lower.includes('price') || lower.includes('cost') || lower.includes('charge') || lower.includes('fees') || lower.includes('fee')) {
+        replyText = `The inspection fee for "${selectedVendor.title}" is ₹${selectedVendor.price || 199}. Any additional material or repair work cost will be discussed before we begin.`;
+      } else if (lower.includes('time') || lower.includes('when') || lower.includes('schedule') || lower.includes('visit') || lower.includes('available')) {
+        replyText = `I can visit your location in Ahmedabad today. What is your preferred time slot? (e.g. 2 PM - 4 PM)`;
+      } else if (lower.includes('address') || lower.includes('location') || lower.includes('area')) {
+        replyText = `Please share your address details or landmark. I will reach there accordingly.`;
+      } else if (lower.includes('book') || lower.includes('confirm') || lower.includes('yes') || lower.includes('order')) {
+        // Trigger auto add to cart
+        window.dispatchEvent(new CustomEvent('add-to-cart-external', { detail: { 
+          id: selectedVendor.id,
+          name: selectedVendor.title,
+          price: selectedVendor.price,
+          image: selectedVendor.image,
+          type: 'service',
+          store: selectedVendor.name,
+          shop_id: selectedVendor.providerId || selectedVendor.id
+        } }));
+        replyText = `Great choice! I have added the service "${selectedVendor.title}" to your cart. Please check your cart at the top right to complete the booking!`;
+      } else {
+        if (cat.includes('ac') || cat.includes('appliance')) {
+          replyText = `I can inspect your AC today. Please let me know what specific issue you're facing (cooling issue, noise, or general service).`;
+        } else if (cat.includes('plumb')) {
+          replyText = `Got it. I have all the plumbing tools ready. Just tell me if it's a pipe leak, tap repair, or installation.`;
+        } else if (cat.includes('elect')) {
+          replyText = `Certainly! I've been doing electrical wiring, switchboard repairs, and fan installation in Ahmedabad for years. What seems to be the issue?`;
+        } else {
+          replyText = `Thanks for reaching out! Let me know when you would like me to visit, or if you want to book the "${selectedVendor.title}" service.`;
+        }
+      }
+      
+      const vendorReply = {
+        id: Date.now() + 1,
+        text: replyText,
+        sender: 'vendor',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      
+      updatedThreads = chatThreads.map(t => {
+        if (t.vendorId === selectedVendor.id) {
+          return {
+            ...t,
+            lastMessage: replyText,
+            timestamp: vendorReply.time,
+            messages: [...t.messages, vendorReply]
+          };
+        }
+        return t;
+      });
+      
+      saveThreads(updatedThreads);
+      setIsTyping(false);
+    }, 1200);
+  };
+
+  const activeThread = chatThreads.find(t => t.vendorId === selectedVendor?.id);
+  const vendorMessages = activeThread ? activeThread.messages : [];
 
   return (
     <>
@@ -111,52 +260,200 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor }) => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 100, scale: 0.8 }}
           >
+            {/* Header */}
             <div className="ai-chat-header">
               <div className="header-info">
-                <div className="bot-avatar">
-                   <Bot size={20} color="white" />
-                </div>
-                <div>
-                  <h3>Passwala AI</h3>
-                  <span>Online • Ready to help</span>
-                </div>
+                {activeTab === 'CHATS' && selectedVendor ? (
+                  <>
+                    <button className="back-chat-btn" onClick={() => setSelectedVendor(null)} style={{ marginRight: '10px', background: 'none', border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}>
+                      <ArrowLeft size={20} />
+                    </button>
+                    {selectedVendor.image ? (
+                      <img src={selectedVendor.image} alt={selectedVendor.name} className="chat-vendor-img" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', marginRight: '10px' }} />
+                    ) : (
+                      <div className="bot-avatar" style={{ background: '#f97316', width: '36px', height: '36px', marginRight: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', borderRadius: '50%' }}>
+                        {selectedVendor.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <h3 style={{ fontSize: '1rem', margin: 0 }}>{selectedVendor.name}</h3>
+                      <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>Online • Local Provider</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="bot-avatar">
+                      <Bot size={20} color="white" />
+                    </div>
+                    <div>
+                      <h3>Passwala Assistant</h3>
+                      <span>Online • Ready to help</span>
+                    </div>
+                  </>
+                )}
               </div>
-              <button className="close-chat" onClick={onClose}>
+              <button className="close-chat" onClick={onClose} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>
                 <X size={20} />
               </button>
             </div>
 
-            <div className="ai-chat-messages" ref={scrollRef}>
-              {messages.map((msg) => (
-                <div key={msg.id} className={`message-wrapper ${msg.sender}`}>
-                  <div className="message-bubble">
-                    {msg.text}
-                    <span className="message-time">{msg.time}</span>
-                  </div>
-                </div>
-              ))}
-              {isTyping && (
-                <div className="message-wrapper ai">
-                  <div className="message-bubble typing">
-                    <Loader2 size={16} className="animate-spin" /> 
-                    <span>Passwala AI is thinking...</span>
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* Tab Switched Header (Visible only when not viewing a specific chat thread) */}
+            {(!selectedVendor || activeTab === 'AI') && (
+              <div className="chat-tabs-bar" style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '5px 10px', background: '#f8fafc' }}>
+                <button 
+                  onClick={() => setActiveTab('AI')}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    border: 'none',
+                    background: 'none',
+                    fontWeight: activeTab === 'AI' ? '700' : '500',
+                    color: activeTab === 'AI' ? '#0f766e' : '#64748b',
+                    borderBottom: activeTab === 'AI' ? '2px solid #0f766e' : 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  Passwala AI
+                </button>
+                <button 
+                  onClick={() => setActiveTab('CHATS')}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    border: 'none',
+                    background: 'none',
+                    fontWeight: activeTab === 'CHATS' ? '700' : '500',
+                    color: activeTab === 'CHATS' ? '#0f766e' : '#64748b',
+                    borderBottom: activeTab === 'CHATS' ? '2px solid #0f766e' : 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  Direct Chats
+                </button>
+              </div>
+            )}
 
-            <div className="ai-chat-input">
-              <input 
-                type="text" 
-                placeholder="Ask me anything..." 
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-              />
-              <button disabled={!input.trim()} onClick={handleSend}>
-                <Send size={20} />
-              </button>
-            </div>
+            {/* Main Chat Area */}
+            {activeTab === 'AI' ? (
+              /* Passwala AI Assistant View */
+              <>
+                <div className="ai-chat-messages" ref={scrollRef}>
+                  {messages.map((msg) => (
+                    <div key={msg.id} className={`message-wrapper ${msg.sender}`}>
+                      <div className="message-bubble">
+                        {msg.text}
+                        <span className="message-time">{msg.time}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {isTyping && (
+                    <div className="message-wrapper ai">
+                      <div className="message-bubble typing">
+                        <Loader2 size={16} className="animate-spin" /> 
+                        <span>Passwala AI is thinking...</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="ai-chat-input">
+                  <input 
+                    type="text" 
+                    placeholder="Ask AI anything..." 
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+                  />
+                  <button disabled={!input.trim()} onClick={handleSend} style={{ border: 'none', cursor: 'pointer' }}>
+                    <Send size={20} />
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* Direct Vendor Chats View */
+              selectedVendor ? (
+                /* Thread View */
+                <>
+                  <div className="ai-chat-messages" ref={scrollRef}>
+                    {vendorMessages.map((msg) => (
+                      <div key={msg.id} className={`message-wrapper ${msg.sender === 'user' ? 'user' : 'ai'}`}>
+                        <div className="message-bubble" style={msg.sender === 'vendor' ? { background: '#eff6ff', color: '#1e3a8a' } : {}}>
+                          {msg.text}
+                          <span className="message-time">{msg.time}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {isTyping && (
+                      <div className="message-wrapper ai">
+                        <div className="message-bubble typing" style={{ background: '#eff6ff', color: '#1e3a8a' }}>
+                          <Loader2 size={16} className="animate-spin" /> 
+                          <span>Provider is typing...</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="ai-chat-input">
+                    <input 
+                      type="text" 
+                      placeholder="Type a message to provider..." 
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleSendVendorMessage(input)}
+                    />
+                    <button disabled={!input.trim()} onClick={() => handleSendVendorMessage(input)} style={{ border: 'none', cursor: 'pointer' }}>
+                      <Send size={20} />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                /* Threads List View */
+                <div className="chat-threads-list" style={{ flex: 1, overflowY: 'auto', background: '#f8fafc' }}>
+                  {chatThreads.length === 0 ? (
+                    <div className="empty-threads-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '20px', textAlign: 'center', color: '#64748b' }}>
+                      <MessageSquare size={48} style={{ opacity: 0.3, marginBottom: '15px' }} />
+                      <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#334155', margin: 0 }}>No direct chats yet</h4>
+                      <p style={{ fontSize: '0.8rem', marginTop: '5px', lineHeight: '1.4' }}>Click the chat button next to any service provider on the Local Experts page to start chatting with them directly!</p>
+                    </div>
+                  ) : (
+                    chatThreads.map((thread) => (
+                      <div 
+                        key={thread.vendorId} 
+                        onClick={() => setSelectedVendor({ id: thread.vendorId, name: thread.vendorName, title: thread.vendorTitle, image: thread.vendorImage, category: thread.category, price: thread.price, providerId: thread.providerId })}
+                        className="chat-thread-item"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '15px',
+                          borderBottom: '1px solid #e2e8f0',
+                          background: 'white',
+                          cursor: 'pointer',
+                          transition: 'background 0.2s'
+                        }}
+                      >
+                        {thread.vendorImage ? (
+                          <img src={thread.vendorImage} alt={thread.vendorName} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', marginRight: '12px' }} />
+                        ) : (
+                          <div style={{ background: '#f97316', width: '40px', height: '40px', marginRight: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', color: 'white', fontWeight: 'bold' }}>
+                            {thread.vendorName.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div style={{ flex: 1, overflow: 'hidden' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                            <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: '#1e293b' }}>{thread.vendorName}</h4>
+                            <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{thread.timestamp}</span>
+                          </div>
+                          <span style={{ fontSize: '0.75rem', color: '#0f766e', display: 'block', margin: '2px 0' }}>{thread.vendorTitle}</span>
+                          <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{thread.lastMessage}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )
+            )}
           </motion.div>
         )}
       </AnimatePresence>

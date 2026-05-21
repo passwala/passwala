@@ -72,6 +72,23 @@ app.use('/api/vendor', vendorRoutes);
 app.use('/api/riders', ridersRoutes);
 app.use('/api/admin', adminRoutes);
 
+app.get('/api/route', async (req, res) => {
+  try {
+    const { startLat, startLng, endLat, endLng, profile = 'driving' } = req.query;
+    if (!startLat || !startLng || !endLat || !endLng) {
+      return res.status(400).json({ error: 'Missing coordinates' });
+    }
+    const url = `http://router.project-osrm.org/route/v1/${profile}/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('OSRM API failed');
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    console.error('Routing failed:', err.message);
+    res.status(500).json({ error: 'Routing failed' });
+  }
+});
+
 // 404 Handler
 app.use((req, res) => {
   res.status(404).json({

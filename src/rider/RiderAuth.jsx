@@ -211,11 +211,15 @@ function RiderAuth({ onLogin }) {
 
       // 1. Resolve User ID (Lookup or Create)
       let resolvedUserId = null;
-      const { data: ud } = await supabase.from('users').select('id').eq('phone', phone).maybeSingle();
+      const { data: ud } = await supabase.from('users').select('id, role').eq('phone', phone).maybeSingle();
       if (ud) {
           resolvedUserId = ud.id;
+          // If they exist but don't have the RIDER role, update it to RIDER
+          if (ud.role !== 'RIDER') {
+            await supabase.from('users').update({ role: 'RIDER' }).eq('id', ud.id);
+          }
       } else {
-          const { data: newUser, error: ne } = await supabase.from('users').insert([{ phone, full_name: profile.name }]).select().single();
+          const { data: newUser, error: ne } = await supabase.from('users').insert([{ phone, full_name: profile.name, role: 'RIDER' }]).select().single();
           if (ne) throw ne;
           resolvedUserId = newUser.id;
       }

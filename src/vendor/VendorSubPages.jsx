@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { getOSRMRoute } from '../utils/dijkstra';
 
 export const ConfirmModal = ({ isOpen, title, message, confirmText, cancelText, onConfirm, onCancel, type = 'danger' }) => {
   return (
@@ -586,11 +587,65 @@ export const VendorInventory = ({ businessType, storeId }) => {
 };
 
 // Premium High-Fidelity Custom Leaflet Map Component with OSRM Turn-by-Turn Road Routing
-function VendorOrderTrackingMap({ order, riderCoords }) {
+function VendorOrderTrackingMap({ order, riderCoords, businessType }) {
   const mapRef = React.useRef(null);
   const leafletMapRef = React.useRef(null);
   const markerGroupRef = React.useRef(null);
   const [osrmRoutePoints, setOsrmRoutePoints] = React.useState([]);
+
+  // Coordinate Resolution State
+  const [storeLatLng, setStoreLatLng] = React.useState(null);
+  const [customerLatLng, setCustomerLatLng] = React.useState(null);
+
+  // Dynamic Geocoding resolver helper
+  const geocodeAddress = async (address) => {
+    if (!address) return null;
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ', Ahmedabad, Gujarat, India')}&limit=1`;
+      const res = await fetch(url, { headers: { 'User-Agent': 'Passwalaa-App' } });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.length > 0) {
+          return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+        }
+      }
+    } catch (err) {
+      console.warn('Geocoding error:', err);
+    }
+    return null;
+  };
+
+  React.useEffect(() => {
+    let active = true;
+    const resolvePositions = async () => {
+      // Resolve Store
+      let storePos = null;
+      if (order.stores?.lat && order.stores?.lng) {
+        storePos = [parseFloat(order.stores.lat), parseFloat(order.stores.lng)];
+      } else {
+        const addr = order.stores?.address || 'Ahmedabad';
+        storePos = await geocodeAddress(addr);
+        if (!storePos) storePos = [23.0305, 72.5075];
+      }
+
+      // Resolve Customer
+      let custPos = null;
+      if (order.addresses?.lat && order.addresses?.lng) {
+        custPos = [parseFloat(order.addresses.lat), parseFloat(order.addresses.lng)];
+      } else {
+        const addr = order.addresses?.address_line_1 || 'Ahmedabad';
+        custPos = await geocodeAddress(addr);
+        if (!custPos) custPos = [23.0393, 72.5244];
+      }
+
+      if (active) {
+        setStoreLatLng(storePos);
+        setCustomerLatLng(custPos);
+      }
+    };
+    resolvePositions();
+    return () => { active = false; };
+  }, [order.stores, order.addresses]);
 
   // Initialize Map
   React.useEffect(() => {
@@ -633,13 +688,7 @@ function VendorOrderTrackingMap({ order, riderCoords }) {
 
   // Fetch real-time OSRM turn-by-turn road paths dynamically
   React.useEffect(() => {
-    const storeLatLng = order.stores?.lat && order.stores?.lng
-      ? [parseFloat(order.stores.lat), parseFloat(order.stores.lng)]
-      : [23.0305, 72.5075];
-
-    const customerLatLng = order.addresses?.lat && order.addresses?.lng
-      ? [parseFloat(order.addresses.lat), parseFloat(order.addresses.lng)]
-      : [23.0393, 72.5244];
+    if (!storeLatLng || !customerLatLng) return;
 
     const riderLatLng = (riderCoords && riderCoords.lat && riderCoords.lng)
       ? [parseFloat(riderCoords.lat), parseFloat(riderCoords.lng)]
@@ -651,19 +700,18 @@ function VendorOrderTrackingMap({ order, riderCoords }) {
       const end = (order.status === 'ACCEPTED' || order.status === 'PREPARING') ? storeLatLng : customerLatLng;
 
       if (!start[0] || !start[1] || !end[0] || !end[1] || (start[0] === end[0] && start[1] === end[1])) {
-        setOsrmRoutePoints([]);
+        setTimeout(() => {
+          setOsrmRoutePoints(prev => prev.length > 0 ? [] : prev);
+        }, 0);
         return;
       }
 
       try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.routes && data.routes.length > 0) {
-            const coords = data.routes[0].geometry.coordinates.map(pt => [pt[1], pt[0]]);
-            setOsrmRoutePoints(coords);
-          }
+        const routeData = await getOSRMRoute(start[0], start[1], end[0], end[1]);
+        if (routeData.success && routeData.polyline.length > 0) {
+          setOsrmRoutePoints(routeData.polyline);
+        } else {
+          setOsrmRoutePoints([]);
         }
       } catch (err) {
         console.warn("OSRM routing fetch failed for vendor map, falling back to direct line:", err);
@@ -672,11 +720,11 @@ function VendorOrderTrackingMap({ order, riderCoords }) {
     };
 
     fetchOSRMRoute();
-  }, [order, riderCoords]);
+  }, [order.status, riderCoords, storeLatLng, customerLatLng]);
 
   // Plot and synchronize markers + dynamic route lines on changes
   React.useEffect(() => {
-    if (!leafletMapRef.current || !markerGroupRef.current) return;
+    if (!leafletMapRef.current || !markerGroupRef.current || !storeLatLng || !customerLatLng) return;
 
     markerGroupRef.current.clearLayers();
 
@@ -685,7 +733,10 @@ function VendorOrderTrackingMap({ order, riderCoords }) {
       className: 'custom-leaflet-marker rider-marker',
       html: `<div class="marker-container" style="background: #10b981; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative;">
                <span class="pulse-ring" style="position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 3px solid #10b981; animation: marker-pulse 1.8s infinite; opacity: 0.6;"></span>
-               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(45deg);"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+               ${businessType === 'service'
+                 ? `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`
+                 : `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(45deg);"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>`
+               }
              </div>`,
       iconSize: [42, 42],
       iconAnchor: [21, 21]
@@ -709,14 +760,6 @@ function VendorOrderTrackingMap({ order, riderCoords }) {
       iconAnchor: [21, 21]
     });
 
-    const storeLatLng = order.stores?.lat && order.stores?.lng
-      ? [parseFloat(order.stores.lat), parseFloat(order.stores.lng)]
-      : [23.0305, 72.5075];
-
-    const customerLatLng = order.addresses?.lat && order.addresses?.lng
-      ? [parseFloat(order.addresses.lat), parseFloat(order.addresses.lng)]
-      : [23.0393, 72.5244];
-
     let riderLatLng = (riderCoords && riderCoords.lat && riderCoords.lng)
       ? [parseFloat(riderCoords.lat), parseFloat(riderCoords.lng)]
       : null;
@@ -735,7 +778,7 @@ function VendorOrderTrackingMap({ order, riderCoords }) {
 
     // Plot Markers
     L.marker(storeLatLng, { icon: createStoreIcon() })
-      .bindPopup(`<b>Your Store Hub</b>`)
+      .bindPopup(`<b>${businessType === 'service' ? 'Your Service Hub' : 'Your Store Hub'}</b>`)
       .addTo(markerGroupRef.current);
 
     L.marker(customerLatLng, { icon: createCustomerIcon() })
@@ -744,7 +787,7 @@ function VendorOrderTrackingMap({ order, riderCoords }) {
 
     if (riderLatLng) {
       L.marker(riderLatLng, { icon: createRiderIcon() })
-        .bindPopup(`<b>Assigned Rider</b>`)
+        .bindPopup(`<b>${businessType === 'service' ? 'Assigned Expert' : 'Assigned Rider'}</b>`)
         .addTo(markerGroupRef.current);
     }
 
@@ -786,7 +829,8 @@ function VendorOrderTrackingMap({ order, riderCoords }) {
     } catch (e) {
       console.warn('Map boundary fit failed:', e);
     }
-  }, [order, riderCoords, osrmRoutePoints]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order.status, riderCoords, osrmRoutePoints, storeLatLng, customerLatLng, businessType]);
 
   return (
     <div ref={mapRef} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 1 }} />
@@ -794,7 +838,7 @@ function VendorOrderTrackingMap({ order, riderCoords }) {
 }
 
 // Map Wrapper Component to Manage isolated Supabase state per active order
-function VendorOrderMapWrapper({ order }) {
+function VendorOrderMapWrapper({ order, businessType }) {
   const [riderCoords, setRiderCoords] = React.useState(null);
 
   React.useEffect(() => {
@@ -839,12 +883,16 @@ function VendorOrderMapWrapper({ order }) {
       try {
         const { data } = await supabase
           .from('rider_locations')
-          .select('lat, lng, status')
+          .select('lat, lng, updated_at')
           .eq('rider_id', targetRiderId)
           .maybeSingle();
 
-        if (data && data.status === 'ONLINE') {
-          setRiderCoords({ lat: parseFloat(data.lat), lng: parseFloat(data.lng) });
+        if (data) {
+          const lastUpdate = new Date(data.updated_at).getTime();
+          const now = Date.now();
+          if (now - lastUpdate < 120000) { // Active in last 2 mins
+            setRiderCoords({ lat: parseFloat(data.lat), lng: parseFloat(data.lng) });
+          }
         }
       } catch (err) {
         console.warn("Error getting initial rider position:", err);
@@ -861,7 +909,9 @@ function VendorOrderMapWrapper({ order }) {
         table: 'rider_locations',
         filter: `rider_id=eq.${targetRiderId}`
       }, (payload) => {
-        if (payload.new && payload.new.status === 'ONLINE') {
+        if (payload.eventType === 'DELETE') {
+          setRiderCoords(null);
+        } else if (payload.new && payload.new.lat && payload.new.lng) {
           setRiderCoords({ lat: parseFloat(payload.new.lat), lng: parseFloat(payload.new.lng) });
         }
       })
@@ -874,20 +924,23 @@ function VendorOrderMapWrapper({ order }) {
 
   return (
     <div style={{ position: 'relative', height: '260px', borderRadius: '20px', overflow: 'hidden', border: '1px solid #e2e8f0', marginTop: '0.75rem', zIndex: 1 }}>
-      <VendorOrderTrackingMap order={order} riderCoords={riderCoords} />
+      <VendorOrderTrackingMap order={order} riderCoords={riderCoords} businessType={businessType} />
 
       {/* Floating Info Overlay */}
       <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'white', padding: '6px 12px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 10 }}>
         <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: riderCoords ? '#22c55e' : '#94a3b8', animation: riderCoords ? 'pulse 2s infinite' : 'none' }}></div>
         <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155' }}>
-          {(riderCoords || ['ACCEPTED', 'PREPARING', 'DISPATCHED', 'SHIPPED'].includes(order.status)) ? 'Rider / Order In Progress' : (order.rider_id ? 'Rider Assigned' : 'Waiting for Rider Assignment')}
+          {businessType === 'service'
+            ? ((riderCoords || ['ACCEPTED', 'PREPARING', 'DISPATCHED', 'SHIPPED'].includes(order.status)) ? 'Expert / Booking In Progress' : (order.rider_id ? 'Expert Assigned' : 'Waiting for Expert Assignment'))
+            : ((riderCoords || ['ACCEPTED', 'PREPARING', 'DISPATCHED', 'SHIPPED'].includes(order.status)) ? 'Rider / Order In Progress' : (order.rider_id ? 'Rider Assigned' : 'Waiting for Rider Assignment'))
+          }
         </span>
       </div>
     </div>
   );
 }
 
-export const VendorOrders = ({ storeId }) => {
+export const VendorOrders = ({ storeId, businessType }) => {
   const [activeTab, setActiveTab] = React.useState('active');
   const [orders, setOrders] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -900,6 +953,116 @@ export const VendorOrders = ({ storeId }) => {
     cancelText: 'Cancel',
     type: 'danger'
   });
+
+  const handleSimulateOrder = async () => {
+    const isService = businessType === 'service';
+    try {
+      toast.loading(isService ? "Simulating new test booking..." : "Simulating new test order...", { id: 'sim-order' });
+      // 1. Get an address and user from the DB
+      const { data: addrs, error: addrErr } = await supabase.from('addresses').select('id, user_id').limit(1);
+      if (addrErr || !addrs || addrs.length === 0) {
+        toast.error("Simulation failed: No addresses/users found in DB. Please create a user/address first.", { id: 'sim-order' });
+        return;
+      }
+      const addr = addrs[0];
+
+      // 2. Fetch or create a product/service to associate with this store
+      let productId = null;
+      let simulatePrice = 150;
+      
+      if (isService) {
+        // Try to find a service for this store
+        const { data: servs } = await supabase.from('services').select('id, price').eq('provider_id', storeId).limit(1);
+        if (servs && servs.length > 0) {
+          productId = servs[0].id;
+          simulatePrice = servs[0].price || 350;
+        } else {
+          // If no service exists, let's create a dummy service
+          const dummyServiceId = crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+          });
+          const { error: servErr } = await supabase.from('services').insert([{
+            id: dummyServiceId,
+            provider_id: storeId,
+            title: 'Expert AC Diagnosis & Repair',
+            price: 350,
+            description: 'Professional diagnosis and quick repair by certified technician',
+            category_id: '77777777-7777-7777-7777-222222222222',
+            duration_minutes: 60
+          }]);
+          if (!servErr) {
+            productId = dummyServiceId;
+            simulatePrice = 350;
+          } else {
+            console.error("Failed to insert dummy service:", servErr);
+          }
+        }
+      } else {
+        // Try to find a product for this store
+        const { data: prods } = await supabase.from('products').select('id, price').eq('store_id', storeId).limit(1);
+        if (prods && prods.length > 0) {
+          productId = prods[0].id;
+          simulatePrice = prods[0].price || 150;
+        } else {
+          // If no product exists, let's create a dummy product
+          const dummyProductId = crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+          });
+          const { error: prodErr } = await supabase.from('products').insert([{
+            id: dummyProductId,
+            store_id: storeId,
+            name: 'Water Delivery Test Service',
+            price: 150,
+            stock_quantity: 9999,
+            description: 'Service item auto-registered for testing'
+          }]);
+          if (!prodErr) {
+            productId = dummyProductId;
+            simulatePrice = 150;
+          } else {
+            console.error("Failed to insert dummy product:", prodErr);
+          }
+        }
+      }
+
+      // 3. Create the order
+      const { data: newOrder, error: oe } = await supabase
+        .from('orders')
+        .insert([{
+          total_amount: simulatePrice,
+          subtotal: simulatePrice,
+          status: 'PLACED',
+          delivery_fee: 0,
+          store_id: storeId,
+          user_id: addr.user_id,
+          address_id: addr.id
+        }])
+        .select()
+        .single();
+
+      if (oe) {
+        toast.error("Failed to create order record: " + oe.message, { id: 'sim-order' });
+        return;
+      }
+
+      // 4. Create order item
+      if (productId) {
+        await supabase.from('order_items').insert([{
+          order_id: newOrder.id,
+          product_id: productId,
+          quantity: 1,
+          price_at_purchase: simulatePrice
+        }]);
+      }
+
+      toast.success(isService ? "Test booking simulated successfully!" : "Test order simulated successfully!", { id: 'sim-order' });
+      fetchOrders(false);
+    } catch (err) {
+      toast.error("Simulation failed: " + err.message, { id: 'sim-order' });
+    }
+  };
 
   const fetchOrders = React.useCallback(async (isInitial = false) => {
     if (!storeId) {
@@ -922,7 +1085,87 @@ export const VendorOrders = ({ storeId }) => {
         .order('created_at', { ascending: false })
         .limit(20);
 
-      if (!error) setOrders(data || []);
+      if (!error && data) {
+        // Collect all service product_ids where products is null
+        const potentialServiceIds = [];
+        data.forEach(order => {
+          order.order_items?.forEach(oi => {
+            if (!oi.products?.name && oi.product_id) {
+              potentialServiceIds.push(oi.product_id);
+            }
+          });
+        });
+
+        if (potentialServiceIds.length > 0) {
+          try {
+            const { data: servicesData } = await supabase
+              .from('services')
+              .select('id, title')
+              .in('id', potentialServiceIds);
+            
+            if (servicesData) {
+              const serviceMap = {};
+              servicesData.forEach(s => {
+                serviceMap[s.id] = s.title;
+              });
+
+              // Map it back to the data structure
+              data.forEach(order => {
+                order.order_items?.forEach(oi => {
+                  if (!oi.products?.name && serviceMap[oi.product_id]) {
+                    oi.products = {
+                      ...oi.products,
+                      name: serviceMap[oi.product_id]
+                    };
+                  }
+                });
+              });
+            }
+          } catch (servErr) {
+            console.warn("Could not load service titles for vendor:", servErr);
+          }
+        }
+
+        // Normalize/parse addresses to resolve "Geo-location Pending" issues
+        data.forEach(order => {
+          if (!order.addresses) {
+            order.addresses = {
+              id: 'fallback-addr',
+              address_line_1: 'Thaltej, Ahmedabad',
+              city: 'Ahmedabad',
+              state: 'Gujarat',
+              pincode: '380054',
+              society: 'Thaltej, Ahmedabad',
+              lat: 23.0753,
+              lng: 72.5244
+            };
+          } else {
+            // Parse society dynamically from address_line_1 if not present
+            if (!order.addresses.society || order.addresses.society.toLowerCase() === 'ahmedabad') {
+              if (order.addresses.address_line_1 && order.addresses.address_line_1 !== 'Geo-location Pending') {
+                const parts = order.addresses.address_line_1.split(',').map(p => p.trim());
+                const lastPart = parts[parts.length - 1] || '';
+                if (lastPart.toLowerCase() === 'ahmedabad') {
+                  order.addresses.society = parts[parts.length - 2] || parts[0] || 'Thaltej';
+                } else {
+                  order.addresses.society = lastPart || 'Thaltej';
+                }
+              } else {
+                order.addresses.address_line_1 = 'Thaltej, Ahmedabad';
+                order.addresses.society = 'Thaltej';
+              }
+            }
+            if (!order.addresses.lat || !order.addresses.lng) {
+              order.addresses.lat = 23.0753;
+              order.addresses.lng = 72.5244;
+            }
+          }
+        });
+
+        setOrders(data);
+      } else if (!error) {
+        setOrders([]);
+      }
     } catch (err) {
       console.error("Order fetch failed:", err);
     } finally {
@@ -991,19 +1234,52 @@ export const VendorOrders = ({ storeId }) => {
   }, [orders]);
 
   const updateStatus = async (orderId, newStatus) => {
-    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
-    if (!error) {
-      // Background refresh will handle the UI update via Supabase Realtime
+    const isService = businessType === 'service';
+    const toastId = toast.loading(isService ? "Updating booking status..." : "Updating order status...");
+    const isValidUuid = (id) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
+    try {
+      const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
+      if (error) throw error;
+
+      if (isService) {
+        const orderObj = orders.find(o => o.id === orderId);
+        if (orderObj && isValidUuid(storeId)) {
+          const serviceItem = orderObj.order_items?.find(item => item.product_id);
+          const serviceId = serviceItem ? serviceItem.product_id : null;
+
+          let query = supabase
+            .from('service_bookings')
+            .update({ status: newStatus })
+            .eq('user_id', orderObj.user_id)
+            .eq('provider_id', storeId);
+
+          if (serviceId && isValidUuid(serviceId)) {
+            query = query.eq('service_id', serviceId);
+          }
+
+          const { error: bookingErr } = await query;
+          if (bookingErr) {
+            console.warn("Could not sync status to service_bookings:", bookingErr.message);
+          }
+        }
+      }
+
+      toast.success(isService ? "Booking updated successfully!" : "Order updated successfully!", { id: toastId });
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+      fetchOrders(false);
+    } catch (err) {
+      toast.error("Failed to update status: " + err.message, { id: toastId });
     }
   };
 
   const getStatusStyle = (status) => {
+    const isService = businessType === 'service';
     switch (status) {
-      case 'PLACED': return { bg: '#fff7ed', text: '#f97316', dot: '#f97316', label: 'New Order', icon: <Bell size={14} /> };
-      case 'ACCEPTED': return { bg: '#e0f2fe', text: '#0ea5e9', dot: '#0ea5e9', label: 'Rider Accepted', icon: <CheckCircle size={14} /> };
-      case 'PREPARING': return { bg: '#eff6ff', text: '#3b82f6', dot: '#3b82f6', label: 'In Progress', icon: <Clock size={14} /> };
-      case 'SHIPPED': return { bg: '#faf5ff', text: '#a855f7', dot: '#a855f7', label: 'Out for Delivery', icon: <MapPin size={14} /> };
-      case 'DELIVERED': return { bg: '#f0fdf4', text: '#22c55e', dot: '#22c55e', label: 'Completed', icon: <CheckCircle size={14} /> };
+      case 'PLACED': return { bg: '#fff7ed', text: '#f97316', dot: '#f97316', label: isService ? 'New Booking' : 'New Order', icon: <Bell size={14} /> };
+      case 'ACCEPTED': return { bg: '#e0f2fe', text: '#0ea5e9', dot: '#0ea5e9', label: isService ? 'Expert Assigned' : 'Rider Accepted', icon: <CheckCircle size={14} /> };
+      case 'PREPARING': return { bg: '#eff6ff', text: '#3b82f6', dot: '#3b82f6', label: isService ? 'Expert Preparing' : 'In Progress', icon: <Clock size={14} /> };
+      case 'SHIPPED': return { bg: '#faf5ff', text: '#a855f7', dot: '#a855f7', label: isService ? 'Expert En Route' : 'Out for Delivery', icon: <MapPin size={14} /> };
+      case 'DELIVERED': return { bg: '#f0fdf4', text: '#22c55e', dot: '#22c55e', label: isService ? 'Service Completed' : 'Completed', icon: <CheckCircle size={14} /> };
       default: return { bg: '#f1f5f9', text: '#64748b', dot: '#64748b', label: status, icon: <FileText size={14} /> };
     }
   };
@@ -1028,8 +1304,8 @@ export const VendorOrders = ({ storeId }) => {
             </div>
             <span className="v-hero-badge-text" style={{ color: '#ef4444' }}>Fulfillment Dashboard</span>
           </div>
-          <h1 className="v-hero-title">Live Orders</h1>
-          <p className="v-hero-subtitle">Real-time tracking and operational control for your store</p>
+          <h1 className="v-hero-title">{businessType === 'service' ? 'Live Bookings' : 'Live Orders'}</h1>
+          <p className="v-hero-subtitle">{businessType === 'service' ? 'Real-time tracking and operational control for your services' : 'Real-time tracking and operational control for your store'}</p>
         </div>
       </div>
 
@@ -1041,7 +1317,7 @@ export const VendorOrders = ({ storeId }) => {
             className={`v-tab-btn ${activeTab === tab ? 'active' : ''}`}
             style={{ padding: '12px 32px' }}
           >
-            {tab === 'active' ? 'Ongoing Missions' : 'Past Records'}
+            {tab === 'active' ? (businessType === 'service' ? 'Ongoing Bookings' : 'Ongoing Missions') : 'Past Records'}
           </button>
         ))}
       </div>
@@ -1049,6 +1325,7 @@ export const VendorOrders = ({ storeId }) => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {orders.filter(o => activeTab === 'active' ? o.status !== 'DELIVERED' : o.status === 'DELIVERED').map((order, i) => {
           const style = getStatusStyle(order.status);
+          const isService = businessType === 'service';
           return (
             <motion.div
               initial={{ opacity: 0, x: -20 }}
@@ -1063,7 +1340,7 @@ export const VendorOrders = ({ storeId }) => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                    <span style={{ fontWeight: 950, color: '#0f172a', fontSize: '1.25rem', letterSpacing: '-0.5px' }}>#ORD-{order.id.substring(0, 8).toUpperCase()}</span>
+                    <span style={{ fontWeight: 950, color: '#0f172a', fontSize: '1.25rem', letterSpacing: '-0.5px' }}>#{isService ? 'BKG' : 'ORD'}-{order.id.substring(0, 8).toUpperCase()}</span>
                     {['PLACED', 'ACCEPTED'].includes(order.status) && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#fef2f2', color: '#ef4444', padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 900 }}>
                         <div className="v-pulse-dot" style={{ background: '#ef4444' }}></div>
@@ -1084,9 +1361,9 @@ export const VendorOrders = ({ storeId }) => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '3rem', marginBottom: '2rem', alignItems: 'center' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3rem', marginBottom: '2rem', alignItems: 'center' }}>
                 <div>
-                  <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Customer Entity</p>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{isService ? 'Customer Profile' : 'Customer Entity'}</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ width: '40px', height: '40px', background: '#f8fafc', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#475569', border: '1px solid #e2e8f0' }}>
                       {(order.users?.full_name || 'U').charAt(0)}
@@ -1099,24 +1376,16 @@ export const VendorOrders = ({ storeId }) => {
                 </div>
 
                 <div>
-                  <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Destination Node</p>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{isService ? 'Service Address' : 'Destination Node'}</p>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', color: '#1e293b' }}>
                     <MapPin size={18} color="var(--v-primary)" style={{ marginTop: '2px', flexShrink: 0 }} />
                     <span style={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.4 }}>{order.addresses?.society || 'Geo-location Pending'}</span>
                   </div>
                 </div>
-
-                <div style={{ textAlign: 'right', paddingLeft: '2rem', borderLeft: '1px solid #f1f5f9' }}>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Payout Value</p>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', justifyContent: 'flex-end' }}>
-                    <span style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>₹</span>
-                    <span style={{ fontSize: '2rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-1px' }}>{order.total_amount}</span>
-                  </div>
-                </div>
               </div>
 
               <div style={{ background: '#f8fafc', borderRadius: '20px', padding: '1.5rem', marginBottom: '2rem', border: '1px solid #f1f5f9' }}>
-                <p style={{ margin: '0 0 12px 0', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase' }}>Inventory Manifest</p>
+                <p style={{ margin: '0 0 12px 0', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase' }}>{isService ? 'Booked Services' : 'Inventory Manifest'}</p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                   {order.order_items?.map((item, idx) => (
                     <div key={idx} style={{ background: 'white', border: '1px solid #e2e8f0', padding: '6px 14px', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
@@ -1129,13 +1398,13 @@ export const VendorOrders = ({ storeId }) => {
 
               {activeTab === 'active' && ['PLACED', 'PREPARING', 'SHIPPED', 'DISPATCHED'].includes(order.status) && (
                 <div style={{ marginBottom: '2rem' }}>
-                  <p style={{ margin: '0 0 8px 0', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase' }}>Rider Delivery Path & Live Tracking</p>
-                  <VendorOrderMapWrapper order={order} />
+                  <p style={{ margin: '0 0 8px 0', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase' }}>{isService ? 'Expert Location & Live Tracking' : 'Rider Delivery Path & Live Tracking'}</p>
+                  <VendorOrderMapWrapper order={order} businessType={businessType} />
                 </div>
               )}
 
               <div style={{ display: 'flex', gap: '1.25rem' }}>
-                {['PLACED', 'ACCEPTED'].includes(order.status) && (
+                {order.status === 'PLACED' && (
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
@@ -1143,7 +1412,18 @@ export const VendorOrders = ({ storeId }) => {
                     className="v-btn-primary"
                     style={{ flex: 1, padding: '16px' }}
                   >
-                    Initiate Fulfillment
+                    {isService ? 'Confirm Booking' : 'Confirm Order'}
+                  </motion.button>
+                )}
+                {order.status === 'ACCEPTED' && (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => updateStatus(order.id, 'PREPARING')}
+                    className="v-btn-primary"
+                    style={{ flex: 1, padding: '16px' }}
+                  >
+                    {isService ? 'Initiate Service' : 'Initiate Fulfillment'}
                   </motion.button>
                 )}
                 {order.status === 'PREPARING' && (
@@ -1154,17 +1434,30 @@ export const VendorOrders = ({ storeId }) => {
                     className="v-btn-primary"
                     style={{ flex: 1, padding: '16px', background: '#16a34a', boxShadow: '0 10px 25px rgba(22, 163, 74, 0.2)' }}
                   >
-                    Confirm Ready for Pickup
+                    {isService ? 'Dispatch Expert' : 'Confirm Ready for Pickup'}
                   </motion.button>
                 )}
-                {['PLACED', 'ACCEPTED', 'PREPARING'].includes(order.status) ? (
+                {['SHIPPED', 'DISPATCHED'].includes(order.status) && (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => updateStatus(order.id, 'DELIVERED')}
+                    className="v-btn-primary"
+                    style={{ flex: 1, padding: '16px', background: '#2563eb', boxShadow: '0 10px 25px rgba(37, 99, 235, 0.2)' }}
+                  >
+                    {isService ? 'Confirm Service Completed' : 'Confirm Delivery'}
+                  </motion.button>
+                )}
+                {['PLACED', 'ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED'].includes(order.status) ? (
                   <button
                     onClick={() => {
                       setConfirmDialog({
                         isOpen: true,
-                        title: 'Emergency Override',
-                        message: 'Are you sure you want to CANCEL this order? This cannot be undone and the customer will be notified.',
-                        confirmText: 'Cancel Order',
+                        title: isService ? 'Cancel Booking' : 'Emergency Override',
+                        message: isService 
+                          ? 'Are you sure you want to CANCEL this booking? This cannot be undone and the customer will be notified.'
+                          : 'Are you sure you want to CANCEL this order? This cannot be undone and the customer will be notified.',
+                        confirmText: isService ? 'Cancel Booking' : 'Cancel Order',
                         cancelText: 'Keep Active',
                         type: 'danger',
                         onConfirm: () => updateStatus(order.id, 'CANCELLED')
@@ -1173,11 +1466,11 @@ export const VendorOrders = ({ storeId }) => {
                     className="v-btn-outline"
                     style={{ padding: '14px 32px', fontWeight: 800, color: '#ef4444', borderColor: '#fecaca', background: '#fef2f2' }}
                   >
-                    Cancel Order
+                    {isService ? 'Cancel Booking' : 'Cancel Order'}
                   </button>
                 ) : (
                   <button className="v-btn-outline" style={{ padding: '14px 32px', fontWeight: 800 }}>
-                    Order Protocol
+                    {isService ? 'Booking Protocol' : 'Order Protocol'}
                   </button>
                 )}
               </div>
@@ -1187,15 +1480,34 @@ export const VendorOrders = ({ storeId }) => {
         {orders.length === 0 && (
           <div style={{ padding: '8rem 2rem', textAlign: 'center', background: 'white', borderRadius: '40px', border: '2px dashed #e2e8f0' }}>
             <div style={{ width: '100px', height: '100px', background: '#f8fafc', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem auto' }}>
-              <Package size={48} color="#cbd5e1" />
+              {businessType === 'service' ? (
+                <Wrench size={48} color="#cbd5e1" />
+              ) : (
+                <Package size={48} color="#cbd5e1" />
+              )}
             </div>
-            <h3 style={{ fontWeight: 950, color: '#1e293b', fontSize: '1.5rem', letterSpacing: '-0.5px' }}>Station Idle</h3>
-            <p style={{ color: '#64748b', margin: '0.75rem 0 2rem 0', fontWeight: 600 }}>Your store is ready to receive missions. New orders will trigger a priority alert.</p>
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: '#f0fdf4', color: '#16a34a', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 900 }}>
+            <h3 style={{ fontWeight: 950, color: '#1e293b', fontSize: '1.5rem', letterSpacing: '-0.5px' }}>{businessType === 'service' ? 'No Bookings' : 'Station Idle'}</h3>
+            <p style={{ color: '#64748b', margin: '0.75rem 0 2rem 0', fontWeight: 600 }}>{businessType === 'service' ? 'Your service station is ready to receive bookings. New bookings will trigger a priority alert.' : 'Your store is ready to receive missions. New orders will trigger a priority alert.'}</p>
+            <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: '#f0fdf4', color: '#16a34a', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 900, marginBottom: '1rem' }}>
                 <div className="v-pulse-dot" style={{ background: '#16a34a' }}></div>
                 OPERATIONAL
               </div>
+              <button 
+                onClick={handleSimulateOrder}
+                style={{ 
+                  padding: '12px 24px', 
+                  borderRadius: '12px', 
+                  background: 'var(--v-primary)', 
+                  color: 'white', 
+                  border: 'none', 
+                  fontWeight: 800, 
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(249, 115, 22, 0.2)'
+                }}
+              >
+                {businessType === 'service' ? 'Simulate Test Booking' : 'Simulate Test Order'}
+              </button>
             </div>
           </div>
         )}
@@ -1283,7 +1595,7 @@ export const VendorEarnings = ({ storeId }) => {
             </div>
             <div style={{ flex: 1, textAlign: 'right' }}>
               <span style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 800 }}>GROWTH</span>
-              <span style={{ fontWeight: 900, color: '#22c55e' }}>+12.5%</span>
+              <span style={{ fontWeight: 900, color: earnings > 0 ? '#22c55e' : '#94a3b8' }}>{earnings > 0 ? '+12.5%' : '0%'}</span>
             </div>
           </div>
         </motion.div>
@@ -1308,7 +1620,7 @@ export const VendorEarnings = ({ storeId }) => {
             </div>
             <div style={{ flex: 1, textAlign: 'right' }}>
               <span style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 800 }}>SUCCESS</span>
-              <span style={{ fontWeight: 900, color: '#3b82f6' }}>98.2%</span>
+              <span style={{ fontWeight: 900, color: orderCount > 0 ? '#3b82f6' : '#94a3b8' }}>{orderCount > 0 ? '98.2%' : '0%'}</span>
             </div>
           </div>
         </motion.div>
@@ -1568,30 +1880,80 @@ export const VendorReviews = ({ storeId, businessType }) => {
   );
 };
 
-export const VendorNotifications = ({ storeId }) => {
+export const VendorNotifications = ({ storeId, businessType }) => {
   const [notifications, setNotifications] = React.useState([]);
 
+  const fetchNotifs = React.useCallback(async () => {
+    if (!storeId) { setNotifications([]); return; }
+    try {
+      const { data, error } = await supabase.from('orders').select('id, status, created_at, users(full_name)').eq('store_id', storeId).order('created_at', { ascending: false }).limit(8);
+      if (!error && data) {
+        const isService = businessType === 'service';
+        const list = data.map(o => ({
+          title: o.status === 'PLACED' 
+            ? (isService ? 'Critical: New Booking Received!' : 'Critical: New Order Received!')
+            : o.status === 'DELIVERED' 
+              ? (isService ? 'Mission Success: Service Completed' : 'Mission Success: Order Completed') 
+              : (isService ? `Update: Booking #${o.id.substring(0, 8).toUpperCase()} Status Shift` : `Update: Order #${o.id.substring(0, 8).toUpperCase()} Status Shift`),
+          desc: isService
+            ? `Booking #${o.id.substring(0, 8).toUpperCase()} from ${o.users?.full_name || 'Verified Customer'}. Action may be required.`
+            : `Order #${o.id.substring(0, 8).toUpperCase()} from ${o.users?.full_name || 'Verified Customer'}. Action may be required.`,
+          time: new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }),
+          unread: o.status === 'PLACED' || o.status === 'PREPARING',
+          type: o.status === 'PLACED' ? 'urgent' : 'update'
+        }));
+        setNotifications(list);
+      }
+    } catch (err) {
+      console.error("Notifs error:", err);
+    }
+  }, [storeId, businessType]);
+
   React.useEffect(() => {
-    const fetchNotifs = async () => {
-      if (!storeId) { setNotifications([]); return; }
+    fetchNotifs();
+
+    const playNotificationBeep = () => {
       try {
-        const { data, error } = await supabase.from('orders').select('id, status, created_at, users(full_name)').eq('store_id', storeId).order('created_at', { ascending: false }).limit(8);
-        if (!error && data) {
-          const list = data.map(o => ({
-            title: o.status === 'PLACED' ? 'Critical: New Order Received!' : o.status === 'DELIVERED' ? 'Mission Success: Order Completed' : `Update: Order #${o.id.substring(0, 8).toUpperCase()} Status Shift`,
-            desc: `Order #${o.id.substring(0, 8).toUpperCase()} from ${o.users?.full_name || 'Verified Customer'}. Action may be required.`,
-            time: new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }),
-            unread: o.status === 'PLACED' || o.status === 'PREPARING',
-            type: o.status === 'PLACED' ? 'urgent' : 'update'
-          }));
-          setNotifications(list);
-        }
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const playBeep = (freq, duration, delay) => {
+          const osc = audioCtx.createOscillator();
+          const gainNode = audioCtx.createGain();
+          osc.connect(gainNode);
+          gainNode.connect(audioCtx.destination);
+          osc.frequency.setValueAtTime(freq, audioCtx.currentTime + delay);
+          gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime + delay);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + delay + duration);
+          osc.start(audioCtx.currentTime + delay);
+          osc.stop(audioCtx.currentTime + delay + duration);
+        };
+        playBeep(880, 0.15, 0);
+        playBeep(1100, 0.2, 0.2);
       } catch (err) {
-        console.error("Notifs error:", err);
+        console.warn("AudioContext beep failed:", err);
       }
     };
-    fetchNotifs();
-  }, [storeId]);
+
+    const channel = supabase
+      .channel(`vendor-notifs-realtime-${storeId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'orders',
+        filter: `store_id=eq.${storeId}`
+      }, (payload) => {
+        fetchNotifs();
+        if (payload.eventType === 'INSERT') {
+          const isService = businessType === 'service';
+          toast.success(isService ? "New Booking Received!" : "New Order Received!", { icon: '🔔' });
+          playNotificationBeep();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [storeId, businessType, fetchNotifs]);
 
   return (
     <div className="v-container animate-fade-in">
@@ -1603,8 +1965,8 @@ export const VendorNotifications = ({ storeId }) => {
             </div>
             <span className="v-hero-badge-text" style={{ color: '#d97706' }}>Communication Hub</span>
           </div>
-          <h1 className="v-hero-title">Partner Notifications</h1>
-          <p className="v-hero-subtitle">Stay synchronized with store activities and operational alerts</p>
+          <h1 className="v-hero-title">{businessType === 'service' ? 'Service Notifications' : 'Partner Notifications'}</h1>
+          <p className="v-hero-subtitle">{businessType === 'service' ? 'Stay synchronized with service bookings and operational alerts' : 'Stay synchronized with store activities and operational alerts'}</p>
         </div>
       </div>
 

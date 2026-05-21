@@ -15,9 +15,11 @@ import {
 import './ExpertServices.css';
 import { supabase } from '../../supabase';
 import { useTranslation } from '../LanguageContext';
+import { useCart } from '../../context/CartContext';
 
 const ExpertServices = ({ onBack, location }) => {
   const { t } = useTranslation();
+  const { addToCart } = useCart();
   const currentArea = location?.split(',')[0] || 'your area';
   const [activeTab, setActiveTab] = useState('All');
   const [experts, setExperts] = useState([]);
@@ -125,7 +127,8 @@ const ExpertServices = ({ onBack, location }) => {
             recommendations: provider.recommendations || 0,
             experience: provider.experience ? `${provider.experience} years exp` : null,
             verified: provider.is_verified || false,
-            description: s.description
+            description: s.description,
+            providerId: provider.id
           };
         });
 
@@ -162,10 +165,6 @@ const ExpertServices = ({ onBack, location }) => {
             placeholder="Describe issue (e.g. leaking tap, AC service)..." 
             onFocus={() => toast.success('AI: Tell me what happened, I will find the right expert.')}
           />
-        </div>
-
-        <div className="ai-booking-hint" onClick={() => toast.success('AI: Scanning for 5-star plumbers within 2km...')}>
-           <MessageCircle size={16} /> <span>BOOK WITH AI CHATBOLT</span>
         </div>
 
         <div className="category-tabs-scroll">
@@ -239,13 +238,28 @@ const ExpertServices = ({ onBack, location }) => {
                   <span>Inspection Fee</span>
                   <strong>₹{expert.price || 199}</strong>
                </div>
-               <div className="expert-actions">
-                  <button className="chat-btn" onClick={() => toast(`AI: Connecting you to ${expert.name}...`)}><MessageCircle size={18} /></button>
-                  <button 
-                    className="hire-btn"
-                    onClick={() => toast.loading(`Booking ${expert.name}...`, { duration: 1500 })}
-                  >{t('book_now')}</button>
-               </div>
+                <div className="expert-actions">
+                   <button className="chat-btn" onClick={() => {
+                     toast.dismiss();
+                     toast.success(`Opening Passwala AI for ${expert.name}...`);
+                     window.dispatchEvent(new CustomEvent('open-ai-chat', { detail: { expert } }));
+                   }}><MessageCircle size={18} /></button>
+                   <button 
+                     className="hire-btn"
+                     onClick={() => {
+                       addToCart({
+                         id: expert.id,
+                         name: expert.title,
+                         price: expert.price,
+                         image: expert.image,
+                         type: 'service',
+                         store: expert.name,
+                         shop_id: expert.providerId || expert.id
+                       });
+                       toast.success(`${expert.title} added to cart`);
+                     }}
+                   >{t('book_now')}</button>
+                </div>
             </div>
           </motion.div>
         ))}

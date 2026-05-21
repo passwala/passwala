@@ -5,7 +5,7 @@ import { MapPin, Navigation, Phone, CheckCircle, Package, Clock, ChevronRight, C
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../supabase'; // Import supabase client
-import { getShortestPathDistance, getNearestLandmark } from '../utils/dijkstra';
+import { getOSRMRoute, getStraightLineDistance } from '../utils/dijkstra';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './RiderPortal.css'; // Import custom styles
@@ -41,8 +41,8 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
   const [activeAreas, setActiveAreas] = useState([]);
   const [nearbyStores, setNearbyStores] = useState([]);
 
-  // OSRM Routing Engine States (For fastest route, bicycle, walking)
-  const [routeMode, setRouteMode] = useState('driving'); // 'driving' | 'cycling' | 'foot'
+  // OSRM Routing Engine States (Only Bike route mode)
+  const [routeMode, setRouteMode] = useState('cycling'); // 'cycling'
   const [osrmRoutePoints, setOsrmRoutePoints] = useState([]);
   const [routeStats, setRouteStats] = useState(null); // { distanceKm, durationMins }
   const [isFetchingRoute, setIsFetchingRoute] = useState(false);
@@ -256,7 +256,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
 
         let query = supabase
           .from('orders')
-          .select('*, stores(name, address, lat, lng), addresses(*), users(full_name), order_items(id)')
+          .select('*, stores(name, address, lat, lng, vendor_id), addresses(*), users(full_name), order_items(id, products(description))')
           .in('status', ['PLACED', 'PREPARING'])
           .gt('total_amount', 0)
           .gt('created_at', yesterday.toISOString())
@@ -271,14 +271,47 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         if (error) return;
         
         if (data && data.length > 0) {
-          const validOrder = data.find(order => {
-            const storeCoords = { lat: order.stores?.lat || 23.0225, lng: order.stores?.lng || 72.5714 };
-            const dist = getShortestPathDistance(mapCoords.lat, mapCoords.lng, storeCoords.lat, storeCoords.lng);
-            // Allow up to 10,000 km to support seamless local/deployed testing across different coordinates/cities (e.g. Hyderabad map vs Ahmedabad default)
-            return dist <= 10000;
+          // Filter out orders that are service bookings (stores without vendor_id or containing service products)
+          const filteredOrders = data.filter(order => {
+            const hasServiceProduct = order.order_items?.some(item => 
+              item.products?.description === 'Service item auto-registered'
+            );
+            const isServiceProvider = order.stores && !order.stores.vendor_id;
+            return !hasServiceProduct && !isServiceProvider;
           });
 
-          if (!validOrder) return;
+          // Parse society dynamically from address_line_1 if not present or is generic city
+          for (const order of filteredOrders) {
+            if (order.addresses && (!order.addresses.society || order.addresses.society.toLowerCase() === 'ahmedabad') && order.addresses.address_line_1) {
+              const parts = order.addresses.address_line_1.split(',').map(p => p.trim());
+              const lastPart = parts[parts.length - 1] || '';
+              if (lastPart.toLowerCase() === 'ahmedabad') {
+                order.addresses.society = parts[parts.length - 2] || parts[0] || 'Thaltej';
+              } else {
+                order.addresses.society = lastPart || 'Thaltej';
+              }
+            }
+          }
+
+          if (filteredOrders.length > 0) {
+            let validOrder = null;
+            let routeToStore = null;
+            let routeToCustomer = null;
+            
+            for (const order of filteredOrders) {
+              const storeCoords = { lat: order.stores?.lat || 23.0225, lng: order.stores?.lng || 72.5714 };
+              const rToStore = await getOSRMRoute(mapCoords.lat, mapCoords.lng, storeCoords.lat, storeCoords.lng);
+              if (rToStore.distanceKm <= 10000) {
+                validOrder = order;
+                routeToStore = rToStore;
+                
+                const cCoords = order.addresses ? { lat: parseFloat(order.addresses.lat) || 23.0225, lng: parseFloat(order.addresses.lng) || 72.5714 } : { lat: 23.0225, lng: 72.5714 };
+                routeToCustomer = await getOSRMRoute(storeCoords.lat, storeCoords.lng, cCoords.lat, cCoords.lng);
+                break;
+              }
+            }
+
+            if (!validOrder) return;
 
           const order = validOrder;
           let dropAddr = 'Customer Location';
@@ -292,8 +325,8 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           }
 
           const storeCoords = { lat: parseFloat(order.stores?.lat) || 23.0225, lng: parseFloat(order.stores?.lng) || 72.5714 };
-          const distToStore = getShortestPathDistance(mapCoords.lat, mapCoords.lng, storeCoords.lat, storeCoords.lng);
-          const distToCustomer = getShortestPathDistance(storeCoords.lat, storeCoords.lng, customerCoords.lat, customerCoords.lng);
+          const distToStore = routeToStore.distanceKm;
+          const distToCustomer = routeToCustomer.distanceKm;
           const totalDist = distToStore + distToCustomer;
 
           setIncomingOrder({
@@ -314,6 +347,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           });
           toast.success(`New Delivery Request! (${totalDist.toFixed(1)} km)`, { icon: "🔔" });
         }
+      }
       } catch (err) {
         console.error("Order polling error", err);
       }
@@ -554,7 +588,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         nearbyStores.forEach(store => {
           if (!store.lat || !store.lng) return;
           const storeLatLng = [parseFloat(store.lat), parseFloat(store.lng)];
-          const dist = getShortestPathDistance(mapCoords.lat, mapCoords.lng, storeLatLng[0], storeLatLng[1]);
+          const dist = getStraightLineDistance(mapCoords.lat, mapCoords.lng, storeLatLng[0], storeLatLng[1]);
           
           L.marker(storeLatLng, { icon: createStoreIcon(store.name) })
             .bindPopup(`
@@ -577,7 +611,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
   }, [mapCoords, activeOrder, deliveryStep, nearbyStores, isOnline, osrmRoutePoints]);
 
   const handleToggleOnline = async () => {
-    let id = user?.id || user?.uid;
+    let id = user?.id || user?.uid || user?.user_id;
     if (!id && user?.phoneNumber) {
       const phoneNo = user.phoneNumber.replace('+91', '');
       try {

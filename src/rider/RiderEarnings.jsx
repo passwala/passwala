@@ -34,7 +34,7 @@ function RiderEarnings({ _user, riderId, stats, isOnline, sessionStartTime }) {
                 setLoading(true);
                 let query = supabase
                     .from('orders')
-                    .select('id, created_at, total_amount, stores (name), addresses (society)')
+                    .select('id, created_at, total_amount, stores (name), addresses (address_line_1, city)')
                     .eq('rider_id', riderId)
                     .eq('status', 'DELIVERED');
                 

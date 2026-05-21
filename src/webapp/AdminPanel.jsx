@@ -56,6 +56,8 @@ const adminSupabase = (supabaseUrl && supabaseKey)
 if (!import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY) {
   console.warn('⚠️ Admin Panel is running with ANON_KEY. Some management functions may fail if RLS is enabled.');
 }
+
+const API_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
 const ActivityFeed = () => {
   const [recent, setRecent] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -63,7 +65,7 @@ const ActivityFeed = () => {
   const fetchRecent = async () => {
     try {
       const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
-      const res = await fetch('/api/admin/fetch?table=orders', { headers: { 'x-admin-key': adminKey } });
+      const res = await fetch(`${API_URL}/api/admin/fetch?table=orders`, { headers: { 'x-admin-key': adminKey } });
       const json = await res.json();
       if (json.success && json.data) {
         setRecent(json.data.slice(0, 5));
@@ -133,8 +135,8 @@ const TABLE_SCHEMAS = {
   service_providers: { phone: '', full_name: '', user_id: '', business_name: '', aadhar_no: '', license_no: '', is_verified: false },
   services: { provider_id: '', category_id: '', title: '', description: '', price: 0, duration_minutes: 0 },
   products: { store_id: '', category_id: '', name: '', description: '', price: 0, discount_price: 0, image_url: '', is_active: true },
-  service_bookings: { user_id: '', service_id: '', provider_id: '', address_id: '', status: 'PENDING', total_amount: 0 },
-  deals: { store_id: '', title: '', discount_percentage: 0 },
+  service_bookings: { user_id: '', service_id: '', provider_id: '', address_id: '', status: 'PENDING', total_amount: 0, scheduled_at: '' },
+  deals: { store_id: '', title: '', discount_percentage: 0, valid_until: '' },
   posts: { user_id: '', content: '', image_url: '', likes_count: 0 },
   notifications: { user_id: '', title: '', message: '', is_read: false },
   service_areas: { city: 'Ahmedabad', area_name: '', is_active: true },
@@ -149,7 +151,7 @@ const DATABASE_SCHEMAS = {
   service_providers: ['user_id', 'business_name', 'about', 'rating', 'is_verified', 'phone', 'full_name', 'name', 'aadhar_no', 'license_no', 'address', 'profile_completed'],
   services: ['provider_id', 'category_id', 'title', 'description', 'price', 'duration_minutes'],
   products: ['store_id', 'category_id', 'name', 'description', 'price', 'discount_price', 'image_url', 'is_active'],
-  service_bookings: ['user_id', 'service_id', 'provider_id', 'address_id', 'status', 'total_amount'],
+  service_bookings: ['user_id', 'service_id', 'provider_id', 'address_id', 'status', 'total_amount', 'scheduled_at'],
   deals: ['store_id', 'title', 'discount_percentage', 'valid_until'],
   posts: ['user_id', 'content', 'image_url', 'likes_count'],
   notifications: ['user_id', 'title', 'message', 'is_read'],
@@ -264,6 +266,18 @@ function MapRecenter({ coords }) {
 
 const TABS = tabSections.flatMap(s => s.items);
 
+const formatDateForInput = (val) => {
+  if (!val) return '';
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch (e) {
+    return '';
+  }
+};
+
 const AdminPanel = ({ onLogout, location }) => {
   const [activeAdminTab, setActiveAdminTab] = useState(() => localStorage.getItem('admin_active_tab') || 'dashboard');
   const [loading, setLoading] = useState(true);
@@ -314,24 +328,26 @@ const AdminPanel = ({ onLogout, location }) => {
   const [productCategoriesList, setProductCategoriesList] = useState([]);
   const [serviceCategoriesList, setServiceCategoriesList] = useState([]);
   const [servicesList, setServicesList] = useState([]);
+  const [addressesList, setAddressesList] = useState([]);
 
   const fetchReferences = useCallback(async () => {
     try {
       const fetchTable = async (table) => {
         const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
-        const res = await fetch(`/api/admin/fetch?table=${table}`, { headers: { 'x-admin-key': adminKey } });
+        const res = await fetch(`${API_URL}/api/admin/fetch?table=${table}`, { headers: { 'x-admin-key': adminKey } });
         const json = await res.json();
         return json.success ? json.data : [];
       };
 
-      const [u, v, s, p, pc, sc, sv] = await Promise.all([
+      const [u, v, s, p, pc, sc, sv, addr] = await Promise.all([
         fetchTable('users'),
         fetchTable('vendors'),
         fetchTable('stores'),
         fetchTable('service_providers'),
         fetchTable('product_categories'),
         fetchTable('service_categories'),
-        fetchTable('services')
+        fetchTable('services'),
+        fetchTable('addresses')
       ]);
 
       if (u) setUsersList(u);
@@ -341,6 +357,7 @@ const AdminPanel = ({ onLogout, location }) => {
       if (pc) setProductCategoriesList(pc);
       if (sc) setServiceCategoriesList(sc);
       if (sv) setServicesList(sv);
+      if (addr) setAddressesList(addr);
     } catch (err) {
       console.error('Failed to fetch references:', err);
     }
@@ -355,12 +372,10 @@ const AdminPanel = ({ onLogout, location }) => {
 
   const currentTab = useMemo(() => TABS.find(t => t.id === activeAdminTab) || TABS[0], [activeAdminTab]);
 
-  const API_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
-
   const fetchStats = async () => {
     try {
       const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
-      const res = await fetch('/api/admin/stats', { headers: { 'x-admin-key': adminKey } });
+      const res = await fetch(`${API_URL}/api/admin/stats`, { headers: { 'x-admin-key': adminKey } });
       const json = await res.json();
       if (json.success && json.stats) {
         setStats(json.stats);
@@ -379,7 +394,11 @@ const AdminPanel = ({ onLogout, location }) => {
     try {
       toast.loading('Performing deep purge of platform residue...', { id: 'purge' });
       
-      const res = await fetch('/api/admin/purge', { method: 'POST' });
+      const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
+      const res = await fetch(`${API_URL}/api/admin/purge`, { 
+        method: 'POST',
+        headers: { 'x-admin-key': adminKey }
+      });
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to purge data');
 
@@ -396,7 +415,10 @@ const AdminPanel = ({ onLogout, location }) => {
       setMapLoading(true);
       const combined = [];
 
-      const res = await fetch('/api/admin/people_map');
+      const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
+      const res = await fetch(`${API_URL}/api/admin/people_map`, {
+        headers: { 'x-admin-key': adminKey }
+      });
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to fetch people map data');
 
@@ -536,14 +558,18 @@ const AdminPanel = ({ onLogout, location }) => {
 
     try {
       const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
-      const res = await fetch(`/api/admin/fetch?table=${currentTable}`, { headers: { 'x-admin-key': adminKey } });
+      const res = await fetch(`${API_URL}/api/admin/fetch?table=${currentTable}`, { headers: { 'x-admin-key': adminKey } });
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to fetch cloud data');
       const suData = json.data;
 
       // Update State & Cache
-      setData(suData || []);
-      localStorage.setItem(`admin_cache_${currentTable}`, JSON.stringify(suData || []));
+      let filteredData = suData || [];
+      if (currentTable === 'products') {
+        filteredData = filteredData.filter(p => p.description !== 'Service item auto-registered' && p.stock_quantity !== 9999);
+      }
+      setData(filteredData);
+      localStorage.setItem(`admin_cache_${currentTable}`, JSON.stringify(filteredData));
       setSyncStatus('cloud');
       toast.dismiss('offline-toast'); // Clear any previous offline warnings
     } catch (err) {
@@ -596,7 +622,7 @@ const AdminPanel = ({ onLogout, location }) => {
 
       if (!isTemp) {
         const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
-        const res = await fetch('/api/admin/delete', {
+        const res = await fetch(`${API_URL}/api/admin/delete`, {
           method: 'DELETE',
           headers: { 
             'Content-Type': 'application/json',
@@ -692,7 +718,7 @@ const AdminPanel = ({ onLogout, location }) => {
 
       try {
         const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
-        const response = await fetch('/api/admin/upsert', {
+        const response = await fetch(`${API_URL}/api/admin/upsert`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -743,7 +769,7 @@ const AdminPanel = ({ onLogout, location }) => {
     try {
       const nextVerified = !item.is_verified;
       const adminKey = localStorage.getItem('admin_code') || 'PASSWALA99';
-      const response = await fetch('/api/admin/upsert', {
+      const response = await fetch(`${API_URL}/api/admin/upsert`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -751,7 +777,7 @@ const AdminPanel = ({ onLogout, location }) => {
         },
         body: JSON.stringify({
           table: currentTab.table,
-          payload: { id: item.id, is_verified: nextVerified }
+          payload: { ...item, is_verified: nextVerified }
         })
       });
       const result = await response.json();
@@ -831,6 +857,14 @@ const AdminPanel = ({ onLogout, location }) => {
     const uniqueEntries = [];
     const seenSignatures = new Set();
     filtered.forEach(item => {
+      // Filter out non-buyer roles from the Users tab
+      if (currentTab.table === 'users') {
+        const role = item.role ? item.role.toUpperCase() : 'BUYER';
+        if (role !== 'BUYER' && role !== 'USER') {
+          return; // Skip vendors, riders, admins etc.
+        }
+      }
+
       const isPeopleTable = ['users', 'vendors', 'riders', 'service_providers'].includes(currentTab.table);
       const signature = isPeopleTable
         ? `${item.phone || ''}_${item.full_name || item.business_name || item.name || ''}`.toLowerCase().trim()
@@ -893,6 +927,29 @@ const AdminPanel = ({ onLogout, location }) => {
                     <td className="id-col">#{String(item.id).slice(-4)}</td>
                     {keys.map(k => {
                       let v = item[k];
+                      
+                      // Flatten relation data for display in the table cells
+                      if (k === 'user_id' && item.users) {
+                        v = `${item.users.full_name || 'No Name'} (${item.users.phone})`;
+                      } else if (k === 'service_id' && item.services) {
+                        v = item.services.title;
+                      } else if (k === 'provider_id' && item.service_providers) {
+                        v = item.service_providers.business_name || 'No Name';
+                      } else if (k === 'address_id' && item.addresses) {
+                        v = `${item.addresses.address_line_1 || ''} (${item.addresses.society || item.addresses.city || ''})`.trim();
+                        if (v === '()') v = 'N/A';
+                      } else if (k === 'store_id' && item.stores) {
+                        v = item.stores.name;
+                      } else if (k === 'category_id') {
+                        if (currentTab.table === 'products' && item.product_categories) {
+                          v = item.product_categories.name;
+                        } else if (currentTab.table === 'services' && item.service_categories) {
+                          v = item.service_categories.name;
+                        }
+                      } else if (k === 'vendor_id' && item.vendors) {
+                        v = item.vendors.business_name || item.vendors.name || item.vendors.phone;
+                      }
+
                       // Flatten joined user data for display
                       if (item.users) {
                         if (k === 'phone' && !v) v = item.users.phone;
@@ -900,7 +957,9 @@ const AdminPanel = ({ onLogout, location }) => {
                       }
 
                       let displayVal = v === null || v === undefined ? 'N/A' : String(v);
-                      if ((k === 'id_proof' || k === 'aadhar_no') && displayVal.length === 12 && /^\d+$/.test(displayVal)) {
+                      if (['price', 'discount_price', 'total_amount', 'amount', 'subtotal', 'delivery_fee'].includes(k) && v !== null && v !== undefined) {
+                        displayVal = `₹${parseFloat(v).toLocaleString()}`;
+                      } else if ((k === 'id_proof' || k === 'aadhar_no') && displayVal.length === 12 && /^\d+$/.test(displayVal)) {
                         const parts = [];
                         for (let i = 0; i < displayVal.length; i += 4) {
                           parts.push(displayVal.slice(i, i + 4));
@@ -1304,17 +1363,17 @@ const AdminPanel = ({ onLogout, location }) => {
         <div className="main-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
           <div className="stat-card p-gradient" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 10px 25px rgba(99, 102, 241, 0.15)' }}>
             <span style={{ fontSize: '0.9rem', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>Total Revenue</span>
-            <h3 style={{ fontSize: '2.25rem', fontWeight: 900, margin: '0.5rem 0' }}>₹1,48,250</h3>
-            <p style={{ fontSize: '0.85rem', margin: 0, opacity: 0.9 }}>📈 +14.2% from last month</p>
+            <h3 style={{ fontSize: '2.25rem', fontWeight: 900, margin: '0.5rem 0' }}>₹{stats?.totalRevenue?.toLocaleString() || 0}</h3>
+            <p style={{ fontSize: '0.85rem', margin: 0, opacity: 0.9 }}>Real-time earnings</p>
           </div>
           <div className="stat-card o-gradient" style={{ background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', color: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 10px 25px rgba(249, 115, 22, 0.15)' }}>
             <span style={{ fontSize: '0.9rem', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>Average Order Value</span>
-            <h3 style={{ fontSize: '2.25rem', fontWeight: 900, margin: '0.5rem 0' }}>₹320</h3>
+            <h3 style={{ fontSize: '2.25rem', fontWeight: 900, margin: '0.5rem 0' }}>₹{stats?.averageOrderValue?.toLocaleString() || 0}</h3>
             <p style={{ fontSize: '0.85rem', margin: 0, opacity: 0.9 }}>🎯 Optimized delivery margins</p>
           </div>
           <div className="stat-card b-gradient" style={{ background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)', color: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 10px 25px rgba(6, 182, 212, 0.15)' }}>
             <span style={{ fontSize: '0.9rem', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>Orders Completed</span>
-            <h3 style={{ fontSize: '2.25rem', fontWeight: 900, margin: '0.5rem 0' }}>462</h3>
+            <h3 style={{ fontSize: '2.25rem', fontWeight: 900, margin: '0.5rem 0' }}>{stats?.ordersCompleted || 0}</h3>
             <p style={{ fontSize: '0.85rem', margin: 0, opacity: 0.9 }}>⚡ 98.4% Fulfillment rate</p>
           </div>
         </div>
@@ -1323,33 +1382,35 @@ const AdminPanel = ({ onLogout, location }) => {
           <div className="glass" style={{ padding: '2rem', borderRadius: '24px', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.02)' }}>
             <h4 style={{ margin: '0 0 1.5rem 0', fontWeight: 800, fontSize: '1.1rem', color: '#0f172a' }}>Weekly Revenue Trend</h4>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', height: '180px', paddingTop: '10px' }}>
-              {[
-                { label: 'Mon', val: 40 },
-                { label: 'Tue', val: 55 },
-                { label: 'Wed', val: 75 },
-                { label: 'Thu', val: 60 },
-                { label: 'Fri', val: 90 },
-                { label: 'Sat', val: 120 },
-                { label: 'Sun', val: 110 }
-              ].map((item, idx) => (
+              {(stats?.weeklyRevenue || [
+                { label: 'Mon', val: 0 },
+                { label: 'Tue', val: 0 },
+                { label: 'Wed', val: 0 },
+                { label: 'Thu', val: 0 },
+                { label: 'Fri', val: 0 },
+                { label: 'Sat', val: 0 },
+                { label: 'Sun', val: 0 }
+              ]).map((item, idx) => {
+                const maxVal = stats?.weeklyRevenue ? Math.max(...stats.weeklyRevenue.map(d => d.val), 1) : 120;
+                return (
                 <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: '8px' }}>
                   <div style={{ position: 'relative', width: '28px', height: '120px', background: '#f1f5f9', borderRadius: '8px', overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${(item.val / 120) * 100}%`, background: 'linear-gradient(to top, #6366f1, #818cf8)', borderRadius: '8px', transition: 'height 1s ease' }}></div>
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${(item.val / maxVal) * 100}%`, background: 'linear-gradient(to top, #6366f1, #818cf8)', borderRadius: '8px', transition: 'height 1s ease' }}></div>
                   </div>
                   <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>{item.label}</span>
                 </div>
-              ))}
+              )})}
             </div>
           </div>
 
           <div className="glass" style={{ padding: '2rem', borderRadius: '24px', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.02)' }}>
             <h4 style={{ margin: '0 0 1.5rem 0', fontWeight: 800, fontSize: '1.1rem', color: '#0f172a' }}>Sales by Category</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', justifyContent: 'center', height: '180px' }}>
-              {[
-                { name: 'Grocery & Essentials', percent: 65, color: '#10b981' },
-                { name: 'Expert Services', percent: 20, color: '#6366f1' },
-                { name: 'Food Delivery', percent: 15, color: '#f59e0b' }
-              ].map((cat, idx) => (
+              {(stats?.salesByCategory || [
+                { name: 'Grocery & Essentials', percent: 0, color: '#10b981' },
+                { name: 'Expert Services', percent: 0, color: '#6366f1' },
+                { name: 'Food Delivery', percent: 0, color: '#f59e0b' }
+              ]).map((cat, idx) => (
                 <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>
                     <span>{cat.name}</span>
@@ -1643,11 +1704,11 @@ CREATE TABLE IF NOT EXISTS service_areas (
             <form onSubmit={handleUpsert} className="admin-form">
               <div className="form-grid">
                 {Object.keys(formData).length > 0 ? Object.keys(formData).map(key => {
-                  const hiddenFields = ['id', 'uid', 'created_at', 'updated_at', 'users', 'address_id'];
+                  const hiddenFields = ['id', 'uid', 'created_at', 'updated_at', 'users'];
                   if (hiddenFields.includes(key)) return null;
 
                   const isBoolean = typeof formData[key] === 'boolean';
-                  const isForeignKey = ['user_id', 'vendor_id', 'store_id', 'provider_id', 'category_id', 'service_id'].includes(key);
+                  const isForeignKey = ['user_id', 'vendor_id', 'store_id', 'provider_id', 'category_id', 'service_id', 'address_id'].includes(key);
 
                   return (
                     <div className="form-field" key={key} style={isBoolean ? { flexDirection: 'row', alignItems: 'center', gap: '0.5rem' } : {}}>
@@ -1662,7 +1723,25 @@ CREATE TABLE IF NOT EXISTS service_areas (
                       ) : isForeignKey ? (
                         <select
                           value={formData[key] || ''}
-                          onChange={(e) => setFormData({ ...formData, [key]: e.target.value || null })}
+                          onChange={(e) => {
+                            const val = e.target.value || null;
+                            const nextData = { ...formData, [key]: val };
+                            
+                            // Automatically pre-populate price/amount based on selection
+                            if (key === 'service_id' && val && currentTab.table === 'service_bookings') {
+                              const serv = servicesList.find(s => s.id === val);
+                              if (serv) {
+                                if (serv.price) {
+                                  nextData.total_amount = serv.price;
+                                }
+                                if (serv.provider_id) {
+                                  nextData.provider_id = serv.provider_id;
+                                }
+                              }
+                            }
+                            
+                            setFormData(nextData);
+                          }}
                           className="admin-select"
                         >
                           <option value="">-- Select {key.replace(/_/g, ' ').toUpperCase()} --</option>
@@ -1681,6 +1760,17 @@ CREATE TABLE IF NOT EXISTS service_areas (
                           {key === 'service_id' && servicesList.map(sv => (
                             <option key={sv.id} value={sv.id}>{sv.title}</option>
                           ))}
+                          {key === 'address_id' && addressesList
+                            .filter(addr => !formData.user_id || addr.user_id === formData.user_id)
+                            .map(addr => {
+                              const uName = usersList.find(u => u.id === addr.user_id)?.full_name || 'Unknown User';
+                              return (
+                                <option key={addr.id} value={addr.id}>
+                                  {addr.address_line_1}{addr.address_line_2 ? `, ${addr.address_line_2}` : ''}, {addr.city || ''} ({uName})
+                                </option>
+                              );
+                            })
+                          }
                           {key === 'category_id' && (
                             currentTab.table === 'products'
                               ? productCategoriesList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)
@@ -1689,8 +1779,8 @@ CREATE TABLE IF NOT EXISTS service_areas (
                         </select>
                       ) : (
                         <input
-                          type={typeof formData[key] === 'number' ? 'number' : 'text'}
-                          value={formData[key] || ''}
+                          type={['scheduled_at', 'valid_until'].includes(key) ? 'datetime-local' : (typeof formData[key] === 'number' ? 'number' : 'text')}
+                          value={['scheduled_at', 'valid_until'].includes(key) ? formatDateForInput(formData[key]) : (formData[key] || '')}
                           maxLength={key === 'phone' ? 10 : (key === 'aadhar_no' ? 14 : (key === 'license_no' ? 14 : (key === 'id_proof' ? (formData[key] && /^\d+$/.test(formData[key].replace(/[^A-Z0-9]/g, '')) ? 14 : 10) : undefined)))}
                           onChange={(e) => {
                             let val = e.target.value;

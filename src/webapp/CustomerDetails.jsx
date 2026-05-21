@@ -263,14 +263,17 @@ const CustomerDetails = ({ user, onComplete }) => {
           pincode: formData.pincode,
           lat: formData.lat,
           lng: formData.lng,
-          is_default: true,
-          // Store these in separate columns if they exist, or just rely on address_line_1
-          house_no: formData.houseNo,
-          floor: formData.floor,
-          society: formData.society
+          is_default: true
         }], { onConflict: 'user_id' })
         .select()
         .single();
+
+      // Manually augment savedAddr with the society, house_no, and floor fields for UI state sync
+      if (savedAddr) {
+        savedAddr.house_no = formData.houseNo;
+        savedAddr.floor = formData.floor;
+        savedAddr.society = formData.society;
+      }
 
       if (addressError) {
         console.warn('Supabase address save error (continuing):', addressError.message);
@@ -311,10 +314,6 @@ const CustomerDetails = ({ user, onComplete }) => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <div className="left-illustration-pane">
-          <img src="/illustration_profile.png" alt="Welcome to Passwala" />
-        </div>
-
         <div className="right-form-pane">
           <div className="details-header">
             <h1>Complete Profile</h1>

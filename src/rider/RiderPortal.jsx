@@ -14,6 +14,7 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
   const [stats, setStats] = useState({ earnings: 0, deliveries: 0 });
   const mainScrollRef = useRef(null);
   const [isDetecting, setIsDetecting] = useState(false);
+  const [currentCoords, setCurrentCoords] = useState(null);
 
   useEffect(() => {
     const resetScroll = () => {
@@ -34,7 +35,7 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
   useEffect(() => {
     const initRider = async () => {
       let rid = riderId;
-      let uid = user?.id || user?.uid;
+      let uid = user?.id || user?.uid || user?.user_id;
 
       if (!rid && uid) {
         const { data } = await supabase.from('riders').select('id, is_active').eq('user_id', uid).maybeSingle();
@@ -105,7 +106,7 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
   useEffect(() => {
     // Check initial active status from DB
     const checkStatus = async () => {
-      let id = user?.id || user?.uid;
+      let id = user?.id || user?.uid || user?.user_id;
       // Fallback for stale local sessions that only have phoneNumber
       if (!id && user?.phoneNumber) {
         const phoneNo = user.phoneNumber.replace('+91', '');
@@ -128,26 +129,26 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
 
   const [sessionStartTime, setSessionStartTime] = useState(null);
 
-  // 🛰️ Real-time Location Tracking Sync
+  // 🛰️ Real-time Location Tracking Sync (watchPosition for Uber/Zepto-style tracking)
   useEffect(() => {
-    let trackingInterval;
-    
-    const syncLocation = async () => {
-      // Only sync if online and we have a valid rider ID
-      if (isOnline && riderId) {
-        if (!navigator.geolocation) return;
+    let watchId = null;
 
-        navigator.geolocation.getCurrentPosition(async (position) => {
+    const startTracking = () => {
+      if (!navigator.geolocation) return;
+
+      watchId = navigator.geolocation.watchPosition(
+        async (position) => {
           const { latitude, longitude } = position.coords;
+          setCurrentCoords({ lat: latitude, lng: longitude });
+
           try {
-            // Upsert to rider_locations table
+            // Upsert to rider_locations table without status column
             const { error } = await supabase
               .from('rider_locations')
               .upsert({
                 rider_id: riderId,
                 lat: latitude,
                 lng: longitude,
-                status: 'ONLINE',
                 updated_at: new Date().toISOString()
               }, { onConflict: 'rider_id' }); // Ensure unique rider_id in table
             
@@ -155,24 +156,24 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
           } catch (err) {
             console.error("Critical location tracking error:", err);
           }
-        }, () => console.warn("GPS tracking blocked"), { enableHighAccuracy: true });
-      }
+        },
+        (error) => console.warn("GPS tracking error/blocked:", error),
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+      );
     };
 
-    if (isOnline) {
-      syncLocation(); // Initial sync
-      trackingInterval = setInterval(syncLocation, 3000); // 🚀 Zepto-speed: Sync every 3 seconds
+    if (isOnline && riderId) {
+      startTracking();
     } else if (riderId) {
-       // Update status to OFFLINE when rider goes off
-       supabase.from('rider_locations').upsert({ 
-         rider_id: riderId, 
-         status: 'OFFLINE',
-         updated_at: new Date().toISOString()
-       }, { onConflict: 'rider_id' });
+       // Delete location row when rider goes off
+       supabase.from('rider_locations').delete().eq('rider_id', riderId);
+       setCurrentCoords(null);
     }
 
     return () => {
-      if (trackingInterval) clearInterval(trackingInterval);
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+      }
     };
   }, [isOnline, riderId]);
 
@@ -187,11 +188,11 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
   const renderContent = () => {
     const commonProps = { user, riderId, stats, setStats, isOnline, sessionStartTime };
     switch (activeTab) {
-      case 'DASHBOARD': return <RiderDashboard {...commonProps} setIsOnline={setIsOnline} riderLocation={location} setRiderLocation={setLocation} isDetecting={isDetecting} setIsDetecting={setIsDetecting} userCoords={userCoords} />;
+      case 'DASHBOARD': return <RiderDashboard {...commonProps} setIsOnline={setIsOnline} riderLocation={location} setRiderLocation={setLocation} isDetecting={isDetecting} setIsDetecting={setIsDetecting} userCoords={currentCoords || userCoords} />;
       case 'EARNINGS': return <RiderEarnings {...commonProps} />;
       case 'WALLET': return <RiderWallet {...commonProps} />;
       case 'PROFILE': return <RiderProfile {...commonProps} onLogout={onLogout} />;
-      default: return <RiderDashboard {...commonProps} setIsOnline={setIsOnline} riderLocation={location} setRiderLocation={setLocation} isDetecting={isDetecting} setIsDetecting={setIsDetecting} />;
+      default: return <RiderDashboard {...commonProps} setIsOnline={setIsOnline} riderLocation={location} setRiderLocation={setLocation} isDetecting={isDetecting} setIsDetecting={setIsDetecting} userCoords={currentCoords || userCoords} />;
     }
   };
 

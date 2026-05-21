@@ -54,22 +54,84 @@ const OrderHistory = () => {
       setLoading(true);
       // Get current user ID if available
       const savedUser = JSON.parse(localStorage.getItem('passwala_user') || '{}');
-      const userId = savedUser.id || savedUser.uid;
-
-      let query = supabase
-        .from('orders')
-        .select('*, addresses(society)')
-        .order('created_at', { ascending: false });
+      let resolvedUserId = savedUser.id || savedUser.uid;
       
-      // If we have a user ID, filter by it
-      if (userId) {
-        query = query.eq('user_id', userId);
+      const isUUID = resolvedUserId && resolvedUserId.length === 36;
+      
+      if (!isUUID && resolvedUserId) {
+        // Resolve from database
+        const phoneNo = savedUser.phoneNumber?.replace('+91', '') || savedUser.phone?.replace('+91', '');
+        const orFilters = [];
+        if (savedUser.uid) orFilters.push(`uid.eq.${savedUser.uid}`);
+        if (savedUser.email) orFilters.push(`email.eq.${savedUser.email}`);
+        if (phoneNo) {
+          orFilters.push(`phone.eq.${phoneNo}`);
+          orFilters.push(`phone.eq.+91${phoneNo}`);
+        }
+        
+        if (orFilters.length > 0) {
+          const { data: usr } = await supabase
+            .from('users')
+            .select('id')
+            .or(orFilters.join(','))
+            .maybeSingle();
+          if (usr) {
+            resolvedUserId = usr.id;
+          } else {
+            resolvedUserId = null;
+          }
+        } else {
+          resolvedUserId = null;
+        }
       }
 
-      const { data, error } = await query;
-      
-      if (error) throw error;
-      setOrders(data || []);
+      let dbOrders = [];
+      if (resolvedUserId && resolvedUserId.length === 36) {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*, addresses(*)')
+          .eq('user_id', resolvedUserId)
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        dbOrders = data || [];
+      } else {
+        console.warn("Could not resolve a valid 36-char user UUID for OrderHistory, skipping query to avoid Postgres UUID cast crash.");
+      }
+
+      // Parse society dynamically from address_line_1 if not present or generic
+      const processedOrders = dbOrders.map(order => {
+        if (!order.addresses) {
+          order.addresses = {
+            id: 'fallback-addr',
+            address_line_1: 'Thaltej, Ahmedabad',
+            city: 'Ahmedabad',
+            state: 'Gujarat',
+            pincode: '380054',
+            society: 'Thaltej, Ahmedabad',
+            lat: 23.0753,
+            lng: 72.5244
+          };
+        } else {
+          if (!order.addresses.society || order.addresses.society.toLowerCase() === 'ahmedabad') {
+            if (order.addresses.address_line_1 && order.addresses.address_line_1 !== 'Geo-location Pending') {
+              const parts = order.addresses.address_line_1.split(',').map(p => p.trim());
+              const lastPart = parts[parts.length - 1] || '';
+              if (lastPart.toLowerCase() === 'ahmedabad') {
+                order.addresses.society = parts[parts.length - 2] || parts[0] || 'Thaltej';
+              } else {
+                order.addresses.society = lastPart || 'Thaltej';
+              }
+            } else {
+              order.addresses.address_line_1 = 'Thaltej, Ahmedabad';
+              order.addresses.society = 'Thaltej';
+            }
+          }
+        }
+        return order;
+      });
+
+      setOrders(processedOrders);
     } catch (err) {
       console.error('Error fetching orders:', err);
     } finally {

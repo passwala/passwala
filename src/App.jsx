@@ -41,7 +41,7 @@ import { onAuthStateChanged } from 'firebase/auth'
 import { supabase } from './supabase'
 import AIAssistant from './webapp/AIAssistant'
 import CustomerDetails from './webapp/CustomerDetails'
-import { CartProvider } from './context/CartContext'
+import { CartProvider, useCart } from './context/CartContext'
 import CartDrawer from './webapp/buyer/CartDrawer'
 import { NotificationProvider, useNotifications } from './context/NotificationContext'
 import { SearchProvider } from './context/SearchContext'
@@ -151,6 +151,29 @@ const AppContent = ({
       localStorage.setItem('theme', 'light');
     }
   }, [isDarkMode]);
+
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const { addToCart } = useCart();
+
+  useEffect(() => {
+    const handleOpenChat = () => setIsAiChatOpen(true);
+    const handleCloseChat = () => setIsAiChatOpen(false);
+    const handleAddExternal = (e) => {
+      if (e.detail) {
+        addToCart(e.detail);
+      }
+    };
+
+    window.addEventListener('open-ai-chat', handleOpenChat);
+    window.addEventListener('close-ai-chat', handleCloseChat);
+    window.addEventListener('add-to-cart-external', handleAddExternal);
+
+    return () => {
+      window.removeEventListener('open-ai-chat', handleOpenChat);
+      window.removeEventListener('close-ai-chat', handleCloseChat);
+      window.removeEventListener('add-to-cart-external', handleAddExternal);
+    };
+  }, [addToCart]);
 
   // 📍 Compulsory Location Enforcement
   useEffect(() => {
@@ -359,7 +382,7 @@ const AppContent = ({
 
             {/* 5. Drawers / Modals */}
             <CartDrawer location={location} isProfileComplete={isProfileComplete} userAddress={userAddress} />
-            <AIAssistant isOpen={false} onClose={() => { }} onOpen={() => { }} />
+            <AIAssistant isOpen={isAiChatOpen} onClose={() => setIsAiChatOpen(false)} />
           </>
         )}
     </div>
@@ -597,7 +620,35 @@ function App() {
             const { data: addr } = await supabase.from('addresses').select('*').eq('user_id', usr.id).maybeSingle();
             if (addr) {
               setIsProfileComplete(true);
+              
+              // Parse society, house_no, floor from address_line_1
+              const parts = (addr.address_line_1 || '').split(', ').map(p => p.trim());
+              let hName = '';
+              let hNo = '';
+              let fl = '';
+              let soc = '';
+              if (parts.length === 4) {
+                [hName, hNo, fl, soc] = parts;
+                fl = fl.replace('Floor ', '');
+              } else if (parts.length === 3) {
+                if (parts[1].startsWith('Floor ')) {
+                  [hNo, fl, soc] = parts;
+                  fl = fl.replace('Floor ', '');
+                } else {
+                  [hName, hNo, soc] = parts;
+                }
+              } else if (parts.length === 2) {
+                [hNo, soc] = parts;
+              } else {
+                soc = parts[0] || '';
+              }
+              addr.house_no = hNo || hName || 'Home';
+              addr.floor = fl || 'Ground';
+              addr.society = soc || addr.address_line_1;
+
               setUserAddress(addr);
+              localStorage.setItem('passwala_user_address', JSON.stringify(addr));
+              
               // 📍 Update global location string to match the verified address
               const displayLoc = addr.society || addr.city || localStorage.getItem('passwala_location') || 'Ahmedabad, Gujarat';
               setLocation(displayLoc);
@@ -606,7 +657,35 @@ function App() {
               // Try legacy UID lookup
               const { data: addrLegacy } = await supabase.from('addresses').select('*').eq('user_id', u.uid).maybeSingle();
               setIsProfileComplete(!!addrLegacy || wasComplete);
-              if (addrLegacy) setUserAddress(addrLegacy);
+              if (addrLegacy) {
+                // Parse society, house_no, floor from address_line_1
+                const parts = (addrLegacy.address_line_1 || '').split(', ').map(p => p.trim());
+                let hName = '';
+                let hNo = '';
+                let fl = '';
+                let soc = '';
+                if (parts.length === 4) {
+                  [hName, hNo, fl, soc] = parts;
+                  fl = fl.replace('Floor ', '');
+                } else if (parts.length === 3) {
+                  if (parts[1].startsWith('Floor ')) {
+                    [hNo, fl, soc] = parts;
+                    fl = fl.replace('Floor ', '');
+                  } else {
+                    [hName, hNo, soc] = parts;
+                  }
+                } else if (parts.length === 2) {
+                  [hNo, soc] = parts;
+                } else {
+                  soc = parts[0] || '';
+                }
+                addrLegacy.house_no = hNo || hName || 'Home';
+                addrLegacy.floor = fl || 'Ground';
+                addrLegacy.society = soc || addrLegacy.address_line_1;
+
+                setUserAddress(addrLegacy);
+                localStorage.setItem('passwala_user_address', JSON.stringify(addrLegacy));
+              }
             }
           } else {
             // No user in Supabase yet, use UID

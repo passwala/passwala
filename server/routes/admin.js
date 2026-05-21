@@ -40,17 +40,30 @@ router.get('/fetch', async (req, res) => {
     if (!table) return res.status(400).json({ error: 'Table name is required' });
 
     try {
-        let query = supabase.from(table).select(
-            table === 'riders' || table === 'vendors' || table === 'service_providers'
-                ? '*, users(phone, full_name)'
-                : '*'
-        );
+        let selectStr = '*';
+        if (table === 'riders' || table === 'vendors' || table === 'service_providers') {
+            selectStr = '*, users(phone, full_name)';
+        } else if (table === 'service_bookings') {
+            selectStr = '*, users(phone, full_name), services(title, price), service_providers(business_name), addresses(address_line_1, city)';
+        } else if (table === 'services') {
+            selectStr = '*, service_providers(business_name), service_categories(name)';
+        } else if (table === 'products') {
+            selectStr = '*, stores(name), product_categories(name)';
+        } else if (table === 'stores') {
+            selectStr = '*, vendors(phone, is_verified)';
+        } else if (table === 'deals') {
+            selectStr = '*, stores(name)';
+        } else if (table === 'notifications' || table === 'posts') {
+            selectStr = '*, users(phone, full_name)';
+        }
+
+        let query = supabase.from(table).select(selectStr);
         
         const { data, error } = await query.order('created_at', { ascending: false });
         
         if (error) throw error;
 
-        // Backend Self-Healing: For any row missing user_id, check if user exists by phone
+        // Backend Self-Healing for riders/vendors/providers
         if (data && (table === 'vendors' || table === 'service_providers' || table === 'riders')) {
             for (let i = 0; i < data.length; i++) {
                 const row = data[i];
@@ -101,6 +114,32 @@ router.get('/fetch', async (req, res) => {
             }
         }
 
+        // Backend Self-Healing: For service_bookings, if total_amount is incorrect or zero, sync with service price
+        if (data && table === 'service_bookings') {
+            for (let i = 0; i < data.length; i++) {
+                const booking = data[i];
+                // Extract society from address_line_1 if not explicitly present
+                if (booking.addresses && !booking.addresses.society && booking.addresses.address_line_1) {
+                    const parts = booking.addresses.address_line_1.split(',');
+                    booking.addresses.society = parts[parts.length - 1]?.trim() || '';
+                }
+                const correctPrice = booking.services?.price;
+                if (booking.service_id && correctPrice && booking.total_amount !== correctPrice) {
+                    try {
+                        const { error: updErr } = await supabase
+                            .from('service_bookings')
+                            .update({ total_amount: correctPrice })
+                            .eq('id', booking.id);
+                        if (!updErr) {
+                            booking.total_amount = correctPrice;
+                        }
+                    } catch (healErr) {
+                        console.error('Self-healing failed for booking price', booking.id, healErr);
+                    }
+                }
+            }
+        }
+
         res.status(200).json({ success: true, data });
     } catch (error) {
         console.error(`❌ Admin Fetch Error [${table}]:`, error.message);
@@ -117,13 +156,53 @@ router.get('/stats', async (req, res) => {
         const { count: orderCount } = await supabase.from('orders').select('*', { count: 'exact', head: true });
         const { count: productCount } = await supabase.from('products').select('*', { count: 'exact', head: true });
 
+        // Calculate real revenue and order stats
+        const { data: allOrders } = await supabase.from('orders').select('total_amount, status, created_at');
+        let totalRevenue = 0;
+        let ordersCompleted = 0;
+        let weeklyMap = { 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0, 'Sat': 0, 'Sun': 0 };
+        
+        if (allOrders) {
+            allOrders.forEach(order => {
+                if (order.status === 'DELIVERED') {
+                    totalRevenue += (order.total_amount || 0);
+                    ordersCompleted++;
+                }
+                // Weekly trend (simplified to day of week mapping)
+                const d = new Date(order.created_at);
+                const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+                if (weeklyMap[dayName] !== undefined && order.total_amount) {
+                    weeklyMap[dayName] += order.total_amount;
+                }
+            });
+        }
+        
+        let averageOrderValue = ordersCompleted > 0 ? Math.round(totalRevenue / ordersCompleted) : 0;
+        
+        const weeklyRevenue = Object.keys(weeklyMap).map(key => ({
+            label: key,
+            val: weeklyMap[key]
+        }));
+        
+        // Mocking category breakdown until order_items are queried properly
+        const salesByCategory = [
+            { name: 'Grocery & Essentials', percent: totalRevenue > 0 ? 65 : 0, color: '#10b981' },
+            { name: 'Expert Services', percent: totalRevenue > 0 ? 20 : 0, color: '#6366f1' },
+            { name: 'Food Delivery', percent: totalRevenue > 0 ? 15 : 0, color: '#f59e0b' }
+        ];
+
         res.status(200).json({
             success: true,
             stats: {
                 users: userCount || 0,
                 vendors: vendorCount || 0,
                 orders: orderCount || 0,
-                activeItems: productCount || 0
+                activeItems: productCount || 0,
+                totalRevenue,
+                ordersCompleted,
+                averageOrderValue,
+                weeklyRevenue,
+                salesByCategory
             }
         });
     } catch (error) {
@@ -243,17 +322,24 @@ router.post('/upsert', async (req, res) => {
         const userLinkedTables = ['riders', 'vendors', 'service_providers'];
         if (userLinkedTables.includes(table) && payload.phone) {
             console.log(`🔗 Linking user for ${table} via phone: ${payload.phone}`);
-            // 1. Check if user exists by phone
-            const { data: existingUser } = await supabase
-                .from('users')
-                .select('*')
-                .eq('phone', payload.phone)
-                .maybeSingle();
+            // 1. Check if user exists by user_id first, then fallback to phone
+            let existingUser = null;
+            if (payload.user_id) {
+                const { data: ud } = await supabase.from('users').select('*').eq('id', payload.user_id).maybeSingle();
+                existingUser = ud;
+            }
+            if (!existingUser) {
+                const { data: ud } = await supabase.from('users').select('*').eq('phone', payload.phone).maybeSingle();
+                existingUser = ud;
+            }
 
             let user = existingUser;
+            // Use existing name if we don't have a new one in the payload
+            const newName = payload.full_name || payload.name || payload.business_name || (existingUser && existingUser.full_name) || 'Admin Created';
+            
             const userPayload = {
                 phone: payload.phone,
-                full_name: payload.full_name || 'Admin Created'
+                full_name: newName
             };
 
             if (existingUser) {
@@ -302,15 +388,31 @@ router.post('/upsert', async (req, res) => {
             });
         }
 
-        // 3. Perform the Upsert
-        // For service_areas, we allow upserting on area_name to prevent duplicate errors
-        const conflictTarget = table === 'service_areas' ? 'area_name' : 'id';
+        // Clean empty strings to null to avoid invalid input syntax (e.g. UUID, Timestamp, Numeric)
+        Object.keys(cleanedPayload).forEach(key => {
+            if (cleanedPayload[key] === '') {
+                cleanedPayload[key] = null;
+            }
+        });
+
+        // 3. Perform the Upsert/Update
+        let dbQuery;
         
-        const { data, error } = await supabase
-            .from(table)
-            .upsert(cleanedPayload, { onConflict: conflictTarget })
-            .select()
-            .single();
+        // If ID is provided and not a temporary frontend ID, we should do a partial update.
+        // This avoids Postgres 'NOT NULL' constraint errors when doing partial updates on existing records.
+        if (cleanedPayload.id && !String(cleanedPayload.id).startsWith('temp_')) {
+            const updatePayload = { ...cleanedPayload };
+            delete updatePayload.id; // Optional, but cleaner
+            dbQuery = supabase.from(table).update(updatePayload).eq('id', cleanedPayload.id).select().single();
+        } else {
+            // It's an insert. Remove temp ID so the database can generate a proper UUID.
+            if (cleanedPayload.id && String(cleanedPayload.id).startsWith('temp_')) {
+                delete cleanedPayload.id;
+            }
+            dbQuery = supabase.from(table).insert([cleanedPayload]).select().single();
+        }
+        
+        const { data, error } = await dbQuery;
 
         if (error) {
             console.error(`❌ Admin Upsert Error [${table}]:`, error.message);

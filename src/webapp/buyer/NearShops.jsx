@@ -19,7 +19,7 @@ import 'leaflet/dist/leaflet.css';
 import './NearShops.css';
 import { supabase } from '../../supabase';
 import { useCart } from '../../context/CartContext';
-import { getShortestPathDistance } from '../../utils/dijkstra';
+import { getOSRMRoute } from '../../utils/dijkstra';
 
 // --- Leaflet Icon Fix & Customization ---
 const orangeIcon = new L.Icon({
@@ -165,11 +165,7 @@ const NearShops = ({ location, userCoords }) => {
     toast.success(`${product.name} added to cart`);
   };
 
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    if (!lat1 || !lon1 || !lat2 || !lon2) return 'N/A';
-    const dist = getShortestPathDistance(lat1, lon1, lat2, lon2);
-    return dist.toFixed(1);
-  };
+
 
   const fetchData = useCallback(async () => {
     try {
@@ -202,7 +198,8 @@ const NearShops = ({ location, userCoords }) => {
             name: title,
             category: item.category || (viewType === 'SHOPS' ? 'General' : 'Professional Service'),
             rating: item.rating || (viewType === 'SERVICES' ? 4.5 : 0),
-            distance: calculateDistance(userCoords?.lat, userCoords?.lng, lat, lng),
+            // distance will be updated asynchronously below
+            distance: 'N/A',
             lat: lat,
             lng: lng,
             image: item.photo_url || (viewType === 'SHOPS' ? "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80&w=800" : "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=500&q=80"),
@@ -212,7 +209,16 @@ const NearShops = ({ location, userCoords }) => {
           });
         }
       });
-      setShops(uniqueItems);
+      
+      const itemsWithDistance = await Promise.all(uniqueItems.map(async (item) => {
+        if (!userCoords?.lat || !userCoords?.lng || !item.lat || !item.lng) {
+          return { ...item, distance: 'N/A' };
+        }
+        const routeInfo = await getOSRMRoute(userCoords.lat, userCoords.lng, item.lat, item.lng);
+        return { ...item, distance: routeInfo.distanceKm.toFixed(1) };
+      }));
+
+      setShops(itemsWithDistance);
     } catch (err) {
       console.error("Failed to fetch data:", err);
       toast.error(`Could not load nearby ${viewType.toLowerCase()}`);

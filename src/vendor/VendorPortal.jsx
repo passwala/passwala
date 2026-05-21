@@ -89,6 +89,8 @@ const VendorPortal = ({ user, onLogout }) => {
   const [showSuccessPop, setShowSuccessPop] = useState(false);
   const [storeId, setStoreId] = useState(null);
   const [stats, setStats] = useState({ orders: 0, earnings: 0, pending: 0, rating: 0 });
+  const fileInputRef = React.useRef(null);
+  const [profileImage, setProfileImage] = useState(localStorage.getItem('vProfileImage') || null);
 
   // ⚡ REAL-TIME STATS ENGINE
   const fetchLiveStats = async () => {
@@ -106,7 +108,12 @@ const VendorPortal = ({ user, onLogout }) => {
       let foundStoreId = vendorData?.id;
       if (!foundStoreId) {
         const { data: vend } = await supabase.from('vendors').select('id').eq('phone', phone).maybeSingle();
-        if (vend) foundStoreId = vend.id;
+        if (vend) {
+          foundStoreId = vend.id;
+        } else {
+          const { data: prov } = await supabase.from('service_providers').select('id').eq('phone', phone).maybeSingle();
+          if (prov) foundStoreId = prov.id;
+        }
       }
 
       if (!foundStoreId) {
@@ -126,7 +133,11 @@ const VendorPortal = ({ user, onLogout }) => {
 
       // Fetch Real Rating from Stores Table
       let realRating = 4.8;
-      const { data: storeData } = await supabase.from('stores').select('rating').eq('vendor_id', foundStoreId).maybeSingle();
+      const { data: storeData } = await supabase
+        .from('stores')
+        .select('rating')
+        .or(`vendor_id.eq.${foundStoreId},id.eq.${foundStoreId}`)
+        .maybeSingle();
       if (storeData && typeof storeData.rating === 'number') {
         realRating = storeData.rating;
       }
@@ -146,6 +157,27 @@ const VendorPortal = ({ user, onLogout }) => {
     if (appStatus === 'dashboard') {
       fetchLiveStats();
 
+      const playNotificationBeep = () => {
+        try {
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const playBeep = (freq, duration, delay) => {
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime + delay);
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime + delay);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + delay + duration);
+            osc.start(audioCtx.currentTime + delay);
+            osc.stop(audioCtx.currentTime + delay + duration);
+          };
+          playBeep(880, 0.15, 0);
+          playBeep(1100, 0.2, 0.2);
+        } catch (err) {
+          console.warn("AudioContext beep failed:", err);
+        }
+      };
+
       const channel = supabase
         .channel('vendor-dashboard-realtime')
         .on('postgres_changes', { 
@@ -155,7 +187,8 @@ const VendorPortal = ({ user, onLogout }) => {
         }, (payload) => {
           fetchLiveStats();
           if (payload.eventType === 'INSERT') {
-            toast.success("New Order Received!", { icon: '🔔' });
+            toast.success(businessType === 'service' ? "New Booking Received!" : "New Order Received!", { icon: '🔔' });
+            playNotificationBeep();
           }
         })
         .subscribe();
@@ -164,7 +197,7 @@ const VendorPortal = ({ user, onLogout }) => {
         supabase.removeChannel(channel);
       };
     }
-  }, [appStatus, vendorData?.id]);
+  }, [appStatus, vendorData?.id, businessType]);
 
   useEffect(() => {
     localStorage.setItem('vendorActiveTab', activeTab);
@@ -652,6 +685,23 @@ const VendorPortal = ({ user, onLogout }) => {
       id: resolvedVendor.id || savedForm.id || localStorage.getItem('vPartnerId') || '4289'
     };
     const currentData = isEditingProfile ? editFormData : effectiveData;
+
+    const handleImageUpload = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        if (file.size > 2 * 1024 * 1024) {
+          toast.error("Image too large. Please select an image under 2MB.");
+          return;
+        }
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setProfileImage(reader.result);
+          localStorage.setItem('vProfileImage', reader.result);
+          toast.success("Profile photo updated successfully!");
+        };
+        reader.readAsDataURL(file);
+      }
+    };
     
     return (
       <div className="v-container animate-fade-in">
@@ -673,10 +723,15 @@ const VendorPortal = ({ user, onLogout }) => {
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', marginBottom: '3rem', paddingBottom: '2rem', borderBottom: '1px solid var(--v-border)', position: 'relative', zIndex: 1 }}>
             <div style={{ position: 'relative' }}>
-              <div style={{ width: '100px', height: '100px', borderRadius: '32px', background: 'linear-gradient(135deg, #f97316 0%, #ff8f3d 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', fontWeight: 900, boxShadow: '0 10px 25px rgba(249, 115, 22, 0.3)' }}>
-                {(currentData?.name || 'P').charAt(0).toUpperCase()}
+              <div style={{ width: '100px', height: '100px', borderRadius: '32px', background: profileImage ? 'transparent' : 'linear-gradient(135deg, #f97316 0%, #ff8f3d 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', fontWeight: 900, boxShadow: '0 10px 25px rgba(249, 115, 22, 0.3)', overflow: 'hidden' }}>
+                {profileImage ? (
+                  <img src={profileImage} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  (currentData?.name || 'P').charAt(0).toUpperCase()
+                )}
               </div>
-              <button style={{ position: 'absolute', bottom: '-5px', right: '-5px', width: '32px', height: '32px', borderRadius: '10px', background: 'white', border: '1px solid var(--v-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', cursor: 'pointer', color: 'var(--v-text-muted)' }}>
+              <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" style={{ display: 'none' }} />
+              <button onClick={() => fileInputRef.current?.click()} style={{ position: 'absolute', bottom: '-5px', right: '-5px', width: '32px', height: '32px', borderRadius: '10px', background: 'white', border: '1px solid var(--v-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', cursor: 'pointer', color: 'var(--v-text-muted)', zIndex: 10 }}>
                 <Camera size={16} />
               </button>
             </div>
@@ -774,7 +829,7 @@ const VendorPortal = ({ user, onLogout }) => {
               <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: '#475569', marginBottom: '12px' }}>
                 <IndianRupee size={16} color="var(--v-primary)" /> REGISTERED PHONE
               </label>
-              <div className="v-input v-readonly" style={{ padding: '14px 18px', background: '#f8fafc', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>+91 {resolvedVendor.phone || '9999999999'}</div>
+              <div className="v-input v-readonly" style={{ padding: '14px 18px', background: '#f8fafc', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>+91 {resolvedVendor.phone || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : '9999999999')}</div>
             </div>
 
             <div className="v-form-group" style={{ gridColumn: '1 / -1' }}>
@@ -1064,10 +1119,10 @@ const VendorPortal = ({ user, onLogout }) => {
                     if (data) savedId = data.id;
                   }
 
-                  if (savedId && targetTable === 'vendors') {
+                  if (savedId) {
                     await supabase.from('stores').upsert({
                       id: savedId,
-                      vendor_id: savedId,
+                      vendor_id: targetTable === 'vendors' ? savedId : null,
                       name: tablePayload.business_name,
                       address: tablePayload.address
                     });
