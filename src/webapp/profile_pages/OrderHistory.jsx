@@ -90,6 +90,7 @@ const OrderHistory = () => {
           .from('orders')
           .select('*, addresses(*)')
           .eq('user_id', resolvedUserId)
+          .neq('status', 'PENDING')
           .order('created_at', { ascending: false });
         
         if (error) throw error;

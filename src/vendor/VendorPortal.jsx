@@ -619,7 +619,7 @@ const VendorPortal = ({ user, onLogout }) => {
         }
 
         // 2. Delete any cart items or carts associated with this store
-        await supabase.from('cart').delete().eq('store_id', targetId);
+        await supabase.from('carts').delete().eq('store_id', targetId);
 
         // 3. Delete products and deals
         await supabase.from('products').delete().eq('store_id', targetId);

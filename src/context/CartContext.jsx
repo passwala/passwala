@@ -13,13 +13,25 @@ export const CartProvider = ({ children, user }) => {
     const userId = user?.id || user?.uid;
     if (userId) {
       const loadCart = async () => {
-        const { data } = await supabase
-          .from('carts')
-          .select('items')
-          .eq('user_id', userId)
-          .single();
-        if (data?.items) setCartItems(data.items);
-        setIsLoaded(true);
+        if (!supabase) {
+          setIsLoaded(true);
+          return;
+        }
+        try {
+          const { data, error } = await supabase
+            .from('carts')
+            .select('items')
+            .eq('user_id', userId)
+            .single();
+          if (error && error.code !== 'PGRST116') {
+            console.warn('Failed to load cart from Supabase:', error);
+          }
+          if (data?.items) setCartItems(data.items);
+        } catch (err) {
+          console.error('Error loading cart:', err);
+        } finally {
+          setIsLoaded(true);
+        }
       };
       loadCart();
     } else {
@@ -38,14 +50,25 @@ export const CartProvider = ({ children, user }) => {
 
     const timer = setTimeout(() => {
       const syncCart = async () => {
-        if (cartItems.length === 0) {
-          await supabase.from('carts').delete().eq('user_id', userId);
-        } else {
-          await supabase.from('carts').upsert({
-            user_id: userId,
-            items: cartItems,
-            updated_at: new Date()
-          });
+        if (!supabase) return;
+        try {
+          if (cartItems.length === 0) {
+            const { error } = await supabase.from('carts').delete().eq('user_id', userId);
+            if (error) {
+              console.warn('Failed to clear cart in Supabase:', error);
+            }
+          } else {
+            const { error } = await supabase.from('carts').upsert({
+              user_id: userId,
+              items: cartItems,
+              updated_at: new Date()
+            });
+            if (error) {
+              console.warn('Failed to sync cart to Supabase:', error);
+            }
+          }
+        } catch (err) {
+          console.error('Error syncing cart:', err);
         }
       };
       syncCart();

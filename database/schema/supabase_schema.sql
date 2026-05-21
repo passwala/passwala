@@ -154,11 +154,11 @@ CREATE TABLE inventory (
 -- 6. ORDERS & CART
 -- ==============================================
 
-CREATE TABLE cart (
+CREATE TABLE carts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    store_id UUID REFERENCES stores(id),
-    total_amount DECIMAL(10,2) DEFAULT 0.0,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+    store_id UUID REFERENCES stores(id) ON DELETE SET NULL,
+    items JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

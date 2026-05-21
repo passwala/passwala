@@ -166,9 +166,9 @@ const AppContent = ({
         }
         
         // Express Backend update
-        const port = window.location.port === '3001' ? '3004' : '3004'; // use standard local Express server port
+        const port = '3004'; // use standard local Express server port
         const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-          ? `http://${window.location.hostname}:3004` 
+          ? `http://${window.location.hostname}:${port}` 
           : 'https://passwala.onrender.com';
         
         const response = await fetch(`${baseUrl}/api/users/${effectiveUser.id}/fcm-token`, {
@@ -306,7 +306,9 @@ const AppContent = ({
               localStorage.setItem('passwala_user', JSON.stringify(vendorObj));
             }} />
           ) : (
-            <VendorPortal user={effectiveUser} onLogout={handleLogout} />
+            <RoleGuard allowedRoles={['VENDOR', 'ADMIN']} user={effectiveUser}>
+              <VendorPortal user={effectiveUser} onLogout={handleLogout} />
+            </RoleGuard>
           )
         ) : locationPath === '/select-location' ? (
           <LocationSelector
@@ -325,13 +327,15 @@ const AppContent = ({
               localStorage.setItem('passwala_user', JSON.stringify(riderObj));
             }} />
           ) : (
-            <RiderPortal
-              user={effectiveUser}
-              onLogout={handleLogout}
-              location={location}
-              setLocation={setLocation}
-              userCoords={userCoords}
-            />
+            <RoleGuard allowedRoles={['RIDER', 'ADMIN']} user={effectiveUser}>
+              <RiderPortal
+                user={effectiveUser}
+                onLogout={handleLogout}
+                location={location}
+                setLocation={setLocation}
+                userCoords={userCoords}
+              />
+            </RoleGuard>
           )
         ) : (
           <>
@@ -367,7 +371,12 @@ const AppContent = ({
 
             {/* 3. Main Content Routes */}
             <main className={isWebappMode ? `webapp-main ${currentView === 'PROFILE' ? 'profile-mode' : ''}` : 'web-marketing-main'}>
-              <Routes>
+              <Suspense fallback={
+                <div className="flex items-center justify-center min-h-[300px] w-full bg-transparent">
+                  <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#6366f1]"></div>
+                </div>
+              }>
+                <Routes>
                 {/* Home Route */}
                 <Route path="/" element={
                   <>
@@ -448,6 +457,7 @@ const AppContent = ({
                 <Route path="/select-location" element={effectiveUser ? <LocationSelector currentLocation={location} onLocationChange={setLocation} /> : <Navigate to="/" />} />
                 <Route path="/complete-profile" element={effectiveUser ? <CustomerDetails user={effectiveUser} onComplete={(addr, name) => { setIsProfileComplete(true); setUserAddress(addr); if (name) { setUser(prev => ({ ...prev, displayName: name })); } navigate('/'); }} /> : <Navigate to="/" />} />
               </Routes>
+              </Suspense>
             </main>
 
             {/* 4. Global Footers/Navs */}

@@ -40,16 +40,18 @@ function RiderEarnings({ _user, riderId, stats, isOnline, sessionStartTime }) {
                     .eq('status', 'DELIVERED');
                 
                 // Add time range filtering
-                const now = new Date();
                 if (timeRange === 'today') {
-                    const startOfDay = new Date(now.setHours(0,0,0,0)).toISOString();
-                    query = query.gte('created_at', startOfDay);
+                    const d = new Date();
+                    d.setHours(0,0,0,0);
+                    query = query.gte('created_at', d.toISOString());
                 } else if (timeRange === 'weekly') {
-                    const startOfWeek = new Date(now.setDate(now.getDate() - 7)).toISOString();
-                    query = query.gte('created_at', startOfWeek);
+                    const d = new Date();
+                    d.setDate(d.getDate() - 7);
+                    query = query.gte('created_at', d.toISOString());
                 } else if (timeRange === 'monthly') {
-                    const startOfMonth = new Date(now.setMonth(now.getMonth() - 1)).toISOString();
-                    query = query.gte('created_at', startOfMonth);
+                    const d = new Date();
+                    d.setMonth(d.getMonth() - 1);
+                    query = query.gte('created_at', d.toISOString());
                 }
 
                 const { data } = await query

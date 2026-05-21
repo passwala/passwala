@@ -608,12 +608,12 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
       <div className="track-head-row">
          <div className="live-status">
            <div className="live-pulse"></div> 
-           <span>{activeOrders.filter(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED').length} ACTIVE ORDERS</span>
+           <span>{activeOrders.filter(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED' && o.status !== 'PENDING').length} ACTIVE ORDERS</span>
          </div>
       </div>
 
       <div className="orders-list-v2" style={{ paddingBottom: '120px' }}>
-        {loading ? <p>Syncing neighborhood cloud...</p> : activeOrders.filter(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED').map((order, i) => {
+        {loading ? <p>Syncing neighborhood cloud...</p> : activeOrders.filter(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED' && o.status !== 'PENDING').map((order, i) => {
           const progress = getProgress(order.status);
           const firstItem = order.items?.[0] || { name: 'Order' };
           const itemCount = order.items?.length || 0;
@@ -709,7 +709,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
             </motion.div>
           );
         })}
-        {!loading && activeOrders.filter(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED').length === 0 && (
+        {!loading && activeOrders.filter(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED' && o.status !== 'PENDING').length === 0 && (
           <div className="empty-orders-placeholder-card" style={{ border: 'none', background: 'transparent', boxShadow: 'none' }}>
             <div className="placeholder-icon" style={{ background: '#f1f5f9', color: '#94a3b8' }}>📦</div>
             <h3 style={{ color: '#64748b' }}>No Active Orders</h3>

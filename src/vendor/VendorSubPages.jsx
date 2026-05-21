@@ -1323,7 +1323,7 @@ export const VendorOrders = ({ storeId, businessType }) => {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        {orders.filter(o => activeTab === 'active' ? o.status !== 'DELIVERED' : o.status === 'DELIVERED').map((order, i) => {
+        {orders.filter(o => activeTab === 'active' ? (o.status !== 'DELIVERED' && o.status !== 'CANCELLED' && o.status !== 'PENDING') : (o.status === 'DELIVERED' || o.status === 'CANCELLED')).map((order, i) => {
           const style = getStatusStyle(order.status);
           const isService = businessType === 'service';
           return (
