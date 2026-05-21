@@ -891,7 +891,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                 <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Route:</span>
               </div>
               <div style={{ display: 'flex', gap: '2px', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '2px', background: '#f8fafc' }}>
-                {['driving', 'cycling', 'foot'].map(mode => (
+                {['cycling'].map(mode => (
                   <button
                     key={mode} onClick={() => setRouteMode(mode)}
                     style={{

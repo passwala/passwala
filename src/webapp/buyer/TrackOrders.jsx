@@ -668,7 +668,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                 <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'white', padding: '8px 12px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 10 }}>
                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: riderCoords ? '#22c55e' : '#94a3b8', animation: riderCoords ? 'pulse 2s infinite' : 'none' }}></div>
                    <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>
-                     {riderCoords ? 'Live Tracking Active' : (order.status !== 'PLACED' ? (isService ? 'Expert on the way' : 'Rider on the move') : (isService ? 'Assigning Expert...' : 'Waiting for Rider...'))}
+                     {riderCoords ? 'Live Tracking Active' : (order.status !== 'PLACED' ? (isService ? 'Expert on the way' : 'Rider on the move') : (isService ? 'Waiting for Service Provider...' : 'Waiting for Rider...'))}
                    </span>
                 </div>
               </div>
@@ -678,14 +678,14 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                   <div className="eta-timer">
                     <Clock size={20} className="pulse-text" />
                     <span>
-                      {order.status === 'PLACED' ? (isService ? 'Confirming booking...' : 'Confirming order...') : 
+                      {order.status === 'PLACED' ? (isService ? 'Waiting for confirmation...' : 'Confirming order...') : 
                        order.status === 'DELIVERED' ? (isService ? 'Completed!' : 'Arrived!') : 
                        <>Arriving in <strong>{order.eta || '10 mins'}</strong></>}
                     </span>
                   </div>
                   <p className="eta-status">
-                    {order.status === 'PLACED' ? (isService ? 'Confirming booking with nearby experts...' : 'Confirming order with nearby riders...') : 
-                     order.status === 'ACCEPTED' ? (isService ? 'Expert Assigned, preparing service kit' : 'Rider Assigned, heading to the store') :
+                    {order.status === 'PLACED' ? (isService ? 'Waiting for service provider to confirm booking...' : 'Confirming order with nearby riders...') : 
+                     order.status === 'ACCEPTED' ? (isService ? 'Booking Confirmed, preparing service kit' : 'Rider Assigned, heading to the store') :
                      order.status === 'PREPARING' ? (isService ? 'Expert is preparing for service visit' : 'Rider is at the store picking up') :
                      order.status === 'SHIPPED' || order.status === 'DISPATCHED' ? (isService ? 'Expert is on the way to you' : 'Rider is on the way to you') : (isService ? 'Completed' : 'Delivered')}
                   </p>

@@ -931,7 +931,7 @@ function VendorOrderMapWrapper({ order, businessType }) {
         <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: riderCoords ? '#22c55e' : '#94a3b8', animation: riderCoords ? 'pulse 2s infinite' : 'none' }}></div>
         <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155' }}>
           {businessType === 'service'
-            ? ((riderCoords || ['ACCEPTED', 'PREPARING', 'DISPATCHED', 'SHIPPED'].includes(order.status)) ? 'Expert / Booking In Progress' : (order.rider_id ? 'Expert Assigned' : 'Waiting for Expert Assignment'))
+            ? (['ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED'].includes(order.status) ? 'Service in progress' : order.status === 'DELIVERED' ? 'Service completed' : 'Waiting for confirmation')
             : ((riderCoords || ['ACCEPTED', 'PREPARING', 'DISPATCHED', 'SHIPPED'].includes(order.status)) ? 'Rider / Order In Progress' : (order.rider_id ? 'Rider Assigned' : 'Waiting for Rider Assignment'))
           }
         </span>
