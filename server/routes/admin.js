@@ -26,7 +26,8 @@ const ALLOWED_ADMIN_TABLES = [
   'comments',
   'ai_recommendations',
   'wallet_transactions',
-  'reports'
+  'reports',
+  'service_areas'
 ];
 
 function base64urlEncode(strOrBuffer) {

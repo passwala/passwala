@@ -323,14 +323,39 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
         orderPayload.address_id = resolvedAddressId;
       }
 
-      const { data: newOrder, error } = await supabase
-        .from('orders')
-        .insert([orderPayload])
-        .select()
-        .single();
+      let newOrder = null;
+      let insertError = null;
 
-      if (error) {
-        throw error;
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .insert([orderPayload])
+          .select()
+          .single();
+        newOrder = data;
+        insertError = error;
+      } catch (err) {
+        insertError = err;
+      }
+
+      if (insertError) {
+        const errStr = insertError.message || String(insertError);
+        if (errStr.includes('payment_status')) {
+          console.warn("⚠️ Database orders table is missing the 'payment_status' column. Retrying insert without it.");
+          const fallbackPayload = { ...orderPayload };
+          delete fallbackPayload.payment_status;
+          
+          const { data, error } = await supabase
+            .from('orders')
+            .insert([fallbackPayload])
+            .select()
+            .single();
+            
+          if (error) throw error;
+          newOrder = data;
+        } else {
+          throw insertError;
+        }
       }
 
       if (newOrder) {
@@ -644,13 +669,32 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
       } else {
         toast.dismiss("mock_loader");
         // Simulated failure
-        await supabase
-          .from('orders')
-          .update({
-            payment_status: 'FAILED',
-            status: 'CANCELLED'
-          })
-          .eq('id', order.id);
+        try {
+          const { error } = await supabase
+            .from('orders')
+            .update({
+              payment_status: 'FAILED',
+              status: 'CANCELLED'
+            })
+            .eq('id', order.id);
+          
+          if (error && (error.message?.includes('payment_status') || String(error).includes('payment_status'))) {
+            await supabase
+              .from('orders')
+              .update({
+                status: 'CANCELLED'
+              })
+              .eq('id', order.id);
+          }
+        } catch (err) {
+          console.warn("Failed simulated failure update, trying status only", err);
+          await supabase
+            .from('orders')
+            .update({
+              status: 'CANCELLED'
+            })
+            .eq('id', order.id);
+        }
 
         toast.error('Sandbox payment failed! Order cancelled.', { icon: '❌' });
         setShowMockPayment(false);

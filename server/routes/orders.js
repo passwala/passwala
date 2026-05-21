@@ -105,18 +105,49 @@ router.post('/payment/verify', async (req, res) => {
     const finalOrderStatus = isVerified ? 'PLACED' : 'CANCELLED';
 
     // 1. Update the orders table in Supabase
-    const { data: order, error: orderErr } = await supabase
-      .from('orders')
-      .update({
-        payment_status: finalPaymentStatus,
-        status: finalOrderStatus,
-        razorpay_order_id,
-        razorpay_payment_id,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', orderId)
-      .select()
-      .single();
+    let order = null;
+    let orderErr = null;
+    const updatePayload = {
+      payment_status: finalPaymentStatus,
+      status: finalOrderStatus,
+      razorpay_order_id,
+      razorpay_payment_id,
+      updated_at: new Date().toISOString()
+    };
+
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .update(updatePayload)
+        .eq('id', orderId)
+        .select()
+        .single();
+      order = data;
+      orderErr = error;
+    } catch (err) {
+      orderErr = err;
+    }
+
+    if (orderErr) {
+      const errStr = orderErr.message || String(orderErr);
+      if (errStr.includes('payment_status') || errStr.includes('razorpay_')) {
+        console.warn("⚠️ Database orders table is missing custom payment columns. Retrying update with status only.");
+        const fallbackPayload = {
+          status: finalOrderStatus,
+          updated_at: new Date().toISOString()
+        };
+
+        const { data, error } = await supabase
+          .from('orders')
+          .update(fallbackPayload)
+          .eq('id', orderId)
+          .select()
+          .single();
+        
+        order = data;
+        orderErr = error;
+      }
+    }
 
     if (orderErr) {
       console.error('❌ Failed to update order status in Supabase:', orderErr.message);

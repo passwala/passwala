@@ -42,10 +42,10 @@ ADMIN_ACCESS_CODE=your_secure_admin_password
 ### 5. Database Setup (Supabase)
 To initialize your cloud database:
 1. Go to your [Supabase Dashboard](https://supabase.com/).
-2. Open the **SQL Editor**.
-3. Create a **New Query**.
-4. Copy and run the entire contents of `database/schema/setup_complete.sql`.
-   - This single script will create all tables, set up security policies (RLS), and add initial neighborhood data for Satellite, Ahmedabad.
+2. Open the **SQL Editor** and create a **New Query**.
+3. Copy and run the entire contents of `database/schema/supabase_schema.sql` to build the core tables and relationships.
+4. Next, copy and run `database/schema/chat_and_payments_setup.sql` to add real-time chat threads, relational messages, and custom payment tracking fields to the orders table.
+5. Finally, run `database/schema/service_areas_setup.sql` to initialize neighbor area validation tables and insert the pre-defined Ahmedabad societies.
 
 ---
 
