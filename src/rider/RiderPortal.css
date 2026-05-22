@@ -133,11 +133,16 @@
   color: var(--rider-text-secondary);
   border-right: 1px solid var(--rider-border);
   padding-right: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.rider-input {
+.rider-input,
+.rider-input-group input.rider-input,
+.rider-input-wrapper input.rider-input {
   width: 100%;
-  padding: 1rem 1rem 1rem 3rem;
+  padding: 1rem 1rem 1rem 3.5rem;
   border: 1.5px solid var(--rider-border);
   border-radius: 16px;
   background-color: #f8fafc;
@@ -148,7 +153,9 @@
   transition: all 0.2s ease;
 }
 
-.rider-input:focus {
+.rider-input:focus,
+.rider-input-group input.rider-input:focus,
+.rider-input-wrapper input.rider-input:focus {
   border-color: var(--rider-primary);
   box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.15);
   background-color: #ffffff;

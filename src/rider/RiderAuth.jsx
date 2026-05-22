@@ -302,6 +302,7 @@ function RiderAuth({ onLogin }) {
                       maxLength={10}
                       value={phone}
                       onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                      style={{ paddingLeft: '3.5rem' }}
                     />
                   </div>
                 </div>
