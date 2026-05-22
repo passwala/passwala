@@ -78,10 +78,14 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
 
   const fallbackToIP = async () => {
     try {
-      const res = await fetch('https://ipapi.co/json/');
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      
+      const res = await fetch(`${baseUrl}/api/ip-location`);
+      if (!res.ok) throw new Error('Proxied IP Location failed');
+      
       const data = await res.json();
-      if (data.city) {
-        const full = `${data.city}, ${data.region}`;
+      if (data && data.cityName && data.regionName) {
+        const full = `${data.cityName}, ${data.regionName}`;
         onLocationChange(full, { lat: parseFloat(data.latitude), lng: parseFloat(data.longitude) });
         toast.success(`Approximated: ${full}`, { id: 'geo', duration: 3000 });
       } else {
@@ -133,6 +137,20 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
              <strong>{detecting ? 'Locating...' : 'Detect My Exact Neighborhood'}</strong>
              <span>Enable GPS for high accuracy</span>
           </div>
+        </div>
+
+        <div className="privacy-notice" style={{ 
+          fontSize: '11px', 
+          color: '#64748b', 
+          textAlign: 'center', 
+          marginTop: '12px', 
+          padding: '8px 16px',
+          background: 'rgba(99, 102, 241, 0.05)',
+          borderRadius: '8px',
+          border: '1px solid rgba(99, 102, 241, 0.1)',
+          lineHeight: '1.4'
+        }}>
+          🔒 <strong>Privacy Guard Active:</strong> Your IP address is proxied securely through our backend server to prevent sharing your connection details with third-party tracking networks.
         </div>
 
         <div className="neighborhood-list-container">

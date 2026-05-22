@@ -30,9 +30,9 @@ const AdminAuth = ({ onAdminLogin }) => {
       if (res.ok && json.success) {
         toast.success('Admin Authorized!');
         // Persist admin session locally
-        localStorage.setItem('admin_session', 'true');
+        sessionStorage.setItem('admin_session', 'true');
         sessionStorage.setItem('admin_token', json.token);
-        localStorage.removeItem('admin_code');
+        sessionStorage.removeItem('admin_code');
         onAdminLogin();
       } else {
         toast.error(json.error || 'Invalid Credentials');

@@ -1,13 +1,9 @@
-/* eslint-disable */
 import React from 'react';
-import { useCart } from '../context/CartContext';
-import { useSearch } from '../context/SearchContext';
 import './Navbar.css';
 
-const Navbar = ({ isAuthenticated, user, onLogout, onOpenProfile, onOpenAI, onJoin }) => {
+const Navbar = ({ isAuthenticated, user, _onLogout, onOpenProfile, _onOpenAI, _onJoin }) => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
-  const { totalItems, setCartOpen } = useCart();
 
   React.useEffect(() => {
     const handleScroll = () => {
@@ -34,6 +30,7 @@ const Navbar = ({ isAuthenticated, user, onLogout, onOpenProfile, onOpenAI, onJo
              <a href="/#services" className="nav-pill-link">Services</a>
              <a href="/#essentials" className="nav-pill-link">Essentials</a>
              <a href="/#deals" className="nav-pill-link">Deals</a>
+             <a href="/planet-softweb" className="nav-pill-link" style={{ color: '#00d2ff', fontWeight: 'bold' }}>Planet Softweb</a>
              <a href="/#community" className="nav-pill-link">Community</a>
           </div>
         </div>
@@ -59,6 +56,7 @@ const Navbar = ({ isAuthenticated, user, onLogout, onOpenProfile, onOpenAI, onJo
            <a href="/#services" onClick={() => setIsMenuOpen(false)}>Services</a>
            <a href="/#essentials" onClick={() => setIsMenuOpen(false)}>Essentials</a>
            <a href="/#deals" onClick={() => setIsMenuOpen(false)}>Deals</a>
+           <a href="/planet-softweb" onClick={() => setIsMenuOpen(false)} style={{ color: '#00d2ff', fontWeight: 'bold' }}>Planet Softweb</a>
            <a href="/#community" onClick={() => setIsMenuOpen(false)}>Community</a>
            <hr />
            {isAuthenticated && (

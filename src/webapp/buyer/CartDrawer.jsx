@@ -5,6 +5,7 @@ import { useNotifications } from '../../context/NotificationContext';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from '../LanguageContext';
 import { supabase } from '../../supabase';
+import { DEFAULT_LOCATION } from '../../utils/constants';
 import './CartDrawer.css';
 
 import { useNavigate } from 'react-router-dom';
@@ -36,7 +37,7 @@ const loadRazorpayScript = () => {
 const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { cartItems, cartOpen, setCartOpen, removeFromCart, updateQty, clearCart, totalItems, totalPrice } = useCart();
+  const { cartItems, cartOpen, setCartOpen, removeFromCart, updateQty, clearCart, totalItems, totalPrice, error } = useCart();
   const { addNotification } = useNotifications();
   const [showConfirm, setShowConfirm] = React.useState(false);
   const [supportedAreas, setSupportedAreas] = React.useState([]);
@@ -226,7 +227,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
       }
 
       if (!resolvedAddressId && resolvedUserId) {
-        const addressLine = location || 'Paldi, Ahmedabad, Gujarat';
+        const addressLine = location || DEFAULT_LOCATION;
         const { data: newAddr, error: addrErr } = await supabase
           .from('addresses')
           .insert([{
@@ -307,237 +308,280 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
         }
       }
 
-      // 4. Build and insert order payload
-      const orderPayload = {
-        total_amount: total,
-        subtotal: total,
-        status: 'PENDING', // Initial status before payment confirmation
-        payment_status: 'PENDING',
-        delivery_fee: 0
-      };
-      if (resolvedUserId) orderPayload.user_id = resolvedUserId;
-      if (resolvedStoreId) orderPayload.store_id = resolvedStoreId;
-      if (userAddress?.id && userAddress.id.length === 36) {
-        orderPayload.address_id = userAddress.id;
-      } else if (resolvedAddressId) {
-        orderPayload.address_id = resolvedAddressId;
-      }
-
-      let newOrder = null;
-      let insertError = null;
-
-      try {
-        const { data, error } = await supabase
-          .from('orders')
-          .insert([orderPayload])
-          .select()
-          .single();
-        newOrder = data;
-        insertError = error;
-      } catch (err) {
-        insertError = err;
-      }
-
-      if (insertError) {
-        const errStr = insertError.message || String(insertError);
-        if (errStr.includes('payment_status')) {
-          console.warn("⚠️ Database orders table is missing the 'payment_status' column. Retrying insert without it.");
-          const fallbackPayload = { ...orderPayload };
-          delete fallbackPayload.payment_status;
-          
-          const { data, error } = await supabase
-            .from('orders')
-            .insert([fallbackPayload])
-            .select()
-            .single();
-            
-          if (error) throw error;
-          newOrder = data;
-        } else {
-          throw insertError;
+      // 4. Build and insert order payloads by store/provider (Order Splitting)
+      let storeIdFallback = resolvedStoreId;
+      if (!storeIdFallback) {
+        const { data: firstStore } = await supabase
+          .from('stores')
+          .select('id')
+          .limit(1)
+          .maybeSingle();
+        if (firstStore) {
+          storeIdFallback = firstStore.id;
         }
       }
 
-      if (newOrder) {
-        // Auto-upsert service items into products table if they are services, to satisfy foreign key constraint
-        for (const item of cartItems) {
-          if (item.type === 'service') {
-            await supabase.from('products').upsert({
-              id: item.id,
-              store_id: resolvedStoreId,
-              name: item.name,
-              price: item.price,
-              stock_quantity: 9999,
-              description: 'Service item auto-registered'
+      const groupedItems = {};
+      for (const item of cartItems) {
+        let sid = item.shop_id || item.store_id;
+        if (!sid || sid.length !== 36) {
+          sid = storeIdFallback;
+        }
+        if (!groupedItems[sid]) {
+          groupedItems[sid] = [];
+        }
+        groupedItems[sid].push(item);
+      }
+
+      const createdOrders = [];
+
+      for (const [sid, items] of Object.entries(groupedItems)) {
+        let currentResolvedStoreId = sid;
+        
+        // Satisfy the stores(id) foreign key constraint
+        const { data: directStore } = await supabase
+          .from('stores')
+          .select('id')
+          .eq('id', currentResolvedStoreId)
+          .maybeSingle();
+          
+        if (!directStore) {
+          // Check if it exists in service_providers (for service orders)
+          const { data: serviceProv } = await supabase
+            .from('service_providers')
+            .select('id, business_name, address')
+            .eq('id', currentResolvedStoreId)
+            .maybeSingle();
+
+          if (serviceProv) {
+            // Auto-upsert to stores table to satisfy foreign key constraint
+            await supabase.from('stores').upsert({
+              id: currentResolvedStoreId,
+              vendor_id: null,
+              name: serviceProv.business_name || 'Service Provider',
+              address: serviceProv.address || 'Service Area'
             });
           }
         }
 
-        const orderItems = cartItems.map(item => ({
-          order_id: newOrder.id,
-          product_id: (typeof item.id === 'string' && item.id.length === 36) ? item.id : null,
-          quantity: item.qty || 1,
-          price_at_purchase: item.price
-        }));
-        const { error: itemError } = await supabase.from('order_items').insert(orderItems);
-        if (itemError) console.warn("Order items save error:", itemError);
+        const groupSubtotal = items.reduce((sum, item) => sum + item.price * (item.qty || 1), 0);
+        const orderPayload = {
+          total_amount: groupSubtotal,
+          subtotal: groupSubtotal,
+          status: 'PENDING',
+          payment_status: 'PENDING',
+          delivery_fee: 0,
+          user_id: resolvedUserId,
+          store_id: currentResolvedStoreId,
+          address_id: (userAddress?.id && userAddress.id.length === 36) ? userAddress.id : resolvedAddressId
+        };
 
-        // Insert into service_bookings table for admin dashboard tracking
-        for (const item of cartItems) {
-          if (item.type === 'service') {
-            // 1. Resolve/verify provider_id
-            const { data: provData } = await supabase
-              .from('service_providers')
-              .select('id')
-              .eq('id', resolvedStoreId)
-              .maybeSingle();
+        let newOrder = null;
+        let insertError = null;
 
-            let bookingProviderId = provData?.id;
-            if (!bookingProviderId) {
-              const { data: anyProv } = await supabase
-                .from('service_providers')
-                .select('id')
-                .limit(1)
-                .maybeSingle();
-              bookingProviderId = anyProv?.id;
-            }
+        try {
+          const { data, error } = await supabase
+            .from('orders')
+            .insert([orderPayload])
+            .select()
+            .single();
+          newOrder = data;
+          insertError = error;
+        } catch (err) {
+          insertError = err;
+        }
 
-            // 2. Resolve/verify service_id
-            const { data: servData } = await supabase
-              .from('services')
-              .select('id')
-              .eq('id', item.id)
-              .maybeSingle();
-
-            let bookingServiceId = servData?.id;
-            if (!bookingServiceId) {
-              const { data: anyServ } = await supabase
-                .from('services')
-                .select('id')
-                .limit(1)
-                .maybeSingle();
-              bookingServiceId = anyServ?.id;
-            }
-
-            // 3. Only insert if we have both valid provider and service IDs
-            if (bookingProviderId && bookingServiceId) {
-              const { error: bookingErr } = await supabase.from('service_bookings').insert([{
-                user_id: resolvedUserId,
-                service_id: bookingServiceId,
-                provider_id: bookingProviderId,
-                address_id: orderPayload.address_id || null,
-                status: 'PENDING',
-                total_amount: item.price * (item.qty || 1),
-                scheduled_at: new Date().toISOString()
-              }]);
-              if (bookingErr) {
-                console.warn("Service booking insert error:", bookingErr.message);
-              }
-            }
+        if (insertError) {
+          const errStr = insertError.message || String(insertError);
+          if (errStr.includes('payment_status')) {
+            console.warn("⚠️ Database orders table is missing the 'payment_status' column. Retrying insert without it.");
+            const fallbackPayload = { ...orderPayload };
+            delete fallbackPayload.payment_status;
+            
+            const { data, error } = await supabase
+              .from('orders')
+              .insert([fallbackPayload])
+              .select()
+              .single();
+              
+            if (error) throw error;
+            newOrder = data;
+          } else {
+            throw insertError;
           }
         }
 
-        // Decrement product stock in database
-        try {
-          for (const item of cartItems) {
-            const isProd = typeof item.id === 'string' && item.id.length === 36;
-            if (isProd && item.type !== 'service') {
-              const { data: prodData } = await supabase
-                .from('products')
-                .select('stock_quantity')
+        if (newOrder) {
+          createdOrders.push({
+            order: newOrder,
+            items: items,
+            storeId: currentResolvedStoreId
+          });
+
+          // Auto-upsert service items into products table if they are services, to satisfy foreign key constraint
+          for (const item of items) {
+            if (item.type === 'service') {
+              await supabase.from('products').upsert({
+                id: item.id,
+                store_id: currentResolvedStoreId,
+                name: item.name,
+                price: item.price,
+                stock_quantity: 9999,
+                description: 'Service item auto-registered'
+              });
+            }
+          }
+
+          const orderItems = items.map(item => ({
+            order_id: newOrder.id,
+            product_id: (typeof item.id === 'string' && item.id.length === 36) ? item.id : null,
+            quantity: item.qty || 1,
+            price_at_purchase: item.price
+          }));
+          const { error: itemError } = await supabase.from('order_items').insert(orderItems);
+          if (itemError) console.warn("Order items save error:", itemError);
+
+          // Insert into service_bookings table for service items
+          for (const item of items) {
+            if (item.type === 'service') {
+              // 1. Resolve/verify provider_id
+              const { data: provData } = await supabase
+                .from('service_providers')
+                .select('id')
+                .eq('id', item.shop_id || item.store_id || currentResolvedStoreId)
+                .maybeSingle();
+
+              let bookingProviderId = provData?.id;
+              if (!bookingProviderId) {
+                const { data: anyProv } = await supabase
+                  .from('service_providers')
+                  .select('id')
+                  .limit(1)
+                  .maybeSingle();
+                bookingProviderId = anyProv?.id;
+              }
+
+              // 2. Resolve/verify service_id
+              const { data: servData } = await supabase
+                .from('services')
+                .select('id')
                 .eq('id', item.id)
                 .maybeSingle();
 
-              if (prodData) {
-                const currentStock = prodData.stock_quantity || 0;
-                const newStock = Math.max(0, currentStock - (item.qty || 1));
-                await supabase
-                  .from('products')
-                  .update({ stock_quantity: newStock })
-                  .eq('id', item.id);
+              let bookingServiceId = servData?.id;
+              if (!bookingServiceId) {
+                const { data: anyServ } = await supabase
+                  .from('services')
+                  .select('id')
+                  .limit(1)
+                  .maybeSingle();
+                bookingServiceId = anyServ?.id;
+              }
+
+              // 3. Only insert if we have both valid provider and service IDs
+              if (bookingProviderId && bookingServiceId) {
+                const { error: bookingErr } = await supabase.from('service_bookings').insert([{
+                  user_id: resolvedUserId,
+                  service_id: bookingServiceId,
+                  provider_id: bookingProviderId,
+                  address_id: orderPayload.address_id || null,
+                  status: 'PENDING',
+                  total_amount: item.price * (item.qty || 1),
+                  scheduled_at: new Date().toISOString()
+                }]);
+                if (bookingErr) {
+                  console.warn("Service booking insert error:", bookingErr.message);
+                }
               }
             }
           }
-        } catch (stockErr) {
-          console.warn("Could not decrement stock:", stockErr);
         }
+      }
 
-        // --- PAYMENT GATEWAY INTEGRATION ---
-        toast.loading("Initiating secure payment...", { id: "payment_loader" });
+      if (createdOrders.length === 0) {
+        throw new Error("No orders could be created.");
+      }
 
-        const createPayOrderRes = await fetch('/api/orders/payment/create', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            amount: total,
-            orderId: newOrder.id
-          })
+      const orderIdsString = createdOrders.map(o => o.order.id).join(',');
+
+      // --- PAYMENT GATEWAY INTEGRATION ---
+      toast.loading("Initiating secure payment...", { id: "payment_loader" });
+
+      const createPayOrderRes = await fetch('/api/orders/payment/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          amount: total,
+          orderId: orderIdsString
+        })
+      });
+
+      toast.dismiss("payment_loader");
+
+      if (!createPayOrderRes.ok) {
+        throw new Error("Could not create gateway transaction order.");
+      }
+
+      const razorpayOrder = await createPayOrderRes.json();
+
+      if (razorpayOrder.is_mock) {
+        // Launch custom sandbox payment dashboard
+        setMockPaymentDetails({
+          order: createdOrders[0].order,
+          createdOrders,
+          razorpayOrder,
+          total,
+          itemNames,
+          resolvedStoreId: createdOrders[0].storeId,
+          userObj
         });
-
-        toast.dismiss("payment_loader");
-
-        if (!createPayOrderRes.ok) {
-          throw new Error("Could not create gateway transaction order.");
+        setShowMockPayment(true);
+        setShowConfirm(false);
+        setIsPlacingOrder(false);
+      } else {
+        // Real Razorpay integration
+        const scriptLoaded = await loadRazorpayScript();
+        if (!scriptLoaded) {
+          throw new Error("Failed to load Razorpay SDK. Please check your internet connection.");
         }
 
-        const razorpayOrder = await createPayOrderRes.json();
+        const options = {
+          key: razorpayOrder.key_id,
+          amount: razorpayOrder.amount,
+          currency: razorpayOrder.currency || 'INR',
+          name: 'Passwala Ahmedabad',
+          description: 'Ahmedabad Neighborhood Delivery',
+          order_id: razorpayOrder.id,
+          handler: async function (response) {
+            try {
+              setIsPlacingOrder(true);
+              toast.loading("Verifying payment...", { id: "payment_verify_loader" });
 
-        if (razorpayOrder.is_mock) {
-          // Launch custom sandbox payment dashboard
-          setMockPaymentDetails({
-            order: newOrder,
-            razorpayOrder,
-            total,
-            itemNames,
-            resolvedStoreId,
-            userObj
-          });
-          setShowMockPayment(true);
-          setShowConfirm(false);
-          setIsPlacingOrder(false);
-        } else {
-          // Real Razorpay integration
-          const scriptLoaded = await loadRazorpayScript();
-          if (!scriptLoaded) {
-            throw new Error("Failed to load Razorpay SDK. Please check your internet connection.");
-          }
+              const verifyRes = await fetch('/api/orders/payment/verify', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_signature: response.razorpay_signature,
+                  orderId: orderIdsString
+                })
+              });
 
-          const options = {
-            key: razorpayOrder.key_id,
-            amount: razorpayOrder.amount,
-            currency: razorpayOrder.currency || 'INR',
-            name: 'Passwala Ahmedabad',
-            description: 'Ahmedabad Neighborhood Delivery',
-            order_id: razorpayOrder.id,
-            handler: async function (response) {
-              try {
-                setIsPlacingOrder(true);
-                toast.loading("Verifying payment...", { id: "payment_verify_loader" });
+              toast.dismiss("payment_verify_loader");
 
-                const verifyRes = await fetch('/api/orders/payment/verify', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify({
-                    razorpay_payment_id: response.razorpay_payment_id,
-                    razorpay_order_id: response.razorpay_order_id,
-                    razorpay_signature: response.razorpay_signature,
-                    orderId: newOrder.id
-                  })
-                });
+              if (!verifyRes.ok) {
+                throw new Error("Payment signature verification failed");
+              }
 
-                toast.dismiss("payment_verify_loader");
-
-                if (!verifyRes.ok) {
-                  throw new Error("Payment signature verification failed");
-                }
-
-                const verifyData = await verifyRes.json();
-                if (verifyData.success) {
-                  // Fire backend notifications
+              const verifyData = await verifyRes.json();
+              if (verifyData.success) {
+                // Fire backend notifications for each split order
+                for (const co of createdOrders) {
                   try {
                     await fetch('/api/orders/notify-new-order', {
                       method: 'POST',
@@ -545,56 +589,56 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
                         'Content-Type': 'application/json'
                       },
                       body: JSON.stringify({
-                        orderId: newOrder.id,
-                        storeId: resolvedStoreId
+                        orderId: co.order.id,
+                        storeId: co.storeId
                       })
                     });
                   } catch (notifErr) {
-                    console.warn("⚠️ Notification dispatch failed:", notifErr);
+                    console.warn("⚠️ Notification dispatch failed for order:", co.order.id, notifErr);
                   }
-
-                  const deliveryLoc = location ? location.split(',')[0] : 'Your Location';
-                  toast.success(`Payment successful! Order placed! ₹${total.toLocaleString()}`, { icon: '🎉', duration: 4000 });
-                  addNotification({
-                    icon: '📦',
-                    title: 'Order Paid & Placed!',
-                    body: `₹${total.toLocaleString()} • ${itemNames} • Payment verified. Delivery starting at ${deliveryLoc}.`,
-                    color: '#22c55e',
-                  });
-                  clearCart();
-                  setCartOpen(false);
-                  setShowConfirm(false);
-                  navigate('/track-orders');
-                } else {
-                  throw new Error("Signature verification rejected");
                 }
-              } catch (err) {
-                console.error("Payment verification failed:", err);
-                toast.error(`Verification Failed: ${err.message || 'Payment not verified'}`);
-              } finally {
-                setIsPlacingOrder(false);
-              }
-            },
-            prefill: {
-              name: userObj?.displayName || 'Passwala Customer',
-              email: userObj?.email || 'customer@passwala.com',
-              contact: userObj?.phoneNumber || ''
-            },
-            theme: {
-              color: '#ff7622'
-            },
-            modal: {
-              ondismiss: function () {
-                toast.error('Payment cancelled');
-                setIsPlacingOrder(false);
-              }
-            }
-          };
 
-          const rzp = new window.Razorpay(options);
-          rzp.open();
-          setShowConfirm(false);
-        }
+                const deliveryLoc = location ? location.split(',')[0] : 'Your Location';
+                toast.success(`Payment successful! Order placed! ₹${total.toLocaleString()}`, { icon: '🎉', duration: 4000 });
+                addNotification({
+                  icon: '📦',
+                  title: 'Order Paid & Placed!',
+                  body: `₹${total.toLocaleString()} • ${itemNames} • Payment verified. Delivery starting at ${deliveryLoc}.`,
+                  color: '#22c55e',
+                });
+                clearCart();
+                setCartOpen(false);
+                setShowConfirm(false);
+                navigate('/track-orders');
+              } else {
+                throw new Error("Signature verification rejected");
+              }
+            } catch (err) {
+              console.error("Payment verification failed:", err);
+              toast.error(`Verification Failed: ${err.message || 'Payment not verified'}`);
+            } finally {
+              setIsPlacingOrder(false);
+            }
+          },
+          prefill: {
+            name: userObj?.displayName || 'Passwala Customer',
+            email: userObj?.email || 'customer@passwala.com',
+            contact: userObj?.phoneNumber || ''
+          },
+          theme: {
+            color: '#ff7622'
+          },
+          modal: {
+            ondismiss: function () {
+              toast.error('Payment cancelled');
+              setIsPlacingOrder(false);
+            }
+          }
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+        setShowConfirm(false);
       }
     } catch (err) {
       console.error('Supabase checkout/payment failed:', err);
@@ -604,12 +648,17 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
     }
   };
 
-  const handleMockPaymentVerify = async (success) => {
+  const handleMockPaymentVerify = async (success, method = 'Sandbox') => {
     if (!mockPaymentDetails) return;
-    const { order, razorpayOrder, total, itemNames, resolvedStoreId } = mockPaymentDetails;
+    const { order, createdOrders, razorpayOrder, total, itemNames, resolvedStoreId } = mockPaymentDetails;
 
     setIsPlacingOrder(true);
-    toast.loading("Simulating payment authorization...", { id: "mock_loader" });
+    toast.loading(`Simulating ${method} authorization...`, { id: "mock_loader" });
+
+    // Determine target order ID(s)
+    const orderIdsString = createdOrders && createdOrders.length > 0 
+      ? createdOrders.map(co => co.order.id).join(',') 
+      : order.id;
 
     try {
       if (success) {
@@ -620,43 +669,49 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            razorpay_payment_id: `pay_mock_${Math.random().toString(36).substring(2, 10)}`,
+            razorpay_payment_id: `pay_mock_${method.toLowerCase()}_${Math.random().toString(36).substring(2, 10)}`,
             razorpay_order_id: razorpayOrder.id,
-            razorpay_signature: 'mock_signature',
-            orderId: order.id
+            razorpay_signature: `mock_signature_${method.toLowerCase()}`,
+            orderId: orderIdsString
           })
         });
 
         toast.dismiss("mock_loader");
 
         if (!verifyRes.ok) {
-          throw new Error('Sandbox payment signature verification failed');
+          throw new Error(`Sandbox ${method} payment verification failed`);
         }
 
         const verifyData = await verifyRes.json();
         if (verifyData.success) {
-          // Trigger notifications
-          try {
-            await fetch('/api/orders/notify-new-order', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                orderId: order.id,
-                storeId: resolvedStoreId
-              })
-            });
-          } catch (notifErr) {
-            console.warn('⚠️ Dispatch notification failure in mock:', notifErr);
+          // Trigger notifications for all split orders
+          const ordersToNotify = createdOrders && createdOrders.length > 0 
+            ? createdOrders 
+            : [{ order, storeId: resolvedStoreId }];
+
+          for (const co of ordersToNotify) {
+            try {
+              await fetch('/api/orders/notify-new-order', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  orderId: co.order.id,
+                  storeId: co.storeId
+                })
+              });
+            } catch (notifErr) {
+              console.warn('⚠️ Dispatch notification failure in mock:', notifErr);
+            }
           }
 
           const deliveryLoc = location ? location.split(',')[0] : 'Your Location';
-          toast.success(`Sandbox payment successful! ₹${total.toLocaleString()}`, { icon: '🎉', duration: 4000 });
+          toast.success(`${method} payment successful! ₹${total.toLocaleString()}`, { icon: '🎉', duration: 4000 });
           addNotification({
             icon: '📦',
-            title: 'Order Paid & Placed! (Sandbox)',
-            body: `₹${total.toLocaleString()} • ${itemNames} • Sandbox payment verified. Delivering to ${deliveryLoc}.`,
+            title: `Order Paid via ${method}!`,
+            body: `₹${total.toLocaleString()} • ${itemNames} • ${method} payment verified. Delivering to ${deliveryLoc}.`,
             color: '#22c55e',
           });
           clearCart();
@@ -664,11 +719,15 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
           setShowMockPayment(false);
           navigate('/track-orders');
         } else {
-          throw new Error('Sandbox signature verification rejected');
+          throw new Error(`Sandbox ${method} signature verification rejected`);
         }
       } else {
         toast.dismiss("mock_loader");
-        // Simulated failure
+        // Simulated failure - cancel all split orders
+        const ordersToCancel = createdOrders && createdOrders.length > 0 
+          ? createdOrders.map(co => co.order.id) 
+          : [order.id];
+
         try {
           const { error } = await supabase
             .from('orders')
@@ -676,7 +735,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
               payment_status: 'FAILED',
               status: 'CANCELLED'
             })
-            .eq('id', order.id);
+            .in('id', ordersToCancel);
           
           if (error && (error.message?.includes('payment_status') || String(error).includes('payment_status'))) {
             await supabase
@@ -684,7 +743,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
               .update({
                 status: 'CANCELLED'
               })
-              .eq('id', order.id);
+              .in('id', ordersToCancel);
           }
         } catch (err) {
           console.warn("Failed simulated failure update, trying status only", err);
@@ -693,7 +752,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
             .update({
               status: 'CANCELLED'
             })
-            .eq('id', order.id);
+            .in('id', ordersToCancel);
         }
 
         toast.error('Sandbox payment failed! Order cancelled.', { icon: '❌' });
@@ -730,7 +789,36 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
 
         {/* Items */}
         <div className="cart-body">
-          {cartItems.length === 0 ? (
+          {error ? (
+            <div className="cart-error-alert" style={{
+              margin: '16px',
+              padding: '16px',
+              background: '#fef2f2',
+              border: '1px solid #fee2e2',
+              borderRadius: '12px',
+              color: '#991b1b',
+              textAlign: 'center',
+              fontSize: '0.85rem'
+            }}>
+              <p style={{ fontWeight: 'bold', marginBottom: '8px' }}>⚠️ Cart Sync Failure</p>
+              <p style={{ margin: '0 0 12px 0', color: '#7f1d1d', lineHeight: '1.4' }}>{error}</p>
+              <button 
+                onClick={() => window.location.reload()} 
+                style={{
+                  background: '#991b1b',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '6px 12px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  fontSize: '0.8rem'
+                }}
+              >
+                Retry Load
+              </button>
+            </div>
+          ) : cartItems.length === 0 ? (
             <div className="cart-empty-v5">
               <div className="empty-illustration">
                 <div className="empty-bag-glow"></div>
@@ -943,7 +1031,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
 
       {/* Sandbox Payment Modal */}
       {showMockPayment && mockPaymentDetails && (
-        <div className="order-confirm-overlay-v4" style={{ zIndex: 1100 }}>
+        <div className="order-confirm-overlay-v4" style={{ zIndex: 4000 }}>
           <div className="order-confirm-modal-v4" style={{
             background: 'rgba(30, 41, 59, 0.95)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -960,7 +1048,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
-              justify: 'center',
+              justifyContent: 'center',
               margin: '0 auto 16px',
               boxShadow: '0 0 20px rgba(139, 92, 246, 0.5)'
             }}>
@@ -1020,7 +1108,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button 
-                onClick={() => handleMockPaymentVerify(true)}
+                onClick={() => handleMockPaymentVerify(true, 'Sandbox')}
                 disabled={isPlacingOrder}
                 style={{
                   background: 'linear-gradient(135deg, #10b981, #059669)',
@@ -1033,7 +1121,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
                   cursor: isPlacingOrder ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  justify: 'center',
+                  justifyContent: 'center',
                   gap: '8px',
                   transition: 'transform 0.1s, opacity 0.2s',
                   boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
@@ -1041,6 +1129,37 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
                 }}
               >
                 <span>Authorize & Pay Success</span>
+              </button>
+
+              {/* Paytm Simulated Option */}
+              <button 
+                onClick={() => {
+                  toast.success('Launching Paytm Secure Checkout...', { icon: '📲', duration: 1000 });
+                  setTimeout(() => {
+                    handleMockPaymentVerify(true, 'Paytm');
+                  }, 1200);
+                }}
+                disabled={isPlacingOrder}
+                style={{
+                  background: 'linear-gradient(135deg, #00baf2, #002e6e)',
+                  border: 'none',
+                  color: 'white',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  fontWeight: 800,
+                  fontSize: '0.9rem',
+                  cursor: isPlacingOrder ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  transition: 'transform 0.1s, opacity 0.2s',
+                  boxShadow: '0 4px 14px rgba(0, 186, 242, 0.45)',
+                  opacity: isPlacingOrder ? 0.7 : 1
+                }}
+              >
+                <span style={{ fontSize: '1.1rem', marginRight: '2px' }}>📱</span>
+                <span>Pay via Paytm (Simulated)</span>
               </button>
               
               <button 
@@ -1059,7 +1178,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
                   opacity: isPlacingOrder ? 0.7 : 1
                 }}
               >
-                Simulate Payment Decline
+                Cancel & Back to Near Shops
               </button>
             </div>
           </div>

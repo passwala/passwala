@@ -58,7 +58,7 @@ const ActivityFeed = ({ onLogout }) => {
   const [recent, setRecent] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchRecent = async () => {
+  const fetchRecent = useCallback(async () => {
     try {
       const adminKey = sessionStorage.getItem('admin_token') || '';
       const res = await fetch(`${API_URL}/api/admin/fetch?table=orders`, { headers: { 'x-admin-key': adminKey } });
@@ -86,7 +86,7 @@ const ActivityFeed = ({ onLogout }) => {
     } finally { 
       setLoading(false); 
     }
-  };
+  }, [onLogout]);
 
   useEffect(() => {
     fetchRecent();
@@ -109,7 +109,7 @@ const ActivityFeed = ({ onLogout }) => {
     return () => {
       adminSupabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchRecent]);
 
   if (loading) return <div style={{ padding: '1rem', color: '#64748b' }}>Syncing feed...</div>;
 
@@ -386,7 +386,7 @@ const AdminPanel = ({ onLogout, location }) => {
 
   const currentTab = useMemo(() => TABS.find(t => t.id === activeAdminTab) || TABS[0], [activeAdminTab]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const adminKey = sessionStorage.getItem('admin_token') || '';
       const res = await fetch(`${API_URL}/api/admin/stats`, { headers: { 'x-admin-key': adminKey } });
@@ -402,7 +402,7 @@ const AdminPanel = ({ onLogout, location }) => {
     } catch (err) {
       console.error('Stats error:', err);
     }
-  };
+  }, [onLogout]);
 
   const handlePurgeMockData = () => {
     setShowPurgeConfirm(true);
@@ -647,7 +647,7 @@ const AdminPanel = ({ onLogout, location }) => {
       fetchData();
     }
     localStorage.setItem('admin_active_tab', activeAdminTab);
-  }, [activeAdminTab, fetchData, fetchPeopleMapData, fetchReferences]);
+  }, [activeAdminTab, fetchData, fetchPeopleMapData, fetchReferences, fetchStats]);
 
   const handleExecuteDelete = async () => {
     if (!deleteConfirmId) return;

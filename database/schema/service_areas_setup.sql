@@ -41,7 +41,7 @@ ALTER TABLE chat_threads ENABLE ROW LEVEL SECURITY;
 
 -- Create Policies
 CREATE POLICY "Allow users to CRUD their own chat threads" ON chat_threads
-    FOR ALL USING (auth.uid() = user_id OR (user_id IS NOT NULL AND auth.role() = 'authenticated')); some default areas for testing
+    FOR ALL USING (auth.uid() = user_id OR (user_id IS NOT NULL AND auth.role() = 'authenticated')); -- some default areas for testing
 INSERT INTO service_areas (area_name, is_active) VALUES 
 ('Satellite', true),
 ('Bopal', true),

@@ -1,12 +1,9 @@
-/* eslint-disable */
 import React from 'react';
-import { toast } from 'react-hot-toast';
 import { ArrowRight, CheckCircle } from 'lucide-react';
 import './VendorCTA.css';
 
 const VendorCTA = () => {
   const [selectedPlan, setSelectedPlan] = React.useState('Growth');
-  const [isModalOpen, setIsModalOpen] = React.useState(false);
 
   const plans = [
     { name: 'Starter', price: '₹499/mo' },

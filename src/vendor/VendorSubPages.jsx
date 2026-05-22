@@ -177,8 +177,7 @@ export const VendorInventory = ({ businessType, storeId }) => {
         }
       });
 
-      // eslint-disable-next-line no-constant-condition
-      if (false) {
+      if (import.meta.env.DEV && unique.length === 0) {
         const demos = businessType === 'shop' ? [
           { id: 'd1', name: 'Fresh Farm Milk', detail: 'Organic A2 cow milk, delivered fresh every morning.', price: 75, image: 'https://images.unsplash.com/photo-1550583724-125581f7793d?auto=format&fit=crop&q=80&w=400', type: 'shop' },
           { id: 'd2', name: 'Artisan Brown Bread', detail: 'Freshly baked whole wheat bread with no preservatives.', price: 55, image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&q=80&w=400', type: 'shop' }

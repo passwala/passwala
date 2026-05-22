@@ -1,4 +1,3 @@
-/* eslint-disable */
 import React, { useState, useEffect } from 'react';
 import { Search, Sparkles, ArrowRight, ShieldCheck, TrendingUp } from 'lucide-react';
 import { useSearch } from '../context/SearchContext';
@@ -18,7 +17,7 @@ const Hero = () => {
         const { count: pCount } = await supabase.from('vendors').select('*', { count: 'exact', head: true });
         if (uCount) setCounts(prev => ({ ...prev, users: `${uCount}+` }));
         if (pCount) setCounts(prev => ({ ...prev, partners: `${pCount}+` }));
-      } catch (err) {}
+      } catch (err) { console.warn(err); }
     };
     fetchCounts();
   }, []);

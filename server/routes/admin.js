@@ -1,11 +1,18 @@
 import express from 'express';
 import crypto from 'crypto';
+import dotenv from 'dotenv';
 import supabase from '../supabase.js';
 import { authLimiter } from '../utils/rateLimiter.js';
 
+dotenv.config();
+
+if (!process.env.ADMIN_ACCESS_CODE) {
+  throw new Error('FATAL Startup Error: ADMIN_ACCESS_CODE environment variable is missing.');
+}
+
 const router = express.Router();
 
-const ADMIN_SECRET = process.env.ADMIN_ACCESS_CODE || 'PASSWALA99';
+const ADMIN_SECRET = process.env.ADMIN_ACCESS_CODE;
 
 const ALLOWED_ADMIN_TABLES = [
   'users',
@@ -97,7 +104,7 @@ export function verifyAdminToken(token) {
 router.post('/login', authLimiter, async (req, res) => {
   const { accessCode } = req.body;
   
-  const secureCode = process.env.ADMIN_ACCESS_CODE || 'PASSWALA99';
+  const secureCode = ADMIN_SECRET;
   
   if (accessCode === secureCode) {
     // Generate a secure JWT session token
@@ -111,19 +118,13 @@ router.post('/login', authLimiter, async (req, res) => {
 // Admin Authentication Middleware
 export const adminAuth = (req, res, next) => {
     const key = req.headers['x-admin-key'];
-    const validKey = process.env.ADMIN_ACCESS_CODE || 'PASSWALA99';
     
     if (!key) {
         console.warn('Unauthorized admin access attempt from IP: Missing key', req.ip);
         return res.status(401).json({ success: false, error: 'Unauthorized: Missing Admin Key' });
     }
 
-    // 1. Backwards compatibility: raw ADMIN_ACCESS_CODE
-    if (key === validKey) {
-        return next();
-    }
-
-    // 2. JWT Cryptographic session validation
+    // JWT Cryptographic session validation
     const decoded = verifyAdminToken(key);
     if (decoded) {
         req.adminSession = decoded;

@@ -795,7 +795,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
               <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
                 {(selectedOrderDetails.items || []).map((item, idx) => (
                   <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', borderBottom: idx !== (selectedOrderDetails.items || []).length - 1 ? '1px solid #e2e8f0' : 'none', background: '#fff' }}>
-                    <span style={{ color: '#334155', fontWeight: 500 }}>{item.quantity || 1}x {item.name || item.products?.name || 'Item'}</span>
+                    <span style={{ color: '#334155', fontWeight: 500 }}>{item.qty || item.quantity || 1}x {item.name || item.products?.name || 'Item'}</span>
                     <span style={{ color: '#0f172a', fontWeight: 600 }}>₹{item.price_at_purchase || item.price || 0}</span>
                   </div>
                 ))}

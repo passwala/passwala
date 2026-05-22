@@ -1,26 +1,23 @@
-/* eslint-disable */
 import React, { useState } from 'react';
 import { Phone, CheckCircle, Navigation, Shield, Bike, UploadCloud, Camera, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../supabase';
 import { auth } from '../firebase';
-import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { RecaptchaVerifier } from 'firebase/auth';
 import './RiderPortal.css'; // Import custom styles
 
 const CameraModal = ({ isOpen, onClose, onCapture, mode = 'user' }) => {
   const videoRef = React.useRef(null);
   const [stream, setStream] = React.useState(null);
 
-  React.useEffect(() => {
-    if (isOpen) {
-      startCamera();
-    } else {
-      stopCamera();
+  const stopCamera = React.useCallback(() => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
     }
-    return () => stopCamera();
-  }, [isOpen]);
+  }, [stream]);
 
-  const startCamera = async () => {
+  const startCamera = React.useCallback(async () => {
     try {
       const s = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: mode === 'user' ? 'user' : 'environment' } 
@@ -32,14 +29,16 @@ const CameraModal = ({ isOpen, onClose, onCapture, mode = 'user' }) => {
       toast.error('Could not access camera. Please check permissions.');
       onClose();
     }
-  };
+  }, [mode, onClose]);
 
-  const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
+  React.useEffect(() => {
+    if (isOpen) {
+      startCamera();
+    } else {
+      stopCamera();
     }
-  };
+    return () => stopCamera();
+  }, [isOpen, startCamera, stopCamera]);
 
   const capture = () => {
     const canvas = document.createElement('canvas');
@@ -106,7 +105,7 @@ function RiderAuth({ onLogin }) {
     setCameraConfig({ isOpen: true, field, mode });
   };
 
-  const [confirmationResult, setConfirmationResult] = useState(null);
+  const [confirmationResult, _setConfirmationResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
   React.useEffect(() => {
@@ -118,7 +117,7 @@ function RiderAuth({ onLogin }) {
     };
   }, []);
 
-  const setupRecaptcha = () => {
+  const _setupRecaptcha = () => {
     try {
       if (window.recaptchaVerifier) return;
       

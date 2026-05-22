@@ -32,3 +32,6 @@ scratch/
 # Agent Configuration Directories
 .antigravitycli/
 
+# Generated Firebase Service Worker
+public/firebase-messaging-sw.js
+

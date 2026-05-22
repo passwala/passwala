@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, X, MessageSquare, Bot, User, Loader2, ArrowLeft } from 'lucide-react';
 // eslint-disable-next-line no-unused-vars
 import { AnimatePresence, motion } from 'framer-motion';
@@ -29,10 +29,10 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor, user }) => {
   };
 
   // Helper to find or create chat thread in Supabase
-  const findOrCreateChat = async (expert) => {
+  const findOrCreateChat = useCallback(async (expert) => {
     if (!user?.id || !supabase) return null;
     try {
-      const { data: existing, error } = await supabase
+      const { data: existing } = await supabase
         .from('chats')
         .select('*')
         .eq('user_id', user.id)
@@ -76,12 +76,84 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor, user }) => {
       console.warn('⚠️ Error finding/creating chat in Supabase:', err);
       return null;
     }
-  };
+  }, [user?.id]);
 
-  // 1. Fetch remote threads and messages from Supabase when user logs in
+  // 1. Fetch & Sync remote threads and messages from Supabase when user logs in
   useEffect(() => {
-    const fetchRemoteThreads = async () => {
+    const syncAndFetchThreads = async () => {
       if (!user?.id || !supabase) return;
+      
+      try {
+        // First sync local unsynced threads to Supabase
+        const saved = localStorage.getItem('passwala_chat_threads');
+        const localThreads = saved ? JSON.parse(saved) : [];
+        
+        if (localThreads.length > 0) {
+          for (const thread of localThreads) {
+            if (!thread.vendorId) continue;
+            
+            // Check if thread exists in DB
+            const { data: existingChat } = await supabase
+              .from('chats')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('vendor_id', thread.vendorId)
+              .maybeSingle();
+              
+            if (!existingChat) {
+              // Create chat in DB
+              const { data: created, error: insErr } = await supabase
+                .from('chats')
+                .insert([{
+                  user_id: user.id,
+                  vendor_id: thread.vendorId,
+                  vendor_name: thread.vendorName,
+                  vendor_title: thread.vendorTitle,
+                  vendor_image: thread.vendorImage,
+                  category: thread.category,
+                  price: thread.price ? Number(thread.price) : 199,
+                  provider_id: thread.providerId,
+                  last_message: thread.lastMessage,
+                  timestamp: thread.timestamp
+                }])
+                .select()
+                .single();
+                
+              if (!insErr && created && thread.messages && thread.messages.length > 0) {
+                const msgsToInsert = thread.messages.map(m => ({
+                  chat_id: created.id,
+                  sender: m.sender === 'ai' ? 'vendor' : m.sender, // Normalize sender for DB
+                  text: m.text
+                }));
+                await supabase.from('chat_messages').insert(msgsToInsert);
+              }
+            } else {
+              // Sync missing messages
+              const { data: existingMsgs } = await supabase
+                .from('chat_messages')
+                .select('text, sender')
+                .eq('chat_id', existingChat.id);
+                
+              const missing = (thread.messages || []).filter(tm => 
+                !existingMsgs?.some(em => em.text === tm.text && em.sender === (tm.sender === 'ai' ? 'vendor' : tm.sender))
+              );
+              
+              if (missing.length > 0) {
+                const msgsToInsert = missing.map(m => ({
+                  chat_id: existingChat.id,
+                  sender: m.sender === 'ai' ? 'vendor' : m.sender,
+                  text: m.text
+                }));
+                await supabase.from('chat_messages').insert(msgsToInsert);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ Error syncing local threads to Supabase:', err);
+      }
+
+      // Now fetch remote threads
       try {
         const { data, error } = await supabase
           .from('chats')
@@ -135,7 +207,7 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor, user }) => {
       }
     };
 
-    fetchRemoteThreads();
+    syncAndFetchThreads();
   }, [user]);
 
   // 2. Real-time delivery via Supabase Channel subscription
@@ -266,7 +338,7 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor, user }) => {
     };
     window.addEventListener('open-ai-chat', handleOpenChatEvent);
     return () => window.removeEventListener('open-ai-chat', handleOpenChatEvent);
-  }, [chatThreads, user]);
+  }, [chatThreads, user, findOrCreateChat]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -278,30 +350,25 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor, user }) => {
     if (!input.trim()) return;
     const userInput = input.trim();
     const userMsg = { id: Date.now(), text: userInput, sender: 'user', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-    setMessages(prev => [...prev, userMsg]);
+    
+    // Update local messages immediately so user sees their message
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setInput('');
     setIsTyping(true);
 
-    setTimeout(() => {
-      let aiResponse = "";
-      const lowerInput = userInput.toLowerCase();
+    const lowerInput = userInput.toLowerCase();
 
-      // --- VERNACULAR GREETINGS ---
-      if (lowerInput.includes('kem cho') || lowerInput.includes('kevu')) {
-        aiResponse = "Maja ma! 🙏 Hoon tamari Ahmedabad Community Help Bot chhu. Su madad karu? (I can help in Gujarati, Hindi & English)";
-      }
-      else if (lowerInput.includes('kaise ho') || lowerInput.includes('namaste')) {
-        aiResponse = "Main bilkul theek hoon! 🙏 Aapki Ahmedabad neighborhood Help Bot sahayta ke liye taiyar hai. Kya madad karu?";
-      }
-
-      // --- VENDOR ONBOARDING FLOW (WA STYLE) ---
-      else if (lowerInput.includes('vendor') || lowerInput.includes('sell') || lowerInput.includes('dukaan') || lowerInput.includes('bhandar')) {
-        setSessionState('ONBOARDING');
-        setOnboardingStep(1);
-        aiResponse = "Wonderful choice! Joining Passwala as a Vendor is as easy as sending a message. 📱 Let's start. \n\nWhat is your **Business Name**?";
-      } 
-      else if (sessionState === 'ONBOARDING') {
-        if (onboardingStep === 1) {
+    // 1. Check if we need to route to Vendor Onboarding
+    const isVendorKeyword = lowerInput.includes('vendor') || lowerInput.includes('sell') || lowerInput.includes('dukaan') || lowerInput.includes('bhandar');
+    if (isVendorKeyword || sessionState === 'ONBOARDING') {
+      setTimeout(() => {
+        let aiResponse = "";
+        if (isVendorKeyword) {
+          setSessionState('ONBOARDING');
+          setOnboardingStep(1);
+          aiResponse = "Wonderful choice! Joining Passwala as a Vendor is as easy as sending a message. 📱 Let's start. \n\nWhat is your **Business Name**?";
+        } else if (onboardingStep === 1) {
           setOnboardingData({ ...onboardingData, name: userInput });
           setOnboardingStep(2);
           aiResponse = `Got it, *${userInput}*! ✍️ \n\nNext, what **Category** best describes your shop? (e.g. Grocery, Dairy, Fruits, or Plumbing Service)`;
@@ -320,37 +387,57 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor, user }) => {
              }, 3000);
           }
         }
-      }
+        setMessages(prev => [...prev, { id: Date.now() + 1, text: aiResponse, sender: 'ai', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
+        setIsTyping(false);
+      }, 1000);
+      return;
+    }
 
-      // --- SERVICE BOOKING FLOW ---
-      else if (lowerInput.includes('leak') || lowerInput.includes('plumb') || lowerInput.includes('tap')) {
-        aiResponse = "I identify a Plumbing issue. 🚰 I've found verified Plumbers in your neighborhood. Should I book a inspection with a top-rated professional?";
-      }
-      else if (lowerInput.includes('light') || lowerInput.includes('wire') || lowerInput.includes('fan') || lowerInput.includes('electric')) {
-        aiResponse = "Electrical issue detected. ⚡ I'm checking available 'Neighborhood Endorsed' electricians. I've found a professional nearby. Book now?";
-      }
+    // 2. Otherwise, delegate to the real AI proxy endpoint
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${baseUrl}/api/ai/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ messages: updatedMessages })
+      });
 
-      // --- ORDER TRACKING ---
-      else if (lowerInput.includes('track') || lowerInput.includes('order status') || lowerInput.includes('kaha hai')) {
-        aiResponse = "I'm checking your active orders. 📦 Your order is being prepared and will be with you shortly. You can see the live map in the 'Track' tab!";
-      }
-
-      // --- SCHEDULING & GROUPING ---
-      else if (lowerInput.includes('morning') || lowerInput.includes('schedule') || lowerInput.includes('group')) {
-        aiResponse = "Good idea! ⏰ You can 'Schedule for 7 AM' directly from your cart for daily essentials. Also, if your neighbors are ordering, you'll see a 'Floor Group' discount automatically!";
-      }
-
-      // --- LANGUAGE & GENERAL ---
-      else if (lowerInput.includes('kaise') || lowerInput.includes('baat')) {
-        aiResponse = "Main aapki sahayta kar sakti hoon! Aapko plumber chahiye ya grocery ki dukaan? Mujhe batayein.";
-      }
-      else {
-        aiResponse = "Passwala Help Bot at your service! 🏙️ I can help you find groceries, book home services, or register your local business. Just ask me!";
-      }
-
-      setMessages(prev => [...prev, { id: Date.now() + 1, text: aiResponse, sender: 'ai', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
+      if (!res.ok) throw new Error('API server returned error');
+      const data = await res.json();
+      
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        text: data.text,
+        sender: 'ai',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }]);
+    } catch (err) {
+      console.warn('⚠️ Real AI Chat call failed, using rule-based local backup:', err);
+      // Local keyword matching backup
+      setTimeout(() => {
+        let aiResponse = "";
+        if (lowerInput.includes('kem cho') || lowerInput.includes('kevu')) {
+          aiResponse = "Maja ma! 🙏 Hoon tamari Ahmedabad Community Help Bot chhu. Su madad karu? (I can help in Gujarati, Hindi & English)";
+        } else if (lowerInput.includes('kaise ho') || lowerInput.includes('namaste')) {
+          aiResponse = "Main bilkul theek hoon! 🙏 Aapki Ahmedabad neighborhood Help Bot sahayta ke liye taiyar hai. Kya madad karu?";
+        } else if (lowerInput.includes('leak') || lowerInput.includes('plumb') || lowerInput.includes('tap')) {
+          aiResponse = "I identify a Plumbing issue. 🚰 I've found verified Plumbers in your neighborhood. Should I book a inspection with a top-rated professional?";
+        } else if (lowerInput.includes('light') || lowerInput.includes('wire') || lowerInput.includes('fan') || lowerInput.includes('electric')) {
+          aiResponse = "Electrical issue detected. ⚡ I'm checking available 'Neighborhood Endorsed' electricians. I've found a professional nearby. Book now?";
+        } else if (lowerInput.includes('track') || lowerInput.includes('order status') || lowerInput.includes('kaha hai')) {
+          aiResponse = "I'm checking your active orders. 📦 Your order is being prepared and will be with you shortly. You can see the live map in the 'Track' tab!";
+        } else if (lowerInput.includes('morning') || lowerInput.includes('schedule') || lowerInput.includes('group')) {
+          aiResponse = "Good idea! ⏰ You can 'Schedule for 7 AM' directly from your cart for daily essentials. Also, if your neighbors are ordering, you'll see a 'Floor Group' discount automatically!";
+        } else {
+          aiResponse = "Passwala Help Bot at your service! 🏙️ I can help you find groceries, book home services, or register your local business. Just ask me!";
+        }
+        setMessages(prev => [...prev, { id: Date.now() + 1, text: aiResponse, sender: 'ai', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
+      }, 1000);
+    } finally {
       setIsTyping(false);
-    }, 1200);
+    }
   };
 
   const handleSendVendorMessage = async (text) => {

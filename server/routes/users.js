@@ -11,6 +11,7 @@ let googleCertCache = {
   certs: null,
   expiresAt: 0
 };
+let pendingFetchPromise = null;
 
 async function fetchGoogleCerts() {
   const now = Date.now();
@@ -18,17 +19,31 @@ async function fetchGoogleCerts() {
     return googleCertCache.certs;
   }
 
-  return new Promise((resolve, reject) => {
+  if (pendingFetchPromise) {
+    return pendingFetchPromise;
+  }
+
+  pendingFetchPromise = new Promise((resolve, reject) => {
     https.get('https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com', (res) => {
+      // Dynamic max-age header parsing
+      const cacheControl = res.headers['cache-control'];
+      let maxAge = 3600; // default 1 hour in seconds
+      if (cacheControl) {
+        const match = cacheControl.match(/max-age=(\d+)/);
+        if (match) {
+          maxAge = parseInt(match[1], 10);
+        }
+      }
+
       let data = '';
       res.on('data', (chunk) => { data += chunk; });
       res.on('end', () => {
+        pendingFetchPromise = null;
         try {
           const certs = JSON.parse(data);
-          // Cache for 1 hour
           googleCertCache = {
             certs,
-            expiresAt: Date.now() + 3600000
+            expiresAt: Date.now() + maxAge * 1000
           };
           resolve(certs);
         } catch (e) {
@@ -36,9 +51,12 @@ async function fetchGoogleCerts() {
         }
       });
     }).on('error', (err) => {
+      pendingFetchPromise = null;
       reject(err);
     });
   });
+
+  return pendingFetchPromise;
 }
 
 function base64urlDecode(str) {
@@ -54,6 +72,9 @@ export async function verifyFirebaseToken(token) {
 
   // Support local development mock tokens
   if (token.startsWith('mock_session_token_')) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Mock session tokens are not allowed in production mode.');
+    }
     const uid = token.replace('mock_session_token_', '');
     return {
       uid,
@@ -111,7 +132,7 @@ export async function verifyFirebaseToken(token) {
     throw new Error('Token has expired');
   }
 
-  const projectId = 'passwala-75faa';
+  const projectId = process.env.FIREBASE_PROJECT_ID || 'passwala-75faa';
   if (payload.iss !== `https://securetoken.google.com/${projectId}`) {
     throw new Error('Invalid issuer: ' + payload.iss);
   }
@@ -133,12 +154,6 @@ export const userAuth = async (req, res, next) => {
   try {
     // 1. Check for Admin Access
     const adminKey = req.headers['x-admin-key'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '');
-    const validAdminKey = process.env.ADMIN_ACCESS_CODE || 'PASSWALA99';
-    
-    if (adminKey && adminKey === validAdminKey) {
-      req.isAdmin = true;
-      return next();
-    }
     
     if (adminKey) {
       const decodedAdmin = verifyAdminToken(adminKey);

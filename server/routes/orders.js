@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import Razorpay from 'razorpay';
 import supabase from '../supabase.js';
 import { sendNotification } from '../utils/notifications.js';
-import { apiLimiter } from '../utils/rateLimiter.js';
+import { userAuth } from './users.js';
 
 const router = express.Router();
 
@@ -19,8 +19,6 @@ if (keyId && keySecret) {
   });
 }
 
-// Apply API general rate limit on orders routes
-router.use(apiLimiter);
 
 /**
  * POST /api/orders/payment/create
@@ -36,6 +34,9 @@ router.post('/payment/create', async (req, res) => {
   try {
     // If Razorpay keys are missing or set to dummy values, run in simulated mode
     if (!razorpay || keyId.startsWith('rzp_test_mock')) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('Razorpay payment gateway credentials are not configured.');
+      }
       console.log(`[Razorpay Simulator] Creating mock payment order for DB Order: ${orderId}`);
       const mockOrder = {
         id: `order_mock_${Math.random().toString(36).substring(2, 10)}`,
@@ -73,18 +74,92 @@ router.post('/payment/create', async (req, res) => {
  * POST /api/orders/payment/verify
  * Verifies Razorpay payment signature and updates order status.
  */
-router.post('/payment/verify', async (req, res) => {
+router.post('/payment/verify', userAuth, async (req, res) => {
   const { razorpay_payment_id, razorpay_order_id, razorpay_signature, orderId } = req.body;
 
   if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature || !orderId) {
     return res.status(400).json({ error: 'Missing payment verification details' });
   }
 
+  // 1. Input Format Validations
+  // Razorpay payment ID format check
+  const paymentIdRegex = /^(pay_[a-zA-Z0-9]+|pay_mock_[a-zA-Z0-9]+|mock_[a-zA-Z0-9]+)$/;
+  if (!paymentIdRegex.test(razorpay_payment_id)) {
+    return res.status(400).json({ error: 'Invalid Razorpay payment ID format' });
+  }
+
+  // Razorpay order ID format check
+  const razorpayOrderIdRegex = /^(order_[a-zA-Z0-9]+|order_mock_[a-zA-Z0-9]+|mock_[a-zA-Z0-9]+)$/;
+  if (!razorpayOrderIdRegex.test(razorpay_order_id)) {
+    return res.status(400).json({ error: 'Invalid Razorpay order ID format' });
+  }
+
+  // Parse and check UUID formats for order IDs
+  const orderIds = (typeof orderId === 'string' 
+    ? (orderId.includes(',') ? orderId.split(',') : [orderId]) 
+    : (Array.isArray(orderId) ? orderId : [orderId]))
+    .map(id => typeof id === 'string' ? id.trim() : id)
+    .filter(id => id && id.length > 0);
+
+  const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  for (const id of orderIds) {
+    if (!uuidRegex.test(id)) {
+      return res.status(400).json({ error: `Invalid order ID format: ${id}` });
+    }
+  }
+
   try {
+    // 2. Ownership Verification
+    let dbUserId = null;
+    if (req.user && req.user.uid) {
+      const { data: dbUser, error: dbUserErr } = await supabase
+        .from('users')
+        .select('id')
+        .eq('uid', req.user.uid)
+        .maybeSingle();
+
+      if (dbUserErr) {
+        console.error('❌ Failed to fetch user from DB:', dbUserErr.message);
+        return res.status(500).json({ error: 'Database verification failed' });
+      }
+      if (dbUser) {
+        dbUserId = dbUser.id;
+      }
+    }
+
+    if (!dbUserId && !req.isAdmin) {
+      return res.status(401).json({ error: 'Unauthorized: No matching database user profile' });
+    }
+
+    // Fetch target orders to verify ownership
+    const { data: ordersToCheck, error: fetchOrdersErr } = await supabase
+      .from('orders')
+      .select('id, user_id')
+      .in('id', orderIds);
+
+    if (fetchOrdersErr) {
+      console.error('❌ Failed to verify order ownership:', fetchOrdersErr.message);
+      return res.status(500).json({ error: 'Order verification failed' });
+    }
+
+    if (!ordersToCheck || ordersToCheck.length === 0) {
+      return res.status(404).json({ error: 'Orders not found' });
+    }
+
+    if (!req.isAdmin) {
+      const isOwnerOfAll = ordersToCheck.every(o => o.user_id === dbUserId);
+      if (!isOwnerOfAll) {
+        return res.status(403).json({ error: 'Forbidden: You do not own these orders' });
+      }
+    }
+
     let isVerified = false;
 
     // Verify signature
     if (!razorpay || keyId.startsWith('rzp_test_mock')) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('Mock payment signatures are not allowed in production.');
+      }
       // Mock validation
       console.log(`[Razorpay Simulator] Verifying payment for mock order ID: ${razorpay_order_id}`);
       isVerified = (razorpay_signature === 'mock_signature' || razorpay_signature.startsWith('mock_'));
@@ -104,7 +179,7 @@ router.post('/payment/verify', async (req, res) => {
     const finalPaymentStatus = isVerified ? 'PAID' : 'FAILED';
     const finalOrderStatus = isVerified ? 'PLACED' : 'CANCELLED';
 
-    // 1. Update the orders table in Supabase
+    // 3. Update the orders table in Supabase
     let order = null;
     let orderErr = null;
     const updatePayload = {
@@ -119,10 +194,10 @@ router.post('/payment/verify', async (req, res) => {
       const { data, error } = await supabase
         .from('orders')
         .update(updatePayload)
-        .eq('id', orderId)
-        .select()
-        .single();
-      order = data;
+        .in('id', orderIds)
+        .select();
+      
+      order = data && data.length > 0 ? data[0] : null;
       orderErr = error;
     } catch (err) {
       orderErr = err;
@@ -140,11 +215,10 @@ router.post('/payment/verify', async (req, res) => {
         const { data, error } = await supabase
           .from('orders')
           .update(fallbackPayload)
-          .eq('id', orderId)
-          .select()
-          .single();
+          .in('id', orderIds)
+          .select();
         
-        order = data;
+        order = data && data.length > 0 ? data[0] : null;
         orderErr = error;
       }
     }
@@ -155,15 +229,66 @@ router.post('/payment/verify', async (req, res) => {
     }
 
     // 2. Also update associated service_bookings if any
-    const { error: bookingErr } = await supabase
-      .from('service_bookings')
-      .update({
-        status: finalOrderStatus
-      })
-      .eq('id', orderId); // booking shares order ID or is related, handle safely
+    try {
+      const { data: updatedOrders } = await supabase
+        .from('orders')
+        .select('user_id, store_id')
+        .in('id', orderIds);
 
-    if (bookingErr) {
-      console.warn('⚠️ Service bookings status update failed (non-critical):', bookingErr.message);
+      if (updatedOrders && updatedOrders.length > 0) {
+        for (const ord of updatedOrders) {
+          await supabase
+            .from('service_bookings')
+            .update({ status: finalOrderStatus })
+            .eq('user_id', ord.user_id)
+            .eq('provider_id', ord.store_id);
+        }
+      }
+    } catch (bookingErr) {
+      console.warn('⚠️ Service bookings status update failed (non-critical):', bookingErr.message || bookingErr);
+    }
+
+    // 3. Decrement product stock in database on successful verification
+    if (isVerified) {
+      try {
+        const { data: orderItems, error: itemsErr } = await supabase
+          .from('order_items')
+          .select('product_id, quantity')
+          .in('order_id', orderIds);
+
+        if (itemsErr) {
+          console.error('❌ Failed to fetch order items for stock decrement:', itemsErr.message);
+        } else if (orderItems && orderItems.length > 0) {
+          for (const item of orderItems) {
+            if (item.product_id) {
+              const { data: product, error: prodErr } = await supabase
+                .from('products')
+                .select('id, stock_quantity, description')
+                .eq('id', item.product_id)
+                .maybeSingle();
+
+              if (prodErr) {
+                console.error(`❌ Failed to fetch product details for ${item.product_id}:`, prodErr.message);
+              } else if (product && product.description !== 'Service item auto-registered') {
+                const currentStock = product.stock_quantity || 0;
+                const newStock = Math.max(0, currentStock - (item.quantity || 1));
+                const { error: updateErr } = await supabase
+                  .from('products')
+                  .update({ stock_quantity: newStock })
+                  .eq('id', product.id);
+
+                if (updateErr) {
+                  console.error(`❌ Failed to update stock for product ${product.id}:`, updateErr.message);
+                } else {
+                  console.log(`[Stock Engine] Securely decremented stock for product ${product.id} from ${currentStock} to ${newStock}`);
+                }
+              }
+            }
+          }
+        }
+      } catch (stockErr) {
+        console.warn('⚠️ Product stock decrement failed (non-critical):', stockErr.message || stockErr);
+      }
     }
 
     res.json({
@@ -191,7 +316,7 @@ router.post('/notify-new-order', async (req, res) => {
   try {
     console.log(`[Notification Engine] Processing notifications for Order #${orderId.substring(0,8)}`);
 
-    // 1. Notify Vendor
+    // 1. Notify Vendor / Service Provider
     const { data: store, error: storeErr } = await supabase
       .from('stores')
       .select('name, vendors(user_id)')
@@ -202,44 +327,73 @@ router.post('/notify-new-order', async (req, res) => {
       console.error('❌ Error fetching store vendor:', storeErr.message);
     }
 
-    const vendorUserId = store?.vendors?.user_id;
-    if (vendorUserId) {
-      console.log(`[Notification Engine] Notifying Store Owner/Vendor: User ID ${vendorUserId}`);
+    let providerUserId = store?.vendors?.user_id;
+    let isServiceBooking = false;
+
+    if (!providerUserId) {
+      // Check if it exists in service_providers
+      const { data: prov, error: provErr } = await supabase
+        .from('service_providers')
+        .select('user_id')
+        .eq('id', storeId)
+        .maybeSingle();
+
+      if (provErr) {
+        console.error('❌ Error fetching service provider user:', provErr.message);
+      }
+
+      if (prov) {
+        providerUserId = prov.user_id;
+        isServiceBooking = true;
+      }
+    }
+
+    if (providerUserId) {
+      console.log(`[Notification Engine] Notifying Provider/Vendor: User ID ${providerUserId}`);
+      const title = isServiceBooking ? 'New Booking Received! 🛠️' : 'New Order Received! 🛍️';
+      const msg = isServiceBooking 
+        ? `A customer has booked a new service #${orderId.substring(0, 8)} with you. Please review details.`
+        : `A customer has placed a new order #${orderId.substring(0, 8)} at your store "${store?.name || 'Local Store'}". Please prepare the items.`;
+
       await sendNotification(
-        vendorUserId,
-        'New Order Received! 🛍️',
-        `A customer has placed a new order #${orderId.substring(0, 8)} at your store "${store.name}". Please prepare the items.`,
+        providerUserId,
+        title,
+        msg,
         { orderId, type: 'new_order' }
       );
     } else {
-      console.log(`⚠️ Store "${store?.name || storeId}" has no associated vendor user ID, skipping vendor push.`);
+      console.log(`⚠️ Store "${store?.name || storeId}" has no associated user ID, skipping push.`);
     }
 
-    // 2. Notify Active Riders
-    const { data: activeRiders, error: ridersErr } = await supabase
-      .from('riders')
-      .select('user_id')
-      .eq('is_active', true)
-      .eq('is_verified', true);
+    // 2. Notify Active Riders (Only if it's not a service booking)
+    if (!isServiceBooking) {
+      const { data: activeRiders, error: ridersErr } = await supabase
+        .from('riders')
+        .select('user_id')
+        .eq('is_active', true)
+        .eq('is_verified', true);
 
-    if (ridersErr) {
-      console.error('❌ Error fetching active riders:', ridersErr.message);
-    }
+      if (ridersErr) {
+        console.error('❌ Error fetching active riders:', ridersErr.message);
+      }
 
-    if (activeRiders && activeRiders.length > 0) {
-      console.log(`[Notification Engine] Notifying ${activeRiders.length} Active, Verified Riders`);
-      for (const rider of activeRiders) {
-        if (rider.user_id && rider.user_id !== vendorUserId) { // Avoid notifying if rider is also store owner
-          await sendNotification(
-            rider.user_id,
-            'New Delivery Job! 🛵',
-            `A new order #${orderId.substring(0, 8)} is ready for pick-up at "${store?.name || 'Local Store'}". Earn extra on delivery!`,
-            { orderId, type: 'rider_job' }
-          );
+      if (activeRiders && activeRiders.length > 0) {
+        console.log(`[Notification Engine] Notifying ${activeRiders.length} Active, Verified Riders`);
+        for (const rider of activeRiders) {
+          if (rider.user_id && rider.user_id !== providerUserId) { // Avoid notifying if rider is also store owner
+            await sendNotification(
+              rider.user_id,
+              'New Delivery Job! 🛵',
+              `A new order #${orderId.substring(0, 8)} is ready for pick-up at "${store?.name || 'Local Store'}". Earn extra on delivery!`,
+              { orderId, type: 'rider_job' }
+            );
+          }
         }
+      } else {
+        console.log('ℹ️ No active, verified riders currently online to receive push.');
       }
     } else {
-      console.log('ℹ️ No active, verified riders currently online in Ahmedabad to receive push.');
+      console.log('ℹ️ Service booking detected. Skipping rider notifications.');
     }
 
     res.json({ success: true, message: 'Notifications dispatched successfully' });
@@ -249,4 +403,46 @@ router.post('/notify-new-order', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/orders/user-history/:userId
+ * Securely fetches order history with order items for a specific user using service role
+ */
+router.get('/user-history/:userId', async (req, res) => {
+  const { userId } = req.params;
+
+  if (!userId || userId.length !== 36) {
+    return res.status(400).json({ error: 'A valid 36-character user UUID is required' });
+  }
+
+  try {
+    const { data: dbOrders, error } = await supabase
+      .from('orders')
+      .select(`
+        *, 
+        addresses(*),
+        stores(name),
+        order_items(
+          id,
+          quantity,
+          price_at_purchase,
+          products(name)
+        )
+      `)
+      .eq('user_id', userId)
+      .neq('status', 'PENDING')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error(`❌ Error fetching order history for user ${userId}:`, error.message);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json(dbOrders || []);
+  } catch (err) {
+    console.error('🔥 Server Error in user-history endpoint:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 export default router;
+

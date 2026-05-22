@@ -246,7 +246,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
 
         let query = supabase
           .from('orders')
-          .select('*, stores(name, address, lat, lng, vendor_id), addresses(*), users(full_name), order_items(id, products(description))')
+          .select('*, stores(name, address, lat, lng, vendor_id), addresses(*), users(full_name), order_items(id, quantity, products(description))')
           .in('status', ['PLACED', 'PREPARING'])
           .gt('total_amount', 0)
           .gt('created_at', yesterday.toISOString())
@@ -330,7 +330,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
             distance: `${totalDist.toFixed(1)} km`, 
             earnings: `₹${order.total_amount || 50}`, 
             time: `${Math.round(totalDist * 5 + 5)} mins`, 
-            items: order.order_items?.length || 2,
+            items: order.order_items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 1,
             dbId: order.id,
             storeCoords: storeCoords,
             customerCoords: customerCoords

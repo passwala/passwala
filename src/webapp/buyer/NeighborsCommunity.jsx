@@ -18,10 +18,11 @@ import {
 } from 'lucide-react';
 import './NeighborsCommunity.css';
 import { supabase } from '../../supabase';
+import { DEFAULT_LOCATION } from '../../utils/constants';
 
 const NeighborsCommunity = ({ onBack, location }) => {
   const currentArea = location?.split(',')[0] || 'Greenwood Hills';
-  const currentFull = location || 'Ahmedabad, Gujarat';
+  const currentFull = location || DEFAULT_LOCATION;
   const [activeTab, setActiveTab] = useState('Feed');
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);

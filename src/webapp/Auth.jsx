@@ -1,4 +1,3 @@
-/* eslint-disable */
 import React, { useState, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import {
@@ -33,16 +32,9 @@ const Auth = ({ onLogin }) => {
     return 'PHONE';
   });
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [userName, setUserName] = useState('');
-  const [userEmail, setUserEmail] = useState('');
-  const [houseNo, setHouseNo] = useState('');
-  const [society, setSociety] = useState('');
-  const [landmark, setLandmark] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(0);
-  const [confirmationResult, setConfirmationResult] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [tempCred, setTempCred] = useState(null);
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
   const [syncedUser, setSyncedUser] = useState(null);
   const [showSearch, setShowSearch] = useState(false);
@@ -105,6 +97,7 @@ const Auth = ({ onLogin }) => {
   };
 
   const handleVerifyOtp = async () => {
+    const confirmationResult = null; // Mock placeholder for Firebase OTP confirmation
     const otpValue = otp.join('');
     if (otpValue.length !== 6) { toast.error('Enter 6-digit Code'); return; }
     try {
@@ -140,7 +133,7 @@ const Auth = ({ onLogin }) => {
           ...userData,
           address: { address_line_1: '', address_line_2: '' }
         })
-      }).catch(e => console.warn("Cloud skip"));
+      }).catch(() => console.warn("Cloud skip"));
 
       const userWithAddress = { ...userData, address: '' };
       localStorage.setItem('passwala_user', JSON.stringify(userWithAddress));
@@ -251,13 +244,13 @@ const Auth = ({ onLogin }) => {
     let currentUserToLog = syncedUser || (storedUser ? JSON.parse(storedUser) : null);
 
     if (currentUserToLog) {
-      if (!currentUserToLog.displayName && userName) {
-        currentUserToLog.displayName = userName;
+      if (!currentUserToLog.displayName) {
+        currentUserToLog.displayName = 'Passwala User';
       }
       localStorage.setItem('passwala_user', JSON.stringify(currentUserToLog));
       onLogin(currentUserToLog);
     } else {
-      const fallbackUser = { displayName: userName || 'Passwala User', address: addressName };
+      const fallbackUser = { displayName: 'Passwala User', address: addressName };
       localStorage.setItem('passwala_user', JSON.stringify(fallbackUser));
       onLogin(fallbackUser);
     }

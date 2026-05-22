@@ -1,7 +1,8 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import fs from 'fs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -25,6 +26,43 @@ export default defineConfig(({ mode }) => {
                  isVendor ? 'dist/vendor' : 
                  isRider ? 'dist/rider' : 
                  isAdmin ? 'dist/admin' : 'dist';
+
+  const env = loadEnv(mode, process.cwd(), '');
+
+  const firebaseSWContent = `/* eslint-disable no-undef */
+importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
+
+firebase.initializeApp({
+  apiKey: "${env.VITE_FIREBASE_API_KEY || ''}",
+  authDomain: "${env.VITE_FIREBASE_AUTH_DOMAIN || ''}",
+  projectId: "${env.VITE_FIREBASE_PROJECT_ID || ''}",
+  storageBucket: "${env.VITE_FIREBASE_STORAGE_BUCKET || ''}",
+  messagingSenderId: "${env.VITE_FIREBASE_MESSAGING_SENDER_ID || ''}",
+  appId: "${env.VITE_FIREBASE_APP_ID || ''}"
+});
+
+const messaging = firebase.messaging();
+
+messaging.onBackgroundMessage((payload) => {
+  console.log('[firebase-messaging-sw.js] Received background message ', payload);
+  const notificationTitle = payload.notification.title;
+  const notificationOptions = {
+    body: payload.notification.body,
+    icon: '/logo.png'
+  };
+
+  self.registration.showNotification(notificationTitle, notificationOptions);
+});
+`;
+
+  try {
+    const swPath = path.resolve(__dirname, 'public/firebase-messaging-sw.js');
+    fs.writeFileSync(swPath, firebaseSWContent, 'utf-8');
+    console.log('✅ Dynamic firebase-messaging-sw.js successfully generated in public directory.');
+  } catch (err) {
+    console.error('❌ Failed to write dynamic firebase-messaging-sw.js:', err.message);
+  }
 
   return {
     plugins: [react()],

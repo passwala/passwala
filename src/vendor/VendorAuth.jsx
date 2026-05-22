@@ -1,8 +1,9 @@
-/* eslint-disable */
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import './VendorPortal.css';
+
+const _ = motion;
 
 const VendorAuth = ({ onLogin }) => {
   const [phoneNumber, setPhoneNumber] = useState('');

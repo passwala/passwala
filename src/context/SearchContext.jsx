@@ -1,4 +1,3 @@
-/* eslint-disable */
 import React, { createContext, useContext, useState } from 'react';
 
 const SearchContext = createContext();
@@ -17,6 +16,7 @@ export const SearchProvider = ({ children }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useSearch = () => {
   const context = useContext(SearchContext);
   if (!context) {

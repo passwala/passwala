@@ -1,5 +1,5 @@
 import React, { Suspense, useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom'
+import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom'
 import Navbar from './web/Navbar'
 import Hero from './web/Hero'
 import AIRecommendations from './web/AIRecommendations'
@@ -12,32 +12,17 @@ import VendorCTA from './web/VendorCTA'
 import SplashScreen from './webapp/SplashScreen'
 import NeighborhoodHub from './webapp/buyer/NeighborhoodHub'
 import Auth from './webapp/Auth'
-import AdminPanel from './webapp/AdminPanel'
-import NearShops from './webapp/buyer/NearShops'
-import ExpertServices from './webapp/buyer/ExpertServices'
-import NeighborsCommunity from './webapp/buyer/NeighborsCommunity'
-import WebappProfile from './webapp/WebappProfile'
 import WebappNavbar from './webapp/WebappNavbar'
 import BottomNav from './webapp/BottomNav'
 import LocationSelector from './webapp/LocationSelector'
 import AdminAuth from './webapp/AdminAuth'
-import VendorPortal from './vendor/VendorPortal'
 import VendorAuth from './vendor/VendorAuth'
-import RiderPortal from './rider/RiderPortal'
 import RiderAuth from './rider/RiderAuth'
-import TrackOrders from './webapp/buyer/TrackOrders'
-import OrderHistory from './webapp/profile_pages/OrderHistory'
-import Wallet from './webapp/profile_pages/Wallet'
-import PrivacySecurity from './webapp/profile_pages/PrivacySecurity'
-import HelpSupport from './webapp/profile_pages/HelpSupport'
-import AppSettings from './webapp/profile_pages/AppSettings'
 import Footer from './web/Footer'
 import Policies from './web/Policies'
 import { Toaster, toast } from 'react-hot-toast'
 import './App.css'
 
-import { auth } from './firebase'
-import { onAuthStateChanged } from 'firebase/auth'
 import { supabase } from './supabase'
 import AIAssistant from './webapp/AIAssistant'
 import CustomerDetails from './webapp/CustomerDetails'
@@ -46,14 +31,35 @@ import CartDrawer from './webapp/buyer/CartDrawer'
 import { NotificationProvider, useNotifications } from './context/NotificationContext'
 import { SearchProvider } from './context/SearchContext'
 import { LanguageProvider } from './webapp/LanguageContext'
-import { parseAddressLine } from './utils/address'
 
-const appMode = import.meta.env.MODE || '';
-const isWebMode = appMode === 'web' || (appMode !== 'webapp' && appMode !== 'vendor' && appMode !== 'rider' && appMode !== 'admin' && window.location.port === '3000');
-const isWebappMode = appMode === 'webapp' || (appMode === 'development' && window.location.port === '3001');
-const isVendorMode = appMode === 'vendor' || (appMode === 'development' && window.location.port === '3002');
-const isRiderMode = appMode === 'rider' || (appMode === 'development' && window.location.port === '3003');
-const isAdminMode = appMode === 'admin' || (appMode === 'development' && window.location.port === '3005');
+// Custom Hooks
+import { useAuth } from './hooks/useAuth'
+import { useLocation as useAppLocation } from './hooks/useLocation'
+import { useTheme } from './hooks/useTheme'
+
+// Code Splitting - Lazy Load heavy screens
+const AdminPanel = React.lazy(() => import('./webapp/AdminPanel'));
+const VendorPortal = React.lazy(() => import('./vendor/VendorPortal'));
+const RiderPortal = React.lazy(() => import('./rider/RiderPortal'));
+const NearShops = React.lazy(() => import('./webapp/buyer/NearShops'));
+const ExpertServices = React.lazy(() => import('./webapp/buyer/ExpertServices'));
+const NeighborsCommunity = React.lazy(() => import('./webapp/buyer/NeighborsCommunity'));
+const TrackOrders = React.lazy(() => import('./webapp/buyer/TrackOrders'));
+const WebappProfile = React.lazy(() => import('./webapp/WebappProfile'));
+const OrderHistory = React.lazy(() => import('./webapp/profile_pages/OrderHistory'));
+const Wallet = React.lazy(() => import('./webapp/profile_pages/Wallet'));
+const PrivacySecurity = React.lazy(() => import('./webapp/profile_pages/PrivacySecurity'));
+const HelpSupport = React.lazy(() => import('./webapp/profile_pages/HelpSupport'));
+const AppSettings = React.lazy(() => import('./webapp/profile_pages/AppSettings'));
+const PlanetSoftweb = React.lazy(() => import('./planet_softweb/PlanetSoftweb'));
+
+// Dedicated Environment-based Modes (no fragile port fallbacks)
+const appMode = import.meta.env.VITE_APP_MODE || import.meta.env.MODE || 'web';
+const isWebMode = appMode === 'web';
+const isWebappMode = appMode === 'webapp';
+const isVendorMode = appMode === 'vendor';
+const isRiderMode = appMode === 'rider';
+const isAdminMode = appMode === 'admin';
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -64,8 +70,6 @@ const ScrollToTop = () => {
   }, [pathname]);
   return null;
 };
-
-
 
 // 🛡️ Security Guard Component for Role-Based Access
 const RoleGuard = ({ children, allowedRoles, user, loading }) => {
@@ -86,9 +90,188 @@ const RoleGuard = ({ children, allowedRoles, user, loading }) => {
   return children;
 };
 
+export class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("Global ErrorBoundary caught an error", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)',
+          color: '#f8fafc',
+          fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+          padding: '2rem',
+          textAlign: 'center'
+        }}>
+          <div style={{
+            background: 'rgba(30, 41, 59, 0.7)',
+            backdropFilter: 'blur(16px)',
+            borderRadius: '24px',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            padding: '3rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            maxWidth: '560px',
+            width: '100%',
+            animation: 'fadeIn 0.6s ease-out'
+          }}>
+            <div style={{
+              width: '80px',
+              height: '80px',
+              background: 'linear-gradient(135deg, #ec4899 0%, #f43f5e 100%)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.5rem',
+              boxShadow: '0 10px 20px rgba(244, 63, 94, 0.3)'
+            }}>
+              <span style={{ fontSize: '2.5rem' }}>⚠️</span>
+            </div>
+            <h1 style={{
+              fontSize: '2rem',
+              fontWeight: '800',
+              marginBottom: '1rem',
+              background: 'linear-gradient(to right, #38bdf8, #818cf8)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>
+              Something went wrong
+            </h1>
+            <p style={{ color: '#94a3b8', fontSize: '1rem', lineHeight: '1.6', marginBottom: '2rem' }}>
+              Passwala encountered an unexpected error. We have logged the issue and are looking into it. Your data is secure and safe.
+            </p>
+            {this.state.error && (
+              <div style={{
+                background: 'rgba(15, 23, 42, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                borderRadius: '12px',
+                padding: '1rem',
+                textAlign: 'left',
+                overflowX: 'auto',
+                marginBottom: '2rem',
+                maxHeight: '150px'
+              }}>
+                <pre style={{
+                  margin: 0,
+                  fontFamily: 'monospace',
+                  fontSize: '0.85rem',
+                  color: '#f43f5e',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all'
+                }}>
+                  {this.state.error.stack || this.state.error.toString()}
+                </pre>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+              <button
+                onClick={() => window.location.reload()}
+                style={{
+                  padding: '0.85rem 2rem',
+                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                  color: '#ffffff',
+                  fontWeight: '600',
+                  fontSize: '0.95rem',
+                  borderRadius: '12px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
+                  transition: 'all 0.2s ease',
+                  outline: 'none'
+                }}
+              >
+                Reload Passwala
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// 🛡️ Sub-tree Error Boundaries
+class AdminErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '2rem', background: '#fff1f2', color: '#9f1239', minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', fontFamily: 'sans-serif' }}>
+          <div style={{ background: 'white', padding: '2.5rem', borderRadius: '16px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', maxWidth: '500px', width: '100%', textAlign: 'center' }}>
+            <span style={{ fontSize: '3rem' }}>🔒</span>
+            <h2 style={{ marginTop: '1rem', fontSize: '1.5rem', fontWeight: 'bold' }}>Admin Console Error</h2>
+            <p style={{ color: '#4b5563', margin: '0.75rem 0' }}>An unexpected error crashed the Admin sub-tree. Please contact the security team if this persists.</p>
+            <pre style={{ background: '#f3f4f6', padding: '0.75rem', borderRadius: '8px', textAlign: 'left', overflowX: 'auto', fontSize: '0.8rem', color: '#374151', margin: '1rem 0' }}>{this.state.error?.toString()}</pre>
+            <button onClick={() => window.location.reload()} style={{ width: '100%', padding: '0.75rem', background: '#e11d48', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Reload Admin Portal</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+class VendorErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '2rem', background: '#fff7ed', color: '#c2410c', minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', fontFamily: 'sans-serif' }}>
+          <div style={{ background: 'white', padding: '2.5rem', borderRadius: '16px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', maxWidth: '500px', width: '100%', textAlign: 'center' }}>
+            <span style={{ fontSize: '3rem' }}>🏪</span>
+            <h2 style={{ marginTop: '1rem', fontSize: '1.5rem', fontWeight: 'bold' }}>Vendor Workspace Error</h2>
+            <p style={{ color: '#4b5563', margin: '0.75rem 0' }}>Your store management page encountered an error. Don't worry, your orders are safe.</p>
+            <pre style={{ background: '#f3f4f6', padding: '0.75rem', borderRadius: '8px', textAlign: 'left', overflowX: 'auto', fontSize: '0.8rem', color: '#374151', margin: '1rem 0' }}>{this.state.error?.toString()}</pre>
+            <button onClick={() => window.location.reload()} style={{ width: '100%', padding: '0.75rem', background: '#ea580c', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Reload Workspace</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+class RiderErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '2rem', background: '#f0fdf4', color: '#15803d', minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', fontFamily: 'sans-serif' }}>
+          <div style={{ background: 'white', padding: '2.5rem', borderRadius: '16px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', maxWidth: '500px', width: '100%', textAlign: 'center' }}>
+            <span style={{ fontSize: '3rem' }}>🛵</span>
+            <h2 style={{ marginTop: '1rem', fontSize: '1.5rem', fontWeight: 'bold' }}>Rider Dashboard Error</h2>
+            <p style={{ color: '#4b5563', margin: '0.75rem 0' }}>The delivery dashboard crashed. Your active navigation and order progress are recorded.</p>
+            <pre style={{ background: '#f3f4f6', padding: '0.75rem', borderRadius: '8px', textAlign: 'left', overflowX: 'auto', fontSize: '0.8rem', color: '#374151', margin: '1rem 0' }}>{this.state.error?.toString()}</pre>
+            <button onClick={() => window.location.reload()} style={{ width: '100%', padding: '0.75rem', background: '#16a34a', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Reload Dashboard</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const AppContent = ({
   effectiveUser, isProfileComplete, setIsProfileComplete,
-  isAdmin, setIsAdmin, location, userCoords, setLocation, userAddress, setUserAddress, setUser
+  isAdmin, setIsAdmin, location, userCoords, setLocation, userAddress, setUserAddress, setUser,
+  isDarkMode, setIsDarkMode, handleLogout
 }) => {
   const navigate = useNavigate();
   const locationPath = useLocation().pathname;
@@ -107,24 +290,13 @@ const AppContent = ({
     }
   }, []);
 
-  // Admin Persistence
-  useEffect(() => {
-    localStorage.setItem('admin_session', isAdmin);
-    if (isAdmin) {
-      sessionStorage.setItem('admin_active', 'true');
-    } else {
-      sessionStorage.removeItem('admin_active');
-      sessionStorage.removeItem('admin_token');
-      localStorage.removeItem('admin_code');
-    }
-  }, [isAdmin]);
-
-  // Global Notification Listener for Buyer
+  // Global Notification Listener for Buyer (Using UNIQUE Channel IDs to clean up correctly)
   const { addNotification, fcmToken } = useNotifications();
   useEffect(() => {
     if (!effectiveUser?.id || isVendorMode || isRiderMode || isAdminMode) return;
 
-    const sub = supabase.channel('global_order_updates')
+    const channelName = `orders_${effectiveUser.id}`;
+    const sub = supabase.channel(channelName)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `user_id=eq.${effectiveUser.id}` }, (payload) => {
         const shortId = payload.new.id.substring(0, 6).toUpperCase();
         toast.success(`Order #${shortId} is now ${payload.new.status}`, {
@@ -133,7 +305,6 @@ const AppContent = ({
           id: `order-update-${payload.new.id}`
         });
 
-        // Push Real-Time Notification to Context globally
         addNotification({
           title: 'Order Status Update',
           text: `Update on Order #${shortId}: Status changed to ${payload.new.status}`,
@@ -143,33 +314,18 @@ const AppContent = ({
       })
       .subscribe();
 
-    return () => supabase.removeChannel(sub);
+    return () => {
+      supabase.removeChannel(sub);
+    };
   }, [effectiveUser, addNotification]);
 
-  // Sync FCM Token to Supabase & Express Backend
+  // Sync FCM Token exclusively to the Express Backend route (no redundant direct Supabase call)
   useEffect(() => {
     const syncToken = async () => {
       if (!effectiveUser?.id || !fcmToken) return;
-      console.log('🔄 Syncing FCM token to database:', fcmToken);
+      console.log('🔄 Syncing FCM token via Backend only:', fcmToken);
       try {
-        // Direct Supabase update
-        if (supabase) {
-          const { error } = await supabase
-            .from('users')
-            .update({ fcm_token: fcmToken })
-            .eq('id', effectiveUser.id);
-          if (error) {
-            console.warn('⚠️ Supabase FCM Token sync failed:', error.message);
-          } else {
-            console.log('✅ FCM Token synced directly to Supabase');
-          }
-        }
-        
-        // Express Backend update
-        const port = '3004'; // use standard local Express server port
-        const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-          ? `http://${window.location.hostname}:${port}` 
-          : 'https://passwala.onrender.com';
+        const baseUrl = import.meta.env.VITE_API_URL || '';
         
         const response = await fetch(`${baseUrl}/api/users/${effectiveUser.id}/fcm-token`, {
           method: 'PUT',
@@ -179,30 +335,15 @@ const AppContent = ({
         if (!response.ok) {
           console.warn('⚠️ Server endpoint FCM Token sync failed:', response.statusText);
         } else {
-          console.log('✅ FCM Token synced to Express Backend');
+          console.log('✅ FCM Token synced exclusively to Express Backend');
         }
       } catch (err) {
-        console.warn('⚠️ Error during FCM token synchronization:', err);
+        console.warn('⚠️ Error during FCM token backend synchronization:', err);
       }
     };
     
     syncToken();
   }, [effectiveUser, fcmToken]);
-
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem('theme');
-    return saved === 'dark' || (saved === null && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  });
-
-  useEffect(() => {
-    if (isDarkMode) {
-      document.body.classList.add('dark-mode');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.body.classList.remove('dark-mode');
-      localStorage.setItem('theme', 'light');
-    }
-  }, [isDarkMode]);
 
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const { addToCart } = useCart();
@@ -227,56 +368,15 @@ const AppContent = ({
     };
   }, [addToCart]);
 
-  // 📍 Compulsory Location Enforcement
+  // Compulsory Location Enforcement for Buyer profile completion
   useEffect(() => {
     const isAuthPage = locationPath === '/auth' || locationPath === '/' || locationPath === '/rider-auth';
     const isProfilePage = locationPath === '/complete-profile';
-
-    // Force profile completion for Buyers
     const userRole = effectiveUser?.role || 'BUYER';
     if (isWebappMode && effectiveUser && userRole === 'BUYER' && !isProfileComplete && !isAuthPage && !isProfilePage) {
-      // Redirecting to profile completion
       navigate('/complete-profile');
     }
-  }, [effectiveUser, isProfileComplete, location, locationPath, navigate]);
-
-  const handleLogout = async (skipToast = false) => {
-    try {
-      if (auth.currentUser) {
-        await auth.signOut().catch(e => console.warn('Firebase Signout Skip:', e));
-      }
-
-      // Preserve notification permission state across logouts
-      const notifStatus = localStorage.getItem('passwala_vendor_notifications');
-      
-      // Clear ALL possible session markers
-      localStorage.clear();
-      sessionStorage.clear();
-
-      if (notifStatus) {
-        localStorage.setItem('passwala_vendor_notifications', notifStatus);
-      }
-
-      // Clear React State
-      setUser(null);
-      setIsProfileComplete(false);
-
-      if (!skipToast) toast.success('Signed Out.');
-
-      if (!isWebMode) {
-        return;
-      } else {
-        navigate('/');
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-      const notifStatus = localStorage.getItem('passwala_vendor_notifications');
-      localStorage.clear();
-      if (notifStatus) {
-        localStorage.setItem('passwala_vendor_notifications', notifStatus);
-      }
-    }
-  };
+  }, [effectiveUser, isProfileComplete, locationPath, navigate]);
 
   const currentView =
     locationPath === '/near-shops' ? 'NEAR_SHOPS' :
@@ -285,31 +385,48 @@ const AppContent = ({
           locationPath === '/track-orders' ? 'TRACKING' :
             locationPath === '/profile' ? 'PROFILE' : 'DASHBOARD';
 
-
   const isAuthorizedAdmin = isAdmin || (effectiveUser && effectiveUser.role === 'ADMIN');
 
   return (
     <div className="app-main-layout" style={(isVendorMode || locationPath === '/vendor' || isRiderMode || locationPath === '/rider' || isAdminMode) ? { width: '100%', height: '100vh', overflow: 'hidden', margin: 0, padding: 0 } : {}}>
-      {/* 0. Admin Mode (Port 3005) - Strict Isolation */}
+      {/* 0. Admin Mode (Strict Isolation & Code Splitting via AdminErrorBoundary) */}
       {isAdminMode ? (
-        !isAuthorizedAdmin ? (
-          <AdminAuth onAdminLogin={() => setIsAdmin(true)} />
-        ) : (
-          <AdminPanel location={location} onLogout={() => { setIsAdmin(false); localStorage.removeItem('admin_session'); sessionStorage.removeItem('admin_active'); sessionStorage.removeItem('admin_token'); localStorage.removeItem('admin_code'); }} />
-        )
-      ) : /* 1. Vendor Mode (Port 3002) - High level takeover */
-        (locationPath === '/vendor' || isVendorMode) ? (
-          (!effectiveUser) ? (
-            <VendorAuth onLogin={(phone, profile) => {
-              const vendorObj = { ...profile, displayName: profile?.name || 'Vendor', phoneNumber: phone, role: 'VENDOR' };
-              setUser(vendorObj);
-              localStorage.setItem('passwala_user', JSON.stringify(vendorObj));
-            }} />
+        <AdminErrorBoundary>
+          {!isAuthorizedAdmin ? (
+            <AdminAuth onAdminLogin={() => setIsAdmin(true)} />
           ) : (
-            <RoleGuard allowedRoles={['VENDOR', 'ADMIN']} user={effectiveUser}>
-              <VendorPortal user={effectiveUser} onLogout={handleLogout} />
-            </RoleGuard>
-          )
+            <Suspense fallback={
+              <div className="flex flex-col items-center justify-center h-screen bg-slate-900 text-white">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mb-4"></div>
+                <p className="font-semibold text-slate-400">Loading Secure Admin Console...</p>
+              </div>
+            }>
+              <AdminPanel location={location} onLogout={() => { setIsAdmin(false); sessionStorage.removeItem('admin_session'); sessionStorage.removeItem('admin_active'); sessionStorage.removeItem('admin_token'); sessionStorage.removeItem('admin_code'); }} />
+            </Suspense>
+          )}
+        </AdminErrorBoundary>
+      ) : /* 1. Vendor Mode - Workspace takeover */
+        (locationPath === '/vendor' || isVendorMode) ? (
+          <VendorErrorBoundary>
+            {(!effectiveUser) ? (
+              <VendorAuth onLogin={(phone, profile) => {
+                const vendorObj = { ...profile, displayName: profile?.name || 'Vendor', phoneNumber: phone, role: 'VENDOR' };
+                setUser(vendorObj);
+                localStorage.setItem('passwala_user', JSON.stringify(vendorObj));
+              }} />
+            ) : (
+              <RoleGuard allowedRoles={['VENDOR', 'ADMIN']} user={effectiveUser}>
+                <Suspense fallback={
+                  <div className="flex flex-col items-center justify-center h-screen bg-slate-950 text-white">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#ff7622] mb-4"></div>
+                    <p className="font-semibold text-slate-400">Loading Vendor Workspace...</p>
+                  </div>
+                }>
+                  <VendorPortal user={effectiveUser} onLogout={handleLogout} />
+                </Suspense>
+              </RoleGuard>
+            )}
+          </VendorErrorBoundary>
         ) : locationPath === '/select-location' ? (
           <LocationSelector
             currentLocation={location}
@@ -319,24 +436,33 @@ const AppContent = ({
             }}
           />
         ) : (locationPath === '/rider' || isRiderMode) ? (
-          /* Rider Mode (Port 3003) */
-          (!effectiveUser) ? (
-            <RiderAuth onLogin={(phone, profile) => {
-              const riderObj = { ...profile, displayName: profile.name, phoneNumber: phone, role: 'RIDER' };
-              setUser(riderObj);
-              localStorage.setItem('passwala_user', JSON.stringify(riderObj));
-            }} />
-          ) : (
-            <RoleGuard allowedRoles={['RIDER', 'ADMIN']} user={effectiveUser}>
-              <RiderPortal
-                user={effectiveUser}
-                onLogout={handleLogout}
-                location={location}
-                setLocation={setLocation}
-                userCoords={userCoords}
-              />
-            </RoleGuard>
-          )
+          /* Rider Mode - Dashboard takeover */
+          <RiderErrorBoundary>
+            {(!effectiveUser) ? (
+              <RiderAuth onLogin={(phone, profile) => {
+                const riderObj = { ...profile, displayName: profile.name, phoneNumber: phone, role: 'RIDER' };
+                setUser(riderObj);
+                localStorage.setItem('passwala_user', JSON.stringify(riderObj));
+              }} />
+            ) : (
+              <RoleGuard allowedRoles={['RIDER', 'ADMIN']} user={effectiveUser}>
+                <Suspense fallback={
+                  <div className="flex flex-col items-center justify-center h-screen bg-slate-950 text-white">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#10b981] mb-4"></div>
+                    <p className="font-semibold text-slate-400">Loading Rider Dashboard...</p>
+                  </div>
+                }>
+                  <RiderPortal
+                    user={effectiveUser}
+                    onLogout={handleLogout}
+                    location={location}
+                    setLocation={setLocation}
+                    userCoords={userCoords}
+                  />
+                </Suspense>
+              </RoleGuard>
+            )}
+          </RiderErrorBoundary>
         ) : (
           <>
             {/* Global Navbar Logic */}
@@ -369,94 +495,88 @@ const AppContent = ({
               )
             )}
 
-            {/* 3. Main Content Routes */}
+            {/* 3. Main Content Routes (Leveraging Lazy loading dynamically) */}
             <main className={isWebappMode ? `webapp-main ${currentView === 'PROFILE' ? 'profile-mode' : ''}` : 'web-marketing-main'}>
               <Suspense fallback={
-                <div className="flex items-center justify-center min-h-[300px] w-full bg-transparent">
+                <div className="flex items-center justify-center min-h-[350px] w-full bg-transparent">
                   <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#6366f1]"></div>
                 </div>
               }>
                 <Routes>
-                {/* Home Route */}
-                <Route path="/" element={
-                  <>
-                    {/* Webapp Logic (Auth or Hub) */}
-                    {isWebappMode ? (
-                      (isProfileComplete) ? <NeighborhoodHub
-                        user={effectiveUser}
-                        setLocation={setLocation}
-                        location={location}
-                        onLogout={handleLogout}
-                        onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')}
-                      /> : <Auth onLogin={(userData) => {
-                        // Persist user and complete profile state
-                        localStorage.setItem('passwala_user', JSON.stringify(userData));
-                        localStorage.setItem('passwala_profile_complete', 'true');
-                        
-                        // Sync location, coordinates, and address from localStorage to React states reactively
-                        const newLoc = localStorage.getItem('passwala_location') || 'Ahmedabad, Gujarat';
-                        const savedCoords = localStorage.getItem('passwala_coords');
-                        const newCoords = savedCoords ? JSON.parse(savedCoords) : { lat: 23.0225, lng: 72.5714 };
-                        const savedAddr = localStorage.getItem('passwala_user_address');
-                        const newAddr = savedAddr ? JSON.parse(savedAddr) : {
-                          address_line_1: newLoc,
-                          city: 'Ahmedabad',
-                          state: 'Gujarat',
-                          pincode: '380015',
-                          society: newLoc.split(',')[0],
-                          house_no: 'Home',
-                          floor: 'Ground',
-                          is_default: true
-                        };
+                  <Route path="/" element={
+                    <>
+                      {isWebappMode ? (
+                        (isProfileComplete) ? <NeighborhoodHub
+                          user={effectiveUser}
+                          setLocation={setLocation}
+                          location={location}
+                          onLogout={handleLogout}
+                          onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')}
+                        /> : <Auth onLogin={(userData) => {
+                          localStorage.setItem('passwala_user', JSON.stringify(userData));
+                          localStorage.setItem('passwala_profile_complete', 'true');
+                          
+                          const newLoc = localStorage.getItem('passwala_location') || 'India';
+                          const savedCoords = localStorage.getItem('passwala_coords');
+                          const newCoords = savedCoords ? JSON.parse(savedCoords) : { lat: 20.5937, lng: 78.9629 };
+                          const savedAddr = localStorage.getItem('passwala_user_address');
+                          const newAddr = savedAddr ? JSON.parse(savedAddr) : {
+                            address_line_1: newLoc,
+                            city: 'Ahmedabad',
+                            state: 'Gujarat',
+                            pincode: '380015',
+                            society: newLoc.split(',')[0],
+                            house_no: 'Home',
+                            floor: 'Ground',
+                            is_default: true
+                          };
 
-                        setLocation(newLoc, newCoords);
-                        setUserAddress(newAddr);
-                        setUser(userData);
-                        setIsProfileComplete(true);
+                          setLocation(newLoc, newCoords);
+                          setUserAddress(newAddr);
+                          setUser(userData);
+                          setIsProfileComplete(true);
+                          navigate('/');
+                        }} />
+                      ) : (
+                        <>
+                          {effectiveUser && (
+                            <NeighborhoodHub user={effectiveUser} isProfileComplete={isProfileComplete} onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')} />
+                          )}
+                          <Hero />
+                          <AIRecommendations />
+                          <QuickServices />
+                          <Services />
+                          <Essentials />
+                          <NearbyDeals />
+                          <Community />
+                          <VendorCTA onOpenVendor={() => window.open(import.meta.env.VITE_VENDOR_PORTAL_URL || `http://${window.location.hostname}:3002`, '_blank')} />
+                        </>
+                      )}
+                    </>
+                  } />
 
-                        // Navigate home safely
-                        navigate('/');
-                      }} />
-                    ) : (
-                      /* Marketing Logic (Hub on top if logged in, then standard homepage) */
-                      <>
-                        {effectiveUser && (
-                          <NeighborhoodHub user={effectiveUser} isProfileComplete={isProfileComplete} onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')} />
-                        )}
-                        <Hero />
-                        <AIRecommendations />
-                        <QuickServices />
-                        <Services />
-                        <Essentials />
-                        <NearbyDeals />
-                        <Community />
-                        <VendorCTA onOpenVendor={() => window.open(import.meta.env.VITE_VENDOR_PORTAL_URL || `http://${window.location.hostname}:3002`, '_blank')} />
-                      </>
-                    )}
-                  </>
-                } />
+                  {/* Public Legal & Policy Routes */}
+                  <Route path="/privacy-policy" element={<Policies />} />
+                  <Route path="/terms" element={<Policies />} />
+                  <Route path="/refunds-cancellation" element={<Policies />} />
+                  <Route path="/data-deletion" element={<Policies />} />
+                  <Route path="/policies" element={<Policies />} />
 
-                {/* Public Legal & Policy Routes for App Store / Play Store Reviewers & Users */}
-                <Route path="/privacy-policy" element={<Policies />} />
-                <Route path="/terms" element={<Policies />} />
-                <Route path="/refunds-cancellation" element={<Policies />} />
-                <Route path="/data-deletion" element={<Policies />} />
-                <Route path="/policies" element={<Policies />} />
-
-                {/* Common Application Routes */}
-                <Route path="/near-shops" element={effectiveUser ? <NearShops onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/" />} />
-                <Route path="/expert-services" element={effectiveUser ? <ExpertServices onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
-                <Route path="/neighbors" element={effectiveUser ? <NeighborsCommunity onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
-                <Route path="/track-orders" element={effectiveUser ? <TrackOrders user={effectiveUser} userCoords={userCoords} onBack={() => navigate('/')} /> : <Navigate to="/" />} />
-                <Route path="/profile" element={effectiveUser ? <WebappProfile user={effectiveUser} onLogout={handleLogout} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} onUpdateUser={(updated) => setUser(updated)} /> : <Navigate to="/" />} />
-                <Route path="/order-history" element={effectiveUser ? <OrderHistory /> : <Navigate to="/" />} />
-                <Route path="/wallet" element={effectiveUser ? <Wallet user={effectiveUser} /> : <Navigate to="/" />} />
-                <Route path="/privacy-security" element={effectiveUser ? <PrivacySecurity /> : <Navigate to="/" />} />
-                <Route path="/help-support" element={effectiveUser ? <HelpSupport /> : <Navigate to="/" />} />
-                <Route path="/settings" element={effectiveUser ? <AppSettings isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/" />} />
-                <Route path="/select-location" element={effectiveUser ? <LocationSelector currentLocation={location} onLocationChange={setLocation} /> : <Navigate to="/" />} />
-                <Route path="/complete-profile" element={effectiveUser ? <CustomerDetails user={effectiveUser} onComplete={(addr, name) => { setIsProfileComplete(true); setUserAddress(addr); if (name) { setUser(prev => ({ ...prev, displayName: name })); } navigate('/'); }} /> : <Navigate to="/" />} />
-              </Routes>
+                  {/* Common Application Routes (Suspended correctly) */}
+                  <Route path="/near-shops" element={effectiveUser ? <NearShops onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/" />} />
+                  <Route path="/expert-services" element={effectiveUser ? <ExpertServices onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
+                  <Route path="/neighbors" element={effectiveUser ? <NeighborsCommunity onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
+                  <Route path="/track-orders" element={effectiveUser ? <TrackOrders user={effectiveUser} userCoords={userCoords} onBack={() => navigate('/')} /> : <Navigate to="/" />} />
+                  <Route path="/profile" element={effectiveUser ? <WebappProfile user={effectiveUser} onLogout={handleLogout} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} onUpdateUser={(updated) => setUser(updated)} /> : <Navigate to="/" />} />
+                  <Route path="/order-history" element={effectiveUser ? <OrderHistory /> : <Navigate to="/" />} />
+                  <Route path="/wallet" element={effectiveUser ? <Wallet user={effectiveUser} /> : <Navigate to="/" />} />
+                  <Route path="/privacy-security" element={effectiveUser ? <PrivacySecurity /> : <Navigate to="/" />} />
+                  <Route path="/help-support" element={effectiveUser ? <HelpSupport /> : <Navigate to="/" />} />
+                  <Route path="/settings" element={effectiveUser ? <AppSettings isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/" />} />
+                  <Route path="/select-location" element={effectiveUser ? <LocationSelector currentLocation={location} onLocationChange={setLocation} /> : <Navigate to="/" />} />
+                  <Route path="/complete-profile" element={effectiveUser ? <CustomerDetails user={effectiveUser} onComplete={(addr, name) => { setIsProfileComplete(true); setUserAddress(addr); if (name) { setUser(prev => ({ ...prev, displayName: name })); } navigate('/'); }} /> : <Navigate to="/" />} />
+                  <Route path="/planet-softweb" element={<PlanetSoftweb />} />
+                </Routes>
               </Suspense>
             </main>
 
@@ -476,375 +596,80 @@ const AppContent = ({
   );
 };
 
-class ErrorBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
-  static getDerivedStateFromError(error) { return { hasError: true, error }; }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: '2rem', background: '#fee2e2', color: '#991b1b', minHeight: '100vh' }}>
-          <h2>🚨 App Crash Detected</h2>
-          <pre style={{ whiteSpace: 'pre-wrap', marginTop: '1rem' }}>{this.state.error?.toString()}</pre>
-          <button onClick={() => window.location.reload()} style={{ marginTop: '1rem', padding: '0.5rem 1rem', background: '#b91c1c', color: 'white', borderRadius: '8px' }}>Reload App</button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+
 
 function App() {
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('passwala_user');
-    try {
-      return saved ? JSON.parse(saved) : null;
-    } catch (e) {
-      return null;
-    }
-  });
-  const [authLoading, setAuthLoading] = useState(() => {
-    // If we have a saved user, we can skip the initial loading state to feel faster
-    return !localStorage.getItem('passwala_user');
-  });
-  const [isProfileComplete, setIsProfileComplete] = useState(() => {
-    return localStorage.getItem('passwala_profile_complete') === 'true';
-  });
-  const [userAddress, setUserAddress] = useState(() => {
-    const saved = localStorage.getItem('passwala_user_address');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [minSplashDone, setMinSplashDone] = useState(() => {
-    return !!localStorage.getItem('passwala_user') || sessionStorage.getItem('v_initial_splash_done') === 'true';
-  });
-  const [isAdmin, setIsAdmin] = useState(() => {
-    const isAdminApp = isAdminMode;
-    const hasAdminSession = localStorage.getItem('admin_session') === 'true';
-    const hasAdminToken = sessionStorage.getItem('admin_token');
-    if (!isAdminApp) return false;
-    return !!(hasAdminSession && hasAdminToken);
-  });
-  const [location, setLocation] = useState(() => localStorage.getItem('passwala_location') || 'Ahmedabad, Gujarat');
-  const [userCoords, setUserCoords] = useState(() => {
-    const saved = localStorage.getItem('passwala_coords');
-    return saved ? JSON.parse(saved) : { lat: 23.0225, lng: 72.5714 };
-  });
+  const {
+    user,
+    setUser,
+    authLoading,
+    isProfileComplete,
+    setIsProfileComplete,
+    userAddress,
+    setUserAddress,
+    minSplashDone,
+    isAdmin,
+    setIsAdmin,
+    handleLogout
+  } = useAuth();
 
-  const updateLocation = (newLoc, coords) => {
-    setLocation(newLoc);
-    localStorage.setItem('passwala_location', newLoc);
-    if (coords) updateCoords(coords);
-  };
+  const {
+    location,
+    userCoords,
+    updateLocation
+  } = useAppLocation();
 
-  const updateCoords = (newCoords) => {
-    setUserCoords(newCoords);
-    localStorage.setItem('passwala_coords', JSON.stringify(newCoords));
-  };
-
-  // Authentication state logic
-
-  useEffect(() => {
-    const autoDetectLocation = async () => {
-      // 📍 Optimization: If location is already set, don't auto-detect again on every refresh
-      const savedLoc = localStorage.getItem('passwala_location');
-      // Always try to detect if location is not explicitly set in storage or is the generic default
-      if (savedLoc && savedLoc !== 'Detecting Location...' && savedLoc !== 'Ahmedabad, Gujarat') return;
-
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            try {
-              const { latitude, longitude } = position.coords;
-              updateCoords({ lat: latitude, lng: longitude });
-              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18`);
-              const data = await res.json();
-              if (data.address) {
-                const area = data.address.suburb || data.address.neighbourhood || data.address.residential || data.address.village || '';
-                const city = data.address.city || data.address.town || data.address.state_district || '';
-
-                if (area && city) {
-                  const preUpdateLoc = localStorage.getItem('passwala_location');
-                  updateLocation(`${area}, ${city}`);
-                  // 📍 Only show toast if we don't have a verified address yet
-                  if (!preUpdateLoc || preUpdateLoc === 'Detecting Location...' || preUpdateLoc === 'Ahmedabad, Gujarat') {
-                    toast.success(`Located: ${area}`, { icon: '📍', id: 'auto-geo' });
-                  }
-                  return;
-                } else if (city) {
-                  const state = data.address.state || '';
-                  updateLocation(`${city}${state ? `, ${state}` : ''}`);
-                  return;
-                }
-              }
-            } catch (err) {
-              console.warn('GPS Reverse Geocode failed, falling back to IP');
-              fetchIPLocation();
-            }
-          },
-          (error) => {
-        console.warn('GPS Denied or Failed:', error);
-        // 🛡️ Silently fall back to IP without annoying error toast
-        fetchIPLocation();
-      },
-        );
-      } else {
-        fetchIPLocation();
-      }
-    };
-
-    const fetchIPLocation = async () => {
-      try {
-        const res = await fetch('https://ipapi.co/json/');
-        const data = await res.json();
-        if (data && data.city && data.region) {
-          const detectedCity = data.city || '';
-          if (detectedCity.toLowerCase().includes('ahmedabad')) {
-            updateLocation(`${data.city}, ${data.region}`);
-          } else {
-            updateLocation(`${data.city}, ${data.region}`);
-          }
-          if (data.latitude && data.longitude) {
-            updateCoords({ lat: parseFloat(data.latitude), lng: parseFloat(data.longitude) });
-          }
-        } else {
-          throw new Error('ipapi failed');
-        }
-      } catch (e) {
-        try {
-          const res2 = await fetch('https://freeipapi.com/api/json');
-          const data2 = await res2.json();
-          if (data2 && data2.cityName) {
-            updateLocation(`${data2.cityName}, ${data2.regionName}`);
-            updateCoords({ lat: data2.latitude, lng: data2.longitude });
-          }
-        } catch (err2) {
-          console.warn('All IP Location fallbacks failed');
-        }
-      }
-    };
-
-    autoDetectLocation();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // PERSISTENCE: Sync user state to localStorage
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem('passwala_user', JSON.stringify(user));
-      localStorage.setItem('passwala_profile_complete', JSON.stringify(isProfileComplete));
-      if (userAddress) localStorage.setItem('passwala_user_address', JSON.stringify(userAddress));
-    }
-  }, [user, isProfileComplete, userAddress]);
-
-  useEffect(() => {
-    const alreadyShown = sessionStorage.getItem('v_initial_splash_done');
-    const isRedirect = localStorage.getItem('google_login_pending') === 'true';
-    
-    const hasUser = !!localStorage.getItem('passwala_user');
-    
-    // 🚀 Fast-Track: If we have a cached user, Google redirect, or already showed splash, skip it
-    const delay = (alreadyShown || isRedirect || hasUser) ? 0 : 800; 
-    
-    const splashTimer = setTimeout(() => {
-      setMinSplashDone(true);
-      sessionStorage.setItem('v_initial_splash_done', 'true');
-    }, delay);
-
-    // EMERGENCY TIMEOUT: Don't stay stuck on splash if Firebase is slow
-    const authTimeout = setTimeout(() => {
-      setAuthLoading(false);
-    }, 3000);
-
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      clearTimeout(authTimeout); // Firebase responded, clear timeout
-      const isSpecialMode = isVendorMode || isRiderMode || isAdminMode;
-      const savedUser = localStorage.getItem('passwala_user');
-      const manualUser = savedUser ? JSON.parse(savedUser) : null;
-      const wasComplete = localStorage.getItem('passwala_profile_complete') === 'true';
-
-      if (isSpecialMode) {
-        if (!manualUser) {
-          setUser(null);
-          setIsProfileComplete(false);
-          setAuthLoading(false);
-          return;
-        } else {
-          setUser(manualUser);
-          setIsProfileComplete(wasComplete);
-          setAuthLoading(false);
-          return;
-        }
-      }
-
-      if (!u && manualUser && manualUser.role && manualUser.role !== 'BUYER') {
-        // Keep the manual session for non-buyers
-        setAuthLoading(false);
-        setIsProfileComplete(true);
-        return;
-      }
-
-      let finalUser = u || manualUser;
-      if (u && supabase) {
-        try {
-          // 1. Fetch Supabase ID (UUID) for this user
-          const phoneNo = u.phoneNumber?.replace('+91', '');
-          const rawPhone = u.phoneNumber;
-          
-          let orFilter = [];
-          if (u.email) orFilter.push(`email.eq.${u.email}`);
-          if (phoneNo) orFilter.push(`phone.eq.${phoneNo}`);
-          if (rawPhone) orFilter.push(`phone.eq.${rawPhone}`);
-          
-          const { data: usr } = await supabase.from('users')
-            .select('id, full_name, role')
-            .or(orFilter.join(','))
-            .maybeSingle();
-
-          if (usr) {
-            // Augment Firebase user with Supabase UUID and role
-            finalUser = {
-              ...u,
-              id: usr.id,
-              uid: u.uid,
-              email: u.email,
-              phoneNumber: u.phoneNumber,
-              displayName: usr.full_name || u.displayName || manualUser?.displayName,
-              role: usr.role || 'BUYER'
-            };
-
-            // 2. Fetch address using the UUID
-            const { data: addr } = await supabase.from('addresses').select('*').eq('user_id', usr.id).maybeSingle();
-            if (addr) {
-              setIsProfileComplete(true);
-              
-              // Parse society, house_no, floor from address_line_1 using robust utility
-              const parsed = parseAddressLine(addr.address_line_1);
-              addr.house_no = parsed.house_no;
-              addr.floor = parsed.floor;
-              addr.society = parsed.society;
-
-              setUserAddress(addr);
-              localStorage.setItem('passwala_user_address', JSON.stringify(addr));
-              
-              // 📍 Update global location string to match the verified address
-              const displayLoc = addr.society || addr.city || localStorage.getItem('passwala_location') || 'Ahmedabad, Gujarat';
-              setLocation(displayLoc);
-              localStorage.setItem('passwala_location', displayLoc);
-            } else {
-              // Try legacy UID lookup
-              const { data: addrLegacy } = await supabase.from('addresses').select('*').eq('user_id', u.uid).maybeSingle();
-              setIsProfileComplete(!!addrLegacy || wasComplete);
-              if (addrLegacy) {
-                // Parse society, house_no, floor from address_line_1 using robust utility
-                const parsed = parseAddressLine(addrLegacy.address_line_1);
-                addrLegacy.house_no = parsed.house_no;
-                addrLegacy.floor = parsed.floor;
-                addrLegacy.society = parsed.society;
-
-                setUserAddress(addrLegacy);
-                localStorage.setItem('passwala_user_address', JSON.stringify(addrLegacy));
-              }
-            }
-          } else {
-            // No user in Supabase yet, use UID
-            setIsProfileComplete(wasComplete);
-          }
-        } catch (err) {
-          console.error("Auto Sync Failed", err);
-          setIsProfileComplete(wasComplete);
-        }
-      } else {
-        // Firebase user is null
-        if (!manualUser) {
-          setIsProfileComplete(false);
-          setUser(null);
-        } else {
-          // Keep manual user session
-          setIsProfileComplete(wasComplete);
-          setUser(manualUser);
-        }
-      }
-
-      if (wasComplete) {
-        setIsProfileComplete(true);
-        const savedAddr = localStorage.getItem('passwala_user_address');
-        if (savedAddr) {
-          setUserAddress(JSON.parse(savedAddr));
-        } else {
-          const savedLoc = localStorage.getItem('passwala_location') || 'Ahmedabad, Gujarat';
-          const fallbackAddr = {
-            address_line_1: savedLoc,
-            city: 'Ahmedabad',
-            state: 'Gujarat',
-            pincode: '380015',
-            society: savedLoc.split(',')[0],
-            house_no: 'Home',
-            floor: 'Ground',
-            is_default: true
-          };
-          setUserAddress(fallbackAddr);
-          localStorage.setItem('passwala_user_address', JSON.stringify(fallbackAddr));
-        }
-      }
-
-      setUser(finalUser);
-      setAuthLoading(false);
-    });
-
-    return () => {
-      unsub();
-      clearTimeout(splashTimer);
-    };
-  }, []);
+  const [isDarkMode, setIsDarkMode] = useTheme();
 
   return (
     <ErrorBoundary>
       {(authLoading || !minSplashDone) ? (
         <SplashScreen />
       ) : (
-        <Router>
-          <ScrollToTop />
-          <SearchProvider>
-            <NotificationProvider>
-              <LanguageProvider>
-                <CartProvider user={user}>
-                  <div className="app-container">
-                    <Toaster
-                      position="top-center"
-                      toastOptions={{
-                        className: 'passwala-toast',
-                        duration: 3000,
-                        style: {
-                          background: '#1e293b',
-                          color: '#fff',
-                          borderRadius: '12px',
-                          padding: '10px 18px',
-                          fontSize: '0.85rem',
-                          fontWeight: '600',
-                          boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
-                          maxWidth: '90vw'
-                        },
-                      }}
-                    />
-                    <AppContent
-                      effectiveUser={user}
-                      isProfileComplete={isProfileComplete}
-                      setIsProfileComplete={setIsProfileComplete}
-                      isWebappMode={isWebappMode}
-                      isAdmin={isAdmin}
-                      setIsAdmin={setIsAdmin}
-                      location={location}
-                      userCoords={userCoords}
-                      setLocation={updateLocation}
-                      userAddress={userAddress}
-                      setUserAddress={setUserAddress}
-                      setUser={setUser}
-                    />
-                  </div>
-                </CartProvider>
-              </LanguageProvider>
-            </NotificationProvider>
-          </SearchProvider>
-        </Router>
+        <SearchProvider>
+          <NotificationProvider>
+            <LanguageProvider>
+              <CartProvider user={user}>
+                <div className="app-container">
+                  <Toaster
+                    position="top-center"
+                    toastOptions={{
+                      className: 'passwala-toast',
+                      duration: 3000,
+                      style: {
+                        background: '#1e293b',
+                        color: '#fff',
+                        borderRadius: '12px',
+                        padding: '10px 18px',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
+                        maxWidth: '90vw'
+                      },
+                    }}
+                  />
+                  <ScrollToTop />
+                  <AppContent
+                    effectiveUser={user}
+                    isProfileComplete={isProfileComplete}
+                    setIsProfileComplete={setIsProfileComplete}
+                    isAdmin={isAdmin}
+                    setIsAdmin={setIsAdmin}
+                    location={location}
+                    userCoords={userCoords}
+                    setLocation={updateLocation}
+                    userAddress={userAddress}
+                    setUserAddress={setUserAddress}
+                    setUser={setUser}
+                    isDarkMode={isDarkMode}
+                    setIsDarkMode={setIsDarkMode}
+                    handleLogout={handleLogout}
+                  />
+                </div>
+              </CartProvider>
+            </LanguageProvider>
+          </NotificationProvider>
+        </SearchProvider>
       )}
     </ErrorBoundary>
   );

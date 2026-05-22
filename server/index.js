@@ -7,7 +7,10 @@ import vendorRoutes from './routes/vendor.js';
 import adminRoutes from './routes/admin.js';
 import ridersRoutes from './routes/riders.js';
 import orderRoutes from './routes/orders.js';
+import planetSoftwebRoutes from './routes/planetSoftweb.js';
+import aiRoutes from './routes/ai.js';
 import { apiLimiter } from './utils/rateLimiter.js';
+import supabase from './supabase.js';
 
 dotenv.config();
 
@@ -67,7 +70,30 @@ app.get('/', (req, res) => {
   });
 });
 
-app.get('/health', (req, res) => res.json({ status: 'healthy', database: 'connected' }));
+app.get('/health', async (req, res) => {
+  try {
+    const start = Date.now();
+    const { error } = await supabase.from('users').select('id').limit(1);
+    const duration = Date.now() - start;
+    
+    if (error) throw error;
+    
+    res.json({ 
+      status: 'healthy', 
+      database: 'connected',
+      pingMs: duration,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('🔥 Database health check failed:', err.message);
+    res.status(500).json({ 
+      status: 'unhealthy', 
+      database: 'disconnected',
+      error: err.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
 
 // Register Admin Portal routes first to bypass global rate limits (secured by cryptographic JWT keys)
 app.use('/api/admin', adminRoutes);
@@ -79,6 +105,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/vendor', vendorRoutes);
 app.use('/api/riders', ridersRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/planet-softweb', planetSoftwebRoutes);
+app.use('/api/ai', aiRoutes);
 
 app.get('/api/route', async (req, res) => {
   try {
@@ -94,6 +122,27 @@ app.get('/api/route', async (req, res) => {
   } catch (err) {
     console.error('Routing failed:', err.message);
     res.status(500).json({ error: 'Routing failed' });
+  }
+});
+
+app.get('/api/ip-location', async (req, res) => {
+  try {
+    let clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    if (clientIp) {
+      clientIp = clientIp.split(',')[0].trim();
+      if (clientIp.startsWith('::ffff:')) {
+        clientIp = clientIp.substring(7);
+      }
+    }
+    const isLocal = !clientIp || clientIp === '127.0.0.1' || clientIp === '::1' || clientIp.startsWith('10.') || clientIp.startsWith('192.168.') || clientIp.startsWith('172.16.');
+    const url = isLocal ? 'https://freeipapi.com/api/json' : `https://freeipapi.com/api/json/${clientIp}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('FreeIPAPI failed');
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    console.error('IP Geolocation failed:', err.message);
+    res.status(500).json({ error: 'IP Geolocation failed' });
   }
 });
 
