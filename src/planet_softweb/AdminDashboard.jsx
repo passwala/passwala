@@ -48,11 +48,36 @@ export default function AdminDashboard({ onSelectOrder }) {
 
   useEffect(() => {
     loadAdminData();
+
+    const channel = window.supabase
+      .channel('admin-dashboard-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        loadAdminData();
+      })
+      .subscribe();
+
+    return () => {
+      window.supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleUpdateStatus = async (orderId, newStatus) => {
     setIsProcessing(true);
     try {
+      if (newStatus === 'CANCELLED') {
+        const { data: items } = await window.supabase.from('order_items').select('product_id, quantity').eq('order_id', orderId);
+        if (items && items.length > 0) {
+          for (const item of items) {
+            if (item.product_id) {
+              const { data: prod } = await window.supabase.from('products').select('stock_quantity').eq('id', item.product_id).maybeSingle();
+              if (prod) {
+                await window.supabase.from('products').update({ stock_quantity: (prod.stock_quantity || 0) + item.quantity }).eq('id', item.product_id);
+              }
+            }
+          }
+        }
+      }
+
       const { error } = await window.supabase
         .from('orders')
         .update({ status: newStatus })

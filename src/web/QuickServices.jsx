@@ -5,6 +5,20 @@ import { supabase } from '../supabase';
 import './QuickServices.css';
 
 
+const IconImage = ({ url, name, fallback }) => {
+  const [error, setError] = React.useState(false);
+  const isValidUrl = url && typeof url === 'string' && url.length > 5;
+  if (!isValidUrl || error) return fallback(name);
+  return (
+    <img 
+      src={url} 
+      alt={name} 
+      style={{ width: '24px', height: '24px' }} 
+      onError={() => setError(true)} 
+    />
+  );
+};
+
 const QuickServices = () => {
   const [categories, setCategories] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -54,7 +68,7 @@ const QuickServices = () => {
                 }}
               >
                 <div className="icon-box">
-                  {s.icon_url ? <img src={s.icon_url} alt={s.name} style={{ width: '24px', height: '24px' }} /> : getFallbackIcon(s.name)}
+                  <IconImage url={s.icon_url} name={s.name} fallback={getFallbackIcon} />
                 </div>
                 <span>{s.name}</span>
               </div>

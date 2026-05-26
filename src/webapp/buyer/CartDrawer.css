@@ -403,6 +403,7 @@
 }
 
 .order-confirm-modal-v4 {
+  position: relative;
   background: white;
   width: 100%;
   max-width: 400px;
@@ -411,6 +412,28 @@
   text-align: center;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.confirm-close-btn-v4 {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: #64748b;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.confirm-close-btn-v4:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+  transform: rotate(90deg) scale(1.05);
 }
 
 .confirm-icon-v4 {

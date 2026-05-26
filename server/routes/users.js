@@ -7,6 +7,22 @@ import { authLimiter } from '../utils/rateLimiter.js';
 
 const router = express.Router();
 
+/**
+ * Normalize any phone string to a clean 10-digit Indian mobile number.
+ * Strips +91 / 91 country code prefix and all spaces / dashes.
+ * Returns null when input is falsy.
+ */
+function normalizePhone(raw) {
+  if (!raw) return null;
+  let p = String(raw).trim();
+  // Strip country code prefix first
+  if (p.startsWith('+91')) p = p.slice(3);
+  else if (p.startsWith('91') && p.length === 12) p = p.slice(2);
+  // Remove all non-digit characters (spaces, dashes, parentheses)
+  p = p.replace(/\D/g, '');
+  return p.length === 10 ? p : null;
+}
+
 let googleCertCache = {
   certs: null,
   expiresAt: 0
@@ -254,6 +270,7 @@ export const userAuth = async (req, res, next) => {
 router.post('/', authLimiter, async (req, res) => {
   const { uid, email, displayName, photoURL, phoneNumber, authProvider, role, fcmToken, fcm_token } = req.body;
   const token = fcmToken || fcm_token;
+  const cleanPhone = normalizePhone(phoneNumber); // Normalize to 10-digit format
 
   if (!uid || !authProvider) {
     return res.status(400).json({ error: 'uid and authProvider are required' });
@@ -288,9 +305,9 @@ router.post('/', authLimiter, async (req, res) => {
       existingUser = data;
     }
     
-    // Check by Provided Phone
-    if (!existingUser && phoneNumber) {
-      const { data } = await supabase.from('users').select('*').eq('phone', phoneNumber).maybeSingle();
+    // Check by Normalized Phone (10-digit)
+    if (!existingUser && cleanPhone) {
+      const { data } = await supabase.from('users').select('*').eq('phone', cleanPhone).maybeSingle();
       existingUser = data;
     }
 
@@ -302,10 +319,10 @@ router.post('/', authLimiter, async (req, res) => {
       existingUser = data;
       
       if (!existingUser) {
-         userData.phone = phoneNumber || generatedPhone;
+         userData.phone = cleanPhone || generatedPhone;
       }
-    } else if (phoneNumber) {
-      userData.phone = phoneNumber;
+    } else if (cleanPhone) {
+      userData.phone = cleanPhone;
     }
 
     let resultData;
@@ -381,14 +398,24 @@ router.get('/:uid', userAuth, async (req, res) => {
   }
 });
 
-// GET /api/users — Get all users (admin secured)
+// GET /api/users — Get users (admin secured)
+// Default: returns only BUYER role users.
+// Pass ?role=VENDOR, ?role=RIDER, or ?role=ALL to override.
 router.get('/', adminAuth, async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const roleFilter = (req.query.role || 'BUYER').toUpperCase();
+
+    let query = supabase
       .from('users')
-      .select('*')
+      .select('id, phone, full_name, email, photo_url, role, uid, wallet_balance, fcm_token, created_at, updated_at')
       .order('created_at', { ascending: false });
 
+    // Apply role filter unless caller explicitly requests all records
+    if (roleFilter !== 'ALL') {
+      query = query.eq('role', roleFilter);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
 
     res.status(200).json({ success: true, users: data });
@@ -550,7 +577,7 @@ router.put('/:uid/photo', userAuth, async (req, res) => {
       .eq('id', user.id);
     
     if (updateError) throw updateError;
-    res.status(200).json({ success: true, message: 'Photo updated' });
+    res.status(200).json({ success: true, message: 'Photo updated', photoURL: finalPhotoUrl });
   } catch (error) {
     console.error('Error updating photo:', error);
     res.status(500).json({ error: 'System Error: Failed to update photo' });

@@ -24,7 +24,7 @@ if (keyId && keySecret) {
  * POST /api/orders/payment/create
  * Creates a Razorpay payment order.
  */
-router.post('/payment/create', async (req, res) => {
+router.post('/payment/create', userAuth, async (req, res) => {
   const { amount, orderId } = req.body;
 
   if (!amount || !orderId) {
@@ -83,7 +83,7 @@ router.post('/payment/verify', userAuth, async (req, res) => {
 
   // 1. Input Format Validations
   // Razorpay payment ID format check
-  const paymentIdRegex = /^(pay_[a-zA-Z0-9]+|pay_mock_[a-zA-Z0-9]+|mock_[a-zA-Z0-9]+)$/;
+  const paymentIdRegex = /^(pay_[a-zA-Z0-9_]+|pay_mock_[a-zA-Z0-9_]+|mock_[a-zA-Z0-9_]+)$/;
   if (!paymentIdRegex.test(razorpay_payment_id)) {
     return res.status(400).json({ error: 'Invalid Razorpay payment ID format' });
   }

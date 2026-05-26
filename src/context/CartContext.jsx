@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 
+const isValidUUID = (str) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
 const CartContext = createContext();
 
 export const CartProvider = ({ children, user }) => {
@@ -11,7 +13,8 @@ export const CartProvider = ({ children, user }) => {
 
   // Load cart from Supabase or localStorage on login/mount
   useEffect(() => {
-    const userId = user?.id || user?.uid;
+    const rawUserId = user?.id || user?.uid;
+    const userId = isValidUUID(rawUserId) ? rawUserId : null;
     setError(null);
 
     // Load local storage fallback first as immediate state
@@ -39,16 +42,24 @@ export const CartProvider = ({ children, user }) => {
             .single();
 
           if (sbError) {
-            // PGRST116 means no row found, PGRST205 means table not found in schema cache
+            // PGRST116 / 42P01 / 42501 means no row found, table missing, or RLS blocked.
+            // In a premium app, we handle these silently by falling back to localStorage.
             if (sbError.code === 'PGRST116') {
               // User has no saved cart yet, use local cart if available
               if (parsedLocal.length > 0) setCartItems(parsedLocal);
-            } else if (sbError.code === 'PGRST205' || sbError.message?.includes('schema cache')) {
-              console.warn('carts table not found in Supabase schema cache, falling back to localStorage');
+            } else if (
+              sbError.code === 'PGRST205' || 
+              sbError.code === '42P01' || 
+              sbError.code === '42501' || 
+              sbError.message?.includes('schema cache') ||
+              sbError.message?.includes('violates row-level security') ||
+              sbError.message?.includes('permission denied')
+            ) {
+              console.warn('carts table not accessible (missing, RLS, or permission), falling back silently to localStorage:', sbError);
               setCartItems(parsedLocal);
             } else {
               console.warn('Failed to load cart from Supabase:', sbError);
-              // For other database/auth errors, we still show the local cart so they can transact
+              // For other fatal database/auth errors, we still show the local cart so they can transact
               setCartItems(parsedLocal);
               setError('Failed to sync your cart with cloud, using local backup.');
             }
@@ -74,7 +85,8 @@ export const CartProvider = ({ children, user }) => {
 
   // Sync cart to Supabase and localStorage on change (debounced to avoid rapid DB writes)
   useEffect(() => {
-    const userId = user?.id || user?.uid;
+    const rawUserId = user?.id || user?.uid;
+    const userId = isValidUUID(rawUserId) ? rawUserId : null;
     if (!isLoaded) return;
 
     // Always update local storage immediately for safety

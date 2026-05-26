@@ -36,70 +36,102 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
   const [isManualLocation, setIsManualLocation] = useState(false);
   const [activeAreas, setActiveAreas] = useState([]);
   const [nearbyStores, setNearbyStores] = useState([]);
+  const [realStoreDistances, setRealStoreDistances] = useState({});
 
   // OSRM Routing Engine States (Only Bike route mode)
   const [routeMode, setRouteMode] = useState('cycling'); // 'cycling'
-  const [osrmRoutePoints, setOsrmRoutePoints] = useState([]);
+  const [osrmRouteToStore, setOsrmRouteToStore] = useState([]);
+  const [osrmRouteToCustomer, setOsrmRouteToCustomer] = useState([]);
   const [routeStats, setRouteStats] = useState(null); // { distanceKm, durationMins }
+  const lastAlertedOrderId = useRef(null);
 
   // Fetch real street coordinates from OSRM Engine
   useEffect(() => {
-    if (!activeOrder) {
-      setOsrmRoutePoints([]);
+    const orderToRoute = activeOrder || incomingOrder;
+    if (!orderToRoute) {
+      setOsrmRouteToStore([]);
+      setOsrmRouteToCustomer([]);
       setRouteStats(null);
       return;
     }
 
     const fetchOSRMRoute = async () => {
       const riderLatLng = [mapCoords.lat, mapCoords.lng];
-      const targetCoords = deliveryStep < 2 
-        ? (activeOrder.storeCoords || { lat: 23.0305, lng: 72.5075 })
-        : (activeOrder.customerCoords || { lat: 23.0393, lng: 72.5244 });
+      const storeCoords = orderToRoute.storeCoords || { lat: 23.0305, lng: 72.5075 };
+      const customerCoords = orderToRoute.customerCoords || { lat: 23.0393, lng: 72.5244 };
 
-      if (!riderLatLng[0] || !riderLatLng[1] || !targetCoords.lat || !targetCoords.lng) return;
-
+      if (!riderLatLng[0] || !riderLatLng[1] || !storeCoords.lat || !storeCoords.lng || !customerCoords.lat || !customerCoords.lng) return;
 
       try {
-        // Map UI route mode to OSRM profiles
         const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
         const profile = routeMode === 'driving' ? 'driving' : routeMode === 'cycling' ? 'cycling' : 'foot';
-        const url = `${apiBase}/api/route?startLat=${riderLatLng[0]}&startLng=${riderLatLng[1]}&endLat=${targetCoords.lat}&endLng=${targetCoords.lng}&profile=${profile}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('OSRM routing request failed');
-        const data = await res.json();
         
-        if (data.routes && data.routes.length > 0) {
-          const route = data.routes[0];
-          // Convert from [lng, lat] to [lat, lng] for Leaflet compatibility
-          const coords = route.geometry.coordinates.map(pt => [pt[1], pt[0]]);
-          setOsrmRoutePoints(coords);
-          
-          setRouteStats({
-            distanceKm: (route.distance / 1000).toFixed(1),
-            durationMins: Math.round(route.duration / 60)
-          });
+        let dist1 = 0, dur1 = 0;
+        let dist2 = 0, dur2 = 0;
+
+        // Fetch Leg 1: Rider -> Store (Only if deliveryStep < 2)
+        if (deliveryStep < 2) {
+          const url1 = `${apiBase}/api/route?startLat=${riderLatLng[0]}&startLng=${riderLatLng[1]}&endLat=${storeCoords.lat}&endLng=${storeCoords.lng}&profile=${profile}`;
+          const res1 = await fetch(url1);
+          if (res1.ok) {
+              const data1 = await res1.json();
+              if (data1.routes && data1.routes.length > 0) {
+                 setOsrmRouteToStore(data1.routes[0].geometry.coordinates.map(pt => [pt[1], pt[0]]));
+                 dist1 = data1.routes[0].distance / 1000;
+                 // Apply 2.2x traffic multiplier for realistic Indian city ETA
+                 dur1 = (data1.routes[0].duration / 60) * 2.2;
+              }
+          }
+        } else {
+          setOsrmRouteToStore([]);
         }
+
+        // Fetch Leg 2: Rider -> Customer (Only if deliveryStep >= 2)
+        if (deliveryStep >= 2) {
+          const startLat2 = riderLatLng[0];
+          const startLng2 = riderLatLng[1];
+          
+          const url2 = `${apiBase}/api/route?startLat=${startLat2}&startLng=${startLng2}&endLat=${customerCoords.lat}&endLng=${customerCoords.lng}&profile=${profile}`;
+          const res2 = await fetch(url2);
+          if (res2.ok) {
+              const data2 = await res2.json();
+              if (data2.routes && data2.routes.length > 0) {
+                 setOsrmRouteToCustomer(data2.routes[0].geometry.coordinates.map(pt => [pt[1], pt[0]]));
+                 dist2 = data2.routes[0].distance / 1000;
+                 // Apply 2.2x traffic multiplier for realistic Indian city ETA
+                 dur2 = (data2.routes[0].duration / 60) * 2.2;
+              }
+          }
+        } else {
+          setOsrmRouteToCustomer([]);
+        }
+
+        let activeDist = 0;
+        let activeDur = 0;
+        
+        if (deliveryStep < 2) {
+           activeDist = dist1;
+           activeDur = dur1;
+        } else {
+           activeDist = dist2;
+           activeDur = dur2;
+        }
+
+        setRouteStats({
+           distanceKm: activeDist.toFixed(1),
+           durationMins: Math.round(activeDur)
+        });
+
       } catch (err) {
         console.warn("OSRM routing API failed, drawing straight line fallback:", err);
-        setOsrmRoutePoints([]);
-        
-        // Calculate dynamic fallback route stats using Leaflet's distance metric or direct formula
-        try {
-          const startLatLng = L.latLng(riderLatLng[0], riderLatLng[1]);
-          const endLatLng = L.latLng(targetCoords.lat, targetCoords.lng);
-          const directDistanceKm = startLatLng.distanceTo(endLatLng) / 1000;
-          setRouteStats({
-            distanceKm: directDistanceKm.toFixed(1),
-            durationMins: Math.max(1, Math.round(directDistanceKm * 4 + 2)) // average 15km/h for city delivery
-          });
-        } catch (calcErr) {
-          setRouteStats(null);
-        }
+        setOsrmRouteToStore([]);
+        setOsrmRouteToCustomer([]);
+        setRouteStats(null);
       }
     };
 
     fetchOSRMRoute();
-  }, [activeOrder, deliveryStep, routeMode, mapCoords.lat, mapCoords.lng]);
+  }, [activeOrder, incomingOrder, deliveryStep, routeMode, mapCoords.lat, mapCoords.lng]);
 
   // Map elements refs
   const mapRef = useRef(null);
@@ -130,6 +162,28 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     };
     fetchAreasAndStores();
   }, []);
+
+  // Calculate real OSRM distances for nearby stores
+  useEffect(() => {
+    if (!mapCoords.lat || nearbyStores.length === 0) return;
+    const fetchRealDistances = async () => {
+      const dists = {};
+      await Promise.all(nearbyStores.map(async (store) => {
+        if (!store.lat || !store.lng) return;
+        try {
+          // getOSRMRoute dynamically finds real road distance via OSRM demo server
+          const res = await getOSRMRoute(mapCoords.lat, mapCoords.lng, parseFloat(store.lat), parseFloat(store.lng), routeMode);
+          if (res && res.success) {
+            dists[store.id] = res.distanceKm;
+          }
+        } catch (e) {
+           console.warn("Store OSRM fetch failed", e);
+        }
+      }));
+      setRealStoreDistances(dists);
+    };
+    fetchRealDistances();
+  }, [mapCoords.lat, mapCoords.lng, nearbyStores, routeMode]);
 
 
 
@@ -239,6 +293,24 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
   useEffect(() => {
     if (!isOnline || activeOrder || incomingOrder) return;
 
+    const playNotificationSound = () => {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(900, ctx.currentTime);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.4);
+      } catch(e) { console.log('Audio error', e); }
+    };
+
     const fetchPendingOrder = async () => {
       try {
         const yesterday = new Date();
@@ -335,7 +407,12 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
             storeCoords: storeCoords,
             customerCoords: customerCoords
           });
-          toast.success(`New Delivery Request! (${totalDist.toFixed(1)} km)`, { icon: "🔔" });
+          
+          if (lastAlertedOrderId.current !== order.id) {
+            lastAlertedOrderId.current = order.id;
+            playNotificationSound();
+            toast.success(`New Delivery Request! (${totalDist.toFixed(1)} km)`, { icon: "🔔" });
+          }
         }
       }
       } catch (err) {
@@ -344,6 +421,10 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     };
 
     fetchPendingOrder();
+
+    const pollingInterval = setInterval(() => {
+      fetchPendingOrder();
+    }, 8000);
 
     const channel = supabase
       .channel('new-orders-broadcast')
@@ -368,6 +449,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       .subscribe();
 
     return () => {
+      clearInterval(pollingInterval);
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -473,22 +555,24 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         .addTo(markerGroupRef.current);
     }
 
-    if (activeOrder) {
+    const orderToDraw = activeOrder || incomingOrder;
+
+    if (orderToDraw) {
       // Show Delivery Routing (Real Map, No fake streets)
-      const storeCoords = activeOrder.storeCoords || { lat: 23.0305, lng: 72.5075 };
-      const customerCoords = activeOrder.customerCoords || { lat: 23.0393, lng: 72.5244 };
+      const storeCoords = orderToDraw.storeCoords || { lat: 23.0305, lng: 72.5075 };
+      const customerCoords = orderToDraw.customerCoords || { lat: 23.0393, lng: 72.5244 };
 
       const storeLatLng = [storeCoords.lat, storeCoords.lng];
       const customerLatLng = [customerCoords.lat, customerCoords.lng];
 
       // Draw Store Marker
-      L.marker(storeLatLng, { icon: createStoreIcon(activeOrder.store) })
-        .bindPopup(`<b>Store Hub:</b> ${activeOrder.store}<br/>Pickup point`)
+      L.marker(storeLatLng, { icon: createStoreIcon(orderToDraw.store) })
+        .bindPopup(`<b>Store Hub:</b> ${orderToDraw.store}<br/>Pickup point`)
         .addTo(markerGroupRef.current);
 
       // Draw Customer Marker
-      L.marker(customerLatLng, { icon: createCustomerIcon(activeOrder.customerName) })
-        .bindPopup(`<b>Customer:</b> ${activeOrder.customerName}<br/>Deliver to: ${activeOrder.dropAddress}`)
+      L.marker(customerLatLng, { icon: createCustomerIcon(orderToDraw.customerName) })
+        .bindPopup(`<b>Customer:</b> ${orderToDraw.customerName}<br/>Deliver to: ${orderToDraw.dropAddress}`)
         .addTo(markerGroupRef.current);
 
       // Draw interactive path depending on active phase
@@ -497,73 +581,38 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
 
       if (deliveryStep < 2) {
         // Active Phase: Rider navigating to Store
-        if (osrmRoutePoints && osrmRoutePoints.length > 0) {
-          // Draw high-fidelity turn-by-turn road route from OSRM
-          L.polyline(osrmRoutePoints, {
-            color: leg1Color,
-            weight: 6,
-            opacity: 0.95,
-            lineJoin: 'round'
-          }).addTo(markerGroupRef.current);
+        if (osrmRouteToStore && osrmRouteToStore.length > 0) {
+          L.polyline(osrmRouteToStore, { color: leg1Color, weight: 6, opacity: 0.95, lineJoin: 'round' }).addTo(markerGroupRef.current);
         } else {
-          // Fallback to straight line
-          L.polyline([riderLatLng, storeLatLng], {
-            color: leg1Color,
-            weight: 6,
-            opacity: 0.9,
-            lineJoin: 'round'
-          }).addTo(markerGroupRef.current);
+          L.polyline([riderLatLng, storeLatLng], { color: leg1Color, weight: 6, opacity: 0.9, lineJoin: 'round' }).addTo(markerGroupRef.current);
         }
 
         // Leg 2 (Store -> Customer) is DASHED upcoming blue route
-        L.polyline([storeLatLng, customerLatLng], {
-          color: leg2Color,
-          weight: 4,
-          opacity: 0.5,
-          dashArray: '8, 8',
-          lineJoin: 'round'
-        }).addTo(markerGroupRef.current);
+        if (osrmRouteToCustomer && osrmRouteToCustomer.length > 0) {
+          L.polyline(osrmRouteToCustomer, { color: leg2Color, weight: 6, opacity: 0.6, dashArray: '8, 8', lineJoin: 'round' }).addTo(markerGroupRef.current);
+        } else {
+          L.polyline([storeLatLng, customerLatLng], { color: leg2Color, weight: 4, opacity: 0.5, dashArray: '8, 8', lineJoin: 'round' }).addTo(markerGroupRef.current);
+        }
       } else {
         // Active Phase: Rider delivering to Customer
         // Leg 1 (Store -> Rider) is faded completed dashed route
-        L.polyline([storeLatLng, riderLatLng], {
-          color: '#94a3b8',
-          weight: 3,
-          opacity: 0.4,
-          dashArray: '4, 4',
-          lineJoin: 'round'
-        }).addTo(markerGroupRef.current);
+        L.polyline([storeLatLng, riderLatLng], { color: '#94a3b8', weight: 3, opacity: 0.4, dashArray: '4, 4', lineJoin: 'round' }).addTo(markerGroupRef.current);
 
-        if (osrmRoutePoints && osrmRoutePoints.length > 0) {
-          // Draw high-fidelity turn-by-turn road route from OSRM
-          L.polyline(osrmRoutePoints, {
-            color: leg2Color,
-            weight: 6,
-            opacity: 0.95,
-            lineJoin: 'round'
-          }).addTo(markerGroupRef.current);
+        // Leg 2 (Rider -> Customer) is SOLID blue route
+        if (osrmRouteToCustomer && osrmRouteToCustomer.length > 0) {
+          L.polyline(osrmRouteToCustomer, { color: leg2Color, weight: 6, opacity: 0.95, lineJoin: 'round' }).addTo(markerGroupRef.current);
         } else {
-          // Fallback to straight line
-          L.polyline([riderLatLng, customerLatLng], {
-            color: leg2Color,
-            weight: 6,
-            opacity: 0.9,
-            lineJoin: 'round'
-          }).addTo(markerGroupRef.current);
+          L.polyline([riderLatLng, customerLatLng], { color: leg2Color, weight: 6, opacity: 0.9, lineJoin: 'round' }).addTo(markerGroupRef.current);
         }
       }
 
       // Automatically focus bounds to include all elements
       try {
         let validCoords = [];
-        if (osrmRoutePoints && osrmRoutePoints.length > 0) {
-          validCoords = [...osrmRoutePoints];
-        } else {
-          validCoords = [riderLatLng, storeLatLng, customerLatLng];
-        }
+        if (osrmRouteToStore && osrmRouteToStore.length > 0) validCoords.push(...osrmRouteToStore);
+        if (osrmRouteToCustomer && osrmRouteToCustomer.length > 0) validCoords.push(...osrmRouteToCustomer);
         
-        validCoords.push(storeLatLng);
-        validCoords.push(customerLatLng);
+        validCoords.push(riderLatLng, storeLatLng, customerLatLng);
 
         const filteredCoords = validCoords.filter(c => c && !isNaN(c[0]) && !isNaN(c[1]));
         if (filteredCoords.length > 0) {
@@ -580,7 +629,8 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         nearbyStores.forEach(store => {
           if (!store.lat || !store.lng) return;
           const storeLatLng = [parseFloat(store.lat), parseFloat(store.lng)];
-          const dist = getStraightLineDistance(mapCoords.lat, mapCoords.lng, storeLatLng[0], storeLatLng[1]);
+          // Use real OSRM street distance if calculated, otherwise fallback to straight line
+          const dist = realStoreDistances[store.id] !== undefined ? realStoreDistances[store.id] : getStraightLineDistance(mapCoords.lat, mapCoords.lng, storeLatLng[0], storeLatLng[1]);
           
           L.marker(storeLatLng, { icon: createStoreIcon(store.name) })
             .bindPopup(`
@@ -600,7 +650,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       // Re-center on Rider smoothly
       leafletMapRef.current.setView(riderLatLng, 14);
     }
-  }, [mapCoords, activeOrder, deliveryStep, nearbyStores, isOnline, osrmRoutePoints]);
+  }, [mapCoords, activeOrder, incomingOrder, deliveryStep, nearbyStores, realStoreDistances, isOnline, osrmRouteToStore, osrmRouteToCustomer]);
 
   const handleToggleOnline = async () => {
     let id = user?.id || user?.uid || user?.user_id;
@@ -902,22 +952,6 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                   <span style={{ color: 'var(--rider-success)' }}>⏱️ {routeStats.durationMins} m</span>
                 </div>
               )}
-            </div>
-
-            {/* ETA Floating Card */}
-            <div style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'white', padding: '0.5rem 1rem', borderRadius: '12px', boxShadow: 'var(--rider-shadow-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 10 }}>
-               <span style={{ fontSize: '0.7rem', color: 'var(--rider-text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>
-                 ETA to {deliveryStep < 2 ? 'Store' : 'Customer'}
-               </span>
-               <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--rider-primary)' }}>
-                 {deliveryStep === 1 ? 'Arrived' 
-                  : deliveryStep === 4 ? 'Delivered'
-                  : routeStats && routeStats.durationMins !== undefined ? `${routeStats.durationMins} min`
-                  : deliveryStep === 0 ? (() => { let d = new Date(); d.setMinutes(d.getMinutes() + 5); return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); })() 
-                  : deliveryStep === 2 ? (() => { let d = new Date(); d.setMinutes(d.getMinutes() + 15); return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); })()
-                  : deliveryStep === 3 ? (() => { let d = new Date(); d.setMinutes(d.getMinutes() + 4); return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); })()
-                  : 'Delivered'}
-               </span>
             </div>
           </>
         )}

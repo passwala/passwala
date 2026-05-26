@@ -8,46 +8,91 @@ import './RiderPortal.css'; // Import custom styles
 
 const CameraModal = ({ isOpen, onClose, onCapture, mode = 'user' }) => {
   const videoRef = React.useRef(null);
-  const [stream, setStream] = React.useState(null);
-
-  const stopCamera = React.useCallback(() => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-    }
-  }, [stream]);
-
-  const startCamera = React.useCallback(async () => {
-    try {
-      const s = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: mode === 'user' ? 'user' : 'environment' } 
-      });
-      setStream(s);
-      if (videoRef.current) videoRef.current.srcObject = s;
-    } catch (err) {
-      console.error(err);
-      toast.error('Could not access camera. Please check permissions.');
-      onClose();
-    }
-  }, [mode, onClose]);
+  const streamRef = React.useRef(null);
+  const onCloseRef = React.useRef(onClose);
+  const onCaptureRef = React.useRef(onCapture);
 
   React.useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  React.useEffect(() => {
+    onCaptureRef.current = onCapture;
+  }, [onCapture]);
+
+  React.useEffect(() => {
+    let activeStream = null;
+    let isCancelled = false;
+
+    const startCamera = async () => {
+      try {
+        // Try specific facing mode first
+        let s;
+        try {
+          s = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: mode === 'user' ? 'user' : 'environment' } 
+          });
+        } catch (initialErr) {
+          // Fallback to any available camera if specific mode fails
+          s = await navigator.mediaDevices.getUserMedia({ video: true });
+        }
+
+        if (isCancelled) {
+          s.getTracks().forEach(track => track.stop());
+          return;
+        }
+
+        activeStream = s;
+        streamRef.current = s;
+        if (videoRef.current) {
+          videoRef.current.srcObject = s;
+          videoRef.current.muted = true;
+          videoRef.current.onloadedmetadata = () => {
+            if (videoRef.current && !isCancelled) {
+              videoRef.current.play().catch(e => console.log('Autoplay prevented:', e));
+            }
+          };
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          console.error(err);
+          toast.error('Could not access camera. Please check permissions.', { id: 'camera-err' });
+          if (onCloseRef.current) {
+            onCloseRef.current();
+          }
+        }
+      }
+    };
+
     if (isOpen) {
       startCamera();
-    } else {
-      stopCamera();
     }
-    return () => stopCamera();
-  }, [isOpen, startCamera, stopCamera]);
+
+    return () => {
+      isCancelled = true;
+      if (activeStream) {
+        activeStream.getTracks().forEach(track => track.stop());
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, [isOpen, mode]);
 
   const capture = () => {
+    if (!videoRef.current) return;
     const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
+    canvas.width = videoRef.current.videoWidth || 640;
+    canvas.height = videoRef.current.videoHeight || 480;
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(videoRef.current, 0, 0);
-    onCapture(canvas.toDataURL('image/jpeg', 0.8));
-    onClose();
+    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+    if (onCaptureRef.current) {
+      onCaptureRef.current(canvas.toDataURL('image/jpeg', 0.8));
+    }
+    if (onCloseRef.current) {
+      onCloseRef.current();
+    }
   };
 
   if (!isOpen) return null;
@@ -59,7 +104,13 @@ const CameraModal = ({ isOpen, onClose, onCapture, mode = 'user' }) => {
              <X size={20} />
           </button>
           
-          <video ref={videoRef} autoPlay playsInline style={{ width: '100%', height: 'auto', display: 'block', background: '#000' }} />
+          <video 
+            ref={videoRef} 
+            autoPlay 
+            playsInline 
+            muted 
+            style={{ width: '100%', height: 'auto', display: 'block', background: '#000' }} 
+          />
           
           <div style={{ padding: '2rem', display: 'flex', justifyContent: 'center', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' }}>
              <button onClick={capture} style={{ width: '64px', height: '64px', borderRadius: '50%', border: '4px solid white', background: 'transparent', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>

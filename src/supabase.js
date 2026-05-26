@@ -7,6 +7,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Supabase configuration is missing. Real-time data will be disabled.');
 }
 
-export const supabase = (supabaseUrl && supabaseAnonKey) 
-  ? createClient(supabaseUrl, supabaseAnonKey) 
-  : null;
+export const supabase = createClient(
+  supabaseUrl || 'https://xxxxxxxxxxxxxxxxxxxx.supabase.co', 
+  supabaseAnonKey || 'dummy_anon_key'
+);

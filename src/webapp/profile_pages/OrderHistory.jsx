@@ -10,11 +10,14 @@ import {
   MapPin,
   X,
   Store,
-  CreditCard
+  CreditCard,
+  Download
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../supabase';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import './ProfilePages.css';
 
 const _ = motion;
@@ -216,6 +219,260 @@ const OrderHistory = () => {
     }
   };
 
+  const handleDownloadInvoice = (order) => {
+    const doc = new jsPDF();
+    
+    const storeName = order.stores?.name || order.items?.[0]?.store || 'Passwala Partner';
+    const storeAddress = order.stores?.address || 'Thaltej, Ahmedabad, Gujarat 380054';
+    const customerName = order.addresses?.name || 'Customer';
+    const customerAddress = `${order.addresses?.society || ''}, ${order.addresses?.address_line_1 || ''}`;
+    const orderId = order.id ? String(order.id).substring(0, 8).toUpperCase() : 'N/A';
+    const invoiceDate = new Date(order.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    
+    // Default styles
+    doc.setTextColor(0, 0, 0);
+    doc.setDrawColor(150, 150, 150);
+    doc.setLineWidth(0.1);
+
+    // Header Logo & Title
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    // Planet Softweb logo style (green/black vibe like Blinkit, or their brand color)
+    doc.setTextColor(16, 185, 129); // Emerald green
+    doc.text("Planet Softweb", 14, 20);
+    
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.text("Tax Invoice", 196, 20, { align: "right" });
+    
+    // --- TOP GRID ---
+    let startY = 25;
+    let gridHeight = 60;
+    
+    // Outer Border for Top Grid
+    doc.rect(14, startY, 182, gridHeight);
+    
+    // Horizontal divider
+    doc.line(14, startY + 30, 196, startY + 30);
+    // Vertical divider
+    doc.line(125, startY, 125, startY + gridHeight);
+
+    // SELLER INFO (Top Left)
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text("Sold By : Seller", 16, startY + 5);
+    doc.text(storeName.toUpperCase(), 16, startY + 9);
+    doc.setFont("helvetica", "normal");
+    doc.text(storeAddress, 16, startY + 13, { maxWidth: 105 });
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("FSSAI License Number:", 16, startY + 23);
+    doc.setFont("helvetica", "normal");
+    doc.text("10722999000123", 45, startY + 23);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("GSTIN:", 16, startY + 27);
+    doc.setFont("helvetica", "normal");
+    doc.text("24AAACP1234Q1Z5", 28, startY + 27);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("PAN:", 65, startY + 27);
+    doc.setFont("helvetica", "normal");
+    doc.text("AAACP1234Q", 75, startY + 27);
+
+    // INVOICE NUMBER (Top Right)
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text("Invoice Number:", 127, startY + 15);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${orderId}-INV`, 155, startY + 15);
+
+    // BUYER INFO (Bottom Left)
+    let bottomY = startY + 30;
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text("Invoice To:", 16, bottomY + 5);
+    doc.setFont("helvetica", "normal");
+    doc.text(customerName, 40, bottomY + 5);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Address:", 16, bottomY + 9);
+    doc.setFont("helvetica", "normal");
+    doc.text(customerAddress, 40, bottomY + 9, { maxWidth: 80 });
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Pin code:", 16, bottomY + 20);
+    doc.setFont("helvetica", "normal");
+    doc.text("380054", 40, bottomY + 20);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("State:", 16, bottomY + 24);
+    doc.setFont("helvetica", "normal");
+    doc.text("Gujarat", 40, bottomY + 24);
+
+    // ORDER INFO (Bottom Right)
+    doc.setFont("helvetica", "bold");
+    doc.text("Order Id:", 127, bottomY + 5);
+    doc.setFont("helvetica", "normal");
+    doc.text(orderId, 155, bottomY + 5);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Invoice Date:", 127, bottomY + 9);
+    doc.setFont("helvetica", "normal");
+    doc.text(invoiceDate, 155, bottomY + 9);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Place of Supply:", 127, bottomY + 15);
+    doc.setFont("helvetica", "normal");
+    doc.text("Gujarat", 155, bottomY + 15);
+
+    // --- TABLE ---
+    const tableColumn = ["Sr no", "Item Description", "MRP", "Disc.", "Qty", "Taxable Value", "CGST (%)", "CGST (Amt)", "SGST (%)", "SGST (Amt)", "Total"];
+    const tableRows = [];
+    
+    let subtotal = 0;
+    
+    (order.items || []).forEach((item, index) => {
+      const itemPrice = parseFloat(item.price || item.price_at_purchase || 0);
+      const itemQty = parseInt(item.qty || item.quantity || 1);
+      const itemTotal = itemPrice * itemQty;
+      
+      const baseValue = itemTotal / 1.05;
+      const taxAmt = itemTotal - baseValue;
+      const cgstAmt = taxAmt / 2;
+      const sgstAmt = taxAmt / 2;
+      
+      subtotal += itemTotal;
+      
+      tableRows.push([
+        index + 1,
+        item.name || item.products?.name || 'Item',
+        itemPrice.toFixed(2),
+        "0.00",
+        itemQty,
+        baseValue.toFixed(2),
+        "2.5%",
+        cgstAmt.toFixed(2),
+        "2.5%",
+        sgstAmt.toFixed(2),
+        itemTotal.toFixed(2)
+      ]);
+    });
+    
+    if (order.delivery_fee && parseFloat(order.delivery_fee) > 0) {
+       const fee = parseFloat(order.delivery_fee);
+       subtotal += fee;
+       tableRows.push([
+         tableRows.length + 1,
+         "Delivery charges",
+         fee.toFixed(2),
+         "0.00",
+         1,
+         fee.toFixed(2),
+         "0%",
+         "0.00",
+         "0%",
+         "0.00",
+         fee.toFixed(2)
+       ]);
+    }
+    
+    autoTable(doc, {
+      startY: startY + gridHeight + 2,
+      head: [tableColumn],
+      body: tableRows,
+      theme: 'grid',
+      styles: { fontSize: 6, cellPadding: 2, textColor: [0,0,0], lineColor: [150,150,150], lineWidth: 0.1 },
+      headStyles: { fillColor: [250, 250, 250], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center' },
+      columnStyles: {
+        0: { halign: 'center' },
+        2: { halign: 'right' },
+        3: { halign: 'right' },
+        4: { halign: 'center' },
+        5: { halign: 'right' },
+        6: { halign: 'center' },
+        7: { halign: 'right' },
+        8: { halign: 'center' },
+        9: { halign: 'right' },
+        10: { halign: 'right' }
+      },
+      margin: { left: 14, right: 14 }
+    });
+    
+    let finalY = doc.lastAutoTable.finalY;
+    
+    // --- TOTAL ROW ---
+    doc.rect(14, finalY, 182, 6);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.text("Total", 16, finalY + 4);
+    doc.text(subtotal.toFixed(2), 194, finalY + 4, { align: 'right' });
+    finalY += 6;
+    
+    // --- AMOUNT IN WORDS ---
+    const amountInWords = `Rupees ${subtotal.toFixed(2)} Only`;
+    doc.rect(14, finalY, 182, 6);
+    doc.setFont("helvetica", "bold");
+    doc.text("Amount in Words:", 16, finalY + 4);
+    doc.setFont("helvetica", "normal");
+    doc.text(amountInWords, 45, finalY + 4);
+    finalY += 6;
+
+    // --- COMPANY FOOTER BOX ---
+    let footerHeight = 22;
+    doc.rect(14, finalY, 182, footerHeight);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Planet Softweb Private Limited", 16, finalY + 5);
+    
+    doc.text("GSTIN:", 16, finalY + 9);
+    doc.setFont("helvetica", "normal");
+    doc.text("24AAACP1234Q1Z5", 35, finalY + 9);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("CIN:", 16, finalY + 13);
+    doc.setFont("helvetica", "normal");
+    doc.text("U74999GJ2026PTC000000", 35, finalY + 13);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("FSSAI License Number:", 80, finalY + 9);
+    doc.setFont("helvetica", "normal");
+    doc.text("10722999000123", 110, finalY + 9);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("PAN:", 80, finalY + 13);
+    doc.setFont("helvetica", "normal");
+    doc.text("AAACP1234Q", 110, finalY + 13);
+    
+    // Signature
+    doc.setFontSize(6);
+    doc.text("Authorized Signatory", 170, finalY + 18, { align: 'center' });
+    doc.line(155, finalY + 15, 185, finalY + 15); // Signature line
+    finalY += footerHeight;
+    
+    // --- REVERSE CHARGE ---
+    doc.rect(14, finalY, 182, 6);
+    doc.setFont("helvetica", "bold");
+    doc.text("Whether the tax is payable on reverse charge: No", 16, finalY + 4);
+    finalY += 6;
+
+    // --- TERMS & CONDITIONS ---
+    doc.rect(14, finalY, 182, 28);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text("Terms & Conditions:", 16, finalY + 5);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6);
+    doc.text("1. If you have any issues or queries in respect of your order, please contact customer chat support through Planet Softweb platform or drop in email at", 16, finalY + 9);
+    doc.text("info@planetsoftweb.com.", 16, finalY + 12);
+    doc.text("2. Please note that we never ask for bank account details such as CVV, account number, UPI Pin etc. across our support channels. For your safety please do", 16, finalY + 16);
+    doc.text("not share these details with anyone over any medium.", 16, finalY + 19);
+    doc.text("3. MRP displayed on the platform is as printed on the product package. Actual MRP and amount payable may be a function of offers, discounts and/or the", 16, finalY + 23);
+    doc.text("revised GST rates made effective by Govt. From time to time.", 16, finalY + 26);
+    
+    doc.save(`Invoice_${orderId}.pdf`);
+  };
+
   return (
     <>
       <motion.div 
@@ -283,94 +540,89 @@ const OrderHistory = () => {
 
       <AnimatePresence>
         {selectedOrderDetails && (
-          <div className="past-order-modal-overlay" style={{
-            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-            background: 'rgba(0,0,0,0.6)', zIndex: 99999,
-            display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
-          }} onClick={() => setSelectedOrderDetails(null)}>
+          <div className="past-order-modal-overlay" onClick={() => setSelectedOrderDetails(null)}>
             <motion.div 
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               className="past-order-modal-content"
-              style={{
-                width: '100%', maxWidth: '500px', background: 'var(--bg-soft, #fff)', 
-                borderTopLeftRadius: '24px', borderTopRightRadius: '24px',
-                padding: '24px', paddingBottom: '40px', boxShadow: '0 -10px 40px rgba(0,0,0,0.3)',
-                border: '1px solid var(--border-light, #e2e8f0)',
-                color: 'var(--text-primary, #0f172a)'
-              }}
               onClick={e => e.stopPropagation()}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div className="past-order-modal-header">
                 <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary, #0f172a)' }}>Order Details</h3>
-                <button onClick={() => setSelectedOrderDetails(null)} style={{ background: 'var(--border-light, #f1f5f9)', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: 'var(--text-secondary, #64748b)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <X size={20} />
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={() => handleDownloadInvoice(selectedOrderDetails)} style={{ background: 'var(--border-light, #f1f5f9)', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: 'var(--primary, #ff7622)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Download Invoice">
+                    <Download size={20} />
+                  </button>
+                  <button onClick={() => setSelectedOrderDetails(null)} style={{ background: 'var(--border-light, #f1f5f9)', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: 'var(--text-secondary, #64748b)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
               
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', background: 'rgba(0, 0, 0, 0.02)', padding: '16px', borderRadius: '16px', border: '1px solid var(--border-light, #f1f5f9)' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(255, 107, 0, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary, #ff7622)' }}>
-                  <Store size={24} />
+              <div className="past-order-modal-body">
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', background: 'rgba(0, 0, 0, 0.02)', padding: '16px', borderRadius: '16px', border: '1px solid var(--border-light, #f1f5f9)' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(255, 107, 0, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary, #ff7622)' }}>
+                    <Store size={24} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary, #1e293b)' }}>{selectedOrderDetails.stores?.name || selectedOrderDetails.items?.[0]?.store || 'Passwala Grocery Partner'}</h4>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary, #64748b)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Clock size={14} /> Ordered on {new Date(selectedOrderDetails.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                    </p>
+                  </div>
                 </div>
+
+                {/* Address Section */}
+                <div style={{ marginBottom: '24px' }}>
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: 'var(--text-secondary, #475569)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>
+                    Delivery Address
+                  </h4>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', background: 'rgba(0, 0, 0, 0.02)', borderRadius: '16px', border: '1px solid var(--border-light, #f1f5f9)' }}>
+                    <MapPin size={20} color="var(--primary, #ff7622)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                    <div>
+                      <div style={{ color: 'var(--text-primary, #1e293b)', fontWeight: 700, fontSize: '0.95rem' }}>{selectedOrderDetails.addresses?.society || 'Thaltej'}</div>
+                      <div style={{ color: 'var(--text-secondary, #64748b)', fontSize: '0.85rem', marginTop: '4px', lineHeight: 1.4 }}>{selectedOrderDetails.addresses?.address_line_1 || ''}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '24px' }}>
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: 'var(--text-secondary, #475569)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>Items Summary</h4>
+                  <div style={{ border: '1px solid var(--border-light, #e2e8f0)', borderRadius: '12px', overflow: 'hidden' }}>
+                    {(selectedOrderDetails.items || []).map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', borderBottom: idx !== (selectedOrderDetails.items || []).length - 1 ? '1px solid var(--border-light, #e2e8f0)' : 'none', background: 'var(--bg-soft, #fff)' }}>
+                        <span style={{ color: 'var(--text-primary, #334155)', fontWeight: 500 }}>{item.qty || item.quantity || 1}x {item.name || item.products?.name || 'Item'}</span>
+                        <span style={{ color: 'var(--text-primary, #0f172a)', fontWeight: 600 }}>₹{item.price_at_purchase || item.price || 0}</span>
+                      </div>
+                    ))}
+                    {(!selectedOrderDetails.items || selectedOrderDetails.items.length === 0) && (
+                      <div style={{ padding: '12px 16px', color: 'var(--text-secondary, #64748b)' }}>Details not available</div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(0,0,0,0.02)', borderTop: '1px solid var(--border-light, #e2e8f0)' }}>
+                      <span style={{ color: 'var(--text-secondary, #64748b)', fontWeight: 600 }}>Total Paid</span>
+                      <span style={{ color: '#10b981', fontWeight: 800, fontSize: '1.1rem' }}>₹{selectedOrderDetails.total_price || selectedOrderDetails.total_amount}</span>
+                    </div>
+                  </div>
+                </div>
+
                 <div>
-                  <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary, #1e293b)' }}>{selectedOrderDetails.stores?.name || selectedOrderDetails.items?.[0]?.store || 'Passwala Grocery Partner'}</h4>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary, #64748b)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Clock size={14} /> Ordered on {new Date(selectedOrderDetails.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-                  </p>
-                </div>
-              </div>
-
-              {/* Address Section */}
-              <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: 'var(--text-secondary, #475569)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>
-                  Delivery Address
-                </h4>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', background: 'rgba(0, 0, 0, 0.02)', borderRadius: '16px', border: '1px solid var(--border-light, #f1f5f9)' }}>
-                  <MapPin size={20} color="var(--primary, #ff7622)" style={{ marginTop: '2px', flexShrink: 0 }} />
-                  <div>
-                    <div style={{ color: 'var(--text-primary, #1e293b)', fontWeight: 700, fontSize: '0.95rem' }}>{selectedOrderDetails.addresses?.society || 'Thaltej'}</div>
-                    <div style={{ color: 'var(--text-secondary, #64748b)', fontSize: '0.85rem', marginTop: '4px', lineHeight: 1.4 }}>{selectedOrderDetails.addresses?.address_line_1 || ''}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: 'var(--text-secondary, #475569)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>Items Summary</h4>
-                <div style={{ border: '1px solid var(--border-light, #e2e8f0)', borderRadius: '12px', overflow: 'hidden' }}>
-                  {(selectedOrderDetails.items || []).map((item, idx) => (
-                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', borderBottom: idx !== (selectedOrderDetails.items || []).length - 1 ? '1px solid var(--border-light, #e2e8f0)' : 'none', background: 'transparent' }}>
-                      <span style={{ color: 'var(--text-primary, #334155)', fontWeight: 500 }}>{item.qty || 1}x {item.name || 'Item'}</span>
-                      <span style={{ color: 'var(--text-primary, #0f172a)', fontWeight: 600 }}>₹{((item.price || 0) * (item.qty || 1)).toFixed(2)}</span>
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: 'var(--text-secondary, #475569)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>Payment Info</h4>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: 'var(--border-light, #f1f5f9)', borderRadius: '12px' }}>
+                    <CreditCard size={20} color="var(--text-secondary, #64748b)" />
+                    <div>
+                      <div style={{ color: 'var(--text-primary, #334155)', fontWeight: 600 }}>{selectedOrderDetails.payment_method || 'Paid Online'}</div>
+                      <div style={{ color: 'var(--text-secondary, #64748b)', fontSize: '0.85rem', marginTop: '2px' }}>
+                        Transaction ID: {selectedOrderDetails.id ? (typeof selectedOrderDetails.id === 'string' ? selectedOrderDetails.id.split('-')[0].toUpperCase() : String(selectedOrderDetails.id)) : ''}
+                      </div>
                     </div>
-                  ))}
-                  {(!selectedOrderDetails.items || selectedOrderDetails.items.length === 0) && (
-                    <div style={{ padding: '12px 16px', color: 'var(--text-secondary, #64748b)' }}>Details not available</div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(0, 0, 0, 0.03)', borderTop: '1px solid var(--border-light, #e2e8f0)' }}>
-                    <span style={{ color: 'var(--text-secondary, #64748b)', fontWeight: 700 }}>Total Paid</span>
-                    <span style={{ color: '#10b981', fontWeight: 800, fontSize: '1.1rem' }}>₹{(selectedOrderDetails.total_amount || 0).toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: 'var(--text-secondary, #475569)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>Payment Info</h4>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: 'rgba(0, 0, 0, 0.02)', borderRadius: '12px', border: '1px solid var(--border-light, #f1f5f9)' }}>
-                  <CreditCard size={20} color="var(--text-secondary, #64748b)" />
-                  <div>
-                    <div style={{ color: 'var(--text-primary, #334155)', fontWeight: 600 }}>{selectedOrderDetails.payment_method || 'Paid Online'}</div>
-                    <div style={{ color: 'var(--text-secondary, #64748b)', fontSize: '0.85rem', marginTop: '2px' }}>
-                      Transaction ID: {selectedOrderDetails.id ? (typeof selectedOrderDetails.id === 'string' ? selectedOrderDetails.id.split('-')[0].toUpperCase() : String(selectedOrderDetails.id)) : ''}
+                    <div style={{ marginLeft: 'auto', background: '#10b981', color: 'white', fontSize: '0.75rem', fontWeight: 700, padding: '4px 8px', borderRadius: '8px' }}>
+                      {selectedOrderDetails.status || 'SUCCESS'}
                     </div>
                   </div>
-                  <div style={{ marginLeft: 'auto', background: '#10b981', color: 'white', fontSize: '0.75rem', fontWeight: 700, padding: '4px 8px', borderRadius: '8px' }}>
-                    {selectedOrderDetails.status || 'SUCCESS'}
-                  </div>
                 </div>
               </div>
-
             </motion.div>
           </div>
         )}

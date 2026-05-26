@@ -15,13 +15,15 @@ const Essentials = () => {
   useEffect(() => {
     const fetchEssentials = async () => {
       try {
-        const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+        const { data, error } = await supabase.from('products').select('*, stores(name)').order('created_at', { ascending: false });
         
         if (error) throw error;
         
         if (data) {
+          const groceryItems = data.filter(item => item.description !== 'Service item auto-registered');
+          
           // Filter unique names to avoid duplicates in the UI
-          const uniqueData = data.reduce((acc, current) => {
+          const uniqueData = groceryItems.reduce((acc, current) => {
             const x = acc.find(item => item.name === current.name);
             if (!x) return acc.concat([current]);
             else return acc;
@@ -68,7 +70,7 @@ const Essentials = () => {
                 <div key={item.id} className="item-card glass card-hover">
                    <div className="item-details">
                       <strong>{item.name}</strong>
-                      <span className="store">{item.store} • {item.delivery_time}</span>
+                      <span className="store">{item.stores?.name ? `${item.stores.name} • ` : ''}{item.delivery_time || '15 mins'}</span>
                       <span className="price">₹{item.price}</span>
                    </div>
                    {(() => {

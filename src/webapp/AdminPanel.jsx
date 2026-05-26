@@ -156,7 +156,7 @@ const DATABASE_SCHEMAS = {
   posts: ['user_id', 'content', 'image_url', 'likes_count'],
   notifications: ['user_id', 'title', 'message', 'is_read'],
   service_areas: ['city', 'area_name', 'is_active'],
-  admins: ['username', 'password_hash', 'role'],
+  admins: ['username', 'role'],
   stores: ['vendor_id', 'name', 'description', 'logo_url', 'banner_url', 'address', 'lat', 'lng', 'is_open', 'rating']
 };
 

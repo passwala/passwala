@@ -1,0 +1,174 @@
+import { useState, useRef, useCallback } from 'react';
+
+// Haversine formula to calculate distance between two coordinates in kilometers
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+};
+
+export const useSecureLocation = () => {
+  const [locationState, setLocationState] = useState({
+    lat: null,
+    lng: null,
+    accuracy: null,
+    speed: null,
+    address: '',
+    rawAddressObj: null,
+    loading: false,
+    error: null,
+    errorCode: null,
+    isMock: false
+  });
+
+  const watchIdRef = useRef(null);
+  const prevCoordsRef = useRef(null);
+  const lastTimeRef = useRef(null);
+  const intervalRef = useRef(null);
+
+  const fetchAddress = async (lat, lng) => {
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
+      if (!res.ok) return { formatted: '', raw: null };
+      const data = await res.json();
+      const area = data.address?.suburb || data.address?.neighbourhood || data.address?.city || 'My Location';
+      const city = data.address?.city || data.address?.town || data.address?.state_district || '';
+      return { 
+        formatted: city ? `${area}, ${city}` : area, 
+        raw: data.address || null 
+      };
+    } catch (err) {
+      console.warn('Secure Geo: Reverse geocode failed', err);
+      return { formatted: '', raw: null };
+    }
+  };
+
+  const validateAndProcessPosition = async (position) => {
+    const { latitude, longitude, accuracy, speed } = position.coords;
+    const currentTime = Date.now();
+    
+    // 1. Accuracy Filter
+    if (accuracy > 500) {
+      console.warn(`[SecureGeo] Rejected: Low accuracy (${accuracy}m)`);
+      setLocationState(prev => ({ ...prev, error: 'GPS signal too weak. Please go outside.', errorCode: 'LOW_ACCURACY', loading: false }));
+      return;
+    }
+
+    // 2. Teleportation / Fake GPS Detection
+    let calculatedSpeedKmH = speed ? (speed * 3.6) : 0;
+    
+    if (prevCoordsRef.current && lastTimeRef.current) {
+      const timeDiffHours = (currentTime - lastTimeRef.current) / (1000 * 60 * 60);
+      const distKm = calculateDistance(prevCoordsRef.current.lat, prevCoordsRef.current.lng, latitude, longitude);
+      
+      if (timeDiffHours > 0) {
+        const measuredSpeed = distKm / timeDiffHours;
+        // If speed exceeds 200 km/h, it's highly likely a spoofed teleport
+        if (measuredSpeed > 200) {
+          console.error(`[SecureGeo] MOCK DETECTED: Unrealistic speed ${measuredSpeed.toFixed(2)} km/h`);
+          setLocationState(prev => ({ 
+            ...prev, 
+            isMock: true, 
+            error: 'Suspicious GPS activity detected. Please disable mock locations.', 
+            errorCode: 'MOCK_DETECTED', 
+            loading: false 
+          }));
+          return;
+        }
+        calculatedSpeedKmH = Math.max(calculatedSpeedKmH, measuredSpeed);
+      }
+    }
+
+    console.log(`[SecureGeo] Valid Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}, Acc: ${accuracy}m, Speed: ${calculatedSpeedKmH.toFixed(1)}km/h`);
+
+    // Only reverse geocode if location shifted significantly (e.g., > 100 meters) to save API calls
+    let newAddressData = { formatted: locationState.address, raw: locationState.rawAddressObj };
+    if (!prevCoordsRef.current || calculateDistance(prevCoordsRef.current.lat, prevCoordsRef.current.lng, latitude, longitude) > 0.1) {
+      newAddressData = await fetchAddress(latitude, longitude);
+    }
+
+    prevCoordsRef.current = { lat: latitude, lng: longitude };
+    lastTimeRef.current = currentTime;
+
+    setLocationState({
+      lat: latitude,
+      lng: longitude,
+      accuracy,
+      speed: calculatedSpeedKmH,
+      address: newAddressData.formatted || locationState.address,
+      rawAddressObj: newAddressData.raw || locationState.rawAddressObj,
+      loading: false,
+      error: null,
+      errorCode: null,
+      isMock: false
+    });
+  };
+
+  const handleGeoError = (err) => {
+    console.error('[SecureGeo] Error:', err);
+    let errorMsg = 'Failed to get location';
+    let errorCode = 'NETWORK_ERROR';
+    
+    if (err.code === 1) {
+      errorMsg = 'Location permission denied. Please enable it in browser settings.';
+      errorCode = 'PERMISSION_DENIED';
+    } else if (err.code === 2) {
+      errorMsg = 'GPS is disabled or unavailable. Please turn on location services.';
+      errorCode = 'GPS_DISABLED';
+    } else if (err.code === 3) {
+      errorMsg = 'Location request timed out. Retrying...';
+      errorCode = 'TIMEOUT';
+    }
+    
+    setLocationState(prev => ({ ...prev, error: errorMsg, errorCode, loading: false }));
+  };
+
+  const startTracking = useCallback(() => {
+    if (!navigator.geolocation) {
+      setLocationState(prev => ({ ...prev, error: 'Geolocation is not supported by your browser.', errorCode: 'NOT_SUPPORTED', loading: false }));
+      return;
+    }
+
+    setLocationState(prev => ({ ...prev, loading: true, error: null, errorCode: null }));
+
+    // Request immediate position first, then set up a battery-friendly watch
+    navigator.geolocation.getCurrentPosition(validateAndProcessPosition, handleGeoError, {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 5000
+    });
+
+    // Keep GPS radio hot and track background changes efficiently
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      validateAndProcessPosition, 
+      handleGeoError,
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+    );
+    
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const stopTracking = useCallback(() => {
+    if (watchIdRef.current) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    setLocationState(prev => ({ ...prev, loading: false }));
+  }, []);
+
+  return {
+    ...locationState,
+    startTracking,
+    stopTracking
+  };
+};

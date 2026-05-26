@@ -1,18 +1,18 @@
+/* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react';
 import { User, MapPin, Home, Building2, AlertCircle, Navigation, Phone, Search, ShieldCheck, Share2, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useSecureLocation } from '../hooks/useSecureLocation';
 import { supabase } from '../supabase';
 import { toast } from 'react-hot-toast';
 import { auth } from '../firebase';
 import { updateProfile } from 'firebase/auth';
-/* eslint-disable no-unused-vars */
-import { motion } from 'framer-motion';
 import './CustomerDetails.css';
 
 const CustomerDetails = ({ user, onComplete }) => {
-  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     fullName: user?.displayName || '',
-    phone: user?.phoneNumber || '',
+    phone: (user?.phoneNumber || '').replace(/[\s\-().]/g, '').replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, ''),
     email: user?.email || '',
     houseName: '',
     houseNo: 'A-101',
@@ -27,6 +27,51 @@ const CustomerDetails = ({ user, onComplete }) => {
   const [view, setView] = useState('identity'); // 'identity' | 'address_selection' | 'address_form'
   const [errors, setErrors] = useState({});
   const [activeAreas, setActiveAreas] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [checkingPromo, setCheckingPromo] = useState(false);
+  const [discountAmount, setDiscountAmount] = useState(0);
+
+  const { lat, lng, error: geoError, errorCode, rawAddressObj, loading: geoLoading, startTracking, stopTracking } = useSecureLocation();
+
+  useEffect(() => {
+    if (lat && lng && rawAddressObj) {
+      const addr = rawAddressObj;
+      const detectedSociety = (addr.road || addr.residential || addr.suburb || addr.neighbourhood || '').toLowerCase();
+      const matchedArea = activeAreas.find(a => 
+        detectedSociety.includes(a.toLowerCase()) || a.toLowerCase().includes(detectedSociety)
+      );
+
+      setFormData(prev => ({
+        ...prev,
+        lat: lat,
+        lng: lng,
+        city: addr.city || addr.town || addr.village || addr.state_district || prev.city,
+        pincode: addr.postcode || prev.pincode,
+        landmark: addr.suburb || addr.neighbourhood || addr.amenity || prev.landmark,
+        society: matchedArea || prev.society
+      }));
+      
+      toast.success('Location & Address details secured! 📍', { id: 'geo-detect' });
+      stopTracking();
+      setLoading(false);
+    }
+  }, [lat, lng, rawAddressObj, stopTracking, activeAreas]);
+
+  useEffect(() => {
+    if (geoError) {
+      if (errorCode === 'MOCK_DETECTED') {
+        toast.error('❌ Fake GPS detected! Delivery address must be real.', { id: 'geo-error', duration: 5000 });
+      } else {
+        toast.error(geoError, { id: 'geo-error' });
+      }
+      stopTracking();
+      setLoading(false);
+    }
+  }, [geoError, errorCode, stopTracking]);
+
+  useEffect(() => {
+    return () => stopTracking();
+  }, [stopTracking]);
 
   // Fetch active areas from Admin Panel settings
   useEffect(() => {
@@ -123,60 +168,9 @@ const CustomerDetails = ({ user, onComplete }) => {
   };
 
   const detectLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by your browser', { id: 'geo-unsupported' });
-      return;
-    }
-    
     setLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        try {
-          // Reverse geocoding to fill address fields
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
-          const data = await res.json();
-          const addr = data.address || {};
-          
-          // Try to match detected area with our activeAreas list
-          const detectedSociety = (addr.road || addr.residential || addr.suburb || addr.neighbourhood || '').toLowerCase();
-          const matchedArea = activeAreas.find(a => 
-            detectedSociety.includes(a.toLowerCase()) || a.toLowerCase().includes(detectedSociety)
-          );
-
-          setFormData(prev => ({
-            ...prev,
-            lat: latitude,
-            lng: longitude,
-            city: addr.city || addr.town || addr.village || addr.state_district || prev.city,
-            pincode: addr.postcode || prev.pincode,
-            landmark: addr.suburb || addr.neighbourhood || addr.amenity || prev.landmark,
-            society: matchedArea || prev.society
-          }));
-          
-          toast.success('Location & Address details captured! 📍');
-        } catch (err) {
-          console.error('Reverse Geocode Error:', err);
-          setFormData(prev => ({ ...prev, lat: latitude, lng: longitude }));
-          toast.success('Coordinates captured, but address lookup failed.');
-        } finally {
-          setLoading(false);
-        }
-      },
-      (error) => {
-        console.error('GPS Error:', error);
-        const toastId = 'gps-error';
-        if (error.code === 1) {
-          toast.error('Location access denied. Please enable GPS in settings.', { id: toastId });
-        } else if (error.code === 3) {
-          toast.error('Location request timed out. Please try again.', { id: toastId });
-        } else {
-          toast.error('Could not get precise location. Please enter manually.', { id: toastId });
-        }
-        setLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-    );
+    toast.loading('Activating secure tracker...', { id: 'geo-detect' });
+    startTracking();
   };
 
   const handleSubmit = async (e) => {
@@ -220,12 +214,16 @@ const CustomerDetails = ({ user, onComplete }) => {
       }
 
       // 1. Update/Upsert User Table
+      // Normalize phone: always store as 10-digit number, no +91 prefix
+      const rawPhone = formData.phone || user?.phoneNumber || '';
+      const cleanPhone = rawPhone.replace(/[\s\-().]/g, '').replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, '');
+
       const { data: updatedUser, error: userError } = await supabase
         .from('users')
         .upsert([{ 
           id: userId?.length === 36 ? userId : undefined,
           uid: user?.uid || userId, // Ensure UID is stored for Auth lookup
-          phone: formData.phone || user?.phoneNumber,
+          phone: cleanPhone,
           full_name: formData.fullName,
           email: formData.email,
           role: 'BUYER' // Explicitly set role
@@ -253,20 +251,33 @@ const CustomerDetails = ({ user, onComplete }) => {
       });
 
       // 2. Update/Upsert Addresses Table directly in Supabase
-      const { data: savedAddr, error: addressError } = await supabase
+      const { data: existingAddress } = await supabase
         .from('addresses')
-        .upsert([{
-          user_id: updatedUser?.id || userId,
-          address_line_1: `${formData.houseName ? formData.houseName + ', ' : ''}${formData.houseNo}, ${formData.floor ? 'Floor ' + formData.floor + ', ' : ''}${formData.society}`,
-          address_line_2: formData.landmark,
-          city: formData.city,
-          pincode: formData.pincode,
-          lat: formData.lat,
-          lng: formData.lng,
-          is_default: true
-        }], { onConflict: 'user_id' })
-        .select()
-        .single();
+        .select('id')
+        .eq('user_id', updatedUser?.id || userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const addrPayload = {
+        user_id: updatedUser?.id || userId,
+        address_line_1: `${formData.houseName ? formData.houseName + ', ' : ''}${formData.houseNo}, ${formData.floor ? 'Floor ' + formData.floor + ', ' : ''}${formData.society}`,
+        address_line_2: formData.landmark,
+        city: formData.city,
+        pincode: formData.pincode,
+        lat: formData.lat,
+        lng: formData.lng,
+        is_default: true
+      };
+
+      let savedAddr, addressError;
+      if (existingAddress?.id) {
+        const { data, error } = await supabase.from('addresses').update(addrPayload).eq('id', existingAddress.id).select().single();
+        savedAddr = data; addressError = error;
+      } else {
+        const { data, error } = await supabase.from('addresses').insert([addrPayload]).select().single();
+        savedAddr = data; addressError = error;
+      }
 
       // Manually augment savedAddr with the society, house_no, and floor fields for UI state sync
       if (savedAddr) {

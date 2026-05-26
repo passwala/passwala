@@ -4,27 +4,14 @@ import { motion } from 'framer-motion';
 import { Search, MapPin, Navigation, ChevronLeft, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { useSecureLocation } from '../hooks/useSecureLocation';
+import { AHMEDABAD_AREAS as ahmedabadAreas } from '../utils/constants';
 import './LocationSelector.css';
 
 const LocationSelector = ({ currentLocation, onLocationChange }) => {
   const navigate = useNavigate();
 
-  const ahmedabadAreas = [
-    { name: 'Satellite, Ahmedabad', lat: 23.0305, lng: 72.5075 },
-    { name: 'Prahlad Nagar, Ahmedabad', lat: 23.0120, lng: 72.5108 },
-    { name: 'Bopal, Ahmedabad', lat: 23.0350, lng: 72.4397 },
-    { name: 'South Bopal, Ahmedabad', lat: 23.0158, lng: 72.4566 },
-    { name: 'Vastrapur, Ahmedabad', lat: 23.0393, lng: 72.5244 },
-    { name: 'Bodakdev, Ahmedabad', lat: 23.0416, lng: 72.5133 },
-    { name: 'S.G. Highway, Ahmedabad', lat: 23.0257, lng: 72.5033 },
-    { name: 'Thaltej, Ahmedabad', lat: 23.0497, lng: 72.5107 },
-    { name: 'Gota, Ahmedabad', lat: 23.0753, lng: 72.5258 },
-    { name: 'Ghatlodia, Ahmedabad', lat: 23.0645, lng: 72.5413 },
-    { name: 'Chandkheda, Ahmedabad', lat: 23.1119, lng: 72.5854 },
-    { name: 'Maninagar, Ahmedabad', lat: 22.9972, lng: 72.6014 },
-    { name: 'Navrangpura, Ahmedabad', lat: 23.0333, lng: 72.5621 },
-    { name: 'C.G. Road, Ahmedabad', lat: 23.0269, lng: 72.5599 }
-  ];
+
 
   const handleSelect = (areaObj) => {
     onLocationChange(areaObj.name, { lat: areaObj.lat, lng: areaObj.lng });
@@ -41,48 +28,14 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
 
   const [detecting, setDetecting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  const { lat, lng, error, errorCode, isMock, address, loading, startTracking, stopTracking } = useSecureLocation();
 
-  const filteredAreas = ahmedabadAreas.filter(area => 
-    area.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const detectLocation = async () => {
-    // ... same detection logic ...
-    if (detecting) return;
-    setDetecting(true);
-    toast.loading('Finding your location...', { id: 'geo' });
-    
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(async (position) => {
-        try {
-          const { latitude, longitude } = position.coords;
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`);
-          const data = await res.json();
-          const area = data.address?.suburb || data.address?.neighbourhood || data.address?.city || data.address?.town || 'My Location';
-          const city = data.address?.city || data.address?.town || data.address?.state_district || '';
-          const full = city ? `${area}, ${city}` : area;
-          onLocationChange(full, { lat: latitude, lng: longitude });
-          toast.success(`Located: ${full}`, { id: 'geo' });
-        } catch (err) {
-          fallbackToIP();
-        } finally {
-          setDetecting(false);
-        }
-      }, () => {
-        fallbackToIP();
-      }, { timeout: 10000 });
-    } else {
-      fallbackToIP();
-    }
-  };
-
-  const fallbackToIP = async () => {
+  const fallbackToIP = React.useCallback(async () => {
     try {
       const baseUrl = import.meta.env.VITE_API_URL || '';
-      
       const res = await fetch(`${baseUrl}/api/ip-location`);
       if (!res.ok) throw new Error('Proxied IP Location failed');
-      
       const data = await res.json();
       if (data && data.cityName && data.regionName) {
         const full = `${data.cityName}, ${data.regionName}`;
@@ -96,6 +49,42 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
     } finally {
       setDetecting(false);
     }
+  }, [onLocationChange]);
+  React.useEffect(() => {
+    if (lat && lng && address) {
+      onLocationChange(address, { lat, lng });
+      toast.success(`Securely Located: ${address}`, { id: 'geo' });
+      stopTracking();
+      setDetecting(false);
+    }
+  }, [lat, lng, address, onLocationChange, stopTracking]);
+
+  React.useEffect(() => {
+    if (error) {
+      if (errorCode === 'MOCK_DETECTED') {
+        toast.error('❌ Fake GPS App Detected! Please disable mock locations.', { id: 'geo', duration: 5000 });
+      } else {
+        toast.error(`Error: ${error}`, { id: 'geo' });
+      }
+      setDetecting(false);
+      stopTracking();
+      fallbackToIP();
+    }
+  }, [error, errorCode, stopTracking, fallbackToIP]);
+
+  React.useEffect(() => {
+    return () => stopTracking();
+  }, [stopTracking]);
+
+  const filteredAreas = ahmedabadAreas.filter(area => 
+    area.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const detectLocation = () => {
+    if (detecting || loading) return;
+    setDetecting(true);
+    toast.loading('Initializing secure GPS tracker...', { id: 'geo' });
+    startTracking();
   };
 
   return (

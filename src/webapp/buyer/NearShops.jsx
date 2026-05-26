@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import './NearShops.css';
 import { supabase } from '../../supabase';
 import { useCart } from '../../context/CartContext';
@@ -125,6 +124,7 @@ const NearShops = ({ location, userCoords }) => {
               .eq('store_id', shop.id)
               .order('created_at', { ascending: false });
             if (!error && data) {
+                const filteredData = data.filter(item => item.description !== 'Service item auto-registered');
                 const getCleanProductImage = (imgSrc) => {
                   if (!imgSrc || typeof imgSrc !== 'string') return 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=400'; // Default Premium Grocery
                   const clean = imgSrc.trim();
@@ -134,7 +134,7 @@ const NearShops = ({ location, userCoords }) => {
                   return 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=400';
                 };
 
-                setShopCatalog(data.map(p => ({
+                setShopCatalog(filteredData.map(p => ({
                    id: p.id,
                    name: p.name,
                    detail: p.description,
@@ -167,13 +167,34 @@ const NearShops = ({ location, userCoords }) => {
 
 
 
+  const geocodeAddress = useCallback(async (address) => {
+    if (!address) return null;
+    try {
+      const searchString = address.toLowerCase().includes('ahmedabad') 
+        ? address 
+        : `${address}, Ahmedabad, Gujarat, India`; // Fallback, could be enhanced with user location string
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchString)}&limit=1`;
+      const res = await fetch(url, { headers: { 'User-Agent': 'Passwalaa-App' } });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.length > 0) {
+          return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+        }
+      }
+    } catch (err) {
+      console.warn('Geocoding error:', err);
+    }
+    return null;
+  }, []);
+
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const table = viewType === 'SHOPS' ? 'vendors' : 'service_providers';
       const { data, error } = await supabase
         .from(table) 
-        .select('*');
+        .select('*')
+        .limit(100);
       
       if (error) throw error;
       
@@ -202,6 +223,7 @@ const NearShops = ({ location, userCoords }) => {
             distance: 'N/A',
             lat: lat,
             lng: lng,
+            address: item.address,
             image: item.photo_url || (viewType === 'SHOPS' ? "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80&w=800" : "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=500&q=80"),
             isOpen: true,
             verified: item.is_verified || false,
@@ -211,10 +233,23 @@ const NearShops = ({ location, userCoords }) => {
       });
       
       const itemsWithDistance = await Promise.all(uniqueItems.map(async (item) => {
-        if (!userCoords?.lat || !userCoords?.lng || !item.lat || !item.lng) {
+        let lat = item.lat;
+        let lng = item.lng;
+        
+        if ((!lat || !lng) && item.address) {
+          const coords = await geocodeAddress(item.address);
+          if (coords) {
+            lat = coords.lat;
+            lng = coords.lng;
+            item.lat = lat;
+            item.lng = lng;
+          }
+        }
+        
+        if (!userCoords?.lat || !userCoords?.lng || !lat || !lng) {
           return { ...item, distance: 'N/A' };
         }
-        const routeInfo = await getOSRMRoute(userCoords.lat, userCoords.lng, item.lat, item.lng);
+        const routeInfo = await getOSRMRoute(userCoords.lat, userCoords.lng, lat, lng);
         return { ...item, distance: routeInfo.distanceKm.toFixed(1) };
       }));
 
@@ -225,7 +260,7 @@ const NearShops = ({ location, userCoords }) => {
     } finally {
       setLoading(false);
     }
-  }, [userCoords, viewType]);
+  }, [userCoords, viewType, geocodeAddress]);
 
   useEffect(() => {
     fetchData();

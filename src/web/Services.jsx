@@ -45,7 +45,7 @@ const Services = () => {
     </section>
   );
 
-  if (searchQuery && filteredServices.length === 0) return null;
+  if (filteredServices.length === 0) return null;
 
   return (
     <section className="services" id="services">

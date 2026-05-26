@@ -51,6 +51,7 @@ const PrivacySecurity = React.lazy(() => import('./webapp/profile_pages/PrivacyS
 const HelpSupport = React.lazy(() => import('./webapp/profile_pages/HelpSupport'));
 const AppSettings = React.lazy(() => import('./webapp/profile_pages/AppSettings'));
 const PlanetSoftweb = React.lazy(() => import('./planet_softweb/PlanetSoftweb'));
+const NeighborhoodHub = React.lazy(() => import('./webapp/buyer/NeighborhoodHub'));
 
 // Dedicated Environment-based Modes (no fragile port fallbacks)
 const appMode = import.meta.env.VITE_APP_MODE || import.meta.env.MODE || 'web';
@@ -465,7 +466,7 @@ const AppContent = ({
         ) : (
           <>
             {/* Global Navbar Logic */}
-            {isWebMode ? (
+            {['/', '/privacy-policy', '/terms', '/refunds-cancellation', '/data-deletion', '/policies'].includes(locationPath) ? (
               <Navbar
                 isAuthenticated={!!effectiveUser} user={effectiveUser} onLogout={handleLogout}
                 onOpenProfile={() => navigate('/profile')} onOpenAI={() => navigate('/')}
@@ -502,6 +503,12 @@ const AppContent = ({
                 </div>
               }>
                 <Routes>
+                  <Route path="/admin" element={
+                    <Suspense fallback={<div className="flex h-screen items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-4 border-[#ff6b00] border-t-transparent"></div></div>}>
+                      <AdminPanel />
+                    </Suspense>
+                  } />
+                  
                   <Route path="/" element={
                     <>
                       {isWebappMode ? (
@@ -538,16 +545,7 @@ const AppContent = ({
                         }} />
                       ) : (
                         <>
-                          {effectiveUser && (
-                            <NeighborhoodHub user={effectiveUser} isProfileComplete={isProfileComplete} onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')} />
-                          )}
                           <Hero />
-                          <AIRecommendations />
-                          <QuickServices />
-                          <Services />
-                          <Essentials />
-                          <NearbyDeals />
-                          <Community />
                           <VendorCTA onOpenVendor={() => window.open(import.meta.env.VITE_VENDOR_PORTAL_URL || `http://${window.location.hostname}:3002`, '_blank')} />
                         </>
                       )}
@@ -597,6 +595,20 @@ const AppContent = ({
 
 
 
+function FCMTokenSync({ user }) {
+  const { fcmToken } = useNotifications();
+  
+  useEffect(() => {
+    if (user?.id && fcmToken) {
+      supabase.from('users').update({ fcm_token: fcmToken }).eq('id', user.id).then(({ error }) => {
+        if (error) console.error("Failed to sync FCM token", error);
+      });
+    }
+  }, [user?.id, fcmToken]);
+
+  return null;
+}
+
 function App() {
   const {
     user,
@@ -627,6 +639,7 @@ function App() {
       ) : (
         <SearchProvider>
           <NotificationProvider>
+            <FCMTokenSync user={user} />
             <LanguageProvider>
               <CartProvider user={user}>
                 <div className="app-container">

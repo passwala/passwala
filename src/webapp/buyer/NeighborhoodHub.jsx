@@ -185,6 +185,18 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
       }
     };
     fetchStats();
+
+    const channel1 = supabase.channel('stores-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stores' }, fetchStats)
+      .subscribe();
+    const channel2 = supabase.channel('providers-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'service_providers' }, fetchStats)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel1);
+      supabase.removeChannel(channel2);
+    };
   }, []);
 
   return (

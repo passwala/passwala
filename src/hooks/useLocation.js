@@ -24,7 +24,7 @@ export const useLocation = () => {
     const autoDetectLocation = async () => {
       const savedLoc = localStorage.getItem('passwala_location');
       // If location is already set to something specific (not the default neutral 'India' or generic placeholder), skip detection
-      if (savedLoc && savedLoc !== 'Detecting Location...' && savedLoc !== DEFAULT_LOCATION && savedLoc !== 'Ahmedabad, Gujarat') return;
+      if (savedLoc && savedLoc !== 'Detecting Location...' && savedLoc !== DEFAULT_LOCATION) return;
 
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
@@ -47,7 +47,7 @@ export const useLocation = () => {
                 if (area && city) {
                   const preUpdateLoc = localStorage.getItem('passwala_location');
                   updateLocation(`${area}, ${city}`);
-                  if (!preUpdateLoc || preUpdateLoc === 'Detecting Location...' || preUpdateLoc === DEFAULT_LOCATION || preUpdateLoc === 'Ahmedabad, Gujarat') {
+                  if (!preUpdateLoc || preUpdateLoc === 'Detecting Location...' || preUpdateLoc === DEFAULT_LOCATION) {
                     toast.success(`Located: ${area}`, { icon: '📍', id: 'auto-geo' });
                   }
                   return;

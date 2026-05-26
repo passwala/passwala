@@ -140,7 +140,11 @@ export const VendorInventory = ({ businessType, storeId }) => {
           const idCol = businessType === 'shop' ? 'store_id' : 'provider_id';
           const { data, error } = await supabase.from(targetTable).select('*').eq(idCol, storeId);
           if (!error && data) {
-            dbItems = data.map(item => ({
+            let filteredData = data;
+            if (businessType === 'shop') {
+              filteredData = data.filter(item => item.description !== 'Service item auto-registered');
+            }
+            dbItems = filteredData.map(item => ({
               id: item.id,
               name: item.name || item.title,
               detail: item.description || item.category,
@@ -177,20 +181,25 @@ export const VendorInventory = ({ businessType, storeId }) => {
         }
       });
 
-      if (import.meta.env.DEV && unique.length === 0) {
-        const demos = businessType === 'shop' ? [
-          { id: 'd1', name: 'Fresh Farm Milk', detail: 'Organic A2 cow milk, delivered fresh every morning.', price: 75, image: 'https://images.unsplash.com/photo-1550583724-125581f7793d?auto=format&fit=crop&q=80&w=400', type: 'shop' },
-          { id: 'd2', name: 'Artisan Brown Bread', detail: 'Freshly baked whole wheat bread with no preservatives.', price: 55, image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&q=80&w=400', type: 'shop' }
-        ] : [
-          { id: 's1', name: 'Premium Deep Cleaning', detail: 'Professional 5-step deep cleaning for your entire home.', price: 1999, image: '/cleaning_service_premium.png', type: 'service' },
-          { id: 's2', name: 'Expert Plumbing Repair', detail: 'Quick fixes and full installations by certified plumbers.', price: 499, image: '/plumbing_service_premium.png', type: 'service' }
-        ];
-        setItems(demos);
-      } else {
-        setItems(unique);
-      }
+      setItems(unique);
     };
+    
     fetchCatalog();
+
+    if (storeId && supabase) {
+      const targetTable = businessType === 'shop' ? 'products' : 'services';
+      const idCol = businessType === 'shop' ? 'store_id' : 'provider_id';
+      
+      const sub = supabase.channel(`vendor_inventory_${storeId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: targetTable, filter: `${idCol}=eq.${storeId}` }, () => {
+          fetchCatalog();
+        })
+        .subscribe();
+        
+      return () => {
+        supabase.removeChannel(sub);
+      };
+    }
   }, [storeId, businessType]);
 
   // Synchronize react items state to localStorage automatically on state changes
@@ -215,7 +224,7 @@ export const VendorInventory = ({ businessType, storeId }) => {
           barcode_type: newItem.barcode_type || 'EAN-13',
           stock_quantity: newItem.stock_quantity ? parseInt(newItem.stock_quantity) : 0,
           type: businessType || 'shop',
-          category_id: newItem.category_id || (businessType === 'shop' ? '44444444-4444-4444-4444-444444444444' : '77777777-7777-7777-7777-777777777777')
+          category_id: newItem.category_id || null
         } : item);
         localStorage.setItem('vVendorItems', JSON.stringify(updated.filter(i => !i.id.toString().startsWith('d') && !i.id.toString().startsWith('s'))));
         return updated;
@@ -234,7 +243,7 @@ export const VendorInventory = ({ businessType, storeId }) => {
           } : {
             title: newItem.name,
             price: parseFloat(newItem.price),
-            category_id: newItem.category_id || '77777777-7777-7777-7777-777777777777',
+            category_id: null,
             description: newItem.detail || 'Updated Manually',
             duration_minutes: 60
           };
@@ -243,7 +252,7 @@ export const VendorInventory = ({ businessType, storeId }) => {
       }
 
       setEditingId(null);
-      setNewItem({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: businessType === 'shop' ? '44444444-4444-4444-4444-444444444444' : '77777777-7777-7777-7777-777777777777' });
+      setNewItem({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: null });
       setShowForm(false);
       return;
     }
@@ -259,7 +268,7 @@ export const VendorInventory = ({ businessType, storeId }) => {
       barcode_type: newItem.barcode_type || 'EAN-13',
       stock_quantity: newItem.stock_quantity ? parseInt(newItem.stock_quantity) : 0,
       type: businessType || 'shop',
-      category_id: newItem.category_id || (businessType === 'shop' ? '44444444-4444-4444-4444-444444444444' : '77777777-7777-7777-7777-777777777777')
+      category_id: newItem.category_id || null
     };
 
     setItems(prev => {
@@ -277,7 +286,7 @@ export const VendorInventory = ({ businessType, storeId }) => {
         const payload = businessType === 'shop' ? {
           store_id: storeId,
           name: newProductObj.name,
-          category_id: '44444444-4444-4444-4444-444444444444',
+          category_id: null,
           description: newProductObj.detail || 'Added Manually',
           price: parseFloat(newProductObj.price),
           image_url: newProductObj.image,
@@ -288,7 +297,7 @@ export const VendorInventory = ({ businessType, storeId }) => {
         } : {
           provider_id: storeId,
           title: newProductObj.name,
-          category_id: newProductObj.category_id,
+          category_id: null,
           description: newProductObj.detail || 'Added Manually',
           price: parseFloat(newProductObj.price),
           duration_minutes: 60
@@ -323,7 +332,7 @@ export const VendorInventory = ({ businessType, storeId }) => {
       barcode: item.barcode || '',
       barcode_type: item.barcode_type || 'EAN-13',
       stock_quantity: item.stock_quantity || '',
-      category_id: item.category_id || (businessType === 'shop' ? '44444444-4444-4444-4444-444444444444' : '77777777-7777-7777-7777-777777777777')
+      category_id: item.category_id || null
     });
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -371,7 +380,7 @@ export const VendorInventory = ({ businessType, storeId }) => {
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => { setEditingId(null); setNewItem({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: businessType === 'shop' ? '44444444-4444-4444-4444-444444444444' : '77777777-7777-7777-7777-777777777777' }); setShowForm(true); }}
+          onClick={() => { setEditingId(null); setNewItem({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: null }); setShowForm(true); }}
           className="v-btn-primary"
         >
           <PackagePlus size={20} />
@@ -538,7 +547,12 @@ export const VendorInventory = ({ businessType, storeId }) => {
               className="v-data-card"
             >
               <div className="v-card-image-wrap">
-                <img src={cleanImage} alt={item.name} className="v-card-img" />
+                <img 
+                  src={cleanImage} 
+                  alt={item.name} 
+                  className="v-card-img" 
+                  onError={(e) => { e.target.onerror = null; e.target.src = getFallbackByName(item.name); }} 
+                />
                 <div className="v-card-overlay" />
 
                 <div className="v-card-actions">
@@ -547,7 +561,7 @@ export const VendorInventory = ({ businessType, storeId }) => {
 
                 <div style={{ position: 'absolute', bottom: '16px', left: '16px' }}>
                   <span className={`v-badge-premium ${businessType === 'shop' ? 'v-badge-info' : 'v-badge-success'}`}>
-                    {businessType === 'shop' ? 'In Stock' : 'Active Service'}
+                    {businessType === 'shop' ? (item.stock_quantity > 0 ? `In Stock: ${item.stock_quantity}` : 'Out of Stock') : 'Active Service'}
                   </span>
                 </div>
               </div>
@@ -590,6 +604,7 @@ function VendorOrderTrackingMap({ order, riderCoords, businessType }) {
   const mapRef = React.useRef(null);
   const leafletMapRef = React.useRef(null);
   const markerGroupRef = React.useRef(null);
+  const boundsFitted = React.useRef(false);
   const [osrmRoutePoints, setOsrmRoutePoints] = React.useState([]);
 
   // Coordinate Resolution State
@@ -599,6 +614,14 @@ function VendorOrderTrackingMap({ order, riderCoords, businessType }) {
   // Dynamic Geocoding resolver helper
   const geocodeAddress = async (address) => {
     if (!address) return null;
+    
+    // Precision corrections for known areas that geocode poorly
+    const lower = address.toLowerCase();
+    if (lower.includes('thaltej')) return [23.0500, 72.5186]; // Deep Thaltej instead of SG Highway
+    if (lower.includes('gota')) return [23.0805, 72.5323];
+    if (lower.includes('satellite')) return [23.0293, 72.5137];
+    if (lower.includes('paldi')) return [23.0113, 72.5634];
+
     try {
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ', Ahmedabad, Gujarat, India')}&limit=1`;
       const res = await fetch(url, { headers: { 'User-Agent': 'Passwalaa-App' } });
@@ -763,18 +786,7 @@ function VendorOrderTrackingMap({ order, riderCoords, businessType }) {
       ? [parseFloat(riderCoords.lat), parseFloat(riderCoords.lng)]
       : null;
 
-    // Simulated/Fallback rider movement if the device does not have live active coordinates yet
-    if (!riderLatLng && ['ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED'].includes(order.status)) {
-      if (order.status === 'ACCEPTED' || order.status === 'PREPARING') {
-        riderLatLng = storeLatLng;
-      } else if (order.status === 'SHIPPED' || order.status === 'DISPATCHED') {
-        riderLatLng = [
-          (storeLatLng[0] + customerLatLng[0]) / 2,
-          (storeLatLng[1] + customerLatLng[1]) / 2
-        ];
-      }
-    }
-
+    // Do not simulate rider movement. Only show if real coordinates exist.
     // Plot Markers
     L.marker(storeLatLng, { icon: createStoreIcon() })
       .bindPopup(`<b>${businessType === 'service' ? 'Your Service Hub' : 'Your Store Hub'}</b>`)
@@ -814,7 +826,7 @@ function VendorOrderTrackingMap({ order, riderCoords, businessType }) {
       }
     }
 
-    // Auto-fit bounds
+    // Auto-fit bounds (smart handling to prevent fighting manual user zoom)
     try {
       const validPoints = [storeLatLng, customerLatLng];
       if (riderLatLng && !isNaN(riderLatLng[0]) && !isNaN(riderLatLng[1])) {
@@ -824,7 +836,21 @@ function VendorOrderTrackingMap({ order, riderCoords, businessType }) {
         osrmRoutePoints.forEach(pt => validPoints.push(pt));
       }
       const bounds = L.latLngBounds(validPoints);
-      leafletMapRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+      
+      // ONLY fit bounds if we haven't done it fully yet
+      if (!boundsFitted.current || (osrmRoutePoints.length > 0 && boundsFitted.current === 'initial')) {
+        leafletMapRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+
+        // Layout shift resolution: Refit after DOM expansion
+        setTimeout(() => {
+          if (leafletMapRef.current) {
+            leafletMapRef.current.invalidateSize();
+            leafletMapRef.current.fitBounds(bounds, { padding: [80, 80], maxZoom: 16 });
+          }
+        }, 400);
+
+        boundsFitted.current = osrmRoutePoints.length > 0 ? true : 'initial';
+      }
     } catch (e) {
       console.warn('Map boundary fit failed:', e);
     }
@@ -953,116 +979,6 @@ export const VendorOrders = ({ storeId, businessType }) => {
     type: 'danger'
   });
 
-  const handleSimulateOrder = async () => {
-    const isService = businessType === 'service';
-    try {
-      toast.loading(isService ? "Simulating new test booking..." : "Simulating new test order...", { id: 'sim-order' });
-      // 1. Get an address and user from the DB
-      const { data: addrs, error: addrErr } = await supabase.from('addresses').select('id, user_id').limit(1);
-      if (addrErr || !addrs || addrs.length === 0) {
-        toast.error("Simulation failed: No addresses/users found in DB. Please create a user/address first.", { id: 'sim-order' });
-        return;
-      }
-      const addr = addrs[0];
-
-      // 2. Fetch or create a product/service to associate with this store
-      let productId = null;
-      let simulatePrice = 150;
-      
-      if (isService) {
-        // Try to find a service for this store
-        const { data: servs } = await supabase.from('services').select('id, price').eq('provider_id', storeId).limit(1);
-        if (servs && servs.length > 0) {
-          productId = servs[0].id;
-          simulatePrice = servs[0].price || 350;
-        } else {
-          // If no service exists, let's create a dummy service
-          const dummyServiceId = crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-          });
-          const { error: servErr } = await supabase.from('services').insert([{
-            id: dummyServiceId,
-            provider_id: storeId,
-            title: 'Expert AC Diagnosis & Repair',
-            price: 350,
-            description: 'Professional diagnosis and quick repair by certified technician',
-            category_id: '77777777-7777-7777-7777-222222222222',
-            duration_minutes: 60
-          }]);
-          if (!servErr) {
-            productId = dummyServiceId;
-            simulatePrice = 350;
-          } else {
-            console.error("Failed to insert dummy service:", servErr);
-          }
-        }
-      } else {
-        // Try to find a product for this store
-        const { data: prods } = await supabase.from('products').select('id, price').eq('store_id', storeId).limit(1);
-        if (prods && prods.length > 0) {
-          productId = prods[0].id;
-          simulatePrice = prods[0].price || 150;
-        } else {
-          // If no product exists, let's create a dummy product
-          const dummyProductId = crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-          });
-          const { error: prodErr } = await supabase.from('products').insert([{
-            id: dummyProductId,
-            store_id: storeId,
-            name: 'Water Delivery Test Service',
-            price: 150,
-            stock_quantity: 9999,
-            description: 'Service item auto-registered for testing'
-          }]);
-          if (!prodErr) {
-            productId = dummyProductId;
-            simulatePrice = 150;
-          } else {
-            console.error("Failed to insert dummy product:", prodErr);
-          }
-        }
-      }
-
-      // 3. Create the order
-      const { data: newOrder, error: oe } = await supabase
-        .from('orders')
-        .insert([{
-          total_amount: simulatePrice,
-          subtotal: simulatePrice,
-          status: 'PLACED',
-          delivery_fee: 0,
-          store_id: storeId,
-          user_id: addr.user_id,
-          address_id: addr.id
-        }])
-        .select()
-        .single();
-
-      if (oe) {
-        toast.error("Failed to create order record: " + oe.message, { id: 'sim-order' });
-        return;
-      }
-
-      // 4. Create order item
-      if (productId) {
-        await supabase.from('order_items').insert([{
-          order_id: newOrder.id,
-          product_id: productId,
-          quantity: 1,
-          price_at_purchase: simulatePrice
-        }]);
-      }
-
-      toast.success(isService ? "Test booking simulated successfully!" : "Test order simulated successfully!", { id: 'sim-order' });
-      fetchOrders(false);
-    } catch (err) {
-      toast.error("Simulation failed: " + err.message, { id: 'sim-order' });
-    }
-  };
-
   const fetchOrders = React.useCallback(async (isInitial = false) => {
     if (!storeId) {
       setOrders([]);
@@ -1071,106 +987,177 @@ export const VendorOrders = ({ storeId, businessType }) => {
     }
     try {
       if (isInitial) setLoading(true);
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          users(full_name, phone),
-          addresses(*),
-          stores(name, address, lat, lng),
-          order_items(quantity, price_at_purchase, products(name))
-        `)
-        .eq('store_id', storeId)
-        .order('created_at', { ascending: false })
-        .limit(20);
 
-      if (!error && data) {
-        // Collect all service product_ids where products is null
-        const potentialServiceIds = [];
-        data.forEach(order => {
-          order.order_items?.forEach(oi => {
-            if (!oi.products?.name && oi.product_id) {
-              potentialServiceIds.push(oi.product_id);
-            }
-          });
-        });
+      if (businessType === 'service') {
+        const { data, error } = await supabase
+          .from('service_bookings')
+          .select(`
+            *,
+            users(full_name, phone),
+            addresses(*),
+            services(title)
+          `)
+          .eq('provider_id', storeId)
+          .order('created_at', { ascending: false })
+          .limit(30);
 
-        if (potentialServiceIds.length > 0) {
-          try {
-            const { data: servicesData } = await supabase
-              .from('services')
-              .select('id, title')
-              .in('id', potentialServiceIds);
-            
-            if (servicesData) {
-              const serviceMap = {};
-              servicesData.forEach(s => {
-                serviceMap[s.id] = s.title;
-              });
-
-              // Map it back to the data structure
-              data.forEach(order => {
-                order.order_items?.forEach(oi => {
-                  if (!oi.products?.name && serviceMap[oi.product_id]) {
-                    oi.products = {
-                      ...oi.products,
-                      name: serviceMap[oi.product_id]
-                    };
+        if (!error && data) {
+          data.forEach(booking => {
+            if (!booking.addresses) {
+              booking.addresses = {
+                id: 'fallback-addr',
+                address_line_1: 'Thaltej, Ahmedabad',
+                city: 'Ahmedabad',
+                state: 'Gujarat',
+                pincode: '380054',
+                society: 'Thaltej, Ahmedabad',
+                lat: 23.0753,
+                lng: 72.5244
+              };
+            } else {
+              if (!booking.addresses.society || booking.addresses.society.toLowerCase() === 'ahmedabad') {
+                if (booking.addresses.address_line_1 && booking.addresses.address_line_1 !== 'Geo-location Pending') {
+                  const parts = booking.addresses.address_line_1.split(',').map(p => p.trim());
+                  const lastPart = parts[parts.length - 1] || '';
+                  if (lastPart.toLowerCase() === 'ahmedabad') {
+                    booking.addresses.society = parts[parts.length - 2] || parts[0] || 'Thaltej';
+                  } else {
+                    booking.addresses.society = lastPart || 'Thaltej';
                   }
-                });
-              });
-            }
-          } catch (servErr) {
-            console.warn("Could not load service titles for vendor:", servErr);
-          }
-        }
-
-        // Normalize/parse addresses to resolve "Geo-location Pending" issues
-        data.forEach(order => {
-          if (!order.addresses) {
-            order.addresses = {
-              id: 'fallback-addr',
-              address_line_1: 'Thaltej, Ahmedabad',
-              city: 'Ahmedabad',
-              state: 'Gujarat',
-              pincode: '380054',
-              society: 'Thaltej, Ahmedabad',
-              lat: 23.0753,
-              lng: 72.5244
-            };
-          } else {
-            // Parse society dynamically from address_line_1 if not present
-            if (!order.addresses.society || order.addresses.society.toLowerCase() === 'ahmedabad') {
-              if (order.addresses.address_line_1 && order.addresses.address_line_1 !== 'Geo-location Pending') {
-                const parts = order.addresses.address_line_1.split(',').map(p => p.trim());
-                const lastPart = parts[parts.length - 1] || '';
-                if (lastPart.toLowerCase() === 'ahmedabad') {
-                  order.addresses.society = parts[parts.length - 2] || parts[0] || 'Thaltej';
                 } else {
-                  order.addresses.society = lastPart || 'Thaltej';
+                  booking.addresses.address_line_1 = 'Thaltej, Ahmedabad';
+                  booking.addresses.society = 'Thaltej';
                 }
-              } else {
-                order.addresses.address_line_1 = 'Thaltej, Ahmedabad';
-                order.addresses.society = 'Thaltej';
+              }
+              if (!booking.addresses.lat || !booking.addresses.lng) {
+                booking.addresses.lat = 23.0753;
+                booking.addresses.lng = 72.5244;
               }
             }
-            if (!order.addresses.lat || !order.addresses.lng) {
-              order.addresses.lat = 23.0753;
-              order.addresses.lng = 72.5244;
+
+            booking.subtotal = booking.total_amount;
+            booking.order_items = [{
+              quantity: 1,
+              products: {
+                name: booking.services?.title || 'Service Booking'
+              }
+            }];
+          });
+          setOrders(data);
+        } else if (!error) {
+          setOrders([]);
+        }
+      } else {
+        const { data, error } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            users(full_name, phone),
+            addresses(*),
+            stores(name, address, lat, lng),
+            order_items(quantity, price_at_purchase, products(name, description))
+          `)
+          .eq('store_id', storeId)
+          .order('created_at', { ascending: false })
+          .limit(30);
+
+        if (!error && data) {
+          // Filter out service orders for shop vendors, and shop orders for service vendors
+          const isServiceVendor = businessType === 'service';
+          const filteredData = data.filter(order => {
+            const hasServiceItem = order.order_items?.some(oi => 
+              oi.products?.description === 'Service item auto-registered' || (!oi.products?.name && oi.product_id)
+            );
+            return isServiceVendor ? hasServiceItem : !hasServiceItem;
+          });
+
+          // Collect all service product_ids where products is null
+          const potentialServiceIds = [];
+          filteredData.forEach(order => {
+            order.order_items?.forEach(oi => {
+              if (!oi.products?.name && oi.product_id) {
+                potentialServiceIds.push(oi.product_id);
+              }
+            });
+          });
+
+          if (potentialServiceIds.length > 0) {
+            try {
+              const { data: servicesData } = await supabase
+                .from('services')
+                .select('id, title')
+                .in('id', potentialServiceIds);
+              
+              if (servicesData) {
+                const serviceMap = {};
+                servicesData.forEach(s => {
+                  serviceMap[s.id] = s.title;
+                });
+
+                // Map it back to the data structure
+                filteredData.forEach(order => {
+                  order.order_items?.forEach(oi => {
+                    if (!oi.products?.name && serviceMap[oi.product_id]) {
+                      oi.products = {
+                        ...oi.products,
+                        name: serviceMap[oi.product_id]
+                      };
+                    }
+                  });
+                });
+              }
+            } catch (servErr) {
+              console.warn("Could not load service titles for vendor:", servErr);
             }
           }
-        });
 
-        setOrders(data);
-      } else if (!error) {
-        setOrders([]);
+          // Normalize/parse addresses to resolve "Geo-location Pending" issues
+          filteredData.forEach(order => {
+            if (!order.addresses) {
+              order.addresses = {
+                id: 'fallback-addr',
+                address_line_1: 'Thaltej, Ahmedabad',
+                city: 'Ahmedabad',
+                state: 'Gujarat',
+                pincode: '380054',
+                society: 'Thaltej, Ahmedabad',
+                lat: 23.0753,
+                lng: 72.5244
+              };
+            } else {
+              // Parse society dynamically from address_line_1 if not present
+              if (!order.addresses.society || order.addresses.society.toLowerCase() === 'ahmedabad') {
+                if (order.addresses.address_line_1 && order.addresses.address_line_1 !== 'Geo-location Pending') {
+                  const parts = order.addresses.address_line_1.split(',').map(p => p.trim());
+                  const lastPart = parts[parts.length - 1] || '';
+                  if (lastPart.toLowerCase() === 'ahmedabad') {
+                    order.addresses.society = parts[parts.length - 2] || parts[0] || 'Thaltej';
+                  } else {
+                    order.addresses.society = lastPart || 'Thaltej';
+                  }
+                } else {
+                  order.addresses.address_line_1 = 'Thaltej, Ahmedabad';
+                  order.addresses.society = 'Thaltej';
+                }
+              }
+              if (!order.addresses.lat || !order.addresses.lng) {
+                order.addresses.lat = 23.0753;
+                order.addresses.lng = 72.5244;
+              }
+            }
+          });
+
+          setOrders(filteredData);
+        } else if (!error) {
+          setOrders([]);
+        }
       }
     } catch (err) {
       console.error("Order fetch failed:", err);
     } finally {
       setLoading(false);
     }
-  }, [storeId]);
+  }, [storeId, businessType]);
 
   React.useEffect(() => {
     fetchOrders(true);
@@ -1204,7 +1191,7 @@ export const VendorOrders = ({ storeId, businessType }) => {
 
   // Audio Notification Loop for New Orders
   React.useEffect(() => {
-    const hasNewOrders = orders.some(o => o.status === 'PLACED');
+    const hasNewOrders = orders.some(o => o.status === 'PLACED' || o.status === 'PENDING');
     if (!hasNewOrders) return;
 
     const playNotificationSound = () => {
@@ -1234,9 +1221,30 @@ export const VendorOrders = ({ storeId, businessType }) => {
 
   const updateStatus = async (orderId, newStatus) => {
     const isService = businessType === 'service';
-    const toastId = toast.loading(isService ? "Updating booking status..." : "Updating order status...");
+    // Use an instant toast rather than a loading spinner for optimistic updates
+    toast.success(isService ? "Status updated!" : "Status updated!");
     const isValidUuid = (id) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
+    
+    // --- OPTIMISTIC UI RENDER ---
+    const originalOrder = orders.find(o => o.id === orderId);
+    const originalStatus = originalOrder ? originalOrder.status : null;
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+
     try {
+      if (newStatus === 'CANCELLED' && !isService) {
+        const { data: items } = await supabase.from('order_items').select('product_id, quantity').eq('order_id', orderId);
+        if (items && items.length > 0) {
+          for (const item of items) {
+            if (item.product_id) {
+              const { data: prod } = await supabase.from('products').select('stock_quantity').eq('id', item.product_id).maybeSingle();
+              if (prod) {
+                await supabase.from('products').update({ stock_quantity: (prod.stock_quantity || 0) + item.quantity }).eq('id', item.product_id);
+              }
+            }
+          }
+        }
+      }
+
       const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
       if (error) throw error;
 
@@ -1263,17 +1271,21 @@ export const VendorOrders = ({ storeId, businessType }) => {
         }
       }
 
-      toast.success(isService ? "Booking updated successfully!" : "Order updated successfully!", { id: toastId });
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+      // Background fetch to ensure consistency after optimistic update
       fetchOrders(false);
     } catch (err) {
-      toast.error("Failed to update status: " + err.message, { id: toastId });
+      // --- OPTIMISTIC ROLLBACK ---
+      if (originalStatus) {
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: originalStatus } : o));
+      }
+      toast.error("Failed to update status: " + err.message);
     }
   };
 
   const getStatusStyle = (status) => {
     const isService = businessType === 'service';
     switch (status) {
+      case 'PENDING':
       case 'PLACED': return { bg: '#fff7ed', text: '#f97316', dot: '#f97316', label: isService ? 'New Booking' : 'New Order', icon: <Bell size={14} /> };
       case 'ACCEPTED': return { bg: '#e0f2fe', text: '#0ea5e9', dot: '#0ea5e9', label: isService ? 'Expert Assigned' : 'Rider Accepted', icon: <CheckCircle size={14} /> };
       case 'PREPARING': return { bg: '#eff6ff', text: '#3b82f6', dot: '#3b82f6', label: isService ? 'Expert Preparing' : 'In Progress', icon: <Clock size={14} /> };
@@ -1322,194 +1334,194 @@ export const VendorOrders = ({ storeId, businessType }) => {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        {orders.filter(o => activeTab === 'active' ? (o.status !== 'DELIVERED' && o.status !== 'CANCELLED' && o.status !== 'PENDING') : (o.status === 'DELIVERED' || o.status === 'CANCELLED')).map((order, i) => {
-          const style = getStatusStyle(order.status);
-          const isService = businessType === 'service';
-          return (
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.08 }}
-              key={order.id}
-              className="v-data-card"
-              style={{ padding: '2rem', border: '1px solid #f1f5f9', position: 'relative', overflow: 'hidden' }}
-            >
-              <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: style.dot }}></div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                    <span style={{ fontWeight: 950, color: '#0f172a', fontSize: '1.25rem', letterSpacing: '-0.5px' }}>#{isService ? 'BKG' : 'ORD'}-{order.id.substring(0, 8).toUpperCase()}</span>
-                    {['PLACED', 'ACCEPTED'].includes(order.status) && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#fef2f2', color: '#ef4444', padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 900 }}>
-                        <div className="v-pulse-dot" style={{ background: '#ef4444' }}></div>
-                        ACTION REQUIRED
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.9rem', fontWeight: 700 }}>
-                    <Clock size={16} /> Received at {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </div>
+        {(() => {
+          const filteredList = orders.filter(o => activeTab === 'active' ? (o.status !== 'DELIVERED' && o.status !== 'CANCELLED') : (o.status === 'DELIVERED' || o.status === 'CANCELLED'));
+          
+          if (filteredList.length === 0) {
+            return (
+              <div style={{ padding: '8rem 2rem', textAlign: 'center', background: 'white', borderRadius: '40px', border: '2px dashed #e2e8f0' }}>
+                <div style={{ width: '100px', height: '100px', background: '#f8fafc', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem auto' }}>
+                  {businessType === 'service' ? (
+                    <Wrench size={48} color="#cbd5e1" />
+                  ) : (
+                    <Package size={48} color="#cbd5e1" />
+                  )}
                 </div>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 20px', borderRadius: '14px',
-                  background: style.bg, color: style.text, fontSize: '0.85rem', fontWeight: 900, border: `1px solid ${style.dot}15`
-                }}>
-                  {style.icon}
-                  {style.label}
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3rem', marginBottom: '2rem', alignItems: 'center' }}>
-                <div>
-                  <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{isService ? 'Customer Profile' : 'Customer Entity'}</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '40px', height: '40px', background: '#f8fafc', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#475569', border: '1px solid #e2e8f0' }}>
-                      {(order.users?.full_name || 'U').charAt(0)}
-                    </div>
-                    <div>
-                      <span style={{ fontWeight: 850, color: '#1e293b', display: 'block', fontSize: '1rem' }}>{order.users?.full_name || 'Verified User'}</span>
-                      <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>{order.users?.phone || 'Premium Member'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{isService ? 'Service Address' : 'Destination Node'}</p>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', color: '#1e293b' }}>
-                    <MapPin size={18} color="var(--v-primary)" style={{ marginTop: '2px', flexShrink: 0 }} />
-                    <span style={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.4 }}>{order.addresses?.society || 'Geo-location Pending'}</span>
+                <h3 style={{ fontWeight: 950, color: '#1e293b', fontSize: '1.5rem', letterSpacing: '-0.5px' }}>{businessType === 'service' ? 'No Bookings' : 'Station Idle'}</h3>
+                <p style={{ color: '#64748b', margin: '0.75rem 0 2rem 0', fontWeight: 600 }}>{businessType === 'service' ? 'Your service station is ready to receive bookings. New bookings will trigger a priority alert.' : 'Your store is ready to receive missions. New orders will trigger a priority alert.'}</p>
+                <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: '#f0fdf4', color: '#16a34a', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 900, marginBottom: '1rem' }}>
+                    <div className="v-pulse-dot" style={{ background: '#16a34a' }}></div>
+                    OPERATIONAL
                   </div>
                 </div>
               </div>
+            );
+          }
 
-              <div style={{ background: '#f8fafc', borderRadius: '20px', padding: '1.5rem', marginBottom: '2rem', border: '1px solid #f1f5f9' }}>
-                <p style={{ margin: '0 0 12px 0', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase' }}>{isService ? 'Booked Services' : 'Inventory Manifest'}</p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                  {order.order_items?.map((item, idx) => (
-                    <div key={idx} style={{ background: 'white', border: '1px solid #e2e8f0', padding: '6px 14px', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                      <span style={{ color: 'var(--v-primary)' }}>{item.quantity}x</span>
-                      {item.products?.name}
-                    </div>
-                  )) || <span style={{ fontStyle: 'italic', color: '#94a3b8' }}>Parsing manifest data...</span>}
-                </div>
-              </div>
-
-              {activeTab === 'active' && ['PLACED', 'PREPARING', 'SHIPPED', 'DISPATCHED'].includes(order.status) && (
-                <div style={{ marginBottom: '2rem' }}>
-                  <p style={{ margin: '0 0 8px 0', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase' }}>{isService ? 'Expert Location & Live Tracking' : 'Rider Delivery Path & Live Tracking'}</p>
-                  <VendorOrderMapWrapper order={order} businessType={businessType} />
-                </div>
-              )}
-
-              <div style={{ display: 'flex', gap: '1.25rem' }}>
-                {order.status === 'PLACED' && (
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => updateStatus(order.id, 'PREPARING')}
-                    className="v-btn-primary"
-                    style={{ flex: 1, padding: '16px' }}
-                  >
-                    {isService ? 'Confirm Booking' : 'Confirm Order'}
-                  </motion.button>
-                )}
-                {order.status === 'ACCEPTED' && (
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => updateStatus(order.id, 'PREPARING')}
-                    className="v-btn-primary"
-                    style={{ flex: 1, padding: '16px' }}
-                  >
-                    {isService ? 'Initiate Service' : 'Initiate Fulfillment'}
-                  </motion.button>
-                )}
-                {order.status === 'PREPARING' && (
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => updateStatus(order.id, 'SHIPPED')}
-                    className="v-btn-primary"
-                    style={{ flex: 1, padding: '16px', background: '#16a34a', boxShadow: '0 10px 25px rgba(22, 163, 74, 0.2)' }}
-                  >
-                    {isService ? 'Dispatch Expert' : 'Confirm Ready for Pickup'}
-                  </motion.button>
-                )}
-                {['SHIPPED', 'DISPATCHED'].includes(order.status) && (
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => updateStatus(order.id, 'DELIVERED')}
-                    className="v-btn-primary"
-                    style={{ flex: 1, padding: '16px', background: '#2563eb', boxShadow: '0 10px 25px rgba(37, 99, 235, 0.2)' }}
-                  >
-                    {isService ? 'Confirm Service Completed' : 'Confirm Delivery'}
-                  </motion.button>
-                )}
-                {['PLACED', 'ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED'].includes(order.status) ? (
-                  <button
-                    onClick={() => {
-                      setConfirmDialog({
-                        isOpen: true,
-                        title: isService ? 'Cancel Booking' : 'Emergency Override',
-                        message: isService 
-                          ? 'Are you sure you want to CANCEL this booking? This cannot be undone and the customer will be notified.'
-                          : 'Are you sure you want to CANCEL this order? This cannot be undone and the customer will be notified.',
-                        confirmText: isService ? 'Cancel Booking' : 'Cancel Order',
-                        cancelText: 'Keep Active',
-                        type: 'danger',
-                        onConfirm: () => updateStatus(order.id, 'CANCELLED')
-                      });
-                    }}
-                    className="v-btn-outline"
-                    style={{ padding: '14px 32px', fontWeight: 800, color: '#ef4444', borderColor: '#fecaca', background: '#fef2f2' }}
-                  >
-                    {isService ? 'Cancel Booking' : 'Cancel Order'}
-                  </button>
-                ) : (
-                  <button className="v-btn-outline" style={{ padding: '14px 32px', fontWeight: 800 }}>
-                    {isService ? 'Booking Protocol' : 'Order Protocol'}
-                  </button>
-                )}
-              </div>
-            </motion.div>
-          );
-        })}
-        {orders.length === 0 && (
-          <div style={{ padding: '8rem 2rem', textAlign: 'center', background: 'white', borderRadius: '40px', border: '2px dashed #e2e8f0' }}>
-            <div style={{ width: '100px', height: '100px', background: '#f8fafc', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem auto' }}>
-              {businessType === 'service' ? (
-                <Wrench size={48} color="#cbd5e1" />
-              ) : (
-                <Package size={48} color="#cbd5e1" />
-              )}
-            </div>
-            <h3 style={{ fontWeight: 950, color: '#1e293b', fontSize: '1.5rem', letterSpacing: '-0.5px' }}>{businessType === 'service' ? 'No Bookings' : 'Station Idle'}</h3>
-            <p style={{ color: '#64748b', margin: '0.75rem 0 2rem 0', fontWeight: 600 }}>{businessType === 'service' ? 'Your service station is ready to receive bookings. New bookings will trigger a priority alert.' : 'Your store is ready to receive missions. New orders will trigger a priority alert.'}</p>
-            <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: '#f0fdf4', color: '#16a34a', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 900, marginBottom: '1rem' }}>
-                <div className="v-pulse-dot" style={{ background: '#16a34a' }}></div>
-                OPERATIONAL
-              </div>
-              <button 
-                onClick={handleSimulateOrder}
-                style={{ 
-                  padding: '12px 24px', 
-                  borderRadius: '12px', 
-                  background: 'var(--v-primary)', 
-                  color: 'white', 
-                  border: 'none', 
-                  fontWeight: 800, 
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(249, 115, 22, 0.2)'
-                }}
+          return filteredList.map((order, i) => {
+            const style = getStatusStyle(order.status);
+            const isService = businessType === 'service';
+            return (
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.08 }}
+                key={order.id}
+                className="v-data-card"
+                style={{ padding: '2rem', border: '1px solid #f1f5f9', position: 'relative', overflow: 'hidden' }}
               >
-                {businessType === 'service' ? 'Simulate Test Booking' : 'Simulate Test Order'}
-              </button>
-            </div>
-          </div>
-        )}
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: style.dot }}></div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                      <span style={{ fontWeight: 950, color: '#0f172a', fontSize: '1.25rem', letterSpacing: '-0.5px' }}>#{isService ? 'BKG' : 'ORD'}-{order.id.substring(0, 8).toUpperCase()}</span>
+                      {['PENDING', 'PLACED', 'ACCEPTED'].includes(order.status) && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#fef2f2', color: '#ef4444', padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 900 }}>
+                          <div className="v-pulse-dot" style={{ background: '#ef4444' }}></div>
+                          ACTION REQUIRED
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.9rem', fontWeight: 700 }}>
+                      <Clock size={16} /> Received at {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 20px', borderRadius: '14px',
+                    background: style.bg, color: style.text, fontSize: '0.85rem', fontWeight: 900, border: `1px solid ${style.dot}15`
+                  }}>
+                    {style.icon}
+                    {style.label}
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3rem', marginBottom: '2rem', alignItems: 'center' }}>
+                  <div>
+                    <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{isService ? 'Customer Profile' : 'Customer Entity'}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '40px', height: '40px', background: '#f8fafc', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#475569', border: '1px solid #e2e8f0' }}>
+                        {(order.users?.full_name || 'U').charAt(0)}
+                      </div>
+                      <div>
+                        <span style={{ fontWeight: 850, color: '#1e293b', display: 'block', fontSize: '1rem' }}>{order.users?.full_name || 'Verified User'}</span>
+                        <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>{order.users?.phone || 'Premium Member'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{isService ? 'Service Address' : 'Destination Node'}</p>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', color: '#1e293b' }}>
+                      <MapPin size={18} color="var(--v-primary)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                      <span style={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.4 }}>{order.addresses?.society || 'Geo-location Pending'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ background: '#f8fafc', borderRadius: '20px', padding: '1.5rem', marginBottom: '2rem', border: '1px solid #f1f5f9' }}>
+                  <p style={{ margin: '0 0 12px 0', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase' }}>{isService ? 'Booked Services' : 'Inventory Manifest'}</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                    {order.order_items?.map((item, idx) => (
+                      <div key={idx} style={{ background: 'white', border: '1px solid #e2e8f0', padding: '6px 14px', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                        <span style={{ color: 'var(--v-primary)' }}>{item.quantity}x</span>
+                        {item.products?.name}
+                      </div>
+                    )) || <span style={{ fontStyle: 'italic', color: '#94a3b8' }}>Parsing manifest data...</span>}
+                  </div>
+                </div>
+
+                {activeTab === 'active' && ['SHIPPED', 'DISPATCHED'].includes(order.status) && (
+                  <div style={{ marginBottom: '2rem' }}>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase' }}>{isService ? 'Expert Location & Live Tracking' : 'Rider Delivery Path & Live Tracking'}</p>
+                    <VendorOrderMapWrapper order={order} businessType={businessType} />
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '1.25rem' }}>
+                  {['PENDING', 'PLACED'].includes(order.status) && (
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => updateStatus(order.id, 'PREPARING')}
+                      className="v-btn-primary"
+                      style={{ flex: 1, padding: '16px' }}
+                    >
+                      {isService ? 'Confirm Booking' : 'Confirm Order'}
+                    </motion.button>
+                  )}
+                  {order.status === 'ACCEPTED' && (
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => updateStatus(order.id, 'PREPARING')}
+                      className="v-btn-primary"
+                      style={{ flex: 1, padding: '16px' }}
+                    >
+                      {isService ? 'Initiate Service' : 'Initiate Fulfillment'}
+                    </motion.button>
+                  )}
+                  {order.status === 'PREPARING' && (
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => updateStatus(order.id, 'SHIPPED')}
+                      className="v-btn-primary"
+                      style={{ flex: 1, padding: '16px', background: '#16a34a', boxShadow: '0 10px 25px rgba(22, 163, 74, 0.2)' }}
+                    >
+                      {isService ? 'Dispatch Expert' : 'Confirm Ready for Pickup'}
+                    </motion.button>
+                  )}
+                  {['SHIPPED', 'DISPATCHED'].includes(order.status) && (
+                    isService ? (
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => updateStatus(order.id, 'DELIVERED')}
+                        className="v-btn-primary"
+                        style={{ flex: 1, padding: '16px', background: '#2563eb', boxShadow: '0 10px 25px rgba(37, 99, 235, 0.2)' }}
+                      >
+                        Confirm Service Completed
+                      </motion.button>
+                    ) : (
+                      <div
+                        style={{ flex: 1, padding: '16px', background: '#f1f5f9', color: '#64748b', borderRadius: '14px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e2e8f0' }}
+                      >
+                        Out for Delivery by Rider
+                      </div>
+                    )
+                  )}
+                  {['PENDING', 'PLACED', 'ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED'].includes(order.status) ? (
+                    <button
+                      onClick={() => {
+                        setConfirmDialog({
+                          isOpen: true,
+                          title: isService ? 'Cancel Booking' : 'Emergency Override',
+                          message: isService 
+                            ? 'Are you sure you want to CANCEL this booking? This cannot be undone and the customer will be notified.'
+                            : 'Are you sure you want to CANCEL this order? This cannot be undone and the customer will be notified.',
+                          confirmText: isService ? 'Cancel Booking' : 'Cancel Order',
+                          cancelText: 'Keep Active',
+                          type: 'danger',
+                          onConfirm: () => updateStatus(order.id, 'CANCELLED')
+                        });
+                      }}
+                      className="v-btn-outline"
+                      style={{ padding: '14px 32px', fontWeight: 800, color: '#ef4444', borderColor: '#fecaca', background: '#fef2f2' }}
+                    >
+                      {isService ? 'Cancel Booking' : 'Cancel Order'}
+                    </button>
+                  ) : (
+                    <button className="v-btn-outline" style={{ padding: '14px 32px', fontWeight: 800 }}>
+                      {isService ? 'Booking Protocol' : 'Order Protocol'}
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            );
+          });
+        })()}
       </div>
       <ConfirmModal
         isOpen={confirmDialog.isOpen}

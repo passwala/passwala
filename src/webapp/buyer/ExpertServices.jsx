@@ -67,7 +67,6 @@ const ExpertServices = ({ onBack, location }) => {
           service_providers (
             id,
             business_name,
-            name,
             rating,
             is_verified,
             about,

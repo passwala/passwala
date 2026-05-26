@@ -83,7 +83,22 @@ messaging.onBackgroundMessage((payload) => {
     },
     build: {
       outDir,
-      emptyOutDir: true
+      emptyOutDir: true,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+              return 'react-vendor';
+            }
+            if (id.includes('node_modules/leaflet') || id.includes('node_modules/react-leaflet')) {
+              return 'maps-vendor';
+            }
+            if (id.includes('node_modules/framer-motion') || id.includes('node_modules/lucide-react')) {
+              return 'ui-vendor';
+            }
+          }
+        }
+      }
     },
     resolve: {
       alias: {

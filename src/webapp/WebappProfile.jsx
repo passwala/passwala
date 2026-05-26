@@ -119,8 +119,10 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
           body: JSON.stringify({ photoURL: base64String })
         });
         if (!res.ok) throw new Error('Upload failed');
-        setLocalPhoto(base64String);
-        if (onUpdateUser) onUpdateUser({ ...user, photoURL: base64String });
+        const data = await res.json();
+        const uploadedPhotoUrl = data.photoURL || base64String;
+        setLocalPhoto(uploadedPhotoUrl);
+        if (onUpdateUser) onUpdateUser({ ...user, photoURL: uploadedPhotoUrl });
         toast.success('Profile Picture Updated!', { id: 'upload' });
       } catch (err) {
         toast.error('Upload failed.', { id: 'upload' });

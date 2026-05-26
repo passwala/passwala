@@ -9,10 +9,21 @@ import { DEFAULT_LOCATION } from '../utils/constants';
 
 export const useAuth = () => {
   const navigate = useNavigate();
+  const appMode = import.meta.env.VITE_APP_MODE || import.meta.env.MODE || 'web';
+  const isAdminMode = appMode === 'admin';
+  const isSpecialMode = appMode === 'vendor' || appMode === 'rider' || appMode === 'admin';
+
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('passwala_user');
     try {
-      return saved ? JSON.parse(saved) : null;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && !isSpecialMode) {
+          parsed.role = 'BUYER';
+        }
+        return parsed;
+      }
+      return null;
     } catch (e) {
       return null;
     }
@@ -35,9 +46,6 @@ export const useAuth = () => {
     return !!localStorage.getItem('passwala_user') || sessionStorage.getItem('v_initial_splash_done') === 'true';
   });
 
-  const appMode = import.meta.env.VITE_APP_MODE || import.meta.env.MODE || 'web';
-  const isAdminMode = appMode === 'admin';
-
   const [isAdmin, setIsAdmin] = useState(() => {
     const hasAdminSession = sessionStorage.getItem('admin_session') === 'true';
     const hasAdminToken = sessionStorage.getItem('admin_token');
@@ -56,6 +64,15 @@ export const useAuth = () => {
       sessionStorage.removeItem('admin_code');
     }
   }, [isAdmin]);
+
+  // User State Persistence Sync effect
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('passwala_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('passwala_user');
+    }
+  }, [user]);
 
   const handleLogout = async (skipToast = false) => {
     try {
@@ -124,25 +141,35 @@ export const useAuth = () => {
         }
       }
 
-      if (!u && manualUser && manualUser.role && manualUser.role !== 'BUYER') {
+      if (!u) {
+        if (manualUser) {
+          const normalizedUser = {
+            ...manualUser,
+            role: 'BUYER'
+          };
+          setUser(normalizedUser);
+          setIsProfileComplete(wasComplete);
+        } else {
+          setUser(null);
+          setIsProfileComplete(false);
+        }
         setAuthLoading(false);
-        setIsProfileComplete(true);
         return;
       }
 
-      let finalUser = u || manualUser;
-      if (u && supabase) {
+      let finalUser = u;
+      if (supabase) {
         try {
-          const phoneNo = u.phoneNumber?.replace('+91', '');
-          const rawPhone = u.phoneNumber;
+          const rawPhone = u.phoneNumber;                         // e.g. +919825551190
+          const phoneNo = rawPhone?.replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, ''); // 10-digit clean
           
           let orFilter = [];
           if (u.email) orFilter.push(`email.eq.${u.email}`);
-          if (phoneNo) orFilter.push(`phone.eq.${phoneNo}`);
-          if (rawPhone) orFilter.push(`phone.eq.${rawPhone}`);
+          if (phoneNo) orFilter.push(`phone.eq.${phoneNo}`);   // stored clean (new standard)
+          if (rawPhone) orFilter.push(`phone.eq.${rawPhone}`); // stored with +91 (legacy)
           
           const { data: usr } = await supabase.from('users')
-            .select('id, full_name, role')
+            .select('id, full_name, role, photo_url')
             .or(orFilter.join(','))
             .maybeSingle();
 
@@ -154,7 +181,8 @@ export const useAuth = () => {
               email: u.email,
               phoneNumber: u.phoneNumber,
               displayName: usr.full_name || u.displayName || manualUser?.displayName,
-              role: usr.role || 'BUYER'
+              photoURL: usr.photo_url || u.photoURL || manualUser?.photoURL,
+              role: 'BUYER'
             };
 
             const { data: addr } = await supabase.from('addresses').select('*').eq('user_id', usr.id).maybeSingle();
@@ -184,6 +212,15 @@ export const useAuth = () => {
               }
             }
           } else {
+            finalUser = {
+              ...u,
+              uid: u.uid,
+              email: u.email,
+              phoneNumber: u.phoneNumber,
+              displayName: u.displayName || manualUser?.displayName,
+              photoURL: u.photoURL || manualUser?.photoURL,
+              role: 'BUYER'
+            };
             setIsProfileComplete(wasComplete);
           }
         } catch (err) {
@@ -191,13 +228,16 @@ export const useAuth = () => {
           setIsProfileComplete(wasComplete);
         }
       } else {
-        if (!manualUser) {
-          setIsProfileComplete(false);
-          setUser(null);
-        } else {
-          setIsProfileComplete(wasComplete);
-          setUser(manualUser);
-        }
+        finalUser = {
+          ...u,
+          uid: u.uid,
+          email: u.email,
+          phoneNumber: u.phoneNumber,
+          displayName: u.displayName || manualUser?.displayName,
+          photoURL: u.photoURL || manualUser?.photoURL,
+          role: 'BUYER'
+        };
+        setIsProfileComplete(wasComplete);
       }
 
       if (wasComplete) {

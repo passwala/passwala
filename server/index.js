@@ -11,11 +11,14 @@ import planetSoftwebRoutes from './routes/planetSoftweb.js';
 import aiRoutes from './routes/ai.js';
 import { apiLimiter } from './utils/rateLimiter.js';
 import supabase from './supabase.js';
-
+import morgan from 'morgan';
+import { sendNotification } from './utils/notifications.js';
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3004;
+
+app.use(morgan('combined'));
 
 // CORS Security Whitelist
 const allowedOrigins = [
@@ -108,16 +111,28 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/planet-softweb', planetSoftwebRoutes);
 app.use('/api/ai', aiRoutes);
 
+const routeCache = new Map();
+
 app.get('/api/route', async (req, res) => {
   try {
     const { startLat, startLng, endLat, endLng, profile = 'driving' } = req.query;
     if (!startLat || !startLng || !endLat || !endLng) {
       return res.status(400).json({ error: 'Missing coordinates' });
     }
-    const url = `http://router.project-osrm.org/route/v1/${profile}/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
+    const cacheKey = `${startLng},${startLat}|${endLng},${endLat}|${profile}`;
+    if (routeCache.has(cacheKey)) {
+      const cached = routeCache.get(cacheKey);
+      if (Date.now() - cached.timestamp < 30 * 60 * 1000) {
+        return res.json(cached.data);
+      } else {
+        routeCache.delete(cacheKey);
+      }
+    }
+    const url = `https://router.project-osrm.org/route/v1/${profile}/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
     const response = await fetch(url);
     if (!response.ok) throw new Error('OSRM API failed');
     const data = await response.json();
+    routeCache.set(cacheKey, { data, timestamp: Date.now() });
     res.json(data);
   } catch (err) {
     console.error('Routing failed:', err.message);
@@ -174,6 +189,48 @@ const getLocalIP = () => {
   }
   return 'localhost';
 };
+
+// Auto-Cancel Cron Job: Cancel orders stuck in PENDING/PLACED/ORDERED for over 15 mins
+const AUTO_CANCEL_MINUTES = 15;
+setInterval(async () => {
+  try {
+    const cutoffTime = new Date(Date.now() - AUTO_CANCEL_MINUTES * 60000).toISOString();
+    
+    const { data: stuckOrders, error: fetchErr } = await supabase
+      .from('orders')
+      .select('id, user_id')
+      .in('status', ['PENDING', 'PLACED', 'ORDERED'])
+      .lt('created_at', cutoffTime);
+
+    if (fetchErr) {
+      console.error('Auto-cancel fetch error:', fetchErr.message);
+      return;
+    }
+
+    if (stuckOrders && stuckOrders.length > 0) {
+      const orderIds = stuckOrders.map(o => o.id);
+      console.log(`Auto-canceling ${orderIds.length} stuck orders...`);
+      
+      const { error: updateErr } = await supabase
+        .from('orders')
+        .update({ status: 'CANCELLED' })
+        .in('id', orderIds);
+
+      if (updateErr) {
+        console.error('Auto-cancel update error:', updateErr.message);
+      } else {
+        console.log('Auto-canceled orders successfully:', orderIds);
+        for (const order of stuckOrders) {
+          if (order.user_id) {
+            await sendNotification(order.user_id, 'ORDER_CANCELLED', 'Your order was cancelled (no vendor response).');
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Auto-cancel job error:', err.message);
+  }
+}, 60000); // Run every 1 minute
 
 const HOST = '0.0.0.0';
 app.listen(PORT, HOST, () => {

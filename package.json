@@ -22,8 +22,8 @@
     "build:all": "npm run build:web && npm run build:webapp && npm run build:vendor && npm run build:rider && npm run build:admin",
     "lint": "eslint .",
     "preview": "vite preview",
-    "server": "node server/index.js",
-    "server:api": "node server/index.js --headless"
+    "server": "nodemon server/index.js",
+    "server:api": "nodemon server/index.js --headless"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.100.0",
@@ -34,8 +34,11 @@
     "firebase": "^12.11.0",
     "firebase-admin": "^13.10.0",
     "framer-motion": "^12.38.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.477.0",
+    "morgan": "^1.10.1",
     "razorpay": "^2.9.6",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -56,6 +59,8 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
+    "nodemon": "^3.1.14",
+    "postcss": "^8.5.15",
     "vite": "^8.0.1"
   }
 }

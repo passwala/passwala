@@ -9,6 +9,7 @@ import { DEFAULT_LOCATION } from '../../utils/constants';
 import './CartDrawer.css';
 
 import { useNavigate } from 'react-router-dom';
+import { auth } from '../../firebase';
 
 const SUPPORTED_SOCIETIES = [
   'hive pg hostel', 
@@ -42,8 +43,22 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
   const [showConfirm, setShowConfirm] = React.useState(false);
   const [supportedAreas, setSupportedAreas] = React.useState([]);
   const [isPlacingOrder, setIsPlacingOrder] = React.useState(false);
-  const [showMockPayment, setShowMockPayment] = React.useState(false);
-  const [mockPaymentDetails, setMockPaymentDetails] = React.useState(null);
+
+
+  const getAuthToken = async () => {
+    try {
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        return await currentUser.getIdToken();
+      }
+    } catch (e) {
+      console.warn("Failed to get Firebase ID token:", e);
+    }
+    const userJson = localStorage.getItem('passwala_user');
+    const userObj = userJson ? JSON.parse(userJson) : null;
+    const uid = userObj?.uid || userObj?.id || 'mock_user_123';
+    return `mock_session_token_${uid}`;
+  };
 
   React.useEffect(() => {
     const fetchAreas = async () => {
@@ -164,18 +179,25 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
           // Check if it exists in service_providers (for service orders)
           const { data: serviceProv } = await supabase
             .from('service_providers')
-            .select('id, business_name, address')
+            .select('id, business_name')
             .eq('id', resolvedStoreId)
             .maybeSingle();
 
           if (serviceProv) {
             // Auto-upsert to stores table to satisfy foreign key constraint
-            await supabase.from('stores').upsert({
+            const { error: upsertErr } = await supabase.from('stores').upsert({
               id: resolvedStoreId,
               vendor_id: null,
               name: serviceProv.business_name || 'Service Provider',
-              address: serviceProv.address || 'Service Area'
+              address: 'Service Area',
+              lat: 23.0225,
+              lng: 72.5714,
+              is_active: true
             });
+            if (upsertErr) {
+               console.warn("Auto-upsert to stores failed (top level):", upsertErr);
+               resolvedStoreId = null; // will fallback later
+            }
             // Since we upserted it, resolvedStoreId is now a valid stores.id
           } else {
             // If not a service provider, check if it's a vendor_id
@@ -349,18 +371,27 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
           // Check if it exists in service_providers (for service orders)
           const { data: serviceProv } = await supabase
             .from('service_providers')
-            .select('id, business_name, address')
+            .select('id, business_name')
             .eq('id', currentResolvedStoreId)
             .maybeSingle();
 
           if (serviceProv) {
             // Auto-upsert to stores table to satisfy foreign key constraint
-            await supabase.from('stores').upsert({
+            const { error: upsertErr } = await supabase.from('stores').upsert({
               id: currentResolvedStoreId,
               vendor_id: null,
               name: serviceProv.business_name || 'Service Provider',
-              address: serviceProv.address || 'Service Area'
+              address: 'Service Area',
+              lat: 23.0225,
+              lng: 72.5714,
+              is_active: true
             });
+            if (upsertErr) {
+               console.warn("Auto-upsert to stores failed:", upsertErr);
+               currentResolvedStoreId = storeIdFallback;
+            }
+          } else {
+             currentResolvedStoreId = storeIdFallback;
           }
         }
 
@@ -441,6 +472,8 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
           const { error: itemError } = await supabase.from('order_items').insert(orderItems);
           if (itemError) console.warn("Order items save error:", itemError);
 
+
+
           // Insert into service_bookings table for service items
           for (const item of items) {
             if (item.type === 'service') {
@@ -507,10 +540,12 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
       // --- PAYMENT GATEWAY INTEGRATION ---
       toast.loading("Initiating secure payment...", { id: "payment_loader" });
 
+      const token = await getAuthToken();
       const createPayOrderRes = await fetch('/api/orders/payment/create', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           amount: total,
@@ -527,19 +562,45 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
       const razorpayOrder = await createPayOrderRes.json();
 
       if (razorpayOrder.is_mock) {
-        // Launch custom sandbox payment dashboard
-        setMockPaymentDetails({
-          order: createdOrders[0].order,
-          createdOrders,
-          razorpayOrder,
-          total,
-          itemNames,
-          resolvedStoreId: createdOrders[0].storeId,
-          userObj
+        // Direct order book
+        toast.loading("Confirming order...", { id: "payment_verify_loader" });
+        const token = await getAuthToken();
+        const verifyRes = await fetch('/api/orders/payment/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            razorpay_payment_id: `pay_mock_${Math.random().toString(36).substring(2, 10)}`,
+            razorpay_order_id: razorpayOrder.id,
+            razorpay_signature: `mock_signature_sandbox`,
+            orderId: orderIdsString
+          })
         });
-        setShowMockPayment(true);
-        setShowConfirm(false);
-        setIsPlacingOrder(false);
+
+        toast.dismiss("payment_verify_loader");
+        if (!verifyRes.ok) {
+          throw new Error("Direct order confirmation failed. Check console for details.");
+        }
+
+        const verifyData = await verifyRes.json();
+        if (verifyData.success) {
+          addNotification({
+            type: 'ORDER_PLACED',
+            title: 'Order Placed!',
+            message: `Your order from ${itemNames} has been confirmed.`,
+            storeId: createdOrders[0].storeId
+          });
+          toast.success(`Order #${orderIdsString.split(',')[0].slice(0, 6).toUpperCase()} placed successfully!`);
+          setShowConfirm(false);
+          clearCart();
+          setCartOpen(false);
+          setIsPlacingOrder(false);
+          navigate('/track-orders');
+        } else {
+          throw new Error("Payment verification marked as failed.");
+        }
       } else {
         // Real Razorpay integration
         const scriptLoaded = await loadRazorpayScript();
@@ -559,10 +620,12 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
               setIsPlacingOrder(true);
               toast.loading("Verifying payment...", { id: "payment_verify_loader" });
 
+              const token = await getAuthToken();
               const verifyRes = await fetch('/api/orders/payment/verify', {
                 method: 'POST',
                 headers: {
-                  'Content-Type': 'application/json'
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
                   razorpay_payment_id: response.razorpay_payment_id,
@@ -648,125 +711,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
     }
   };
 
-  const handleMockPaymentVerify = async (success, method = 'Sandbox') => {
-    if (!mockPaymentDetails) return;
-    const { order, createdOrders, razorpayOrder, total, itemNames, resolvedStoreId } = mockPaymentDetails;
 
-    setIsPlacingOrder(true);
-    toast.loading(`Simulating ${method} authorization...`, { id: "mock_loader" });
-
-    // Determine target order ID(s)
-    const orderIdsString = createdOrders && createdOrders.length > 0 
-      ? createdOrders.map(co => co.order.id).join(',') 
-      : order.id;
-
-    try {
-      if (success) {
-        // Send a post request to verify endpoint with fake tokens
-        const verifyRes = await fetch('/api/orders/payment/verify', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            razorpay_payment_id: `pay_mock_${method.toLowerCase()}_${Math.random().toString(36).substring(2, 10)}`,
-            razorpay_order_id: razorpayOrder.id,
-            razorpay_signature: `mock_signature_${method.toLowerCase()}`,
-            orderId: orderIdsString
-          })
-        });
-
-        toast.dismiss("mock_loader");
-
-        if (!verifyRes.ok) {
-          throw new Error(`Sandbox ${method} payment verification failed`);
-        }
-
-        const verifyData = await verifyRes.json();
-        if (verifyData.success) {
-          // Trigger notifications for all split orders
-          const ordersToNotify = createdOrders && createdOrders.length > 0 
-            ? createdOrders 
-            : [{ order, storeId: resolvedStoreId }];
-
-          for (const co of ordersToNotify) {
-            try {
-              await fetch('/api/orders/notify-new-order', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  orderId: co.order.id,
-                  storeId: co.storeId
-                })
-              });
-            } catch (notifErr) {
-              console.warn('⚠️ Dispatch notification failure in mock:', notifErr);
-            }
-          }
-
-          const deliveryLoc = location ? location.split(',')[0] : 'Your Location';
-          toast.success(`${method} payment successful! ₹${total.toLocaleString()}`, { icon: '🎉', duration: 4000 });
-          addNotification({
-            icon: '📦',
-            title: `Order Paid via ${method}!`,
-            body: `₹${total.toLocaleString()} • ${itemNames} • ${method} payment verified. Delivering to ${deliveryLoc}.`,
-            color: '#22c55e',
-          });
-          clearCart();
-          setCartOpen(false);
-          setShowMockPayment(false);
-          navigate('/track-orders');
-        } else {
-          throw new Error(`Sandbox ${method} signature verification rejected`);
-        }
-      } else {
-        toast.dismiss("mock_loader");
-        // Simulated failure - cancel all split orders
-        const ordersToCancel = createdOrders && createdOrders.length > 0 
-          ? createdOrders.map(co => co.order.id) 
-          : [order.id];
-
-        try {
-          const { error } = await supabase
-            .from('orders')
-            .update({
-              payment_status: 'FAILED',
-              status: 'CANCELLED'
-            })
-            .in('id', ordersToCancel);
-          
-          if (error && (error.message?.includes('payment_status') || String(error).includes('payment_status'))) {
-            await supabase
-              .from('orders')
-              .update({
-                status: 'CANCELLED'
-              })
-              .in('id', ordersToCancel);
-          }
-        } catch (err) {
-          console.warn("Failed simulated failure update, trying status only", err);
-          await supabase
-            .from('orders')
-            .update({
-              status: 'CANCELLED'
-            })
-            .in('id', ordersToCancel);
-        }
-
-        toast.error('Sandbox payment failed! Order cancelled.', { icon: '❌' });
-        setShowMockPayment(false);
-      }
-    } catch (err) {
-      toast.dismiss("mock_loader");
-      console.error('Sandbox verification failed:', err);
-      toast.error(`Sandbox verification failed: ${err.message || 'Payment not verified'}`);
-      setShowMockPayment(false);
-    } finally {
-      setIsPlacingOrder(false);
-    }
-  };
 
   return (
     <>
@@ -986,8 +931,26 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
 
       {/* Final Confirmation Overlay */}
       {showConfirm && isProfileComplete && userAddress && (
-        <div className="order-confirm-overlay-v4">
-          <div className="order-confirm-modal-v4">
+        <div 
+          className="order-confirm-overlay-v4"
+          onClick={() => {
+            if (!isPlacingOrder) setShowConfirm(false);
+          }}
+        >
+          <div 
+            className="order-confirm-modal-v4"
+            onClick={(e) => e.stopPropagation()}
+          >
+             <button 
+               className="confirm-close-btn-v4"
+               onClick={() => setShowConfirm(false)}
+               disabled={isPlacingOrder}
+               title="Cancel and go back"
+               style={{ opacity: isPlacingOrder ? 0.5 : 1, cursor: isPlacingOrder ? 'not-allowed' : 'pointer' }}
+             >
+                <X size={18} />
+             </button>
+
              <div className="confirm-icon-v4">
                 <CheckCircle size={40} color="#ff7622" />
              </div>
@@ -1029,161 +992,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
         </div>
       )}
 
-      {/* Sandbox Payment Modal */}
-      {showMockPayment && mockPaymentDetails && (
-        <div className="order-confirm-overlay-v4" style={{ zIndex: 4000 }}>
-          <div className="order-confirm-modal-v4" style={{
-            background: 'rgba(30, 41, 59, 0.95)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            color: 'white',
-            backdropFilter: 'blur(20px)',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4)',
-            maxWidth: '420px',
-            textAlign: 'center'
-          }}>
-            <div style={{
-              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px',
-              boxShadow: '0 0 20px rgba(139, 92, 246, 0.5)'
-            }}>
-              <span style={{ fontSize: '1.8rem' }}>💳</span>
-            </div>
-            
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0 0 8px 0', letterSpacing: '-0.025em', color: '#f8fafc' }}>
-              Passwala Sandbox Pay
-            </h2>
-            <div style={{
-              display: 'inline-block',
-              padding: '2px 8px',
-              borderRadius: '9999px',
-              background: 'rgba(139, 92, 246, 0.2)',
-              border: '1px solid rgba(139, 92, 246, 0.4)',
-              fontSize: '0.7rem',
-              color: '#a78bfa',
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              marginBottom: '16px'
-            }}>
-              Simulation Active
-            </div>
 
-            <div style={{
-              background: 'rgba(15, 23, 42, 0.6)',
-              borderRadius: '12px',
-              padding: '16px',
-              border: '1px solid rgba(255, 255, 255, 0.05)',
-              textAlign: 'left',
-              marginBottom: '20px'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.8rem', color: '#94a3b8' }}>
-                <span>Order Reference:</span>
-                <span style={{ fontFamily: 'monospace', color: '#e2e8f0', fontWeight: 600 }}>
-                  #{mockPaymentDetails.order.id.substring(0, 8).toUpperCase()}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.8rem', color: '#94a3b8' }}>
-                <span>Items:</span>
-                <span style={{ color: '#e2e8f0', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
-                  {mockPaymentDetails.itemNames}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '10px', marginTop: '10px' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#94a3b8' }}>Amount to Pay:</span>
-                <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#10b981' }}>
-                  ₹{mockPaymentDetails.total.toLocaleString()}
-                </span>
-              </div>
-            </div>
-
-            <p style={{ fontSize: '0.75rem', color: '#94a3b8', lineHeight: '1.4', margin: '0 0 20px 0' }}>
-              We detected simulated keys or local developer environment. You can authorize a mock success signature or trigger a cancel fail state.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <button 
-                onClick={() => handleMockPaymentVerify(true, 'Sandbox')}
-                disabled={isPlacingOrder}
-                style={{
-                  background: 'linear-gradient(135deg, #10b981, #059669)',
-                  border: 'none',
-                  color: 'white',
-                  borderRadius: '12px',
-                  padding: '12px',
-                  fontWeight: 700,
-                  fontSize: '0.9rem',
-                  cursor: isPlacingOrder ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  transition: 'transform 0.1s, opacity 0.2s',
-                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
-                  opacity: isPlacingOrder ? 0.7 : 1
-                }}
-              >
-                <span>Authorize & Pay Success</span>
-              </button>
-
-              {/* Paytm Simulated Option */}
-              <button 
-                onClick={() => {
-                  toast.success('Launching Paytm Secure Checkout...', { icon: '📲', duration: 1000 });
-                  setTimeout(() => {
-                    handleMockPaymentVerify(true, 'Paytm');
-                  }, 1200);
-                }}
-                disabled={isPlacingOrder}
-                style={{
-                  background: 'linear-gradient(135deg, #00baf2, #002e6e)',
-                  border: 'none',
-                  color: 'white',
-                  borderRadius: '12px',
-                  padding: '12px',
-                  fontWeight: 800,
-                  fontSize: '0.9rem',
-                  cursor: isPlacingOrder ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  transition: 'transform 0.1s, opacity 0.2s',
-                  boxShadow: '0 4px 14px rgba(0, 186, 242, 0.45)',
-                  opacity: isPlacingOrder ? 0.7 : 1
-                }}
-              >
-                <span style={{ fontSize: '1.1rem', marginRight: '2px' }}>📱</span>
-                <span>Pay via Paytm (Simulated)</span>
-              </button>
-              
-              <button 
-                onClick={() => handleMockPaymentVerify(false)}
-                disabled={isPlacingOrder}
-                style={{
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  color: '#f87171',
-                  borderRadius: '12px',
-                  padding: '12px',
-                  fontWeight: 600,
-                  fontSize: '0.9rem',
-                  cursor: isPlacingOrder ? 'not-allowed' : 'pointer',
-                  transition: 'background 0.2s, opacity 0.2s',
-                  opacity: isPlacingOrder ? 0.7 : 1
-                }}
-              >
-                Cancel & Back to Near Shops
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 };

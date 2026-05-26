@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Package, Truck, Compass, CheckCircle2, ChevronRight, RefreshCw, ArrowLeft } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 
 export default function OrderTracking({ orderId, onBack }) {
   const [trackingData, setTrackingData] = useState(null);
@@ -26,9 +28,21 @@ export default function OrderTracking({ orderId, onBack }) {
   useEffect(() => {
     fetchTracking();
 
-    // Setup periodic polling simulation for real-time changes
-    const interval = setInterval(fetchTracking, 7000);
-    return () => clearInterval(interval);
+    const channel = window.supabase
+      .channel(`tracking-${orderId}`)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'delivery_tracking',
+        filter: `order_id=eq.${orderId}`
+      }, () => {
+        fetchTracking();
+      })
+      .subscribe();
+
+    return () => {
+      window.supabase.removeChannel(channel);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
@@ -160,10 +174,30 @@ export default function OrderTracking({ orderId, onBack }) {
 
         {/* Real-time map coordinates info */}
         <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '12px', padding: '16px', border: '1px solid var(--planet-border)', marginBottom: '20px' }}>
-          <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', color: 'var(--planet-primary)' }}>Live GPS Location:</h4>
+          <h4 style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: 'var(--planet-primary)' }}>Live GPS Location:</h4>
+          
+          <div style={{ height: '220px', width: '100%', borderRadius: '8px', overflow: 'hidden', marginBottom: '12px' }}>
+            <MapContainer 
+              center={[trackingData?.current_lat || 23.0225, trackingData?.current_lng || 72.5714]} 
+              zoom={15} 
+              style={{ height: '100%', width: '100%', zIndex: 0 }}
+              zoomControl={false}
+            >
+              <TileLayer
+                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                attribution="&copy; OpenStreetMap contributors"
+              />
+              <Marker position={[trackingData?.current_lat || 23.0225, trackingData?.current_lng || 72.5714]}>
+                <Popup>
+                  <div style={{ fontSize: '12px', fontWeight: 'bold' }}>Delivery Rider</div>
+                </Popup>
+              </Marker>
+            </MapContainer>
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--planet-text-muted)' }}>
-            <span>Latitude: <strong>{trackingData?.current_lat || '23.0225'}</strong></span>
-            <span>Longitude: <strong>{trackingData?.current_lng || '72.5714'}</strong></span>
+            <span>Lat: <strong>{trackingData?.current_lat || '23.0225'}</strong></span>
+            <span>Lng: <strong>{trackingData?.current_lng || '72.5714'}</strong></span>
           </div>
         </div>
 

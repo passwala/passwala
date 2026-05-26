@@ -25,7 +25,7 @@ export function getShortestPathDistance(lat1, lng1, lat2, lng2) {
 }
 
 /**
- * Fetch real routing data from OSRM via backend proxy
+ * Fetch real routing data from OSRM (using public demo server for actual Dijkstra road distances)
  * @param {number} startLat 
  * @param {number} startLng 
  * @param {number} endLat 
@@ -44,9 +44,10 @@ export async function getOSRMRoute(startLat, startLng, endLat, endLng, profile =
   if (!startLat || !startLng || !endLat || !endLng) return fallback;
 
   try {
-    const url = `/api/route?startLat=${startLat}&startLng=${startLng}&endLat=${endLat}&endLng=${endLng}&profile=${profile}`;
+    const baseUrl = import.meta.env.VITE_API_URL || '';
+    const url = `${baseUrl}/api/route?startLat=${startLat}&startLng=${startLng}&endLat=${endLat}&endLng=${endLng}&profile=${profile}`;
     const res = await fetch(url);
-    if (!res.ok) throw new Error('Proxy API returned ' + res.status);
+    if (!res.ok) throw new Error('OSRM Public API returned ' + res.status);
     
     const data = await res.json();
     if (data.routes && data.routes.length > 0) {
@@ -60,7 +61,7 @@ export async function getOSRMRoute(startLat, startLng, endLat, endLng, profile =
       };
     }
   } catch (err) {
-    console.warn("OSRM Proxy failed, falling back to Haversine:", err.message);
+    console.warn("OSRM API failed, falling back to Haversine:", err.message);
   }
 
   return fallback;

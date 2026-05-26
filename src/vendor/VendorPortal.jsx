@@ -1120,18 +1120,34 @@ const VendorPortal = ({ user, onLogout }) => {
                     const { error } = await supabase.from(targetTable).update(tablePayload).eq('id', savedId);
                     if (error) throw error;
                   } else {
-                    const { data, error } = await supabase.from(targetTable).insert([tablePayload]).select().single();
-                    if (error) throw error;
+                    let insertError = null;
+                    let data = null;
+
+                    // Primary insert attempt (full payload including aadhar_no)
+                    ({ data, error: insertError } = await supabase.from(targetTable).insert([tablePayload]).select().single());
+
+                    // If aadhar_no column doesn't exist yet (migration not run), retry without it
+                    if (insertError && insertError.message && insertError.message.includes('aadhar_no')) {
+                      console.warn('aadhar_no column missing in DB — retrying without it. Run migration: add_vendor_business_fields.sql');
+                      const { aadhar_no: _removed, ...payloadWithoutAadhar } = tablePayload;
+                      ({ data, error: insertError } = await supabase.from(targetTable).insert([payloadWithoutAadhar]).select().single());
+                    }
+
+                    if (insertError) throw insertError;
                     if (data) savedId = data.id;
                   }
 
-                  if (savedId) {
-                    await supabase.from('stores').upsert({
+                  if (savedId && businessType === 'shop') {
+                    // Only shops get a stores row — service_providers use service_bookings instead
+                    const { error: storeErr } = await supabase.from('stores').upsert({
                       id: savedId,
-                      vendor_id: targetTable === 'vendors' ? savedId : null,
+                      vendor_id: savedId,
                       name: tablePayload.business_name,
                       address: tablePayload.address
-                    });
+                    }, { onConflict: 'id' });
+                    if (storeErr) {
+                      console.warn('Stores upsert non-critical skip:', storeErr.message);
+                    }
                   }
 
                   toast.success('Onboarding completed!', { id: toastId });
@@ -1139,9 +1155,9 @@ const VendorPortal = ({ user, onLogout }) => {
                   localStorage.setItem('vProfileCompleted', 'true');
                   setShowSuccessPop(true);
                 } catch (err) {
-                  console.error(err);
-                  toast.error('Setup failed', { id: toastId });
-                  setShowSuccessPop(true);
+                  console.error('Vendor registration error:', err);
+                  toast.error(err.message || 'Registration failed. Please try again.', { id: toastId });
+                  // Do NOT show success popup on failure
                 }
               } else {
                 setShowSuccessPop(true);

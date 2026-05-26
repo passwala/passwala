@@ -1,20 +1,24 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Package, Truck, CheckCircle, Clock, MapPin, ChevronRight, MessageCircle, X, Store, CreditCard, Wrench } from 'lucide-react';
+import { Package, Truck, CheckCircle, Clock, MapPin, ChevronRight, MessageCircle, X, Store, CreditCard, Wrench, Download } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import './TrackOrders.css';
+import '../profile_pages/ProfilePages.css';
 import { supabase } from '../../supabase';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { useNotifications } from '../../context/NotificationContext';
+import { AHMEDABAD_AREA_COORDS } from '../../utils/constants';
 
-// High-end Sub-component for individual order tracking maps to safely manage isolated instances
 // High-end Sub-component for individual order tracking maps to safely manage isolated instances
 function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
   const mapRef = useRef(null);
   const leafletMapRef = useRef(null);
   const markerGroupRef = useRef(null);
+  const boundsFitted = useRef(false);
+  const hasFittedBounds = useRef(false);
   const [routePoints, setRoutePoints] = useState([]);
   
   // Coordinate Resolution State
@@ -22,10 +26,21 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
   const [customerLatLng, setCustomerLatLng] = useState(null);
 
   // Dynamic Geocoding resolver helper
-  const geocodeAddress = async (address) => {
+  const geocodeAddress = useCallback(async (address) => {
     if (!address) return null;
+
+    // Precision corrections for known areas that geocode poorly
+    const lower = address.toLowerCase();
+    for (const [area, coords] of Object.entries(AHMEDABAD_AREA_COORDS)) {
+      if (lower.includes(area)) return coords;
+    }
+
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ', Ahmedabad, Gujarat, India')}&limit=1`;
+      const userCity = userCoords?.city || 'Ahmedabad';
+      const searchString = address.toLowerCase().includes(userCity.toLowerCase()) 
+        ? address 
+        : `${address}, ${userCity}, Gujarat, India`;
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchString)}&limit=1`;
       const res = await fetch(url, { headers: { 'User-Agent': 'Passwalaa-App' } });
       if (res.ok) {
         const data = await res.json();
@@ -37,25 +52,57 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
       console.warn('Geocoding error:', err);
     }
     return null;
-  };
+  }, [userCoords?.city]);
+
+  const [providerDetails, setProviderDetails] = useState(null);
+
+  useEffect(() => {
+    if (isService && order.items && order.items.length > 0) {
+      const serviceName = order.items[0].name;
+      const fetchProvider = async () => {
+        try {
+          const { data: serviceData } = await supabase.from('services').select('provider_id').ilike('title', `%${serviceName}%`).limit(1).maybeSingle();
+          if (serviceData?.provider_id) {
+            const { data: prov } = await supabase.from('service_providers').select('*').eq('id', serviceData.provider_id).maybeSingle();
+            if (prov) setProviderDetails(prov);
+          }
+        } catch (e) {
+          console.error('Error fetching provider:', e);
+        }
+      };
+      fetchProvider();
+    }
+  }, [isService, order]);
 
   useEffect(() => {
     let active = true;
     const resolvePositions = async () => {
       // Resolve Store
       let storePos = null;
-      if (order.stores?.lat && order.stores?.lng) {
-        storePos = [parseFloat(order.stores.lat), parseFloat(order.stores.lng)];
+      if (isService && providerDetails) {
+        if (providerDetails.address?.toLowerCase().includes('gota')) {
+           storePos = [23.0805, 72.5323]; // Hardcode Gota for demo precision
+        } else {
+           const addr = providerDetails.address || 'Ahmedabad';
+           storePos = await geocodeAddress(addr);
+           if (!storePos) storePos = [23.0305, 72.5075];
+        }
       } else {
-        const addr = order.stores?.address || 'Ahmedabad';
-        storePos = await geocodeAddress(addr);
-        if (!storePos) storePos = [23.0305, 72.5075];
+        if (order.stores?.lat && order.stores?.lng) {
+          storePos = [parseFloat(order.stores.lat), parseFloat(order.stores.lng)];
+        } else {
+          const addr = order.stores?.address || 'Ahmedabad';
+          storePos = await geocodeAddress(addr);
+          if (!storePos) storePos = [23.0305, 72.5075];
+        }
       }
 
       // Resolve Customer
       let custPos = null;
       if (order.addresses?.lat && order.addresses?.lng) {
         custPos = [parseFloat(order.addresses.lat), parseFloat(order.addresses.lng)];
+      } else if (userCoords?.lat && userCoords?.lng) {
+        custPos = [parseFloat(userCoords.lat), parseFloat(userCoords.lng)];
       } else {
         const addr = order.addresses?.address_line_1 || 'Ahmedabad';
         custPos = await geocodeAddress(addr);
@@ -69,7 +116,7 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
     };
     resolvePositions();
     return () => { active = false; };
-  }, [order.stores, order.addresses]);
+  }, [order.stores, order.addresses, isService, providerDetails, userCoords?.lat, userCoords?.lng, geocodeAddress]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -80,7 +127,13 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
       : [23.0225, 72.5714]; // Fallback to Ahmedabad center
     leafletMapRef.current = L.map(mapRef.current, {
       zoomControl: false,
-      attributionControl: false
+      attributionControl: false,
+      scrollWheelZoom: true,
+      dragging: true,
+      touchZoom: true,
+      doubleClickZoom: true,
+      boxZoom: true,
+      keyboard: true
     }).setView(defaultCenter, 14);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -121,31 +174,23 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
       ? [parseFloat(riderCoords.lat), parseFloat(riderCoords.lng)] 
       : null;
 
-    if (!riderLatLng && ['ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED'].includes(order.status)) {
-       if (order.status === 'ACCEPTED' || order.status === 'PREPARING') {
-         riderLatLng = storeLatLng;
-       } else if (order.status === 'SHIPPED' || order.status === 'DISPATCHED') {
-         riderLatLng = [
-           (storeLatLng[0] + customerLatLng[0]) / 2,
-           (storeLatLng[1] + customerLatLng[1]) / 2
-         ];
-       }
-    }
+    // Removed simulated riderLatLng to avoid showing fake locations
 
-    if (!riderLatLng) {
-      setTimeout(() => {
-        setRoutePoints(prev => prev.length > 0 ? [] : prev);
-      }, 0);
-      return;
-    }
 
-    const start = riderLatLng;
-    const end = ['ACCEPTED', 'PREPARING'].includes(order.status) ? storeLatLng : customerLatLng;
+    let start;
+    let end;
+    
+    if (riderLatLng) {
+      start = riderLatLng;
+      end = (['ACCEPTED', 'PREPARING'].includes(order.status) && !isService) ? storeLatLng : customerLatLng;
+    } else {
+      start = storeLatLng;
+      end = customerLatLng;
+    }
 
     const fetchOSRMRoute = async () => {
       try {
-        const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
-        const url = `${apiBase}/api/route?startLat=${start[0]}&startLng=${start[1]}&endLat=${end[0]}&endLng=${end[1]}&profile=driving`;
+        const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
@@ -162,7 +207,7 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
     };
 
     fetchOSRMRoute();
-  }, [order.status, riderCoords, storeLatLng, customerLatLng]);
+  }, [order.status, riderCoords, storeLatLng, customerLatLng, isService, providerDetails]);
 
   useEffect(() => {
     if (!leafletMapRef.current || !markerGroupRef.current || !storeLatLng || !customerLatLng) return;
@@ -205,20 +250,13 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
       ? [parseFloat(riderCoords.lat), parseFloat(riderCoords.lng)] 
       : null;
     
-    if (!riderLatLng && ['ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED'].includes(order.status)) {
-       if (order.status === 'ACCEPTED' || order.status === 'PREPARING') {
-         riderLatLng = storeLatLng;
-       } else if (order.status === 'SHIPPED' || order.status === 'DISPATCHED') {
-         riderLatLng = [
-           (storeLatLng[0] + customerLatLng[0]) / 2,
-           (storeLatLng[1] + customerLatLng[1]) / 2
-         ];
-       }
-    }
+    // Removed simulated riderLatLng to avoid showing fake locations
+
 
     // Plot Markers
+    // Always plot the base location (store or service provider base)
     L.marker(storeLatLng, { icon: createStoreIcon() })
-      .bindPopup(`<b>${isService ? 'Service Hub' : 'Store Hub'}:</b> ${order.stores?.name || (isService ? 'Partner Provider' : 'Partner Store')}`)
+      .bindPopup(`<b>${isService ? 'Service Provider Base' : 'Store Hub'}:</b> ${isService && providerDetails ? (providerDetails.business_name || providerDetails.name) : (order.stores?.name || 'Partner Store')}`)
       .addTo(markerGroupRef.current);
 
     L.marker(customerLatLng, { icon: createCustomerIcon() })
@@ -232,79 +270,126 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
     }
 
     // Connect with polylines
-    if (order.status === 'ACCEPTED' || order.status === 'PREPARING') {
+    if (isService) {
       if (riderLatLng) {
         if (routePoints.length > 0) {
           L.polyline(routePoints, {
-            color: '#f97316',
-            weight: 6,
-            opacity: 0.9,
-            lineJoin: 'round'
-          }).addTo(markerGroupRef.current);
-        } else {
-          L.polyline([riderLatLng, storeLatLng], {
-            color: '#f97316',
-            weight: 6,
-            opacity: 0.9,
-            lineJoin: 'round'
-          }).addTo(markerGroupRef.current);
-        }
-      }
-
-      L.polyline([storeLatLng, customerLatLng], {
-        color: '#3b82f6',
-        weight: 4,
-        opacity: 0.5,
-        dashArray: '8, 8',
-        lineJoin: 'round'
-      }).addTo(markerGroupRef.current);
-    } else {
-      if (riderLatLng) {
-        L.polyline([storeLatLng, riderLatLng], {
-          color: '#94a3b8',
-          weight: 3,
-          opacity: 0.4,
-          dashArray: '4, 4',
-          lineJoin: 'round'
-        }).addTo(markerGroupRef.current);
-
-        if (routePoints.length > 0) {
-          L.polyline(routePoints, {
-            color: '#3b82f6',
+            color: '#10b981',
             weight: 6,
             opacity: 0.9,
             lineJoin: 'round'
           }).addTo(markerGroupRef.current);
         } else {
           L.polyline([riderLatLng, customerLatLng], {
-            color: '#3b82f6',
+            color: '#10b981',
             weight: 6,
             opacity: 0.9,
             lineJoin: 'round'
           }).addTo(markerGroupRef.current);
         }
-      } else {
+      }
+    } else {
+      if (order.status === 'ACCEPTED' || order.status === 'PREPARING') {
+        if (riderLatLng) {
+          if (routePoints.length > 0) {
+            L.polyline(routePoints, {
+              color: '#f97316',
+              weight: 6,
+              opacity: 0.9,
+              lineJoin: 'round'
+            }).addTo(markerGroupRef.current);
+          } else {
+            L.polyline([riderLatLng, storeLatLng], {
+              color: '#f97316',
+              weight: 6,
+              opacity: 0.9,
+              lineJoin: 'round'
+            }).addTo(markerGroupRef.current);
+          }
+        }
+
         L.polyline([storeLatLng, customerLatLng], {
           color: '#3b82f6',
-          weight: 6,
-          opacity: 0.9,
+          weight: 4,
+          opacity: 0.5,
+          dashArray: '8, 8',
           lineJoin: 'round'
         }).addTo(markerGroupRef.current);
+      } else {
+        if (riderLatLng) {
+          L.polyline([storeLatLng, riderLatLng], {
+            color: '#94a3b8',
+            weight: 3,
+            opacity: 0.4,
+            dashArray: '4, 4',
+            lineJoin: 'round'
+          }).addTo(markerGroupRef.current);
+
+          if (routePoints.length > 0) {
+            L.polyline(routePoints, {
+              color: '#3b82f6',
+              weight: 6,
+              opacity: 0.9,
+              lineJoin: 'round'
+            }).addTo(markerGroupRef.current);
+          } else {
+            L.polyline([riderLatLng, customerLatLng], {
+              color: '#3b82f6',
+              weight: 6,
+              opacity: 0.9,
+              lineJoin: 'round'
+            }).addTo(markerGroupRef.current);
+          }
+        } else {
+          if (routePoints.length > 0) {
+            L.polyline(routePoints, {
+              color: '#3b82f6',
+              weight: 6,
+              opacity: 0.9,
+              lineJoin: 'round'
+            }).addTo(markerGroupRef.current);
+          } else {
+            L.polyline([storeLatLng, customerLatLng], {
+              color: '#3b82f6',
+              weight: 6,
+              opacity: 0.9,
+              lineJoin: 'round'
+            }).addTo(markerGroupRef.current);
+          }
+        }
       }
     }
 
-    // Auto fit viewport
+    // Auto fit viewport - dynamically adjust when route or critical markers change
     try {
       if (leafletMapRef.current) {
-        leafletMapRef.current.invalidateSize();
+        setTimeout(() => {
+          if (!leafletMapRef.current) return;
+          leafletMapRef.current.invalidateSize();
+          let bounds;
+          if (isService) {
+            bounds = L.latLngBounds([customerLatLng]);
+            if (riderLatLng && !isNaN(riderLatLng[0]) && !isNaN(riderLatLng[1])) {
+              bounds.extend(riderLatLng);
+            }
+          } else {
+            bounds = L.latLngBounds([storeLatLng, customerLatLng]);
+            if (riderLatLng && !isNaN(riderLatLng[0]) && !isNaN(riderLatLng[1])) {
+              bounds.extend(riderLatLng);
+            }
+          }
+          
+          if (routePoints && routePoints.length > 0) {
+            bounds.extend(routePoints);
+          }
+          
+          // ONLY fit bounds if we haven't done it fully yet
+          if (!boundsFitted.current || (routePoints && routePoints.length > 0 && boundsFitted.current === 'initial')) {
+            leafletMapRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 15, animate: true });
+            boundsFitted.current = (routePoints && routePoints.length > 0) ? true : 'initial';
+          }
+        }, 150);
       }
-      const bounds = L.latLngBounds([storeLatLng, customerLatLng]);
-      if (routePoints.length > 0) {
-        bounds.extend(routePoints);
-      } else if (riderLatLng && !isNaN(riderLatLng[0]) && !isNaN(riderLatLng[1])) {
-        bounds.extend(riderLatLng);
-      }
-      leafletMapRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
     } catch (e) {
       console.warn('Map boundary fit failed', e);
     }
@@ -323,6 +408,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
   const [activeOrders, setActiveOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
+  const [cancelPromptId, setCancelPromptId] = useState(null);
   const { addNotification } = useNotifications();
 
   useEffect(() => {
@@ -432,6 +518,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
               *,
               stores(name, address, lat, lng),
               addresses(*),
+              delivery_tracking(rider_id),
               order_items(
                 id,
                 quantity,
@@ -489,8 +576,8 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
             state: 'Gujarat',
             pincode: '380054',
             society: 'Thaltej, Ahmedabad',
-            lat: 23.0753,
-            lng: 72.5244
+            lat: null,
+            lng: null
           };
         } else {
           // Parse society dynamically from address_line_1 if not present or generic
@@ -507,10 +594,6 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
               order.addresses.address_line_1 = 'Thaltej, Ahmedabad';
               order.addresses.society = 'Thaltej';
             }
-          }
-          if (!order.addresses.lat || !order.addresses.lng) {
-            order.addresses.lat = 23.0753;
-            order.addresses.lng = 72.5244;
           }
         }
 
@@ -551,15 +634,15 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
     if (!activeShipment) return;
 
     // Supabase order rider tracking
-    const targetRiderId = activeShipment.rider_id;
+    const targetRiderId = activeShipment.delivery_tracking?.[0]?.rider_id || activeShipment.rider_id;
+
+    if (!targetRiderId) {
+      setRiderCoords(null);
+      return;
+    }
 
     const getInitialPos = async () => {
-      let query = supabase.from('rider_locations').select('lat, lng, updated_at');
-      if (targetRiderId) {
-        query = query.eq('rider_id', targetRiderId);
-      } else {
-        query = query.order('updated_at', { ascending: false }).limit(1);
-      }
+      let query = supabase.from('rider_locations').select('lat, lng, updated_at').eq('rider_id', targetRiderId);
       
       const { data } = await query.maybeSingle();
       const activeRider = Array.isArray(data) ? data[0] : data;
@@ -574,14 +657,13 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
     };
     getInitialPos();
 
-    const filterStr = targetRiderId ? `rider_id=eq.${targetRiderId}` : undefined;
     const channel = supabase
-      .channel(`rider-tracking-global-${targetRiderId || 'general'}`)
+      .channel(`rider-tracking-${targetRiderId}`)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'rider_locations',
-        ...(filterStr ? { filter: filterStr } : {})
+        filter: `rider_id=eq.${targetRiderId}`
       }, (payload) => {
         if (payload.eventType === 'DELETE') {
           setRiderCoords(null);
@@ -596,7 +678,286 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
     };
   }, [activeOrders]);
 
+  const handleDownloadInvoice = (order) => {
+    const doc = new jsPDF();
+    
+    const storeName = order.stores?.name || order.items?.[0]?.store || 'Passwala Partner';
+    const storeAddress = order.stores?.address || 'Thaltej, Ahmedabad, Gujarat 380054';
+    const customerName = order.addresses?.name || 'Customer';
+    const customerAddress = `${order.addresses?.society || ''}, ${order.addresses?.address_line_1 || ''}`;
+    const orderId = order.id ? String(order.id).substring(0, 8).toUpperCase() : 'N/A';
+    const invoiceDate = new Date(order.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    
+    // Default styles
+    doc.setTextColor(0, 0, 0);
+    doc.setDrawColor(150, 150, 150);
+    doc.setLineWidth(0.1);
 
+    // Header Logo & Title
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    // Planet Softweb logo style (green/black vibe like Blinkit, or their brand color)
+    doc.setTextColor(16, 185, 129); // Emerald green
+    doc.text("Planet Softweb", 14, 20);
+    
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.text("Tax Invoice", 196, 20, { align: "right" });
+    
+    // --- TOP GRID ---
+    let startY = 25;
+    let gridHeight = 60;
+    
+    // Outer Border for Top Grid
+    doc.rect(14, startY, 182, gridHeight);
+    
+    // Horizontal divider
+    doc.line(14, startY + 30, 196, startY + 30);
+    // Vertical divider
+    doc.line(125, startY, 125, startY + gridHeight);
+
+    // SELLER INFO (Top Left)
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text("Sold By : Seller", 16, startY + 5);
+    doc.text(storeName.toUpperCase(), 16, startY + 9);
+    doc.setFont("helvetica", "normal");
+    doc.text(storeAddress, 16, startY + 13, { maxWidth: 105 });
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("FSSAI License Number:", 16, startY + 23);
+    doc.setFont("helvetica", "normal");
+    doc.text("10722999000123", 45, startY + 23);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("GSTIN:", 16, startY + 27);
+    doc.setFont("helvetica", "normal");
+    doc.text("24AAACP1234Q1Z5", 28, startY + 27);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("PAN:", 65, startY + 27);
+    doc.setFont("helvetica", "normal");
+    doc.text("AAACP1234Q", 75, startY + 27);
+
+    // INVOICE NUMBER (Top Right)
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text("Invoice Number:", 127, startY + 15);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${orderId}-INV`, 155, startY + 15);
+
+    // BUYER INFO (Bottom Left)
+    let bottomY = startY + 30;
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text("Invoice To:", 16, bottomY + 5);
+    doc.setFont("helvetica", "normal");
+    doc.text(customerName, 40, bottomY + 5);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Address:", 16, bottomY + 9);
+    doc.setFont("helvetica", "normal");
+    doc.text(customerAddress, 40, bottomY + 9, { maxWidth: 80 });
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Pin code:", 16, bottomY + 20);
+    doc.setFont("helvetica", "normal");
+    doc.text("380054", 40, bottomY + 20);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("State:", 16, bottomY + 24);
+    doc.setFont("helvetica", "normal");
+    doc.text("Gujarat", 40, bottomY + 24);
+
+    // ORDER INFO (Bottom Right)
+    doc.setFont("helvetica", "bold");
+    doc.text("Order Id:", 127, bottomY + 5);
+    doc.setFont("helvetica", "normal");
+    doc.text(orderId, 155, bottomY + 5);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Invoice Date:", 127, bottomY + 9);
+    doc.setFont("helvetica", "normal");
+    doc.text(invoiceDate, 155, bottomY + 9);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Place of Supply:", 127, bottomY + 15);
+    doc.setFont("helvetica", "normal");
+    doc.text("Gujarat", 155, bottomY + 15);
+
+    // --- TABLE ---
+    const tableColumn = ["Sr no", "Item Description", "MRP", "Disc.", "Qty", "Taxable Value", "CGST (%)", "CGST (Amt)", "SGST (%)", "SGST (Amt)", "Total"];
+    const tableRows = [];
+    
+    let subtotal = 0;
+    
+    (order.items || []).forEach((item, index) => {
+      const itemPrice = parseFloat(item.price || item.price_at_purchase || 0);
+      const itemQty = parseInt(item.qty || item.quantity || 1);
+      const itemTotal = itemPrice * itemQty;
+      
+      const baseValue = itemTotal / 1.05;
+      const taxAmt = itemTotal - baseValue;
+      const cgstAmt = taxAmt / 2;
+      const sgstAmt = taxAmt / 2;
+      
+      subtotal += itemTotal;
+      
+      tableRows.push([
+        index + 1,
+        item.name || item.products?.name || 'Item',
+        itemPrice.toFixed(2),
+        "0.00",
+        itemQty,
+        baseValue.toFixed(2),
+        "2.5%",
+        cgstAmt.toFixed(2),
+        "2.5%",
+        sgstAmt.toFixed(2),
+        itemTotal.toFixed(2)
+      ]);
+    });
+    
+    if (order.delivery_fee && parseFloat(order.delivery_fee) > 0) {
+       const fee = parseFloat(order.delivery_fee);
+       subtotal += fee;
+       tableRows.push([
+         tableRows.length + 1,
+         "Delivery charges",
+         fee.toFixed(2),
+         "0.00",
+         1,
+         fee.toFixed(2),
+         "0%",
+         "0.00",
+         "0%",
+         "0.00",
+         fee.toFixed(2)
+       ]);
+    }
+    
+    autoTable(doc, {
+      startY: startY + gridHeight + 2,
+      head: [tableColumn],
+      body: tableRows,
+      theme: 'grid',
+      styles: { fontSize: 6, cellPadding: 2, textColor: [0,0,0], lineColor: [150,150,150], lineWidth: 0.1 },
+      headStyles: { fillColor: [250, 250, 250], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center' },
+      columnStyles: {
+        0: { halign: 'center' },
+        2: { halign: 'right' },
+        3: { halign: 'right' },
+        4: { halign: 'center' },
+        5: { halign: 'right' },
+        6: { halign: 'center' },
+        7: { halign: 'right' },
+        8: { halign: 'center' },
+        9: { halign: 'right' },
+        10: { halign: 'right' }
+      },
+      margin: { left: 14, right: 14 }
+    });
+    
+    let finalY = doc.lastAutoTable.finalY;
+    
+    // --- TOTAL ROW ---
+    doc.rect(14, finalY, 182, 6);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.text("Total", 16, finalY + 4);
+    doc.text(subtotal.toFixed(2), 194, finalY + 4, { align: 'right' });
+    finalY += 6;
+    
+    // --- AMOUNT IN WORDS ---
+    const amountInWords = `Rupees ${subtotal.toFixed(2)} Only`;
+    doc.rect(14, finalY, 182, 6);
+    doc.setFont("helvetica", "bold");
+    doc.text("Amount in Words:", 16, finalY + 4);
+    doc.setFont("helvetica", "normal");
+    doc.text(amountInWords, 45, finalY + 4);
+    finalY += 6;
+
+    // --- COMPANY FOOTER BOX ---
+    let footerHeight = 22;
+    doc.rect(14, finalY, 182, footerHeight);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Planet Softweb Private Limited", 16, finalY + 5);
+    
+    doc.text("GSTIN:", 16, finalY + 9);
+    doc.setFont("helvetica", "normal");
+    doc.text("24AAACP1234Q1Z5", 35, finalY + 9);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("CIN:", 16, finalY + 13);
+    doc.setFont("helvetica", "normal");
+    doc.text("U74999GJ2026PTC000000", 35, finalY + 13);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("FSSAI License Number:", 80, finalY + 9);
+    doc.setFont("helvetica", "normal");
+    doc.text("10722999000123", 110, finalY + 9);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("PAN:", 80, finalY + 13);
+    doc.setFont("helvetica", "normal");
+    doc.text("AAACP1234Q", 110, finalY + 13);
+    
+    // Signature
+    doc.setFontSize(6);
+    doc.text("Authorized Signatory", 170, finalY + 18, { align: 'center' });
+    doc.line(155, finalY + 15, 185, finalY + 15); // Signature line
+    finalY += footerHeight;
+    
+    // --- REVERSE CHARGE ---
+    doc.rect(14, finalY, 182, 6);
+    doc.setFont("helvetica", "bold");
+    doc.text("Whether the tax is payable on reverse charge: No", 16, finalY + 4);
+    finalY += 6;
+
+    // --- TERMS & CONDITIONS ---
+    doc.rect(14, finalY, 182, 28);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text("Terms & Conditions:", 16, finalY + 5);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6);
+    doc.text("1. If you have any issues or queries in respect of your order, please contact customer chat support through Planet Softweb platform or drop in email at", 16, finalY + 9);
+    doc.text("info@planetsoftweb.com.", 16, finalY + 12);
+    doc.text("2. Please note that we never ask for bank account details such as CVV, account number, UPI Pin etc. across our support channels. For your safety please do", 16, finalY + 16);
+    doc.text("not share these details with anyone over any medium.", 16, finalY + 19);
+    doc.text("3. MRP displayed on the platform is as printed on the product package. Actual MRP and amount payable may be a function of offers, discounts and/or the", 16, finalY + 23);
+    doc.text("revised GST rates made effective by Govt. From time to time.", 16, finalY + 26);
+    
+    doc.save(`Invoice_${orderId}.pdf`);
+  };
+
+
+  const confirmCancelOrder = async (orderId) => {
+    try {
+      const { data: items } = await supabase.from('order_items').select('product_id, quantity').eq('order_id', orderId);
+      if (items && items.length > 0) {
+        for (const item of items) {
+          if (item.product_id) {
+            const { data: prod } = await supabase.from('products').select('stock_quantity').eq('id', item.product_id).maybeSingle();
+            if (prod) {
+              await supabase.from('products').update({ stock_quantity: (prod.stock_quantity || 0) + item.quantity }).eq('id', item.product_id);
+            }
+          }
+        }
+      }
+
+      const { error } = await supabase.from('orders').update({ status: 'CANCELLED' }).eq('id', orderId);
+      
+      if (error) throw new Error(error.message || 'Failed to cancel order');
+      
+      toast.success("Order cancelled successfully");
+      setCancelPromptId(null);
+    } catch (err) {
+      toast.error(`Failed to cancel: ${err.message}`);
+      setCancelPromptId(null);
+    }
+  };
 
   return (
     <motion.div 
@@ -608,12 +969,12 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
       <div className="track-head-row">
          <div className="live-status">
            <div className="live-pulse"></div> 
-           <span>{activeOrders.filter(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED' && o.status !== 'PENDING').length} ACTIVE ORDERS</span>
+           <span>{activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED', 'PENDING'].includes(o.status)).length} ACTIVE ORDERS</span>
          </div>
       </div>
 
       <div className="orders-list-v2" style={{ paddingBottom: '120px' }}>
-        {loading ? <p>Syncing neighborhood cloud...</p> : activeOrders.filter(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED' && o.status !== 'PENDING').map((order, i) => {
+        {loading ? <p>Syncing neighborhood cloud...</p> : activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED', 'PENDING'].includes(o.status)).map((order, i) => {
           const progress = getProgress(order.status);
           const firstItem = order.items?.[0] || { name: 'Order' };
           const itemCount = order.items?.length || 0;
@@ -633,7 +994,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                        {isService ? <Truck size={20} /> : <Package size={20} />}
                     </div>
                      <div>
-                        <h4>{firstItem.provider || firstItem.store || 'Partner'}</h4>
+                        <h4>{isService ? (firstItem.provider || firstItem.store || 'Service Expert') : (order.stores?.name || firstItem.store || 'Partner')}</h4>
                         <p>{firstItem.name} {itemCount > 1 ? `+ ${itemCount - 1} more` : ''}</p>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
                           <MapPin size={12} color="#94a3b8" />
@@ -669,7 +1030,10 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                 <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'white', padding: '8px 12px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 10 }}>
                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: riderCoords ? '#22c55e' : '#94a3b8', animation: riderCoords ? 'pulse 2s infinite' : 'none' }}></div>
                    <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>
-                     {riderCoords ? 'Live Tracking Active' : (order.status !== 'PLACED' ? (isService ? 'Expert on the way' : 'Rider on the move') : (isService ? 'Waiting for Service Provider...' : 'Waiting for Rider...'))}
+                     {['DELIVERED', 'COMPLETED'].includes(order.status) ? (isService ? 'Service Completed' : 'Delivered') :
+                      riderCoords || ['SHIPPED', 'DISPATCHED'].includes(order.status) ? (isService ? 'Expert on the way' : 'Live Tracking Active') : 
+                      ['ACCEPTED', 'PREPARING'].includes(order.status) ? (isService ? 'Preparing Kit...' : 'Preparing Order...') :
+                      (isService ? 'Waiting for Expert...' : 'Waiting for Rider...')}
                    </span>
                 </div>
               </div>
@@ -680,7 +1044,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                     <Clock size={20} className="pulse-text" />
                     <span>
                       {order.status === 'PLACED' ? (isService ? 'Waiting for confirmation...' : 'Confirming order...') : 
-                       order.status === 'DELIVERED' ? (isService ? 'Completed!' : 'Arrived!') : 
+                       ['DELIVERED', 'COMPLETED'].includes(order.status) ? (isService ? 'Completed!' : 'Arrived!') : 
                        <>Arriving in <strong>{order.eta || '10 mins'}</strong></>}
                     </span>
                   </div>
@@ -691,16 +1055,23 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                      order.status === 'SHIPPED' || order.status === 'DISPATCHED' ? (isService ? 'Expert is on the way to you' : 'Rider is on the way to you') : (isService ? 'Completed' : 'Delivered')}
                   </p>
                 </div>
-                  <button className="rider-contact-btn" onClick={() => toast(`Opening chat with ${order.delivery_agent_name || 'Support'}...`)}>
+                <div style={{ display: 'flex', gap: '8px', position: 'relative', zIndex: 20 }}>
+                  {['PENDING', 'PLACED', 'ORDERED', 'ACCEPTED', 'PREPARING'].includes(order.status) && (
+                    <button className="rider-contact-btn" style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', padding: '0 12px' }} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCancelPromptId(order.id); }}>
+                      Cancel
+                    </button>
+                  )}
+                  <button className="rider-contact-btn" onClick={(e) => { e.preventDefault(); e.stopPropagation(); toast(`Opening chat with ${order.delivery_agent_name || 'Support'}...`); }}>
                     <MessageCircle size={18} /> Chat
                   </button>
-                
-                <button className="rider-contact-btn" style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }} onClick={() => setSelectedOrderDetails(order)}>
-                  Details
-                </button>
+                  
+                  <button className="rider-contact-btn" style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedOrderDetails(order); }}>
+                    Details
+                  </button>
+                </div>
               </div>
 
-              {((order.rider_id) || String(order.id).startsWith('local_')) && ['PREPARING', 'SHIPPED', 'DISPATCHED', 'DELIVERED'].includes(order.status) && (
+              {((order.rider_id) || String(order.id).startsWith('local_')) && ['PREPARING', 'SHIPPED', 'DISPATCHED', 'DELIVERED', 'COMPLETED'].includes(order.status) && (
                 <div className="agent-small-info">
                    <img src={`https://i.pravatar.cc/150?u=${order.rider_id || order.id}`} alt="Agent" />
                    <p>{order.delivery_agent_name || 'Verified Partner'} • {isService ? 'Verified Expert' : 'Verified Agent'}</p>
@@ -709,7 +1080,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
             </motion.div>
           );
         })}
-        {!loading && activeOrders.filter(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED' && o.status !== 'PENDING').length === 0 && (
+        {!loading && activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED', 'PENDING'].includes(o.status)).length === 0 && (
           <div className="empty-orders-placeholder-card" style={{ border: 'none', background: 'transparent', boxShadow: 'none' }}>
             <div className="placeholder-icon" style={{ background: '#f1f5f9', color: '#94a3b8' }}>📦</div>
             <h3 style={{ color: '#64748b' }}>No Active Orders</h3>
@@ -719,8 +1090,8 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
       </div>
 
       <div className="past-orders-shortcut">
-         <h4>Previous Orders ({activeOrders.filter(o => o.status === 'DELIVERED' || o.status === 'CANCELLED').length})</h4>
-          {activeOrders.filter(o => o.status === 'DELIVERED' || o.status === 'CANCELLED').map(order => (
+         <h4>Previous Orders ({activeOrders.filter(o => ['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status)).length})</h4>
+          {activeOrders.filter(o => ['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status)).map(order => (
             <div key={order.id} className="past-item-row" onClick={() => setSelectedOrderDetails(order)} style={{ cursor: 'pointer' }}>
                <div className="past-meta">
                   <span>{new Date(order.created_at).toLocaleDateString()}</span>
@@ -732,93 +1103,138 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                <ChevronRight size={16} color="#888" />
             </div>
          ))}
-         {activeOrders.filter(o => o.status === 'DELIVERED' || o.status === 'CANCELLED').length === 0 && (
+         {activeOrders.filter(o => ['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status)).length === 0 && (
            <p className="no-past-p">No history available yet.</p>
          )}
       </div>
 
+      {/* Custom Cancel Confirmation Modal */}
+      {cancelPromptId && (
+        <div className="past-order-modal-overlay" onClick={() => setCancelPromptId(null)} style={{ zIndex: 9999 }}>
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="past-order-modal-content"
+            style={{ maxWidth: '350px', margin: 'auto', borderRadius: '24px', padding: '24px', textAlign: 'center', background: '#fff', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ background: '#fef2f2', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: '#ef4444' }}>
+              <X size={32} />
+            </div>
+            <h3 style={{ margin: '0 0 12px 0', fontSize: '1.25rem', color: '#0f172a' }}>Cancel Order?</h3>
+            <p style={{ margin: '0 0 24px 0', color: '#64748b', fontSize: '0.95rem', lineHeight: 1.5 }}>
+              Are you sure you want to cancel this order? This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button 
+                onClick={() => setCancelPromptId(null)}
+                style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '12px', fontWeight: 600, cursor: 'pointer' }}
+              >
+                No, Keep It
+              </button>
+              <button 
+                onClick={() => confirmCancelOrder(cancelPromptId)}
+                style={{ flex: 1, padding: '12px', background: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '12px', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Yes, Cancel
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Order Details Modal */}
       {selectedOrderDetails && (
-        <div className="past-order-modal-overlay" style={{
-          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-          background: 'rgba(0,0,0,0.5)', zIndex: 9999,
-          display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
-        }} onClick={() => setSelectedOrderDetails(null)}>
+        <div className="past-order-modal-overlay" onClick={() => setSelectedOrderDetails(null)}>
           <motion.div 
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="past-order-modal-content"
-            style={{
-              width: '100%', maxWidth: '500px', background: '#fff', 
-              borderTopLeftRadius: '24px', borderTopRightRadius: '24px',
-              padding: '24px', paddingBottom: '40px', boxShadow: '0 -10px 40px rgba(0,0,0,0.1)'
-            }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div className="past-order-modal-header">
               <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>Order Details</h3>
-              <button onClick={() => setSelectedOrderDetails(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: '#64748b' }}>
-                <X size={20} />
-              </button>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                {['PENDING', 'PLACED', 'ORDERED', 'ACCEPTED', 'PREPARING'].includes(selectedOrderDetails.status) && (
+                  <button 
+                    onClick={() => {
+                      setCancelPromptId(selectedOrderDetails.id);
+                      setSelectedOrderDetails(null);
+                    }} 
+                    style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '6px 12px', cursor: 'pointer', color: '#ef4444', fontWeight: 600, fontSize: '0.85rem' }}
+                  >
+                    Cancel Order
+                  </button>
+                )}
+                <button onClick={() => handleDownloadInvoice(selectedOrderDetails)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Download Invoice">
+                  <Download size={20} />
+                </button>
+                <button onClick={() => setSelectedOrderDetails(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <X size={20} />
+                </button>
+              </div>
             </div>
             
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', background: '#f8fafc', padding: '16px', borderRadius: '16px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4f46e5' }}>
-                <Store size={24} />
-              </div>
-              <div>
-                <h4 style={{ margin: 0, fontSize: '1rem', color: '#1e293b' }}>{selectedOrderDetails.stores?.name || selectedOrderDetails.items?.[0]?.store || 'Passwala Partner'}</h4>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Clock size={14} /> {selectedOrderDetails.status === 'DELIVERED' ? 'Delivered on' : 'Ordered on'} {new Date(selectedOrderDetails.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-                </p>
-              </div>
-            </div>
-
-            {/* Address Section */}
-            <div style={{ marginBottom: '24px' }}>
-              <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                {(selectedOrderDetails.items?.[0]?.type === 'service' || (selectedOrderDetails.stores && !selectedOrderDetails.stores.vendor_id)) ? 'Service Address' : 'Delivery Address'}
-              </h4>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
-                <MapPin size={20} color="#4f46e5" style={{ marginTop: '2px', flexShrink: 0 }} />
+            <div className="past-order-modal-body">
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', background: '#f8fafc', padding: '16px', borderRadius: '16px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4f46e5' }}>
+                  <Store size={24} />
+                </div>
                 <div>
-                  <div style={{ color: '#1e293b', fontWeight: 700, fontSize: '0.95rem' }}>{selectedOrderDetails.addresses?.society || 'Thaltej'}</div>
-                  <div style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '4px', lineHeight: 1.4 }}>{selectedOrderDetails.addresses?.address_line_1 || ''}</div>
+                  <h4 style={{ margin: 0, fontSize: '1rem', color: '#1e293b' }}>{selectedOrderDetails.stores?.name || selectedOrderDetails.items?.[0]?.store || 'Passwala Partner'}</h4>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Clock size={14} /> {['DELIVERED', 'COMPLETED'].includes(selectedOrderDetails.status) ? 'Delivered on' : 'Ordered on'} {new Date(selectedOrderDetails.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                  </p>
                 </div>
               </div>
-            </div>
 
-            <div style={{ marginBottom: '24px' }}>
-              <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Items Summary</h4>
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-                {(selectedOrderDetails.items || []).map((item, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', borderBottom: idx !== (selectedOrderDetails.items || []).length - 1 ? '1px solid #e2e8f0' : 'none', background: '#fff' }}>
-                    <span style={{ color: '#334155', fontWeight: 500 }}>{item.qty || item.quantity || 1}x {item.name || item.products?.name || 'Item'}</span>
-                    <span style={{ color: '#0f172a', fontWeight: 600 }}>₹{item.price_at_purchase || item.price || 0}</span>
+              {/* Address Section */}
+              <div style={{ marginBottom: '24px' }}>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  {(selectedOrderDetails.items?.[0]?.type === 'service' || (selectedOrderDetails.stores && !selectedOrderDetails.stores.vendor_id)) ? 'Service Address' : 'Delivery Address'}
+                </h4>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+                  <MapPin size={20} color="#4f46e5" style={{ marginTop: '2px', flexShrink: 0 }} />
+                  <div>
+                    <div style={{ color: '#1e293b', fontWeight: 700, fontSize: '0.95rem' }}>{selectedOrderDetails.addresses?.society || 'Thaltej'}</div>
+                    <div style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '4px', lineHeight: 1.4 }}>{selectedOrderDetails.addresses?.address_line_1 || ''}</div>
                   </div>
-                ))}
-                {(!selectedOrderDetails.items || selectedOrderDetails.items.length === 0) && (
-                  <div style={{ padding: '12px 16px', color: '#64748b' }}>Details not available</div>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', background: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
-                  <span style={{ color: '#64748b', fontWeight: 600 }}>Total Paid</span>
-                  <span style={{ color: '#10b981', fontWeight: 800, fontSize: '1.1rem' }}>₹{selectedOrderDetails.total_price || selectedOrderDetails.total_amount}</span>
                 </div>
               </div>
-            </div>
 
-            <div>
-              <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Payment Info</h4>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: '#f1f5f9', borderRadius: '12px' }}>
-                <CreditCard size={20} color="#64748b" />
-                <div>
-                  <div style={{ color: '#334155', fontWeight: 600 }}>{selectedOrderDetails.payment_method || 'Paid Online'}</div>
-                  <div style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '2px' }}>Transaction ID: {selectedOrderDetails.id.split('-')[0]}</div>
+              <div style={{ marginBottom: '24px' }}>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Items Summary</h4>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+                  {(selectedOrderDetails.items || []).map((item, idx) => (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', borderBottom: idx !== (selectedOrderDetails.items || []).length - 1 ? '1px solid #e2e8f0' : 'none', background: '#fff' }}>
+                      <span style={{ color: '#334155', fontWeight: 500 }}>{item.qty || item.quantity || 1}x {item.name || item.products?.name || 'Item'}</span>
+                      <span style={{ color: '#0f172a', fontWeight: 600 }}>₹{item.price_at_purchase || item.price || 0}</span>
+                    </div>
+                  ))}
+                  {(!selectedOrderDetails.items || selectedOrderDetails.items.length === 0) && (
+                    <div style={{ padding: '12px 16px', color: '#64748b' }}>Details not available</div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', background: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
+                    <span style={{ color: '#64748b', fontWeight: 600 }}>Total Paid</span>
+                    <span style={{ color: '#10b981', fontWeight: 800, fontSize: '1.1rem' }}>₹{selectedOrderDetails.total_price || selectedOrderDetails.total_amount}</span>
+                  </div>
                 </div>
-                <div style={{ marginLeft: 'auto', background: '#10b981', color: 'white', fontSize: '0.75rem', fontWeight: 700, padding: '4px 8px', borderRadius: '8px' }}>
-                  SUCCESS
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Payment Info</h4>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: '#f1f5f9', borderRadius: '12px' }}>
+                  <CreditCard size={20} color="#64748b" />
+                  <div>
+                    <div style={{ color: '#334155', fontWeight: 600 }}>{selectedOrderDetails.payment_method || 'Paid Online'}</div>
+                    <div style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '2px' }}>Transaction ID: {selectedOrderDetails.id.split('-')[0]}</div>
+                  </div>
+                  <div style={{ marginLeft: 'auto', background: '#10b981', color: 'white', fontSize: '0.75rem', fontWeight: 700, padding: '4px 8px', borderRadius: '8px' }}>
+                    SUCCESS
+                  </div>
                 </div>
               </div>
             </div>

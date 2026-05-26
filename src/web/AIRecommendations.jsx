@@ -41,7 +41,7 @@ const AIRecommendations = () => {
     r.provider?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (loading || (searchQuery && filteredRecs.length === 0)) return null;
+  if (loading || filteredRecs.length === 0) return null;
 
   return (
     <section className="ai-recs" id="recommendations">
