@@ -9,6 +9,8 @@ import ridersRoutes from './routes/riders.js';
 import orderRoutes from './routes/orders.js';
 import planetSoftwebRoutes from './routes/planetSoftweb.js';
 import aiRoutes from './routes/ai.js';
+import cityRidesRoutes from './routes/city_rides.js';
+import eventRoutes from './routes/events.js';
 import { apiLimiter } from './utils/rateLimiter.js';
 import supabase from './supabase.js';
 import morgan from 'morgan';
@@ -110,6 +112,8 @@ app.use('/api/riders', ridersRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/planet-softweb', planetSoftwebRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/city-rides', cityRidesRoutes);
+app.use('/api/events', eventRoutes);
 
 const routeCache = new Map();
 

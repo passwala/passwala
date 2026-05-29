@@ -47,6 +47,22 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
       type: "green",
       view: 'NEAR_SHOPS',
       tag: "ORDER NOW"
+    },
+    {
+      title: "City Rides",
+      subtitle: "Ahmedabad transit",
+      image: "https://cdn-icons-png.flaticon.com/512/3202/3202926.png",
+      type: "peach",
+      view: 'CITY_RIDES',
+      tag: "BOOK TICKET"
+    },
+    {
+      title: "Event Tickets",
+      subtitle: "Ahmedabad events",
+      image: "https://cdn-icons-png.flaticon.com/512/825/825590.png",
+      type: "purple",
+      view: 'EVENTS',
+      tag: "BOOK NOW"
     }
   ];
 

@@ -78,24 +78,24 @@ const NearShops = ({ location, userCoords }) => {
                 const getFallbackByName = (name = '') => {
                   const norm = name.toLowerCase();
                   if (norm.includes('ac') || norm.includes('appliance') || norm.includes('fridge') || norm.includes('washing')) {
-                    return 'https://images.unsplash.com/photo-1581578731522-aa02d681b94d?auto=format&fit=crop&q=80&w=400';
+                    return '/water_purifier.png';
                   }
                   if (norm.includes('clean') || norm.includes('sanitize') || norm.includes('maid') || norm.includes('wash')) {
-                    return 'https://images.unsplash.com/photo-1581578731158-a5a3c262c1db?auto=format&fit=crop&q=80&w=400';
+                    return '/cleaning.png';
                   }
                   if (norm.includes('plumb') || norm.includes('leak') || norm.includes('pipe') || norm.includes('tap')) {
-                    return 'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&q=80&w=400';
+                    return '/water_small.png';
                   }
                   if (norm.includes('electr') || norm.includes('wire') || norm.includes('fan') || norm.includes('switch')) {
-                    return 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&q=80&w=400';
+                    return '/electrician.png';
                   }
                   if (norm.includes('carpenter') || norm.includes('wood') || norm.includes('door') || norm.includes('furniture')) {
-                    return 'https://images.unsplash.com/photo-1533090161767-e6ffed986c88?auto=format&fit=crop&q=80&w=400';
+                    return '/carpentry.png';
                   }
                   if (norm.includes('paint') || norm.includes('wall') || norm.includes('waterproof')) {
-                    return 'https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&q=80&w=400';
+                    return '/expert_services.png';
                   }
-                  return 'https://images.unsplash.com/photo-1581578731522-aa02d681b94d?auto=format&fit=crop&q=80&w=400';
+                  return '/essentials.png';
                 };
 
                 const getCleanImage = (imgSrc, name = '') => {
@@ -126,12 +126,12 @@ const NearShops = ({ location, userCoords }) => {
             if (!error && data) {
                 const filteredData = data.filter(item => item.description !== 'Service item auto-registered');
                 const getCleanProductImage = (imgSrc) => {
-                  if (!imgSrc || typeof imgSrc !== 'string') return 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=400'; // Default Premium Grocery
+                  if (!imgSrc || typeof imgSrc !== 'string') return '/essentials.png'; // Default Premium Grocery
                   const clean = imgSrc.trim();
                   if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:') || clean.startsWith('/')) {
                     return clean;
                   }
-                  return 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=400';
+                  return '/essentials.png';
                 };
 
                 setShopCatalog(filteredData.map(p => ({
@@ -224,7 +224,7 @@ const NearShops = ({ location, userCoords }) => {
             lat: lat,
             lng: lng,
             address: item.address,
-            image: item.photo_url || (viewType === 'SHOPS' ? "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80&w=800" : "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=500&q=80"),
+            image: item.photo_url || (viewType === 'SHOPS' ? "/essentials.png" : "/expert_services.png"),
             isOpen: true,
             verified: item.is_verified || false,
             type: viewType

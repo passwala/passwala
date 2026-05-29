@@ -141,7 +141,12 @@ const TABLE_SCHEMAS = {
   notifications: { user_id: '', title: '', message: '', is_read: false },
   service_areas: { city: 'Ahmedabad', area_name: '', is_active: true },
   stores: { vendor_id: '', name: '', description: '', address: '', is_open: true, rating: 0 },
-  service_categories: { name: '', icon_url: '' }
+  service_categories: { name: '', icon_url: '' },
+  events: { title: '', category: '', venue_name: '', event_date: '', status: 'UPCOMING', banner_url: '' },
+  event_bookings: { user_id: '', event_id: '', tier_id: '', ticket_count: 0, total_amount: 0, status: 'CONFIRMED' },
+  city_routes: { start_area: '', end_area: '', distance_km: 0, base_price: 0, is_active: true },
+  city_vehicles: { driver_id: '', vehicle_type: '', license_plate: '', total_seats: 0, available_seats: 0, is_active: true },
+  ticket_bookings: { user_id: '', route_id: '', vehicle_id: '', pickup_area: '', drop_area: '', total_price: 0, seat_count: 0, status: 'CONFIRMED' }
 };
 
 const DATABASE_SCHEMAS = {
@@ -157,7 +162,12 @@ const DATABASE_SCHEMAS = {
   notifications: ['user_id', 'title', 'message', 'is_read'],
   service_areas: ['city', 'area_name', 'is_active'],
   admins: ['username', 'role'],
-  stores: ['vendor_id', 'name', 'description', 'logo_url', 'banner_url', 'address', 'lat', 'lng', 'is_open', 'rating']
+  stores: ['vendor_id', 'name', 'description', 'logo_url', 'banner_url', 'address', 'lat', 'lng', 'is_open', 'rating'],
+  events: ['title', 'category', 'venue_name', 'event_date', 'status', 'banner_url'],
+  event_bookings: ['user_id', 'event_id', 'tier_id', 'ticket_count', 'total_amount', 'status'],
+  city_routes: ['start_area', 'end_area', 'distance_km', 'base_price', 'is_active'],
+  city_vehicles: ['driver_id', 'vehicle_type', 'license_plate', 'total_seats', 'available_seats', 'is_active'],
+  ticket_bookings: ['user_id', 'route_id', 'vehicle_id', 'pickup_area', 'drop_area', 'total_price', 'seat_count', 'status']
 };
 
 const tabSections = [
@@ -193,6 +203,16 @@ const tabSections = [
     items: [
       { id: 'community', label: 'Community', icon: MessageSquare, table: 'posts' },
       { id: 'notifications', label: 'Notifications', icon: Bell, table: 'notifications' },
+    ]
+  },
+  {
+    label: 'City & Events',
+    items: [
+      { id: 'city_routes', label: 'City Routes', icon: Navigation, table: 'city_routes' },
+      { id: 'city_vehicles', label: 'City Vehicles', icon: Truck, table: 'city_vehicles' },
+      { id: 'ticket_bookings', label: 'Ride Bookings', icon: MapPin, table: 'ticket_bookings' },
+      { id: 'events', label: 'Events', icon: Sparkles, table: 'events' },
+      { id: 'event_bookings', label: 'Event Bookings', icon: Calendar, table: 'event_bookings' }
     ]
   },
   {

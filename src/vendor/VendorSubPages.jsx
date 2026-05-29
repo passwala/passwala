@@ -462,34 +462,45 @@ export const VendorInventory = ({ businessType, storeId }) => {
                 <textarea className="v-input" style={{ minHeight: '120px', resize: 'vertical' }} placeholder="What makes this special? List features, warranty, or delivery times..." value={newItem.detail} onChange={e => setNewItem({ ...newItem, detail: e.target.value })} />
               </div>
 
-              <div className="v-form-group">
-                <label>Visual Presentation</label>
-                <div
-                  className="v-input v-upload-zone"
-                  onClick={() => document.getElementById('inventory-upload').click()}
-                >
-                  <input id="inventory-upload" type="file" hidden accept="image/*" onChange={(e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onloadend = () => setNewItem({ ...newItem, image: reader.result });
-                      reader.readAsDataURL(file);
-                    }
-                  }} />
-                  {newItem.image ? (
-                    <div style={{ position: 'relative', width: '220px', height: '150px', margin: '0 auto' }}>
-                      <img src={newItem.image} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '16px' }} />
-                      <div style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }} onClick={(e) => { e.stopPropagation(); setNewItem({ ...newItem, image: null }); }}><Trash2 size={16} color="#ef4444" /></div>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <Camera size={40} color="#cbd5e1" style={{ marginBottom: '1rem' }} />
-                      <p style={{ margin: 0, fontWeight: 800, color: '#1e293b' }}>Click to upload cover photo</p>
-                      <p style={{ margin: '4px 0 0 0', color: '#94a3b8', fontSize: '0.85rem' }}>High-res photos increase conversion by 40%</p>
-                    </div>
-                  )}
+              {businessType === 'shop' && (
+                <div className="v-form-group">
+                  <label>Visual Presentation</label>
+                  <div
+                    className="v-input v-upload-zone"
+                    onClick={(e) => {
+                      if (e.target.id !== 'inventory-upload') {
+                        document.getElementById('inventory-upload').click();
+                      }
+                    }}
+                  >
+                    <input id="inventory-upload" type="file" hidden accept="image/*" onClick={(e) => e.stopPropagation()} onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setNewItem(prev => ({ ...prev, image: reader.result }));
+                          e.target.value = '';
+                        };
+                        reader.readAsDataURL(file);
+                      } else {
+                        e.target.value = '';
+                      }
+                    }} />
+                    {newItem.image ? (
+                      <div style={{ position: 'relative', width: '220px', height: '150px', margin: '0 auto' }}>
+                        <img src={newItem.image} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '16px' }} />
+                        <div style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setNewItem(prev => ({ ...prev, image: null })); }}><Trash2 size={16} color="#ef4444" /></div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <Camera size={40} color="#cbd5e1" style={{ marginBottom: '1rem' }} />
+                        <p style={{ margin: 0, fontWeight: 800, color: '#1e293b' }}>Click to upload cover photo</p>
+                        <p style={{ margin: '4px 0 0 0', color: '#94a3b8', fontSize: '0.85rem' }}>High-res photos increase conversion by 40%</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="v-form-actions">
                 <button type="button" onClick={() => setShowForm(false)} className="v-btn-outline">Discard</button>
@@ -507,24 +518,24 @@ export const VendorInventory = ({ businessType, storeId }) => {
           const getFallbackByName = (name = '') => {
             const norm = name.toLowerCase();
             if (norm.includes('ac') || norm.includes('appliance') || norm.includes('fridge') || norm.includes('washing')) {
-              return 'https://images.unsplash.com/photo-1581578731522-aa02d681b94d?auto=format&fit=crop&q=80&w=400';
+              return '/water_purifier.png';
             }
             if (norm.includes('clean') || norm.includes('sanitize') || norm.includes('maid') || norm.includes('wash')) {
-              return 'https://images.unsplash.com/photo-1581578731158-a5a3c262c1db?auto=format&fit=crop&q=80&w=400';
+              return '/cleaning.png';
             }
             if (norm.includes('plumb') || norm.includes('leak') || norm.includes('pipe') || norm.includes('tap')) {
-              return 'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&q=80&w=400';
+              return '/water_small.png';
             }
             if (norm.includes('electr') || norm.includes('wire') || norm.includes('fan') || norm.includes('switch')) {
-              return 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&q=80&w=400';
+              return '/electrician.png';
             }
             if (norm.includes('carpenter') || norm.includes('wood') || norm.includes('door') || norm.includes('furniture')) {
-              return 'https://images.unsplash.com/photo-1533090161767-e6ffed986c88?auto=format&fit=crop&q=80&w=400';
+              return '/carpentry.png';
             }
             if (norm.includes('paint') || norm.includes('wall') || norm.includes('waterproof')) {
-              return 'https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&q=80&w=400';
+              return '/expert_services.png';
             }
-            return 'https://images.unsplash.com/photo-1581578731522-aa02d681b94d?auto=format&fit=crop&q=80&w=400';
+            return '/essentials.png';
           };
 
           const getCleanImage = (imgSrc, name = '') => {
@@ -1238,7 +1249,7 @@ export const VendorOrders = ({ storeId, businessType }) => {
             if (item.product_id) {
               const { data: prod } = await supabase.from('products').select('stock_quantity').eq('id', item.product_id).maybeSingle();
               if (prod) {
-                await supabase.from('products').update({ stock_quantity: (prod.stock_quantity || 0) + item.quantity }).eq('id', item.product_id);
+                await supabase.from('products').update({ stock_quantity: (prod.stock_quantity || 0) + (parseInt(item.quantity) || 1) }).eq('id', item.product_id);
               }
             }
           }

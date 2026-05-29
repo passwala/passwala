@@ -1,0 +1,213 @@
+.city-rides-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg-main);
+  position: relative;
+  overflow: hidden;
+}
+
+.cr-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 100%);
+}
+
+.cr-back-btn {
+  background: white;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.cr-header h2 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--secondary);
+  text-shadow: 0 2px 10px rgba(255,255,255,0.8);
+}
+
+.cr-map-area {
+  flex: 1;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.cr-booking-panel {
+  background: var(--bg-card);
+  border-top-left-radius: 30px;
+  border-top-right-radius: 30px;
+  padding: 2rem;
+  box-shadow: 0 -10px 30px rgba(0,0,0,0.08);
+  position: relative;
+  z-index: 10;
+  margin-top: -20px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.cr-badge {
+  position: absolute;
+  top: -15px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--primary);
+  color: white;
+  padding: 4px 16px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  box-shadow: 0 4px 10px rgba(255, 107, 0, 0.3);
+}
+
+.cr-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: var(--bg-surface);
+  border-radius: 20px;
+  padding: 0.5rem;
+  border: 1px solid var(--border-light);
+}
+
+.cr-input-field {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cr-input-field:hover {
+  background: white;
+}
+
+.cr-input-field.active {
+  background: white;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--primary-light);
+}
+
+.cr-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid;
+  position: relative;
+}
+
+.pickup-dot { border-color: #22c55e; }
+.dropoff-dot { border-color: #ef4444; }
+
+.cr-route-line {
+  height: 20px;
+  border-left: 2px dashed var(--border-light);
+  margin-left: 1.3rem;
+}
+
+.cr-input-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.cr-input-content label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.cr-input-content span {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cr-popular-areas h4 {
+  font-size: 0.9rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  color: var(--text-secondary);
+}
+
+.cr-area-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.cr-area-chip {
+  background: var(--bg-surface);
+  border: 1px solid var(--glass-border);
+  padding: 0.6rem 1rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cr-area-chip:hover {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.cr-search-btn {
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+  color: white;
+  border: none;
+  padding: 1.25rem;
+  border-radius: 16px;
+  font-weight: 800;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(255, 107, 0, 0.3);
+  transition: all 0.3s;
+}
+
+.cr-search-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.cr-search-btn:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 15px 35px rgba(255, 107, 0, 0.4);
+}
+
+.cr-spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+}

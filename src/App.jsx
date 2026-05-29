@@ -52,6 +52,13 @@ const HelpSupport = React.lazy(() => import('./webapp/profile_pages/HelpSupport'
 const AppSettings = React.lazy(() => import('./webapp/profile_pages/AppSettings'));
 const PlanetSoftweb = React.lazy(() => import('./planet_softweb/PlanetSoftweb'));
 const NeighborhoodHub = React.lazy(() => import('./webapp/buyer/NeighborhoodHub'));
+const CityTicketBooking = React.lazy(() => import('./webapp/buyer/CityTicketBooking'));
+const RideCheckout = React.lazy(() => import('./webapp/buyer/RideCheckout'));
+const RideTicket = React.lazy(() => import('./webapp/buyer/RideTicket'));
+const EventHub = React.lazy(() => import('./webapp/buyer/events/EventHub'));
+const EventDetails = React.lazy(() => import('./webapp/buyer/events/EventDetails'));
+const EventCheckout = React.lazy(() => import('./webapp/buyer/events/EventCheckout'));
+const EventTicket = React.lazy(() => import('./webapp/buyer/events/EventTicket'));
 
 // Dedicated Environment-based Modes (no fragile port fallbacks)
 const appMode = import.meta.env.VITE_APP_MODE || import.meta.env.MODE || 'web';
@@ -466,7 +473,7 @@ const AppContent = ({
         ) : (
           <>
             {/* Global Navbar Logic */}
-            {['/', '/privacy-policy', '/terms', '/refunds-cancellation', '/data-deletion', '/policies'].includes(locationPath) ? (
+            {(['/privacy-policy', '/terms', '/refunds-cancellation', '/data-deletion', '/policies'].includes(locationPath) || (locationPath === '/' && (!effectiveUser || !isWebappMode))) ? (
               <Navbar
                 isAuthenticated={!!effectiveUser} user={effectiveUser} onLogout={handleLogout}
                 onOpenProfile={() => navigate('/profile')} onOpenAI={() => navigate('/')}
@@ -517,7 +524,7 @@ const AppContent = ({
                           setLocation={setLocation}
                           location={location}
                           onLogout={handleLogout}
-                          onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : '/')}
+                          onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : v === 'CITY_RIDES' ? '/city-ride' : v === 'EVENTS' ? '/events' : '/')}
                         /> : <Auth onLogin={(userData) => {
                           localStorage.setItem('passwala_user', JSON.stringify(userData));
                           localStorage.setItem('passwala_profile_complete', 'true');
@@ -564,6 +571,13 @@ const AppContent = ({
                   <Route path="/expert-services" element={effectiveUser ? <ExpertServices onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
                   <Route path="/neighbors" element={effectiveUser ? <NeighborsCommunity onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
                   <Route path="/track-orders" element={effectiveUser ? <TrackOrders user={effectiveUser} userCoords={userCoords} onBack={() => navigate('/')} /> : <Navigate to="/" />} />
+                  <Route path="/city-ride" element={effectiveUser ? <CityTicketBooking user={effectiveUser} onBack={() => navigate('/')} /> : <Navigate to="/" />} />
+                  <Route path="/ride-checkout" element={effectiveUser ? <RideCheckout /> : <Navigate to="/" />} />
+                  <Route path="/ride-ticket" element={effectiveUser ? <RideTicket /> : <Navigate to="/" />} />
+                  <Route path="/events" element={effectiveUser ? <EventHub onBack={() => navigate('/')} /> : <Navigate to="/" />} />
+                  <Route path="/events/:id" element={effectiveUser ? <EventDetails user={effectiveUser} /> : <Navigate to="/" />} />
+                  <Route path="/events/checkout" element={effectiveUser ? <EventCheckout /> : <Navigate to="/" />} />
+                  <Route path="/events/ticket" element={effectiveUser ? <EventTicket /> : <Navigate to="/" />} />
                   <Route path="/profile" element={effectiveUser ? <WebappProfile user={effectiveUser} onLogout={handleLogout} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} onUpdateUser={(updated) => setUser(updated)} /> : <Navigate to="/" />} />
                   <Route path="/order-history" element={effectiveUser ? <OrderHistory /> : <Navigate to="/" />} />
                   <Route path="/wallet" element={effectiveUser ? <Wallet user={effectiveUser} /> : <Navigate to="/" />} />

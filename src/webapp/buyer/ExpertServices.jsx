@@ -142,7 +142,10 @@ const ExpertServices = ({ onBack, location }) => {
   };
 
   const filteredExperts = experts.filter(e => {
-    const mainMatch = activeTab === 'All' || (e.category || '').toLowerCase().includes(activeTab.toLowerCase());
+    const mainMatch = activeTab === 'All' || 
+      (e.category || '').toLowerCase().includes(activeTab.toLowerCase()) ||
+      (e.title || '').toLowerCase().includes(activeTab.toLowerCase()) ||
+      (e.description || '').toLowerCase().includes(activeTab.toLowerCase());
     const subMatch = selectedSub === 'All' || 
       (e.name || '').toLowerCase().includes(selectedSub.toLowerCase()) || 
       (e.title || '').toLowerCase().includes(selectedSub.toLowerCase()) || 

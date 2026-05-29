@@ -122,6 +122,11 @@
   border-color: rgba(163, 230, 53, 0.1);
 }
 
+.hub-card.purple {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.08) 0%, var(--bg-card) 100%);
+  border-color: rgba(168, 85, 247, 0.1);
+}
+
 /* --- LIGHT MODE SPECIFIC --- */
 body:not(.dark-mode) .hub-card.peach {
   background: linear-gradient(135deg, #FFF9F5 0%, #FFF0E5 100%);
@@ -133,6 +138,10 @@ body:not(.dark-mode) .hub-card.cream {
 
 body:not(.dark-mode) .hub-card.green {
   background: linear-gradient(135deg, #F9FAF2 0%, #F1F4E4 100%);
+}
+
+body:not(.dark-mode) .hub-card.purple {
+  background: linear-gradient(135deg, #F9F5FF 0%, #F3E8FF 100%);
 }
 
 .hub-card:hover {

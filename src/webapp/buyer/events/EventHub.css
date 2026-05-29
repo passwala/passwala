@@ -1,0 +1,231 @@
+.event-hub-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg-main);
+  padding-bottom: 80px;
+}
+
+.eh-header {
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: white;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.eh-back-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+}
+
+.eh-header h2 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--secondary);
+  margin: 0;
+}
+
+.eh-search-container {
+  padding: 0 1.5rem 1rem 1.5rem;
+  background: white;
+}
+
+.eh-search-bar {
+  display: flex;
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 0.8rem 1rem;
+  gap: 0.8rem;
+}
+
+.eh-search-bar input {
+  border: none;
+  background: transparent;
+  width: 100%;
+  outline: none;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.eh-categories-scroll {
+  display: flex;
+  overflow-x: auto;
+  gap: 0.8rem;
+  padding: 1rem 1.5rem;
+  background: white;
+  border-bottom: 1px solid var(--border-light);
+  scrollbar-width: none; /* Firefox */
+}
+.eh-categories-scroll::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.eh-category-chip {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  padding: 0.5rem 1.2rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.eh-category-chip.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.eh-events-list {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.eh-event-card {
+  background: white;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: transform 0.2s;
+  border: 1px solid var(--border-light);
+}
+
+.eh-event-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+
+.eh-event-banner-container {
+  position: relative;
+  height: 180px;
+  width: 100%;
+}
+
+.eh-event-banner {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.eh-category-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  backdrop-filter: blur(4px);
+}
+
+.eh-sold-out-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: #ef4444;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.eh-event-content {
+  padding: 1.2rem;
+}
+
+.eh-event-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--secondary);
+  margin: 0 0 0.8rem 0;
+  line-height: 1.3;
+}
+
+.eh-event-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.2rem;
+}
+
+.eh-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.eh-event-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--border-light);
+}
+
+.eh-price-start {
+  display: flex;
+  flex-direction: column;
+}
+
+.eh-price-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.eh-price-amount {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.eh-book-btn {
+  background: var(--primary-light);
+  color: var(--primary);
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.eh-loading {
+  display: flex;
+  justify-content: center;
+  padding: 3rem 0;
+}
+
+.eh-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+  color: var(--text-secondary);
+}

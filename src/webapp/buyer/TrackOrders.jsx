@@ -941,7 +941,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
           if (item.product_id) {
             const { data: prod } = await supabase.from('products').select('stock_quantity').eq('id', item.product_id).maybeSingle();
             if (prod) {
-              await supabase.from('products').update({ stock_quantity: (prod.stock_quantity || 0) + item.quantity }).eq('id', item.product_id);
+              await supabase.from('products').update({ stock_quantity: (prod.stock_quantity || 0) + (parseInt(item.quantity) || 1) }).eq('id', item.product_id);
             }
           }
         }

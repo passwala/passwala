@@ -34,7 +34,12 @@ const ALLOWED_ADMIN_TABLES = [
   'ai_recommendations',
   'wallet_transactions',
   'reports',
-  'service_areas'
+  'service_areas',
+  'events',
+  'event_bookings',
+  'city_routes',
+  'city_vehicles',
+  'ticket_bookings'
 ];
 
 function base64urlEncode(strOrBuffer) {
