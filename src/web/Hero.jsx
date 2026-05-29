@@ -1,90 +1,88 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Sparkles, ArrowRight, ShieldCheck, TrendingUp } from 'lucide-react';
-import { useSearch } from '../context/SearchContext';
-import { supabase } from '../supabase';
+import React from 'react';
+import { ShoppingBag, Ticket, Car, Navigation, DollarSign, Clock, ShieldCheck, MapPin } from 'lucide-react';
 import './Hero.css';
 
 const Hero = () => {
-  const { updateSearch } = useSearch();
-  const [heroSearch, setHeroSearch] = useState('');
-  const [counts, setCounts] = useState({ users: '5k+', partners: '150+' });
-
-  useEffect(() => {
-    const fetchCounts = async () => {
-      try {
-        if (!supabase) return;
-        const { count: uCount } = await supabase.from('users').select('*', { count: 'exact', head: true });
-        const { count: pCount } = await supabase.from('vendors').select('*', { count: 'exact', head: true });
-        if (uCount) setCounts(prev => ({ ...prev, users: `${uCount}+` }));
-        if (pCount) setCounts(prev => ({ ...prev, partners: `${pCount}+` }));
-      } catch (err) { console.warn(err); }
-    };
-    fetchCounts();
-  }, []);
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    updateSearch(heroSearch);
-    document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const buyerAppUrl = `http://${window.location.hostname}:3001`;
+  const riderAppUrl = `http://${window.location.hostname}:3003`;
 
   return (
     <section className="hero">
-      <div className="container hero-container animate-fade-in">
-        <div className="hero-content">
-          <div className="hero-badge">
-            <Sparkles size={16} />
-            <span>#1 Neighborhood App in Ahmedabad</span>
-          </div>
-          
-          <h1 className="hero-title">
-            Your Neighborhood, <br />
-            <span>Powered by Trust.</span>
-          </h1>
-          
-          <p className="hero-desc">
-            Discover verified services, daily essentials, and exclusive community tenders in Satellite and surrounding areas.
-          </p>
+      <div className="hero-split-container animate-fade-in">
+        
+        {/* Buyer Side */}
+        <div className="hero-half buyer-half">
+          <div className="hero-content">
+            <div className="hero-badge buyer-badge">
+              <ShoppingBag size={16} />
+              <span>For Buyers & Users</span>
+            </div>
+            
+            <h1 className="hero-title">
+              Your City,<br />
+              <span>At Your Fingertips.</span>
+            </h1>
+            
+            <p className="hero-desc">
+              Book City Rides, buy tickets for local events, shop from neighborhood stores, and hire verified experts all from one app.
+            </p>
 
-          <form className="hero-search-box" onSubmit={handleSearch}>
-            <Search size={20} color="var(--text-muted)" />
-            <input 
-              type="text" 
-              placeholder="What are you looking for today?"
-              value={heroSearch}
-              onChange={(e) => setHeroSearch(e.target.value)}
-            />
-            <button type="submit" className="btn btn-primary">
-              Search
+            <div className="feature-grid">
+              <div className="feature-item"><Car size={20}/> <span>City Rides</span></div>
+              <div className="feature-item"><Ticket size={20}/> <span>Event Tickets</span></div>
+              <div className="feature-item"><ShoppingBag size={20}/> <span>Local Shops</span></div>
+              <div className="feature-item"><ShieldCheck size={20}/> <span>Verified Pros</span></div>
+            </div>
+
+            <button 
+              className="btn btn-buyer" 
+              onClick={() => window.open(buyerAppUrl, '_self')}
+            >
+              Open Buyer App
             </button>
-          </form>
-
-          <div className="hero-stats">
-            <div className="stat-item">
-              <span className="stat-num">{counts.users}</span>
-              <span className="stat-label">Happy Neighbors</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-num">{counts.partners}</span>
-              <span className="stat-label">Verified Partners</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-num">24/7</span>
-              <span className="stat-label">Local Support</span>
-            </div>
           </div>
         </div>
 
-        <div className="hero-image">
-          <div className="hero-img-container">
-            <img src="https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=800" alt="Local Community" />
-          </div>
-          {/* Floating tags */}
-          <div style={{ position: 'absolute', top: '20%', right: '-20px', background: 'white', padding: '12px', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ShieldCheck color="#10b981" />
-            <span style={{ fontWeight: 600, fontSize: '14px' }}>Verified Pros</span>
+        {/* Divider */}
+        <div className="hero-divider">
+          <div className="divider-line"></div>
+          <span className="divider-text">OR</span>
+          <div className="divider-line"></div>
+        </div>
+
+        {/* Rider Side */}
+        <div className="hero-half rider-half">
+          <div className="hero-content">
+            <div className="hero-badge rider-badge">
+              <Navigation size={16} />
+              <span>For Riders & Drivers</span>
+            </div>
+            
+            <h1 className="hero-title">
+              Drive, Deliver,<br />
+              <span>Earn on Your Terms.</span>
+            </h1>
+            
+            <p className="hero-desc">
+              Join Passwala's fleet! Drive passengers across Ahmedabad or deliver essential goods. Flexible hours, instant payouts.
+            </p>
+
+            <div className="feature-grid">
+              <div className="feature-item"><DollarSign size={20}/> <span>Great Earnings</span></div>
+              <div className="feature-item"><Clock size={20}/> <span>Flexible Hours</span></div>
+              <div className="feature-item"><MapPin size={20}/> <span>Local Routes</span></div>
+              <div className="feature-item"><Navigation size={20}/> <span>Smart GPS</span></div>
+            </div>
+
+            <button 
+              className="btn btn-rider" 
+              onClick={() => window.open(riderAppUrl, '_self')}
+            >
+              Open Rider App
+            </button>
           </div>
         </div>
+
       </div>
     </section>
   );

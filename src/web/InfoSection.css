@@ -1,0 +1,154 @@
+.info-section {
+  padding: 5rem 0;
+  background: var(--bg-primary);
+}
+
+.info-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 5rem;
+}
+
+.info-block {
+  padding: 3rem;
+  border-radius: 24px;
+  background: var(--bg-secondary);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+}
+
+.buyer-block {
+  border-left: 6px solid var(--primary);
+}
+
+.rider-block {
+  border-left: 6px solid #ff8a3d;
+}
+
+.info-header {
+  text-align: center;
+  margin-bottom: 3.5rem;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.info-header h2 {
+  font-size: 2.25rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+.highlight-buyer {
+  color: var(--primary);
+}
+
+.highlight-rider {
+  color: #ff8a3d;
+}
+
+.info-header p {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  gap: 2rem;
+}
+
+@media (min-width: 768px) {
+  .steps-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.step-card {
+  text-align: center;
+  padding: 2rem;
+  background: var(--bg-primary);
+  border-radius: 16px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+  transition: transform 0.3s ease;
+}
+
+.step-card:hover {
+  transform: translateY(-5px);
+}
+
+.step-icon {
+  width: 70px;
+  height: 70px;
+  margin: 0 auto 1.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.buyer-icon {
+  background: rgba(255, 107, 0, 0.1);
+  color: var(--primary);
+}
+
+.rider-icon {
+  background: rgba(255, 138, 61, 0.1);
+  color: #ff8a3d;
+}
+
+.step-card h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+}
+
+.step-card p {
+  color: var(--text-secondary);
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.trust-banner {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border-radius: 24px;
+  padding: 3rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1.5rem;
+  color: white;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.2);
+}
+
+@media (min-width: 768px) {
+  .trust-banner {
+    flex-direction: row;
+    text-align: left;
+    padding: 3rem 4rem;
+  }
+}
+
+.trust-icon {
+  color: #38bdf8;
+  flex-shrink: 0;
+}
+
+.trust-text h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.trust-text p {
+  color: #cbd5e1;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  margin: 0;
+}

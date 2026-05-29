@@ -2,13 +2,8 @@ import React, { Suspense, useState, useEffect } from 'react'
 import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom'
 import Navbar from './web/Navbar'
 import Hero from './web/Hero'
-import AIRecommendations from './web/AIRecommendations'
-import QuickServices from './web/QuickServices'
-import Services from './web/Services'
-import Essentials from './web/Essentials'
-import NearbyDeals from './web/NearbyDeals'
-import Community from './web/Community'
-import VendorCTA from './web/VendorCTA'
+import InfoSection from './web/InfoSection'
+
 import SplashScreen from './webapp/SplashScreen'
 import Auth from './webapp/Auth'
 import WebappNavbar from './webapp/WebappNavbar'
@@ -553,7 +548,7 @@ const AppContent = ({
                       ) : (
                         <>
                           <Hero />
-                          <VendorCTA onOpenVendor={() => window.open(import.meta.env.VITE_VENDOR_PORTAL_URL || `http://${window.location.hostname}:3002`, '_blank')} />
+                          <InfoSection />
                         </>
                       )}
                     </>
