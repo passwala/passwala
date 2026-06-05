@@ -1005,7 +1005,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
     const tableStartY = G.y + G.rowH * 2 + 3;
     const tableColumns = [
       'Sr', 'HSN', 'Item Description', 'MRP', 'Disc.', 'Qty',
-      'Taxable Val.', 'CGST%', 'CGST₹', 'SGST%', 'SGST₹', 'Total'
+      'Taxable Val.', 'CGST%', 'CGST Rs.', 'SGST%', 'SGST Rs.', 'Total'
     ];
     const tableRows = [];
     let subtotal       = 0;
@@ -1086,15 +1086,15 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
     // ── TAX SUMMARY TABLE (right-aligned block)
     const totalGST = totalCGST + totalSGST;
     const summaryRows = [
-      ['Taxable Amount', `₹${totalTaxable.toFixed(2)}`],
-      [`CGST @ ${CGST_RATE}%`, `₹${totalCGST.toFixed(2)}`],
-      [`SGST @ ${SGST_RATE}%`, `₹${totalSGST.toFixed(2)}`],
+      ['Taxable Amount', `Rs. ${totalTaxable.toFixed(2)}`],
+      [`CGST @ ${CGST_RATE}%`, `Rs. ${totalCGST.toFixed(2)}`],
+      [`SGST @ ${SGST_RATE}%`, `Rs. ${totalSGST.toFixed(2)}`],
     ];
     if (deliveryFee > 0) {
-      summaryRows.push(['Delivery Charges', `₹${deliveryFee.toFixed(2)}`]);
+      summaryRows.push(['Delivery Charges', `Rs. ${deliveryFee.toFixed(2)}`]);
     }
-    summaryRows.push(['Total Tax (GST)', `₹${totalGST.toFixed(2)}`]);
-    summaryRows.push(['GRAND TOTAL', `₹${subtotal.toFixed(2)}`]);
+    summaryRows.push(['Total Tax (GST)', `Rs. ${totalGST.toFixed(2)}`]);
+    summaryRows.push(['GRAND TOTAL', `Rs. ${subtotal.toFixed(2)}`]);
 
     autoTable(doc, {
       startY: finalY,
