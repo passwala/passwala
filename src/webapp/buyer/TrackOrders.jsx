@@ -1579,8 +1579,10 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                     <div style={{ padding: '12px 16px', color: '#64748b' }}>Details not available</div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', background: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
-                    <span style={{ color: '#64748b', fontWeight: 600 }}>Total Paid</span>
-                    <span style={{ color: '#10b981', fontWeight: 800, fontSize: '1.1rem' }}>₹{selectedOrderDetails.total_price || selectedOrderDetails.total_amount}</span>
+                    <span style={{ color: '#64748b', fontWeight: 600 }}>
+                      {selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? 'Total Refunded (Paytm)' : 'Total Paid'}
+                    </span>
+                    <span style={{ color: selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? '#ef4444' : '#10b981', fontWeight: 800, fontSize: '1.1rem' }}>₹{selectedOrderDetails.total_price || selectedOrderDetails.total_amount}</span>
                   </div>
                 </div>
               </div>
@@ -1590,11 +1592,21 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: '#f1f5f9', borderRadius: '12px' }}>
                   <CreditCard size={20} color="#64748b" />
                   <div>
-                    <div style={{ color: '#334155', fontWeight: 600 }}>{selectedOrderDetails.payment_method || 'Paid Online'}</div>
-                    <div style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '2px' }}>Transaction ID: {selectedOrderDetails.id.split('-')[0]}</div>
+                    <div style={{ color: '#334155', fontWeight: 600 }}>
+                      {selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? 'Refunded to Paytm' : (selectedOrderDetails.payment_method || 'Paid Online')}
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '2px' }}>Transaction ID: {selectedOrderDetails.id?.split('-')[0] || ''}</div>
                   </div>
-                  <div style={{ marginLeft: 'auto', background: '#10b981', color: 'white', fontSize: '0.75rem', fontWeight: 700, padding: '4px 8px', borderRadius: '8px' }}>
-                    SUCCESS
+                  <div style={{ 
+                    marginLeft: 'auto', 
+                    background: selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? '#ef4444' : '#10b981', 
+                    color: 'white', 
+                    fontSize: '0.75rem', 
+                    fontWeight: 700, 
+                    padding: '4px 8px', 
+                    borderRadius: '8px' 
+                  }}>
+                    {selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? 'REFUNDED' : 'SUCCESS'}
                   </div>
                 </div>
               </div>

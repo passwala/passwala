@@ -603,8 +603,10 @@ const OrderHistory = () => {
                       <div style={{ padding: '12px 16px', color: 'var(--text-secondary, #64748b)' }}>Details not available</div>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(0,0,0,0.02)', borderTop: '1px solid var(--border-light, #e2e8f0)' }}>
-                      <span style={{ color: 'var(--text-secondary, #64748b)', fontWeight: 600 }}>Total Paid</span>
-                      <span style={{ color: '#10b981', fontWeight: 800, fontSize: '1.1rem' }}>₹{selectedOrderDetails.total_price || selectedOrderDetails.total_amount}</span>
+                      <span style={{ color: 'var(--text-secondary, #64748b)', fontWeight: 600 }}>
+                        {selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? 'Total Refunded (Paytm)' : 'Total Paid'}
+                      </span>
+                      <span style={{ color: selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? '#ef4444' : '#10b981', fontWeight: 800, fontSize: '1.1rem' }}>₹{selectedOrderDetails.total_price || selectedOrderDetails.total_amount}</span>
                     </div>
                   </div>
                 </div>
@@ -614,13 +616,23 @@ const OrderHistory = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: 'var(--border-light, #f1f5f9)', borderRadius: '12px' }}>
                     <CreditCard size={20} color="var(--text-secondary, #64748b)" />
                     <div>
-                      <div style={{ color: 'var(--text-primary, #334155)', fontWeight: 600 }}>{selectedOrderDetails.payment_method || 'Paid Online'}</div>
+                      <div style={{ color: 'var(--text-primary, #334155)', fontWeight: 600 }}>
+                        {selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? 'Refunded to Paytm' : (selectedOrderDetails.payment_method || 'Paid Online')}
+                      </div>
                       <div style={{ color: 'var(--text-secondary, #64748b)', fontSize: '0.85rem', marginTop: '2px' }}>
                         Transaction ID: {selectedOrderDetails.id ? (typeof selectedOrderDetails.id === 'string' ? selectedOrderDetails.id.split('-')[0].toUpperCase() : String(selectedOrderDetails.id)) : ''}
                       </div>
                     </div>
-                    <div style={{ marginLeft: 'auto', background: '#10b981', color: 'white', fontSize: '0.75rem', fontWeight: 700, padding: '4px 8px', borderRadius: '8px' }}>
-                      {selectedOrderDetails.status || 'SUCCESS'}
+                    <div style={{ 
+                      marginLeft: 'auto', 
+                      background: selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? '#ef4444' : '#10b981', 
+                      color: 'white', 
+                      fontSize: '0.75rem', 
+                      fontWeight: 700, 
+                      padding: '4px 8px', 
+                      borderRadius: '8px' 
+                    }}>
+                      {selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? 'REFUNDED' : 'SUCCESS'}
                     </div>
                   </div>
                 </div>
