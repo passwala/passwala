@@ -7,193 +7,272 @@
   overflow: hidden;
 }
 
+/* ── Header ── */
 .cr-header {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   z-index: 1000;
-  padding: 1.5rem;
+  padding: 1.2rem 1.5rem;
   display: flex;
   align-items: center;
   gap: 1rem;
-  background: linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 100%);
-}
-
-.cr-back-btn {
-  background: white;
-  border: none;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
-  color: var(--text-primary);
+  background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 100%);
+  pointer-events: none;
 }
 
 .cr-header h2 {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   font-weight: 800;
   color: var(--secondary);
   text-shadow: 0 2px 10px rgba(255,255,255,0.8);
+  pointer-events: all;
 }
 
+/* ── Map hint ── */
+.cr-map-hint {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1001;
+  background: rgba(0,0,0,0.72);
+  color: white;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+  letter-spacing: 0.2px;
+  pointer-events: none;
+}
+
+/* ── Map Area ── */
 .cr-map-area {
   flex: 1;
   width: 100%;
   position: relative;
   z-index: 1;
+  min-height: 0;
 }
 
+/* Distance badge overlaid on map */
+.cr-distance-badge {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  background: white;
+  border: 1.5px solid var(--primary);
+  color: var(--primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 12px rgba(255,107,0,0.2);
+  pointer-events: none;
+}
+
+/* ── Booking Panel ── */
 .cr-booking-panel {
   background: var(--bg-card);
-  border-top-left-radius: 30px;
-  border-top-right-radius: 30px;
-  padding: 2rem 2rem 4rem 2rem;
-  box-shadow: 0 -10px 30px rgba(0,0,0,0.08);
+  border-top-left-radius: 28px;
+  border-top-right-radius: 28px;
+  padding: 1.5rem 1.5rem 4rem 1.5rem;
+  box-shadow: 0 -10px 30px rgba(0,0,0,0.1);
   position: relative;
   z-index: 10;
-  margin-top: -20px;
+  margin-top: -24px;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  max-height: 65vh;
+  gap: 1.2rem;
+  max-height: 58vh;
   overflow-y: auto;
 }
 
-.cr-booking-panel::-webkit-scrollbar {
-  width: 6px;
-}
-.cr-booking-panel::-webkit-scrollbar-track {
-  background: transparent;
-}
+.cr-booking-panel::-webkit-scrollbar { width: 5px; }
+.cr-booking-panel::-webkit-scrollbar-track { background: transparent; }
 .cr-booking-panel::-webkit-scrollbar-thumb {
   background: var(--border-light);
   border-radius: 10px;
 }
 
-.cr-badge {
-  position: absolute;
-  top: -15px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--primary);
-  color: white;
-  padding: 4px 16px;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  box-shadow: 0 4px 10px rgba(255, 107, 0, 0.3);
-}
-
+/* ── Input Group ── */
 .cr-input-group {
   display: flex;
   flex-direction: column;
-  gap: 0;
   background: var(--bg-surface);
-  border-radius: 20px;
-  padding: 0.5rem;
-  border: 1px solid var(--border-light);
+  border-radius: 18px;
+  padding: 4px 6px;
+  border: 1.5px solid var(--border-light);
 }
 
 .cr-input-field {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  border-radius: 14px;
+  gap: 12px;
+  padding: 12px 10px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.18s;
+  border: 1.5px solid transparent;
+  background: transparent;
+  position: relative;
 }
 
 .cr-input-field:hover {
-  background: white;
+  background: rgba(255,107,0,0.04);
 }
 
 .cr-input-field.active {
   background: white;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--primary-light);
+  border-color: var(--primary);
+  box-shadow: 0 2px 12px rgba(255,107,0,0.1);
 }
 
 .cr-dot {
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
-  border: 2px solid;
-  position: relative;
+  border: 2.5px solid;
+  flex-shrink: 0;
 }
-
-.pickup-dot { border-color: #22c55e; }
-.dropoff-dot { border-color: #ef4444; }
+.pickup-dot  { border-color: #22c55e; background: rgba(34,197,94,0.15); }
+.dropoff-dot { border-color: #ef4444; background: rgba(239,68,68,0.15); }
 
 .cr-route-line {
-  height: 20px;
+  height: 18px;
   border-left: 2px dashed var(--border-light);
-  margin-left: 1.3rem;
+  margin-left: 17px;
 }
 
 .cr-input-content {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  overflow: hidden;
 }
 
 .cr-input-content label {
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
 }
 
 .cr-input-content span {
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cr-input-content span.has-value {
+  font-weight: 700;
   color: var(--text-primary);
 }
 
+/* Clear button inside input field */
+.cr-clear-btn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.cr-clear-btn:hover {
+  background: #fee2e2;
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+/* ── Locate Me Button ── */
+.cr-locate-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,107,0,0.07);
+  border: 1.5px solid var(--primary-light);
+  color: var(--primary);
+  padding: 10px 16px;
+  border-radius: 14px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.cr-locate-btn:hover {
+  background: rgba(255,107,0,0.14);
+}
+.cr-locate-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── Popular Areas ── */
 .cr-popular-areas h4 {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 800;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
   color: var(--text-secondary);
 }
 
 .cr-area-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 0.6rem;
 }
 
 .cr-area-chip {
   background: var(--bg-surface);
-  border: 1px solid var(--glass-border);
-  padding: 0.6rem 1rem;
+  border: 1.5px solid var(--border-light);
+  padding: 6px 12px;
   border-radius: 20px;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--text-primary);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.18s;
 }
-
 .cr-area-chip:hover {
-  background: var(--primary-light);
+  background: rgba(255,107,0,0.08);
   border-color: var(--primary);
   color: var(--primary);
 }
+.cr-area-chip.selected {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
 
+/* ── Search Button ── */
 .cr-search-btn {
   background: linear-gradient(135deg, var(--primary), var(--primary-hover));
   color: white;
   border: none;
-  padding: 1.25rem;
+  padding: 1.1rem;
   border-radius: 16px;
   font-weight: 800;
   font-size: 1rem;
@@ -202,19 +281,17 @@
   justify-content: center;
   gap: 10px;
   cursor: pointer;
-  box-shadow: 0 10px 25px rgba(255, 107, 0, 0.3);
+  box-shadow: 0 8px 20px rgba(255, 107, 0, 0.3);
   transition: all 0.3s;
 }
-
 .cr-search-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
   box-shadow: none;
 }
-
 .cr-search-btn:not(:disabled):hover {
   transform: translateY(-2px);
-  box-shadow: 0 15px 35px rgba(255, 107, 0, 0.4);
+  box-shadow: 0 12px 28px rgba(255, 107, 0, 0.4);
 }
 
 .cr-spinner {
@@ -223,111 +300,97 @@
   border: 3px solid rgba(255,255,255,0.3);
   border-top-color: white;
   border-radius: 50%;
+  animation: spin 0.75s linear infinite;
 }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-/* Premium Admin Routes Styles */
+/* ── Admin Verified Routes ── */
 .admin-routes-container {
-  margin-top: 2.5rem;
+  margin-top: 0.5rem;
 }
-
 .admin-routes-container h4 {
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 800;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1rem;
   color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 8px;
 }
-
 .admin-routes-list {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.9rem;
 }
-
 .admin-route-card {
   background: white;
-  border-radius: 20px;
-  padding: 1.25rem;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+  border-radius: 18px;
+  padding: 1.1rem 1.1rem 1.1rem 1.4rem;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.04);
   border: 1px solid rgba(0,0,0,0.06);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
 }
-
 .admin-route-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 25px rgba(255, 107, 0, 0.15);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(255, 107, 0, 0.14);
   border-color: var(--primary-light);
 }
-
 .admin-route-card::before {
   content: '';
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
+  left: 0; top: 0; bottom: 0;
   width: 5px;
   background: linear-gradient(to bottom, var(--primary), #ff9d5c);
-  border-radius: 20px 0 0 20px;
+  border-radius: 18px 0 0 18px;
 }
-
 .admin-route-info {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding-left: 10px;
+  gap: 6px;
 }
-
 .admin-route-locations {
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 800;
   color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 8px;
 }
-
-.admin-route-arrow {
-  color: var(--text-muted);
-}
-
+.admin-route-arrow { color: var(--text-muted); }
 .admin-route-meta {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 0.85rem;
+  gap: 10px;
+  font-size: 0.82rem;
   font-weight: 700;
-  color: var(--text-secondary);
 }
-
 .admin-route-badge {
   background: var(--bg-surface);
-  padding: 5px 12px;
-  border-radius: 12px;
+  padding: 4px 10px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  color: var(--text-secondary);
 }
-
 .admin-route-book-btn {
   background: linear-gradient(135deg, var(--primary) 0%, #ff5100 100%);
   color: white;
   border: none;
-  padding: 0.85rem 1.4rem;
-  border-radius: 16px;
+  padding: 0.75rem 1.2rem;
+  border-radius: 14px;
   font-weight: 800;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(255, 107, 0, 0.3);
   transition: all 0.2s;
+  white-space: nowrap;
 }
-
 .admin-route-book-btn:hover {
   transform: scale(1.05);
   box-shadow: 0 6px 18px rgba(255, 107, 0, 0.4);

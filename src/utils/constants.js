@@ -1,11 +1,81 @@
 export const DEFAULT_LOCATION = import.meta.env.VITE_DEFAULT_LOCATION || 'India';
 export const DEFAULT_COORDS = { lat: 20.5937, lng: 78.9629 }; // Geographic center of India
 
+// Extended precision map for all major Ahmedabad areas
+// Used to resolve order delivery/service addresses to accurate lat/lng
 export const AHMEDABAD_AREA_COORDS = {
+  // West Ahmedabad
   thaltej: [23.0500, 72.5186],
+  'sg highway': [23.0762, 72.5261],
+  's.g. highway': [23.0762, 72.5261],
+  sghighway: [23.0762, 72.5261],
+  bopal: [23.0333, 72.4667],
+  ghuma: [23.0089, 72.4704],
+  ambli: [23.0414, 72.4924],
+  shela: [22.9961, 72.4711],
   gota: [23.0805, 72.5323],
+  chandkheda: [23.1091, 72.5855],
+  sabarmati: [23.0805, 72.5800],
+  motera: [23.0975, 72.5934],
+  ranip: [23.0841, 72.5577],
+  nava: [23.0612, 72.5500],
+  navarangpura: [23.0365, 72.5611],
+  navrangpura: [23.0365, 72.5611],
   satellite: [23.0293, 72.5137],
+  prahlad: [23.0120, 72.5108],
+  prahladnagar: [23.0120, 72.5108],
+  bodakdev: [23.0453, 72.5063],
+  vastrapur: [23.0350, 72.5293],
+  vejalpur: [23.0026, 72.5299],
+  jodhpur: [23.0105, 72.5222],
+  jodhpurgaon: [23.0105, 72.5222],
+  memnagar: [23.0590, 72.5421],
+  gurukul: [23.0498, 72.5345],
+  drive: [23.0295, 72.5178],
+  drivein: [23.0295, 72.5178],
+  // East Ahmedabad
+  maninagar: [22.9996, 72.6033],
+  vatva: [22.9614, 72.6278],
+  naroda: [23.0694, 72.6560],
+  odhav: [23.0402, 72.6380],
+  vastral: [23.0219, 72.6636],
+  isanpur: [22.9742, 72.6210],
+  vinzol: [22.9617, 72.6456],
+  hathijan: [22.9476, 72.6391],
+  // Central Ahmedabad
+  cg: [23.0375, 72.5567],
+  'cg road': [23.0375, 72.5567],
+  cgroad: [23.0375, 72.5567],
   paldi: [23.0113, 72.5634],
+  naranpura: [23.0582, 72.5612],
+  shahibaug: [23.0636, 72.5883],
+  dariapur: [23.0333, 72.5848],
+  asarwa: [23.0451, 72.6028],
+  gomtipur: [23.0228, 72.6302],
+  khanpur: [23.0212, 72.5808],
+  relief: [23.0258, 72.5767],
+  lal: [23.0220, 72.5820],
+  laldarwaja: [23.0220, 72.5820],
+  gandhinagar: [23.2156, 72.6369],
+  // South Ahmedabad
+  crossings: [22.9924, 72.5019],
+  sarkhej: [22.9918, 72.5019],
+  manipur: [22.9713, 72.5340],
+  juhapura: [23.0020, 72.5333],
+  rajpur: [23.0042, 72.6005],
+  danilimda: [23.0020, 72.6088],
+  amraiwadi: [23.0145, 72.6284],
+  khadia: [23.0287, 72.5908],
+  'new ranip': [23.0841, 72.5503],
+  // North Ahmedabad
+  kathwada: [23.0794, 72.6559],
+  zundal: [23.1316, 72.5983],
+  tragad: [23.1087, 72.6248],
+  nikol: [23.0502, 72.6481],
+  bapunagar: [23.0516, 72.6218],
+  vastralpur: [23.0350, 72.5293],
+  // Fallback generic
+  ahmedabad: [23.0225, 72.5714],
 };
 
 export const AHMEDABAD_AREAS = [
@@ -18,5 +88,15 @@ export const AHMEDABAD_AREAS = [
   { name: 'SG Highway', lat: 23.0762, lng: 72.5261 },
   { name: 'Navrangpura', lat: 23.0365, lng: 72.5611 },
   { name: 'Maninagar', lat: 22.9996, lng: 72.6033 },
-  { name: 'Prahlad Nagar', lat: 23.0120, lng: 72.5108 }
+  { name: 'Prahlad Nagar', lat: 23.0120, lng: 72.5108 },
+  { name: 'Chandkheda', lat: 23.1091, lng: 72.5855 },
+  { name: 'Naroda', lat: 23.0694, lng: 72.6560 },
+  { name: 'CG Road', lat: 23.0375, lng: 72.5567 },
+  { name: 'Bodakdev', lat: 23.0453, lng: 72.5063 },
+  { name: 'Ambli', lat: 23.0414, lng: 72.4924 },
+  { name: 'Shela', lat: 22.9961, lng: 72.4711 },
+  { name: 'Nikol', lat: 23.0502, lng: 72.6481 },
+  { name: 'Memnagar', lat: 23.0590, lng: 72.5421 },
+  { name: 'Gurukul', lat: 23.0498, lng: 72.5345 },
+  { name: 'Sabarmati', lat: 23.0805, lng: 72.5800 },
 ];

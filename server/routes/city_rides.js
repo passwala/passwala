@@ -226,7 +226,7 @@ router.get('/routes', async (req, res) => {
       .from('city_routes')
       .select('*')
       .eq('is_active', true);
-      
+
     if (routeErr) throw routeErr;
 
     const { data: vehicles, error: vehicleErr } = await supabase
@@ -244,4 +244,81 @@ router.get('/routes', async (req, res) => {
   }
 });
 
+// 5. Get user's ride bookings (for buyer tracking)
+router.get('/my-bookings', async (req, res) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const { data: bookings, error } = await supabase
+      .from('ticket_bookings')
+      .select(`
+        *,
+        city_vehicles (
+          id,
+          driver_id,
+          vehicle_type,
+          license_plate,
+          current_lat,
+          current_lng,
+          last_location_update
+        )
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // For each booking, also fetch rider_locations for real-time driver position
+    const enriched = await Promise.all((bookings || []).map(async (booking) => {
+      let driverLocation = null;
+      const driverId = booking.city_vehicles?.driver_id;
+      if (driverId) {
+        // Try to find rider record linked to this driver user_id
+        const { data: rider } = await supabase
+          .from('riders')
+          .select('id')
+          .eq('user_id', driverId)
+          .maybeSingle();
+
+        if (rider?.id) {
+          const { data: loc } = await supabase
+            .from('rider_locations')
+            .select('lat, lng, updated_at')
+            .eq('rider_id', rider.id)
+            .maybeSingle();
+
+          if (loc) {
+            const lastUpdate = new Date(loc.updated_at).getTime();
+            const now = Date.now();
+            // Only use location if updated within last 5 minutes
+            if (now - lastUpdate < 300000) {
+              driverLocation = { lat: parseFloat(loc.lat), lng: parseFloat(loc.lng) };
+            }
+          }
+        }
+
+        // Fallback: use city_vehicles current_lat/lng
+        if (!driverLocation && booking.city_vehicles?.current_lat && booking.city_vehicles?.current_lng) {
+          driverLocation = {
+            lat: parseFloat(booking.city_vehicles.current_lat),
+            lng: parseFloat(booking.city_vehicles.current_lng)
+          };
+        }
+      }
+
+      return { ...booking, driverLocation };
+    }));
+
+    res.json({ success: true, bookings: enriched });
+  } catch (err) {
+    console.error('Fetch My Bookings Error:', err);
+    res.status(500).json({ error: 'Failed to fetch ride bookings' });
+  }
+});
+
 export default router;
+

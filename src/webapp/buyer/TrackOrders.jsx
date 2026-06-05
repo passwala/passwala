@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Package, Truck, CheckCircle, Clock, MapPin, ChevronRight, MessageCircle, X, Store, CreditCard, Wrench, Download } from 'lucide-react';
+import { Package, Truck, CheckCircle, Clock, MapPin, ChevronRight, MessageCircle, X, Store, CreditCard, Wrench, Download, Bike, Navigation } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import L from 'leaflet';
 import './TrackOrders.css';
@@ -29,19 +29,37 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
   const geocodeAddress = useCallback(async (address) => {
     if (!address) return null;
 
-    // Precision corrections for known areas that geocode poorly
-    const lower = address.toLowerCase();
+    const lower = address.toLowerCase().replace(/[.,]/g, ' ');
+
+    // Step 1: Check all words and multi-word combos against our expanded lookup table
+    const words = lower.split(/\s+/).filter(Boolean);
+    // Check longest matches first (multi-word), then single words
+    for (let len = Math.min(words.length, 4); len >= 1; len--) {
+      for (let i = 0; i <= words.length - len; i++) {
+        const phrase = words.slice(i, i + len).join(' ');
+        if (AHMEDABAD_AREA_COORDS[phrase]) {
+          return AHMEDABAD_AREA_COORDS[phrase];
+        }
+      }
+    }
+    // Also check if any key is contained in the address string
     for (const [area, coords] of Object.entries(AHMEDABAD_AREA_COORDS)) {
       if (lower.includes(area)) return coords;
     }
 
+    // Step 2: Nominatim fallback with proper headers
     try {
       const userCity = userCoords?.city || 'Ahmedabad';
-      const searchString = address.toLowerCase().includes(userCity.toLowerCase()) 
-        ? address 
+      const searchString = lower.includes(userCity.toLowerCase())
+        ? address
         : `${address}, ${userCity}, Gujarat, India`;
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchString)}&limit=1`;
-      const res = await fetch(url, { headers: { 'User-Agent': 'Passwalaa-App' } });
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchString)}&limit=1&countrycodes=in&viewbox=72.40,22.85,72.80,23.25&bounded=1`;
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)',
+          'Accept-Language': 'en',
+        },
+      });
       if (res.ok) {
         const data = await res.json();
         if (data && data.length > 0) {
@@ -51,8 +69,11 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
     } catch (err) {
       console.warn('Geocoding error:', err);
     }
-    return null;
+
+    // Step 3: Default to Ahmedabad center
+    return AHMEDABAD_AREA_COORDS['ahmedabad'];
   }, [userCoords?.city]);
+
 
   const [providerDetails, setProviderDetails] = useState(null);
 
@@ -404,12 +425,166 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
   );
 }
 
+// ── Ride Booking Tracking Map ──────────────────────────────────────────────
+function RideTrackingMap({ booking }) {
+  const mapRef = useRef(null);
+  const leafletMapRef = useRef(null);
+  const layerGroupRef = useRef(null);
+  const [routePoints, setRoutePoints] = useState([]);
+
+  // Init map once
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const center = [parseFloat(booking.pickup_lat) || 23.0225, parseFloat(booking.pickup_lng) || 72.5714];
+    leafletMapRef.current = L.map(mapRef.current, {
+      zoomControl: true,
+      attributionControl: false,
+      scrollWheelZoom: true,
+      dragging: true,
+      touchZoom: true,
+    }).setView(center, 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 })
+      .addTo(leafletMapRef.current);
+
+    layerGroupRef.current = L.featureGroup().addTo(leafletMapRef.current);
+
+    const timer = setTimeout(() => leafletMapRef.current?.invalidateSize(), 300);
+    return () => {
+      clearTimeout(timer);
+      if (leafletMapRef.current) { leafletMapRef.current.remove(); leafletMapRef.current = null; }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fetch OSRM road route between pickup and drop
+  useEffect(() => {
+    const pLat = parseFloat(booking.pickup_lat);
+    const pLng = parseFloat(booking.pickup_lng);
+    const dLat = parseFloat(booking.drop_lat);
+    const dLng = parseFloat(booking.drop_lng);
+    if (!pLat || !dLat) return;
+
+    fetch(`https://router.project-osrm.org/route/v1/driving/${pLng},${pLat};${dLng},${dLat}?overview=full&geometries=geojson`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.code === 'Ok' && data.routes?.[0]) {
+          setRoutePoints(data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]));
+        }
+      })
+      .catch(() => {});
+  }, [booking.pickup_lat, booking.pickup_lng, booking.drop_lat, booking.drop_lng]);
+
+  // Draw markers + route whenever data changes
+  useEffect(() => {
+    if (!leafletMapRef.current || !layerGroupRef.current) return;
+    layerGroupRef.current.clearLayers();
+
+    const mkPickup = L.divIcon({
+      className: '',
+      html: `<div style="width:18px;height:18px;background:#22c55e;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.3)"></div>`,
+      iconSize: [18, 18], iconAnchor: [9, 18]
+    });
+    const mkDrop = L.divIcon({
+      className: '',
+      html: `<div style="width:18px;height:18px;background:#ef4444;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.3)"></div>`,
+      iconSize: [18, 18], iconAnchor: [9, 18]
+    });
+    const mkDriver = L.divIcon({
+      className: '',
+      html: `<div style="width:42px;height:42px;background:#f97316;border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(249,115,22,.4)"><svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><circle cx='5.5' cy='17.5' r='3.5'/><circle cx='18.5' cy='17.5' r='3.5'/><path d='M15 6H9l-3 6h12l-3-6z'/><path d='M9 6V4'/></svg></div>`,
+      iconSize: [42, 42], iconAnchor: [21, 42]
+    });
+
+    const pLat = parseFloat(booking.pickup_lat);
+    const pLng = parseFloat(booking.pickup_lng);
+    const dLat = parseFloat(booking.drop_lat);
+    const dLng = parseFloat(booking.drop_lng);
+
+    if (pLat && pLng) L.marker([pLat, pLng], { icon: mkPickup })
+      .bindPopup(`<b>🟢 Pickup</b><br/>${booking.pickup_area}`).addTo(layerGroupRef.current);
+    if (dLat && dLng) L.marker([dLat, dLng], { icon: mkDrop })
+      .bindPopup(`<b>🔴 Drop-off</b><br/>${booking.drop_area}`).addTo(layerGroupRef.current);
+
+    // Driver location
+    if (booking.driverLocation?.lat && booking.driverLocation?.lng) {
+      L.marker([booking.driverLocation.lat, booking.driverLocation.lng], { icon: mkDriver })
+        .bindPopup('<b>🚌 Your Vehicle</b>').addTo(layerGroupRef.current);
+    }
+
+    // Route polyline
+    if (routePoints.length > 1) {
+      L.polyline(routePoints, { color: '#f97316', weight: 5, opacity: 0.85 }).addTo(layerGroupRef.current);
+    } else if (pLat && dLat) {
+      L.polyline([[pLat, pLng], [dLat, dLng]], { color: '#f97316', weight: 4, opacity: 0.6, dashArray: '8 6' }).addTo(layerGroupRef.current);
+    }
+
+    // Fit bounds
+    try {
+      setTimeout(() => {
+        if (!leafletMapRef.current) return;
+        leafletMapRef.current.invalidateSize();
+        const pts = [[pLat, pLng], [dLat, dLng]];
+        if (booking.driverLocation?.lat) pts.push([booking.driverLocation.lat, booking.driverLocation.lng]);
+        leafletMapRef.current.fitBounds(L.latLngBounds(pts), { padding: [40, 40], maxZoom: 15 });
+      }, 200);
+    } catch(e) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [booking.driverLocation, routePoints]);
+
+  return <div ref={mapRef} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 1 }} />;
+}
+
 const TrackOrders = ({ onBack, user, userCoords }) => {
   const [activeOrders, setActiveOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
   const [cancelPromptId, setCancelPromptId] = useState(null);
+  const [rideBookings, setRideBookings] = useState([]);
+  const [rideLoading, setRideLoading] = useState(true);
   const { addNotification } = useNotifications();
+
+  // ── Fetch city ride bookings ────────────────────────────────────────────
+  const fetchRideBookings = useCallback(async () => {
+    if (!user) return;
+    const uid = user.id || user.uid;
+    if (!uid) return;
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${baseUrl}/api/city-rides/my-bookings?userId=${uid}`);
+      const data = await res.json();
+      if (data.success) setRideBookings(data.bookings || []);
+    } catch (e) {
+      console.warn('Ride bookings fetch failed:', e);
+    } finally {
+      setRideLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchRideBookings();
+    const interval = setInterval(fetchRideBookings, 15000); // Poll every 15s
+
+    // Real-time ride booking updates
+    const uid = user?.id || user?.uid;
+    const rideSub = uid ? supabase
+      .channel('ride_booking_updates')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'ticket_bookings' }, (payload) => {
+        setRideBookings(prev => prev.map(b =>
+          b.id === payload.new.id ? { ...b, ...payload.new } : b
+        ));
+        const shortId = payload.new.id.substring(0, 6).toUpperCase();
+        toast.success(`Ride #${shortId} status: ${payload.new.status}`, { icon: '🚌' });
+        addNotification({ text: `Ride Booking #${shortId} is now ${payload.new.status}`, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+      })
+      .subscribe() : null;
+
+    return () => {
+      clearInterval(interval);
+      if (rideSub) supabase.removeChannel(rideSub);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   useEffect(() => {
     fetchOrders();
@@ -969,7 +1144,9 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
       <div className="track-head-row">
          <div className="live-status">
            <div className="live-pulse"></div> 
-           <span>{activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED', 'PENDING'].includes(o.status)).length} ACTIVE ORDERS</span>
+           <span>
+             {activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED', 'PENDING'].includes(o.status)).length + rideBookings.filter(b => b.status === 'CONFIRMED').length} ACTIVE ORDERS
+           </span>
          </div>
       </div>
 
@@ -1080,11 +1257,109 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
             </motion.div>
           );
         })}
-        {!loading && activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED', 'PENDING'].includes(o.status)).length === 0 && (
+        {!loading && activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED', 'PENDING'].includes(o.status)).length === 0 && rideBookings.filter(b => b.status === 'CONFIRMED').length === 0 && (
           <div className="empty-orders-placeholder-card" style={{ border: 'none', background: 'transparent', boxShadow: 'none' }}>
             <div className="placeholder-icon" style={{ background: '#f1f5f9', color: '#94a3b8' }}>📦</div>
             <h3 style={{ color: '#64748b' }}>No Active Orders</h3>
             <p style={{ color: '#94a3b8' }}>You don't have any ongoing deliveries at the moment.</p>
+          </div>
+        )}
+
+        {/* ── CITY RIDE BOOKINGS SECTION ── */}
+        {rideBookings.filter(b => b.status === 'CONFIRMED').length > 0 && (
+          <div style={{ marginTop: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', padding: '0 4px' }}>
+              <div style={{ width: 28, height: 28, background: 'linear-gradient(135deg,#f97316,#ea580c)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Bike size={16} color="white" />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>Active Ride Bookings</h3>
+              <span style={{ marginLeft: 'auto', background: '#fff7ed', color: '#f97316', fontSize: '0.72rem', fontWeight: 800, padding: '3px 10px', borderRadius: 20, border: '1px solid #fed7aa' }}>
+                {rideBookings.filter(b => b.status === 'CONFIRMED').length} CONFIRMED
+              </span>
+            </div>
+            {rideBookings.filter(b => b.status === 'CONFIRMED').map((booking, i) => (
+              <motion.div
+                key={booking.id}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.08 }}
+                className="tracking-card glass"
+                style={{ marginBottom: '1.25rem', border: '1.5px solid #fed7aa', boxShadow: '0 8px 24px rgba(249,115,22,0.10)' }}
+              >
+                {/* Card header */}
+                <div className="card-top">
+                  <div className="shop-info">
+                    <div className="shop-logo-box" style={{ background: 'linear-gradient(135deg,#fff7ed,#ffedd5)', color: '#f97316' }}>
+                      <Bike size={20} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontWeight: 800 }}>{booking.city_vehicles?.vehicle_type || 'City Ride'}</h4>
+                      <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                        {booking.seat_count} seat{booking.seat_count > 1 ? 's' : ''} • ₹{booking.total_price}
+                      </p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                        <MapPin size={12} color="#f97316" />
+                        <span>{booking.pickup_area} → {booking.drop_area}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="order-id-v2" style={{ background: '#fff7ed', color: '#f97316' }}>#{booking.id.slice(0, 8)}</div>
+                </div>
+
+                {/* Vehicle plate + license */}
+                {booking.city_vehicles?.license_plate && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: '#f8fafc', borderRadius: 12, margin: '0 0 12px' }}>
+                    <Navigation size={14} color="#f97316" />
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Vehicle: {booking.city_vehicles.license_plate}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: '0.75rem', background: booking.driverLocation ? '#dcfce7' : '#f1f5f9', color: booking.driverLocation ? '#16a34a' : '#94a3b8', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}>
+                      {booking.driverLocation ? '🟢 Driver Live' : '⚪ Awaiting driver'}
+                    </span>
+                  </div>
+                )}
+
+                {/* Live map */}
+                <div style={{ height: 220, borderRadius: 18, overflow: 'hidden', position: 'relative', border: '1px solid rgba(0,0,0,0.06)', marginBottom: 12 }}>
+                  <div style={{ position: 'relative', width: '100%', height: '100%', isolation: 'isolate' }}>
+                    <RideTrackingMap booking={booking} />
+                  </div>
+                  <div style={{ position: 'absolute', top: 10, right: 10, background: 'white', padding: '6px 12px', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: 6, zIndex: 10 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: booking.driverLocation ? '#22c55e' : '#f97316', animation: 'pulse 2s infinite' }} />
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700 }}>
+                      {booking.driverLocation ? 'Driver En Route' : 'Preparing Ride'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* ETA + actions */}
+                <div className="tracking-meta-v4">
+                  <div className="eta-main">
+                    <div className="eta-timer">
+                      <Clock size={18} className="pulse-text" />
+                      <span>Ride <strong>Confirmed</strong> — Board at pickup point</span>
+                    </div>
+                    <p className="eta-status">Show QR code to driver. Seat{booking.seat_count > 1 ? 's' : ''} reserved.</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      className="rider-contact-btn"
+                      style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', padding: '0 14px' }}
+                      onClick={() => {
+                        const baseUrl = import.meta.env.VITE_API_URL || '';
+                        fetch(`${baseUrl}/api/city-rides/cancel`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ bookingId: booking.id, userId: user?.id || user?.uid })
+                        }).then(() => { fetchRideBookings(); toast.success('Ride booking cancelled'); }).catch(() => toast.error('Cancel failed'));
+                      }}
+                    >Cancel</button>
+                    <button
+                      className="rider-contact-btn"
+                      onClick={() => toast(`QR: ${booking.qr_code_hash}`, { icon: '🎟️', duration: 5000 })}
+                    >🎟️ Show QR</button>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
           </div>
         )}
       </div>
