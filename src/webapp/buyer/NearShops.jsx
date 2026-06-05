@@ -139,7 +139,8 @@ const NearShops = ({ location, userCoords }) => {
                    name: p.name,
                    detail: p.description,
                    price: p.price,
-                   image: getCleanProductImage(p.image_url || p.image)
+                   image: getCleanProductImage(p.image_url || p.image),
+                   stock: p.stock_quantity // Map stock here
                 })));
             } else {
                 setShopCatalog([]);
@@ -160,7 +161,8 @@ const NearShops = ({ location, userCoords }) => {
       image: product.image,
       type: selectedShop.type === 'SERVICES' ? 'service' : 'product',
       store: selectedShop.name,
-      shop_id: selectedShop.id
+      shop_id: selectedShop.id,
+      stock: product.stock // Pass stock property
     });
     toast.success(`${product.name} added to cart`);
   };
@@ -599,27 +601,28 @@ const NearShops = ({ location, userCoords }) => {
                                      </button>
                                   </div>
                                 ) : (
-                                  <button 
-                                    onClick={(e) => handleAddToCart(e, product)} 
-                                    style={{ 
-                                      background: 'var(--primary)', 
-                                      color: 'white', 
-                                      border: 'none', 
-                                      padding: '6px 14px', 
-                                      borderRadius: '10px', 
-                                      display: 'flex', 
-                                      alignItems: 'center', 
-                                      gap: '6px',
-                                      cursor: 'pointer',
-                                      fontWeight: 700,
-                                      fontSize: '0.8rem',
-                                      transition: 'transform 0.2s active'
-                                    }}
-                                    onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'}
-                                    onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                                  >
-                                    <Plus size={16} /> ADD
-                                  </button>
+                                   <button 
+                                     disabled={selectedShop.type !== 'SERVICES' && product.stock <= 0}
+                                     onClick={(e) => handleAddToCart(e, product)} 
+                                     style={{ 
+                                       background: (selectedShop.type !== 'SERVICES' && product.stock <= 0) ? '#cbd5e1' : 'var(--primary)', 
+                                       color: 'white', 
+                                       border: 'none', 
+                                       padding: '6px 14px', 
+                                       borderRadius: '10px', 
+                                       display: 'flex', 
+                                       alignItems: 'center', 
+                                       gap: '6px',
+                                       cursor: (selectedShop.type !== 'SERVICES' && product.stock <= 0) ? 'not-allowed' : 'pointer',
+                                       fontWeight: 700,
+                                       fontSize: '0.8rem',
+                                       transition: 'transform 0.2s active'
+                                     }}
+                                     onMouseDown={(e) => { if (!(selectedShop.type !== 'SERVICES' && product.stock <= 0)) e.currentTarget.style.transform = 'scale(0.95)'; }}
+                                     onMouseUp={(e) => { if (!(selectedShop.type !== 'SERVICES' && product.stock <= 0)) e.currentTarget.style.transform = 'scale(1)'; }}
+                                   >
+                                     {selectedShop.type !== 'SERVICES' && product.stock <= 0 ? 'Out of Stock' : <><Plus size={16} /> ADD</>}
+                                   </button>
                                 );
                               })()}
                           </div>

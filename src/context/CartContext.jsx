@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../supabase';
+import { toast } from 'react-hot-toast';
 
 const isValidUUID = (str) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
@@ -125,8 +126,18 @@ export const CartProvider = ({ children, user }) => {
   }, [cartItems, user, isLoaded]);
 
   const addToCart = (item) => {
+    let stockLimitMet = false;
     setCartItems(prev => {
       const existing = prev.find(i => i.id === item.id && i.type === item.type);
+      const currentQty = existing ? existing.qty : 0;
+      
+      if (item.type !== 'service' && item.stock !== undefined && item.stock !== null) {
+        if (currentQty >= item.stock) {
+          stockLimitMet = true;
+          return prev;
+        }
+      }
+      
       if (existing) {
         return prev.map(i =>
           i.id === item.id && i.type === item.type
@@ -136,6 +147,11 @@ export const CartProvider = ({ children, user }) => {
       }
       return [...prev, { ...item, qty: 1 }];
     });
+    
+    if (stockLimitMet) {
+      toast.error(`Out of stock: Only ${item.stock} units are available.`);
+      return;
+    }
     setCartOpen(true);
   };
 
@@ -144,11 +160,26 @@ export const CartProvider = ({ children, user }) => {
   };
 
   const updateQty = (id, type, delta) => {
-    setCartItems(prev =>
-      prev
+    let stockLimitMet = false;
+    let limitValue = 0;
+    
+    setCartItems(prev => {
+      const item = prev.find(i => i.id === id && i.type === type);
+      if (item && type !== 'service' && item.stock !== undefined && item.stock !== null && delta > 0) {
+        if (item.qty >= item.stock) {
+          stockLimitMet = true;
+          limitValue = item.stock;
+          return prev;
+        }
+      }
+      return prev
         .map(i => i.id === id && i.type === type ? { ...i, qty: i.qty + delta } : i)
-        .filter(i => i.qty > 0)
-    );
+        .filter(i => i.qty > 0);
+    });
+
+    if (stockLimitMet) {
+      toast.error(`Out of stock: Only ${limitValue} units are available.`);
+    }
   };
 
   const clearCart = () => setCartItems([]);
