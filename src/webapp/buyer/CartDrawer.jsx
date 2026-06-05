@@ -979,6 +979,21 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
               </div>
             )}
 
+            <div className="price-breakdown-v3" style={{ borderTop: '1px dashed #e2e8f0', borderBottom: '1px dashed #e2e8f0', padding: '12px 0', margin: '12px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748b' }}>
+                <span>Item Subtotal</span>
+                <span>₹{totalPrice.toFixed(2)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748b' }}>
+                <span>Delivery Partner Fee</span>
+                <span style={{ color: '#10b981', fontWeight: 600 }}>FREE</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#94a3b8' }}>
+                <span>Taxes & Charges (CGST 2.5% + SGST 2.5% incl.)</span>
+                <span>₹{(totalPrice - (totalPrice / 1.05)).toFixed(2)}</span>
+              </div>
+            </div>
+
             <div className="cart-total">
               <div className="total-label">
                 <span>{t('total')} ({totalItems} items)</span>
