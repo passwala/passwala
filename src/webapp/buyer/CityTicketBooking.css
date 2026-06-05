@@ -51,7 +51,7 @@
   background: var(--bg-card);
   border-top-left-radius: 30px;
   border-top-right-radius: 30px;
-  padding: 2rem;
+  padding: 2rem 2rem 4rem 2rem;
   box-shadow: 0 -10px 30px rgba(0,0,0,0.08);
   position: relative;
   z-index: 10;
@@ -59,6 +59,19 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  max-height: 65vh;
+  overflow-y: auto;
+}
+
+.cr-booking-panel::-webkit-scrollbar {
+  width: 6px;
+}
+.cr-booking-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+.cr-booking-panel::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 10px;
 }
 
 .cr-badge {
@@ -210,4 +223,112 @@
   border: 3px solid rgba(255,255,255,0.3);
   border-top-color: white;
   border-radius: 50%;
+}
+
+/* Premium Admin Routes Styles */
+.admin-routes-container {
+  margin-top: 2.5rem;
+}
+
+.admin-routes-container h4 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  margin-bottom: 1.25rem;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-routes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.admin-route-card {
+  background: white;
+  border-radius: 20px;
+  padding: 1.25rem;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+  border: 1px solid rgba(0,0,0,0.06);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-route-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 25px rgba(255, 107, 0, 0.15);
+  border-color: var(--primary-light);
+}
+
+.admin-route-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: linear-gradient(to bottom, var(--primary), #ff9d5c);
+  border-radius: 20px 0 0 20px;
+}
+
+.admin-route-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 10px;
+}
+
+.admin-route-locations {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-route-arrow {
+  color: var(--text-muted);
+}
+
+.admin-route-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.admin-route-badge {
+  background: var(--bg-surface);
+  padding: 5px 12px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-route-book-btn {
+  background: linear-gradient(135deg, var(--primary) 0%, #ff5100 100%);
+  color: white;
+  border: none;
+  padding: 0.85rem 1.4rem;
+  border-radius: 16px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(255, 107, 0, 0.3);
+  transition: all 0.2s;
+}
+
+.admin-route-book-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 18px rgba(255, 107, 0, 0.4);
 }

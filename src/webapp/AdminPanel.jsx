@@ -142,7 +142,8 @@ const TABLE_SCHEMAS = {
   service_areas: { city: 'Ahmedabad', area_name: '', is_active: true },
   stores: { vendor_id: '', name: '', description: '', address: '', is_open: true, rating: 0 },
   service_categories: { name: '', icon_url: '' },
-  events: { title: '', category: '', venue_name: '', event_date: '', status: 'UPCOMING', banner_url: '' },
+  orders: { user_id: '', store_id: '', address_id: '', status: 'PENDING', subtotal: 0, delivery_fee: 0, total_amount: 0, payment_status: 'PENDING' },
+  events: { title: '', category: '', venue_name: '', venue_lat: 23.0225, venue_lng: 72.5714, event_date: '', status: 'UPCOMING', banner_url: '', starting_price: 0 },
   event_bookings: { user_id: '', event_id: '', tier_id: '', ticket_count: 0, total_amount: 0, status: 'CONFIRMED' },
   city_routes: { start_area: '', end_area: '', distance_km: 0, base_price: 0, is_active: true },
   city_vehicles: { driver_id: '', vehicle_type: '', license_plate: '', total_seats: 0, available_seats: 0, is_active: true },
@@ -163,7 +164,8 @@ const DATABASE_SCHEMAS = {
   service_areas: ['city', 'area_name', 'is_active'],
   admins: ['username', 'role'],
   stores: ['vendor_id', 'name', 'description', 'logo_url', 'banner_url', 'address', 'lat', 'lng', 'is_open', 'rating'],
-  events: ['title', 'category', 'venue_name', 'event_date', 'status', 'banner_url'],
+  orders: ['user_id', 'store_id', 'address_id', 'status', 'subtotal', 'delivery_fee', 'total_amount', 'payment_status'],
+  events: ['title', 'category', 'venue_name', 'venue_lat', 'venue_lng', 'event_date', 'status', 'banner_url', 'starting_price'],
   event_bookings: ['user_id', 'event_id', 'tier_id', 'ticket_count', 'total_amount', 'status'],
   city_routes: ['start_area', 'end_area', 'distance_km', 'base_price', 'is_active'],
   city_vehicles: ['driver_id', 'vehicle_type', 'license_plate', 'total_seats', 'available_seats', 'is_active'],
@@ -194,6 +196,7 @@ const tabSections = [
     items: [
       { id: 'stores', label: 'Stores', icon: ShoppingBag, table: 'stores' },
       { id: 'products', label: 'Products', icon: Package, table: 'products' },
+      { id: 'orders', label: 'Product Orders', icon: ShoppingBag, table: 'orders' },
       { id: 'payments', label: 'Payments', icon: CreditCard, table: 'service_bookings' },
       { id: 'deals', label: 'Deals & Offers', icon: Tag, table: 'deals' },
     ]
@@ -631,8 +634,8 @@ const AdminPanel = ({ onLogout, location }) => {
       console.error('Fetch Error:', err);
 
       // Check for missing table error
-      if (err.message && err.message.includes('Could not find the table')) {
-        toast.error(`Table '${currentTable}' is missing in Supabase!`, { duration: 6000 });
+      if (err.message && (err.message.includes('Could not find the table') || err.message.includes('does not exist'))) {
+        toast.error(`Table '${currentTable}' is missing in Supabase!`, { duration: 6000, id: 'missing-table-toast' });
         setSyncStatus('missing_table');
       } else {
         setSyncStatus('offline');
@@ -643,6 +646,7 @@ const AdminPanel = ({ onLogout, location }) => {
       if (cached) {
         setData(JSON.parse(cached));
         toast('Showing local cache (Offline)', {
+          id: 'offline-toast',
           icon: '📦',
           duration: 4000,
           action: {
@@ -1849,8 +1853,8 @@ CREATE TABLE IF NOT EXISTS service_areas (
                         </select>
                       ) : (
                         <input
-                          type={['scheduled_at', 'valid_until'].includes(key) ? 'datetime-local' : (typeof formData[key] === 'number' ? 'number' : 'text')}
-                          value={['scheduled_at', 'valid_until'].includes(key) ? formatDateForInput(formData[key]) : (formData[key] || '')}
+                          type={['scheduled_at', 'valid_until', 'event_date'].includes(key) ? 'datetime-local' : (typeof (TABLE_SCHEMAS[currentTab.table]?.[key]) === 'number' ? 'number' : 'text')}
+                          value={['scheduled_at', 'valid_until', 'event_date'].includes(key) ? formatDateForInput(formData[key]) : (formData[key] !== undefined && formData[key] !== null ? formData[key] : '')}
                           maxLength={key === 'phone' ? 10 : (key === 'aadhar_no' ? 14 : (key === 'license_no' ? 14 : (key === 'id_proof' ? (formData[key] && /^\d+$/.test(formData[key].replace(/[^A-Z0-9]/g, '')) ? 14 : 10) : undefined)))}
                           onChange={(e) => {
                             let val = e.target.value;
@@ -1880,6 +1884,12 @@ CREATE TABLE IF NOT EXISTS service_areas (
                                 val = val.slice(0, 10);
                               }
                             }
+                            
+                            // Strictly parse as number if the schema demands a number, to prevent backend NOT NULL or type errors
+                            if (typeof (TABLE_SCHEMAS[currentTab.table]?.[key]) === 'number') {
+                              val = val === '' ? 0 : Number(val);
+                            }
+                            
                             setFormData({ ...formData, [key]: val });
                           }}
                         />

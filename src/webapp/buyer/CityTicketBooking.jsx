@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import L from 'leaflet';
-import { ArrowLeft, MapPin, Search, Navigation } from 'lucide-react';
+import { ArrowLeft, MapPin, Search, Navigation, ArrowRight, Map } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import './CityTicketBooking.css';
 
@@ -63,6 +63,52 @@ const CityTicketBooking = ({ onBack, user }) => {
     } else {
       setDropoff(loc);
     }
+  };
+
+  const [dbRoutes, setDbRoutes] = useState([]);
+  const [dbVehicles, setDbVehicles] = useState([]);
+
+  useEffect(() => {
+    const fetchDbRoutes = async () => {
+      try {
+        const baseUrl = import.meta.env.VITE_API_URL || '';
+        const res = await fetch(`${baseUrl}/api/city-rides/routes`);
+        const data = await res.json();
+        if (data.success) {
+          setDbRoutes(data.routes || []);
+          setDbVehicles(data.vehicles || []);
+        }
+      } catch(e) {
+        console.error(e);
+      }
+    };
+    fetchDbRoutes();
+  }, []);
+
+  const handleBookAdminRoute = (route) => {
+    if (dbVehicles.length === 0) {
+      toast.error('No vehicles currently available.');
+      return;
+    }
+    
+    // Create mock pickup/dropoff for DB routes to satisfy backend geo-checks
+    const mockPickup = { name: route.start_area, lat: 23.0225, lng: 72.5714 };
+    const mockDropoff = { name: route.end_area, lat: 23.0300, lng: 72.5800 };
+    
+    const rideData = {
+      vehicles: dbVehicles,
+      distanceKm: route.distance_km,
+      estimatedPrice: route.base_price
+    };
+    
+    navigate('/ride-checkout', { 
+      state: { 
+        pickup: mockPickup, 
+        dropoff: mockDropoff, 
+        rideData,
+        user
+      } 
+    });
   };
 
   useEffect(() => {
@@ -205,6 +251,39 @@ const CityTicketBooking = ({ onBack, user }) => {
             <>Search Available Rides <Search size={18} /></>
           )}
         </button>
+        
+        <div className="admin-routes-container">
+          <h4><Map size={18} color="var(--primary)" /> Premium Verified Routes</h4>
+          {dbRoutes.length === 0 ? (
+            <p style={{fontSize:'0.85rem', color:'var(--text-muted)', textAlign: 'center', padding: '2rem'}}>No active verified routes found.</p>
+          ) : (
+            <div className="admin-routes-list">
+              {dbRoutes.map((route) => (
+                <div key={route.id} className="admin-route-card">
+                   <div className="admin-route-info">
+                     <div className="admin-route-locations">
+                       {route.start_area} <ArrowRight size={14} className="admin-route-arrow" /> {route.end_area}
+                     </div>
+                     <div className="admin-route-meta">
+                       <span className="admin-route-badge">
+                         <Navigation size={12} color="var(--primary)"/> {route.distance_km} km
+                       </span>
+                       <span className="admin-route-badge" style={{color: '#22c55e', background: 'rgba(34,197,94,0.1)'}}>
+                         ₹{route.base_price}
+                       </span>
+                     </div>
+                   </div>
+                   <button 
+                     className="admin-route-book-btn"
+                     onClick={() => handleBookAdminRoute(route)}
+                   >
+                     Book Now
+                   </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

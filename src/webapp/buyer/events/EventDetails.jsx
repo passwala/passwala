@@ -47,8 +47,9 @@ const EventDetails = ({ user }) => {
       const days = Math.floor(distance / (1000 * 60 * 60 * 24));
       const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
       
-      setTimeLeft(`${days}d ${hours}h ${minutes}m`);
+      setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s`);
     }, 1000);
 
     return () => clearInterval(interval);
@@ -90,7 +91,16 @@ const EventDetails = ({ user }) => {
             <Calendar className="text-primary" />
             <div>
               <p className="label">Date & Time</p>
-              <p className="value">{new Date(event.event_date).toLocaleString('en-IN')}</p>
+              <p className="value">
+                {new Date(event.event_date).toLocaleDateString('en-IN', {
+                  weekday: 'short',
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </p>
             </div>
           </div>
           <div className="ed-info-card">

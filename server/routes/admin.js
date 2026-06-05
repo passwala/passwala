@@ -168,6 +168,8 @@ router.get('/fetch', async (req, res) => {
             selectStr = '*, stores(name)';
         } else if (table === 'notifications' || table === 'posts') {
             selectStr = '*, users(phone, full_name)';
+        } else if (table === 'events') {
+            selectStr = '*, event_ticket_tiers(price)';
         }
 
         let query = supabase.from(table).select(selectStr);
@@ -250,6 +252,19 @@ router.get('/fetch', async (req, res) => {
                         console.error('Self-healing failed for booking price', booking.id, healErr);
                     }
                 }
+            }
+        }
+
+        // Map event_ticket_tiers back to starting_price for Admin Panel
+        if (data && table === 'events') {
+            for (let i = 0; i < data.length; i++) {
+                const ev = data[i];
+                if (ev.event_ticket_tiers && ev.event_ticket_tiers.length > 0) {
+                    ev.starting_price = Math.min(...ev.event_ticket_tiers.map(t => t.price));
+                } else {
+                    ev.starting_price = 0;
+                }
+                delete ev.event_ticket_tiers;
             }
         }
 
@@ -585,6 +600,13 @@ router.post('/upsert', async (req, res) => {
             }
         });
 
+        // Intercept starting_price to save to event_ticket_tiers
+        let startingPrice = null;
+        if (table === 'events' && cleanedPayload.starting_price !== undefined) {
+            startingPrice = cleanedPayload.starting_price;
+            delete cleanedPayload.starting_price;
+        }
+
         // 3. Perform the Upsert/Update
         let dbQuery;
         
@@ -607,6 +629,24 @@ router.post('/upsert', async (req, res) => {
         if (error) {
             console.error(`❌ Admin Upsert Error [${table}]:`, error.message);
             return res.status(500).json({ success: false, error: error.message });
+        }
+
+        // Save intercepted starting_price to event_ticket_tiers
+        if (table === 'events' && startingPrice !== null && data && data.id) {
+            const tierPayload = {
+                event_id: data.id,
+                tier_name: 'General Admission',
+                price: parseFloat(startingPrice) || 0,
+                total_seats: 1000,
+                available_seats: 1000
+            };
+            const { data: existingTier } = await supabase.from('event_ticket_tiers').select('id').eq('event_id', data.id).eq('tier_name', 'General Admission').maybeSingle();
+            
+            if (existingTier) {
+                await supabase.from('event_ticket_tiers').update({ price: tierPayload.price }).eq('id', existingTier.id);
+            } else {
+                await supabase.from('event_ticket_tiers').insert([tierPayload]);
+            }
         }
 
         res.status(200).json({ success: true, data });

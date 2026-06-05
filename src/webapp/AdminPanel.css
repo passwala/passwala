@@ -87,6 +87,23 @@
   padding: 1rem 0;
   flex: 1;
   overflow-y: auto;
+  min-height: 0;
+  overflow-x: hidden;
+}
+
+/* Sidebar Scrollbar */
+.sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: #475569;
 }
 
 .nav-section-label {

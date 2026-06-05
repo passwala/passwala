@@ -219,4 +219,29 @@ router.post('/cancel', async (req, res) => {
   }
 });
 
+// 4. Get active routes and vehicles
+router.get('/routes', async (req, res) => {
+  try {
+    const { data: routes, error: routeErr } = await supabase
+      .from('city_routes')
+      .select('*')
+      .eq('is_active', true);
+      
+    if (routeErr) throw routeErr;
+
+    const { data: vehicles, error: vehicleErr } = await supabase
+      .from('city_vehicles')
+      .select('*')
+      .eq('is_active', true)
+      .gt('available_seats', 0);
+
+    if (vehicleErr) throw vehicleErr;
+
+    res.json({ success: true, routes, vehicles });
+  } catch (err) {
+    console.error('Fetch Routes Error:', err);
+    res.status(500).json({ error: 'Failed to fetch routes' });
+  }
+});
+
 export default router;

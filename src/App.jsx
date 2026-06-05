@@ -653,7 +653,7 @@ function App() {
               <CartProvider user={user}>
                 <div className="app-container">
                   <Toaster
-                    position="top-center"
+                    position="bottom-center"
                     toastOptions={{
                       className: 'passwala-toast',
                       duration: 3000,

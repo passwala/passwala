@@ -31,33 +31,32 @@ const Footer = () => {
           <div className="footer-col">
             <h4>Why Passwala</h4>
             <ul className="footer-links-list">
-              <li>Values</li>
-              <li>Safety</li>
-              <li>Deployment</li>
-              <li>Trust & Verification</li>
+              <li><a href="#">Values</a></li>
+              <li><a href="#">Safety</a></li>
+              <li><a href="#">Deployment</a></li>
+              <li><a href="#">Trust & Verification</a></li>
             </ul>
           </div>
 
-          {/* Explore */}
+          {/* Explore Portals */}
           <div className="footer-col">
-            <h4>Explore</h4>
+            <h4>Our Apps</h4>
             <ul className="footer-links-list">
-              <li><Link to="/expert-services">Local Experts</Link></li>
-              <li><Link to="/near-shops">Near Shops</Link></li>
-              <li><Link to="/neighbors">Community</Link></li>
-              <li><Link to="/track-orders">Tenders</Link></li>
+              <li><a href={`http://${window.location.hostname}:3001`}>Buyer App</a></li>
+              <li><a href={`http://${window.location.hostname}:3003`}>Rider App</a></li>
+              <li><a href={`http://${window.location.hostname}:3002`}>Vendor Portal</a></li>
+              <li><a href={`http://${window.location.hostname}:3005`}>Admin Portal</a></li>
             </ul>
           </div>
 
-          {/* Build */}
+          {/* Support */}
           <div className="footer-col">
-            <h4>Partner</h4>
+            <h4>Support</h4>
             <ul className="footer-links-list">
-              <li><Link to="/vendor">Vendor Portal</Link></li>
-              <li><a href={import.meta.env.VITE_ADMIN_PORTAL_URL || `http://${window.location.hostname}:3005`} target="_blank" rel="noopener noreferrer">Admin Portal</a></li>
-              <li>Documentation</li>
-              <li>Pricing</li>
-              <li>Support</li>
+              <li><a href="#">Help Center</a></li>
+              <li><a href="#">Documentation</a></li>
+              <li><a href="#">Pricing</a></li>
+              <li><a href="#">Contact Us</a></li>
             </ul>
           </div>
 

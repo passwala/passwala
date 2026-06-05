@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingBag, Ticket, Car, Navigation, DollarSign, Clock, ShieldCheck, MapPin } from 'lucide-react';
+import { ShoppingBag, Ticket, Car, Navigation, IndianRupee, Clock, ShieldCheck, MapPin } from 'lucide-react';
 import './Hero.css';
 
 const Hero = () => {
@@ -68,7 +68,7 @@ const Hero = () => {
             </p>
 
             <div className="feature-grid">
-              <div className="feature-item"><DollarSign size={20}/> <span>Great Earnings</span></div>
+              <div className="feature-item"><IndianRupee size={20}/> <span>Great Earnings</span></div>
               <div className="feature-item"><Clock size={20}/> <span>Flexible Hours</span></div>
               <div className="feature-item"><MapPin size={20}/> <span>Local Routes</span></div>
               <div className="feature-item"><Navigation size={20}/> <span>Smart GPS</span></div>
