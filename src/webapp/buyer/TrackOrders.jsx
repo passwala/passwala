@@ -855,110 +855,123 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
 
   const handleDownloadInvoice = (order) => {
     const doc = new jsPDF();
-    
-    const storeName = order.stores?.name || order.items?.[0]?.store || 'Passwala Partner';
-    const storeAddress = order.stores?.address || 'Thaltej, Ahmedabad, Gujarat 380054';
-    const customerName = order.addresses?.name || 'Customer';
-    const customerAddress = `${order.addresses?.society || ''}, ${order.addresses?.address_line_1 || ''}`;
-    const orderId = order.id ? String(order.id).substring(0, 8).toUpperCase() : 'N/A';
+
+    // ── Store / Seller info (the actual store the order was placed at)
+    const storeName    = order.stores?.name || order.items?.[0]?.store || 'Passwala Partner Store';
+    const storeAddress = order.stores?.address || 'Ahmedabad, Gujarat';
+    const storePhone   = order.stores?.phone || '';
+
+    // ── Customer info
+    const customerName    = order.addresses?.name || order.addresses?.society || 'Customer';
+    const customerAddress = [
+      order.addresses?.society,
+      order.addresses?.address_line_1,
+      order.addresses?.city || 'Ahmedabad',
+    ].filter(Boolean).join(', ');
+    const customerPincode = order.addresses?.pincode || '380054';
+
+    const orderId     = order.id ? String(order.id).substring(0, 8).toUpperCase() : 'N/A';
     const invoiceDate = new Date(order.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    
+
     // Default styles
     doc.setTextColor(0, 0, 0);
     doc.setDrawColor(150, 150, 150);
     doc.setLineWidth(0.1);
 
-    // Header Logo & Title
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
-    // Planet Softweb logo style (green/black vibe like Blinkit, or their brand color)
-    doc.setTextColor(16, 185, 129); // Emerald green
-    doc.text("Planet Softweb", 14, 20);
-    
+    // ── HEADER: Store name (large) + "Tax Invoice" label
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(15, 23, 42);           // dark slate
+    doc.text(storeName.toUpperCase(), 14, 18);
+
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);        // slate-500
+    doc.text('Powered by Passwala', 14, 24);
+
     doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
     doc.setTextColor(0, 0, 0);
-    doc.text("Tax Invoice", 196, 20, { align: "right" });
-    
-    // --- TOP GRID ---
-    let startY = 25;
+    doc.text('Tax Invoice', 196, 18, { align: 'right' });
+    doc.setDrawColor(200, 200, 200);
+    doc.line(14, 27, 196, 27);             // separator line
+
+    // ── TOP GRID
+    let startY = 30;
     let gridHeight = 60;
-    
-    // Outer Border for Top Grid
+
+    doc.setDrawColor(150, 150, 150);
     doc.rect(14, startY, 182, gridHeight);
-    
-    // Horizontal divider
     doc.line(14, startY + 30, 196, startY + 30);
-    // Vertical divider
     doc.line(125, startY, 125, startY + gridHeight);
 
     // SELLER INFO (Top Left)
     doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    doc.text("Sold By : Seller", 16, startY + 5);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Sold By:', 16, startY + 5);
     doc.text(storeName.toUpperCase(), 16, startY + 9);
-    doc.setFont("helvetica", "normal");
+    doc.setFont('helvetica', 'normal');
     doc.text(storeAddress, 16, startY + 13, { maxWidth: 105 });
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("FSSAI License Number:", 16, startY + 23);
-    doc.setFont("helvetica", "normal");
-    doc.text("10722999000123", 45, startY + 23);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("GSTIN:", 16, startY + 27);
-    doc.setFont("helvetica", "normal");
-    doc.text("24AAACP1234Q1Z5", 28, startY + 27);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("PAN:", 65, startY + 27);
-    doc.setFont("helvetica", "normal");
-    doc.text("AAACP1234Q", 75, startY + 27);
+    if (storePhone) doc.text(`Phone: ${storePhone}`, 16, startY + 20);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('GSTIN:', 16, startY + 24);
+    doc.setFont('helvetica', 'normal');
+    doc.text('N/A', 28, startY + 24);
 
     // INVOICE NUMBER (Top Right)
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    doc.text("Invoice Number:", 127, startY + 15);
-    doc.setFont("helvetica", "normal");
-    doc.text(`${orderId}-INV`, 155, startY + 15);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Invoice Number:', 127, startY + 8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${orderId}-INV`, 155, startY + 8);
 
-    // BUYER INFO (Bottom Left)
+    doc.setFont('helvetica', 'bold');
+    doc.text('Invoice Date:', 127, startY + 14);
+    doc.setFont('helvetica', 'normal');
+    doc.text(invoiceDate, 155, startY + 14);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Place of Supply:', 127, startY + 20);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Gujarat', 155, startY + 20);
+
+    // BUYER INFO (Bottom Left of grid)
     let bottomY = startY + 30;
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    doc.text("Invoice To:", 16, bottomY + 5);
-    doc.setFont("helvetica", "normal");
-    doc.text(customerName, 40, bottomY + 5);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("Address:", 16, bottomY + 9);
-    doc.setFont("helvetica", "normal");
-    doc.text(customerAddress, 40, bottomY + 9, { maxWidth: 80 });
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("Pin code:", 16, bottomY + 20);
-    doc.setFont("helvetica", "normal");
-    doc.text("380054", 40, bottomY + 20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Bill To:', 16, bottomY + 5);
+    doc.setFont('helvetica', 'normal');
+    doc.text(customerName, 35, bottomY + 5);
 
-    doc.setFont("helvetica", "bold");
-    doc.text("State:", 16, bottomY + 24);
-    doc.setFont("helvetica", "normal");
-    doc.text("Gujarat", 40, bottomY + 24);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Address:', 16, bottomY + 10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(customerAddress, 35, bottomY + 10, { maxWidth: 80 });
 
-    // ORDER INFO (Bottom Right)
-    doc.setFont("helvetica", "bold");
-    doc.text("Order Id:", 127, bottomY + 5);
-    doc.setFont("helvetica", "normal");
-    doc.text(orderId, 155, bottomY + 5);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("Invoice Date:", 127, bottomY + 9);
-    doc.setFont("helvetica", "normal");
-    doc.text(invoiceDate, 155, bottomY + 9);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("Place of Supply:", 127, bottomY + 15);
-    doc.setFont("helvetica", "normal");
-    doc.text("Gujarat", 155, bottomY + 15);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Pincode:', 16, bottomY + 22);
+    doc.setFont('helvetica', 'normal');
+    doc.text(customerPincode, 35, bottomY + 22);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('State:', 65, bottomY + 22);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Gujarat', 78, bottomY + 22);
+
+    // ORDER INFO (Bottom Right of grid)
+    doc.setFont('helvetica', 'bold');
+    doc.text('Order Id:', 127, bottomY + 5);
+    doc.setFont('helvetica', 'normal');
+    doc.text(orderId, 150, bottomY + 5);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Payment:', 127, bottomY + 12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(order.payment_method || 'Paid Online', 150, bottomY + 12);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Status:', 127, bottomY + 19);
+    doc.setFont('helvetica', 'normal');
+    doc.text(order.status || 'DELIVERED', 150, bottomY + 19);
 
     // --- TABLE ---
     const tableColumn = ["Sr no", "Item Description", "MRP", "Disc.", "Qty", "Taxable Value", "CGST (%)", "CGST (Amt)", "SGST (%)", "SGST (Amt)", "Total"];
@@ -1052,38 +1065,39 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
     doc.text(amountInWords, 45, finalY + 4);
     finalY += 6;
 
-    // --- COMPANY FOOTER BOX ---
-    let footerHeight = 22;
+    // ── COMPANY FOOTER: Passwala as the platform facilitator
+    let footerHeight = 24;
+    doc.setDrawColor(150, 150, 150);
     doc.rect(14, finalY, 182, footerHeight);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("Planet Softweb Private Limited", 16, finalY + 5);
-    
-    doc.text("GSTIN:", 16, finalY + 9);
-    doc.setFont("helvetica", "normal");
-    doc.text("24AAACP1234Q1Z5", 35, finalY + 9);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("CIN:", 16, finalY + 13);
-    doc.setFont("helvetica", "normal");
-    doc.text("U74999GJ2026PTC000000", 35, finalY + 13);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("FSSAI License Number:", 80, finalY + 9);
-    doc.setFont("helvetica", "normal");
-    doc.text("10722999000123", 110, finalY + 9);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("PAN:", 80, finalY + 13);
-    doc.setFont("helvetica", "normal");
-    doc.text("AAACP1234Q", 110, finalY + 13);
-    
-    // Signature
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.text('Platform / Facilitator:', 16, finalY + 5);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Passwala (Powered by Planet Softweb Pvt. Ltd.)', 55, finalY + 5);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Support Email:', 16, finalY + 10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('support@passwala.in', 45, finalY + 10);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Website:', 16, finalY + 15);
+    doc.setFont('helvetica', 'normal');
+    doc.text('www.passwala.in', 33, finalY + 15);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('CIN:', 100, finalY + 10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('U74999GJ2026PTC000000', 112, finalY + 10);
+
+    // Signature line
     doc.setFontSize(6);
-    doc.text("Authorized Signatory", 170, finalY + 18, { align: 'center' });
-    doc.line(155, finalY + 15, 185, finalY + 15); // Signature line
+    doc.text('Authorised Signatory', 170, finalY + 21, { align: 'center' });
+    doc.line(155, finalY + 18, 185, finalY + 18);
     finalY += footerHeight;
-    
+
+
     // --- REVERSE CHARGE ---
     doc.rect(14, finalY, 182, 6);
     doc.setFont("helvetica", "bold");
@@ -1444,9 +1458,16 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                     Cancel Order
                   </button>
                 )}
-                <button onClick={() => handleDownloadInvoice(selectedOrderDetails)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Download Invoice">
-                  <Download size={20} />
-                </button>
+                {/* Download Invoice — only when order is completed/delivered */}
+                {['DELIVERED', 'COMPLETED'].includes(selectedOrderDetails.status) && (
+                  <button
+                    onClick={() => handleDownloadInvoice(selectedOrderDetails)}
+                    style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '6px 14px', cursor: 'pointer', color: '#2563eb', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '0.82rem' }}
+                    title="Download Invoice"
+                  >
+                    <Download size={15} /> Invoice
+                  </button>
+                )}
                 <button onClick={() => setSelectedOrderDetails(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <X size={20} />
                 </button>
