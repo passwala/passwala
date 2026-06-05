@@ -170,6 +170,8 @@ router.get('/fetch', async (req, res) => {
             selectStr = '*, users(phone, full_name)';
         } else if (table === 'events') {
             selectStr = '*, event_ticket_tiers(price)';
+        } else if (table === 'orders') {
+            selectStr = '*, order_items(id, products(description))';
         }
 
         let query = supabase.from(table).select(selectStr);
@@ -177,6 +179,20 @@ router.get('/fetch', async (req, res) => {
         const { data, error } = await query.order('created_at', { ascending: false });
         
         if (error) throw error;
+
+        // Filter out service bookings from the orders table response
+        if (data && table === 'orders') {
+            const productOrdersOnly = data.filter(order => {
+                const hasServiceItem = order.order_items?.some(oi => 
+                    oi.products?.description === 'Service item auto-registered'
+                );
+                return !hasServiceItem;
+            });
+            productOrdersOnly.forEach(order => {
+                delete order.order_items;
+            });
+            return res.status(200).json({ success: true, data: productOrdersOnly });
+        }
 
         // Backend Self-Healing for riders/vendors/providers
         if (data && (table === 'vendors' || table === 'service_providers' || table === 'riders')) {
