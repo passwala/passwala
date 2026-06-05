@@ -126,16 +126,36 @@ const Auth = ({ onLogin }) => {
       };
 
       const API_URL = `${import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`)}/api/users`;
-      await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...userData,
-          address: { address_line_1: '', address_line_2: '' }
-        })
-      }).catch(() => console.warn("Cloud skip"));
+      let finalUser = userData;
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...userData,
+            address: { address_line_1: '', address_line_2: '' }
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.user) {
+            finalUser = {
+              id: data.user.id,
+              uid: data.user.uid,
+              displayName: data.user.full_name || userData.displayName,
+              phoneNumber: data.user.phone || userData.phoneNumber,
+              email: data.user.email || userData.email,
+              photoURL: data.user.photo_url || userData.photoURL,
+              authProvider: authProvider,
+              role: data.user.role?.toLowerCase() || 'buyer'
+            };
+          }
+        }
+      } catch (e) {
+        console.warn("Cloud skip, using client-side defaults:", e);
+      }
 
-      const userWithAddress = { ...userData, address: '' };
+      const userWithAddress = { ...finalUser, address: '' };
       localStorage.setItem('passwala_user', JSON.stringify(userWithAddress));
       setSyncedUser(userWithAddress);
 

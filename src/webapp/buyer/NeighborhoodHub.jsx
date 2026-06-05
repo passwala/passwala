@@ -30,39 +30,39 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
       image: "/neighbor.png",
       type: "peach",
       view: 'NEIGHBORS',
-      tag: "JOIN FLOOR CHAT"
+      tag: t('join_floor_chat')
     },
     {
       title: t('expert_services'),
-      subtitle: "Verified local pros",
+      subtitle: t('verified_pros'),
       image: "/expert_services.png",
       type: "cream",
       view: 'EXPERT_SERVICES',
-      tag: "BOOK PRO"
+      tag: t('book_pro')
     },
     {
       title: t('near_shops'),
-      subtitle: "Best neighborhood stores",
+      subtitle: t('best_stores'),
       image: "/near_shops.png",
       type: "green",
       view: 'NEAR_SHOPS',
-      tag: "ORDER NOW"
+      tag: t('order_now')
     },
     {
-      title: "City Rides",
-      subtitle: "Ahmedabad transit",
+      title: t('city_rides'),
+      subtitle: t('city_rides_sub'),
       image: "https://cdn-icons-png.flaticon.com/512/3202/3202926.png",
       type: "peach",
       view: 'CITY_RIDES',
-      tag: "BOOK TICKET"
+      tag: t('book_ticket')
     },
     {
-      title: "Event Tickets",
-      subtitle: "Ahmedabad events",
+      title: t('event_tickets'),
+      subtitle: t('event_tickets_sub'),
       image: "https://cdn-icons-png.flaticon.com/512/825/825590.png",
       type: "purple",
       view: 'EVENTS',
-      tag: "BOOK NOW"
+      tag: t('book_now_caps')
     }
   ];
 

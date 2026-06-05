@@ -248,48 +248,8 @@ router.post('/payment/verify', userAuth, async (req, res) => {
       console.warn('⚠️ Service bookings status update failed (non-critical):', bookingErr.message || bookingErr);
     }
 
-    // 3. Decrement product stock in database on successful verification
-    if (isVerified) {
-      try {
-        const { data: orderItems, error: itemsErr } = await supabase
-          .from('order_items')
-          .select('product_id, quantity')
-          .in('order_id', orderIds);
+    // Note: Stock decrement is automatically handled by the database trigger (trigger_decrement_stock) on order_items insert.
 
-        if (itemsErr) {
-          console.error('❌ Failed to fetch order items for stock decrement:', itemsErr.message);
-        } else if (orderItems && orderItems.length > 0) {
-          for (const item of orderItems) {
-            if (item.product_id) {
-              const { data: product, error: prodErr } = await supabase
-                .from('products')
-                .select('id, stock_quantity, description')
-                .eq('id', item.product_id)
-                .maybeSingle();
-
-              if (prodErr) {
-                console.error(`❌ Failed to fetch product details for ${item.product_id}:`, prodErr.message);
-              } else if (product && product.description !== 'Service item auto-registered') {
-                const currentStock = product.stock_quantity || 0;
-                const newStock = Math.max(0, currentStock - (item.quantity || 1));
-                const { error: updateErr } = await supabase
-                  .from('products')
-                  .update({ stock_quantity: newStock })
-                  .eq('id', product.id);
-
-                if (updateErr) {
-                  console.error(`❌ Failed to update stock for product ${product.id}:`, updateErr.message);
-                } else {
-                  console.log(`[Stock Engine] Securely decremented stock for product ${product.id} from ${currentStock} to ${newStock}`);
-                }
-              }
-            }
-          }
-        }
-      } catch (stockErr) {
-        console.warn('⚠️ Product stock decrement failed (non-critical):', stockErr.message || stockErr);
-      }
-    }
 
     res.json({
       success: isVerified,

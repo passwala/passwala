@@ -329,10 +329,21 @@ router.post('/', authLimiter, async (req, res) => {
     let resultError;
 
     if (existingUser) {
-      // 2. Update existing user
+      // 2. Update existing user (preserve existing fields so frontend default placeholders don't overwrite custom profile data)
+      const updatePayload = {
+        full_name: existingUser.full_name || displayName || null,
+        photo_url: existingUser.photo_url || photoURL || null,
+        email: existingUser.email || email || null,
+        phone: existingUser.phone || cleanPhone || null,
+        role: existingUser.role || (role ? String(role).toUpperCase() : 'BUYER')
+      };
+      if (token) {
+        updatePayload.fcm_token = token;
+      }
+
       const { data, error } = await supabase
         .from('users')
-        .update(userData)
+        .update(updatePayload)
         .eq('id', existingUser.id)
         .select()
         .single();

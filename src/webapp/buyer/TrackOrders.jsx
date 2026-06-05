@@ -1023,10 +1023,10 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
     (order.items || []).forEach((item, idx) => {
       const mrp      = parseFloat(item.price || item.price_at_purchase || 0);
       const qty      = parseInt(item.qty || item.quantity || 1);
-      const lineTotal = mrp * qty;
-      const taxable  = lineTotal / (1 + GST_RATE / 100);
+      const taxable  = mrp * qty;
       const cgst     = taxable * CGST_RATE / 100;
       const sgst     = taxable * SGST_RATE / 100;
+      const lineTotal = taxable + cgst + sgst;
 
       subtotal     += lineTotal;
       totalCGST    += cgst;
@@ -1189,18 +1189,6 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
 
   const confirmCancelOrder = async (orderId) => {
     try {
-      const { data: items } = await supabase.from('order_items').select('product_id, quantity').eq('order_id', orderId);
-      if (items && items.length > 0) {
-        for (const item of items) {
-          if (item.product_id) {
-            const { data: prod } = await supabase.from('products').select('stock_quantity').eq('id', item.product_id).maybeSingle();
-            if (prod) {
-              await supabase.from('products').update({ stock_quantity: (prod.stock_quantity || 0) + (parseInt(item.quantity) || 1) }).eq('id', item.product_id);
-            }
-          }
-        }
-      }
-
       const { error } = await supabase.from('orders').update({ status: 'CANCELLED' }).eq('id', orderId);
       
       if (error) throw new Error(error.message || 'Failed to cancel order');

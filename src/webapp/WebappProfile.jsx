@@ -34,13 +34,13 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
   const navigate = useNavigate();
 
   const profileItems = [
-    { id: 1, title: 'Order History', subtitle: 'View your past bookings', icon: <History size={20} />, class: 'history', path: '/order-history' },
-    { id: 2, title: 'Passwala Wallet', subtitle: 'Manage your credits', icon: <Wallet size={20} />, class: 'wallet', path: '/wallet' },
-    { id: 3, title: 'Delivery Address', subtitle: 'Manage your locations', icon: <MapPin size={20} />, class: 'address', path: '/complete-profile' },
-    { id: 4, title: 'Data Safety & Deletion', subtitle: 'Manage your data rights', icon: <Trash2 size={20} />, class: 'deletion', path: '/data-deletion' },
-    { id: 5, title: 'Privacy & Security', subtitle: 'Manage your security', icon: <ShieldCheck size={20} />, class: 'privacy', path: '/privacy-security' },
-    { id: 6, title: 'Help & Support', subtitle: '24/7 support available', icon: <HelpCircle size={20} />, class: 'help', path: '/help-support' },
-    { id: 7, title: 'Settings', subtitle: 'App preferences', icon: <Settings size={20} />, class: 'settings', path: '/settings' }
+    { id: 1, titleKey: 'order_history', subtitleKey: 'view_past_bookings', icon: <History size={20} />, class: 'history', path: '/order-history' },
+    { id: 2, titleKey: 'passwala_wallet', subtitleKey: 'manage_credits', icon: <Wallet size={20} />, class: 'wallet', path: '/wallet' },
+    { id: 3, titleKey: 'delivery_address', subtitleKey: 'manage_locations', icon: <MapPin size={20} />, class: 'address', path: '/complete-profile' },
+    { id: 4, titleKey: 'data_safety_deletion', subtitleKey: 'manage_data_rights', icon: <Trash2 size={20} />, class: 'deletion', path: '/data-deletion' },
+    { id: 5, titleKey: 'privacy_security', subtitleKey: 'manage_security', icon: <ShieldCheck size={20} />, class: 'privacy', path: '/privacy-security' },
+    { id: 6, titleKey: 'help_support', subtitleKey: 'support_24_7', icon: <HelpCircle size={20} />, class: 'help', path: '/help-support' },
+    { id: 7, titleKey: 'settings', subtitleKey: 'app_preferences', icon: <Settings size={20} />, class: 'settings', path: '/settings' }
   ];
 
   React.useEffect(() => {
@@ -199,7 +199,7 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
       </div>
 
       <div className="profile-scroll-content">
-        <h3 className="section-label">Appearance</h3>
+        <h3 className="section-label">{t('appearance')}</h3>
         <div className="profile-menu-container">
           <div className="profile-menu-item" onClick={onToggleTheme}>
             <div className="menu-item-left">
@@ -207,8 +207,8 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
                 {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
               </div>
               <div className="menu-text">
-                <strong>Dark Mode</strong>
-                <span>Switch theme style</span>
+                <strong>{t('dark_mode')}</strong>
+                <span>{t('switch_theme')}</span>
               </div>
             </div>
             <div className={`theme-toggle-switch ${isDarkMode ? 'active' : ''}`}>
@@ -231,21 +231,21 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
           ))}
         </div>
 
-        <h3 className="section-label">Account & Activity</h3>
+        <h3 className="section-label">{t('account_activity')}</h3>
         <div className="profile-menu-container">
           {profileItems.map((item) => (
             <button 
               key={item.id} 
               className="profile-menu-item"
-              onClick={() => item.path ? navigate(item.path) : toast(`Opening ${item.title}...`)}
+              onClick={() => item.path ? navigate(item.path) : toast(`Opening ${t(item.titleKey)}...`)}
             >
               <div className="menu-item-left">
                 <div className={`menu-icon-box ${item.class}`}>
                   {item.icon}
                 </div>
                 <div className="menu-text">
-                   <strong>{item.title}</strong>
-                   <span>{item.subtitle}</span>
+                   <strong>{t(item.titleKey)}</strong>
+                   <span>{t(item.subtitleKey)}</span>
                 </div>
               </div>
               <ChevronRight size={18} className="chevron-right" />
@@ -257,8 +257,8 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
                 <LogOut size={20} />
               </div>
               <div className="menu-text">
-                 <strong>Sign Out</strong>
-                 <span>Logout of your session</span>
+                 <strong>{t('logout')}</strong>
+                 <span>{t('logout_session')}</span>
               </div>
             </div>
           </button>
@@ -267,7 +267,7 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
         <div className="profile-actions-footer">
           <button className="delete-account-btn" onClick={() => setShowDeleteModal(true)}>
              <Trash2 size={16} />
-             <span>Delete Account Permanently</span>
+             <span>{t('delete_account_permanently')}</span>
           </button>
         </div>
       </div>

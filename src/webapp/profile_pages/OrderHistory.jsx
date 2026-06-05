@@ -337,12 +337,10 @@ const OrderHistory = () => {
     (order.items || []).forEach((item, index) => {
       const itemPrice = parseFloat(item.price || item.price_at_purchase || 0);
       const itemQty = parseInt(item.qty || item.quantity || 1);
-      const itemTotal = itemPrice * itemQty;
-      
-      const baseValue = itemTotal / 1.05;
-      const taxAmt = itemTotal - baseValue;
-      const cgstAmt = taxAmt / 2;
-      const sgstAmt = taxAmt / 2;
+      const baseValue = itemPrice * itemQty;
+      const cgstAmt = baseValue * 0.025;
+      const sgstAmt = baseValue * 0.025;
+      const itemTotal = baseValue + cgstAmt + sgstAmt;
       
       subtotal += itemTotal;
       

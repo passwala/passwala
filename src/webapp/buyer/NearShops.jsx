@@ -19,6 +19,8 @@ import './NearShops.css';
 import { supabase } from '../../supabase';
 import { useCart } from '../../context/CartContext';
 import { getOSRMRoute } from '../../utils/dijkstra';
+import { useTranslation } from '../LanguageContext';
+
 
 // --- Leaflet Icon Fix & Customization ---
 const orangeIcon = new L.Icon({
@@ -52,6 +54,7 @@ function RecenterMap({ coords }) {
 }
 
 const NearShops = ({ location, userCoords }) => {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -290,7 +293,7 @@ const NearShops = ({ location, userCoords }) => {
                 <Search size={20} className="search-icon-near" />
                 <input 
                   type="text" 
-                  placeholder={viewType === 'SHOPS' ? "Search shops, items..." : "Search experts, services..."}
+                  placeholder={viewType === 'SHOPS' ? t('search_shops_items') : t('search_experts_services')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -305,13 +308,13 @@ const NearShops = ({ location, userCoords }) => {
                 className={viewType === 'SHOPS' ? 'active' : ''} 
                 onClick={() => setViewType('SHOPS')}
               >
-                <ShoppingBag size={16} /> <span>Near Shops</span>
+                <ShoppingBag size={16} /> <span>{t('near_shops')}</span>
               </button>
               <button 
                 className={viewType === 'SERVICES' ? 'active' : ''} 
                 onClick={() => setViewType('SERVICES')}
               >
-                <Star size={16} /> <span>Local Experts</span>
+                <Star size={16} /> <span>{t('expert_services')}</span>
               </button>
            </div>
         </div>
@@ -319,15 +322,29 @@ const NearShops = ({ location, userCoords }) => {
         {/* New Category Tabs for Buyers */}
         <div className="category-scroll-near">
            {(viewType === 'SHOPS' 
-             ? ['All', 'General Store', 'Grocery', 'Vegetables', 'Dairy', 'Bakery']
-             : ['All', 'Plumbing', 'Electrical', 'AC Service', 'Cleaning', 'Carpentry']
+             ? [
+                 { label: t('all'), value: 'All' },
+                 { label: t('general_store'), value: 'General Store' },
+                 { label: t('grocery'), value: 'Grocery' },
+                 { label: t('vegetables'), value: 'Vegetables' },
+                 { label: t('dairy'), value: 'Dairy' },
+                 { label: t('bakery'), value: 'Bakery' }
+               ]
+             : [
+                 { label: t('all'), value: 'All' },
+                 { label: t('plumbing'), value: 'Plumbing' },
+                 { label: t('electrical'), value: 'Electrical' },
+                 { label: t('ac_service'), value: 'AC Service' },
+                 { label: t('cleaning'), value: 'Cleaning' },
+                 { label: t('carpentry'), value: 'Carpentry' }
+               ]
            ).map(cat => (
              <button 
-               key={cat} 
-               className={`cat-tab-near ${searchQuery.toLowerCase() === cat.toLowerCase() ? 'active' : ''}`}
-               onClick={() => setSearchQuery(cat === 'All' ? '' : cat)}
+               key={cat.value} 
+               className={`cat-tab-near ${searchQuery.toLowerCase() === cat.value.toLowerCase() ? 'active' : ''}`}
+               onClick={() => setSearchQuery(cat.value === 'All' ? '' : cat.value)}
              >
-               {cat}
+               {cat.label}
              </button>
            ))}
         </div>
@@ -342,9 +359,7 @@ const NearShops = ({ location, userCoords }) => {
                zoom={14} 
                scrollWheelZoom={false}
                style={{ height: '100%', width: '100%', zIndex: 1 }}
-               maxBounds={[[5.0, 65.0], [38.0, 98.0]]}
                minZoom={5}
-               maxBoundsViscosity={1.0}
              >
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -354,7 +369,7 @@ const NearShops = ({ location, userCoords }) => {
                 {/* User Location Marker */}
                 {userCoords && userCoords.lat && userCoords.lng && (
                   <Marker position={[userCoords.lat, userCoords.lng]} icon={blueIcon}>
-                    <Popup>You are here</Popup>
+                    <Popup>{t('you_are_here')}</Popup>
                   </Marker>
                 )}
 
@@ -393,7 +408,7 @@ const NearShops = ({ location, userCoords }) => {
                               fontWeight: 'bold'
                             }}
                           >
-                            {isService ? 'View Services' : 'View Catalog'}
+                            {isService ? t('view_services') : t('view_catalog')}
                           </button>
                         </div>
                       </Popup>
@@ -466,7 +481,7 @@ const NearShops = ({ location, userCoords }) => {
                        handleOpenShop(shop); 
                      }}
                    >
-                     {shop.type === 'SERVICES' ? 'Book Expert' : 'Order Now'}
+                     {shop.type === 'SERVICES' ? t('book_expert') : t('order_now')}
                    </button>
                </Motion.div>
              ))

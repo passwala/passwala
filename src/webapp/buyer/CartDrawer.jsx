@@ -117,13 +117,42 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
     if (storeId && storeId.length !== 36) storeId = null;
 
     const itemNames = cartItems.map(i => i.name).join(', ');
-    const total = totalPrice;
+    const total = parseFloat((totalPrice * 1.05).toFixed(2));
 
     let resolvedUserId = userId;
     let resolvedStoreId = storeId;
     let resolvedAddressId = userAddress?.id;
 
     try {
+      // 0. Stock Verification: Verify that all physical products in the cart have enough stock in database
+      const productItems = cartItems.filter(item => item.type !== 'service');
+      if (productItems.length > 0) {
+        const productIds = productItems.map(item => item.id);
+        const { data: dbProducts, error: dbProdError } = await supabase
+          .from('products')
+          .select('id, name, stock_quantity')
+          .in('id', productIds);
+
+        if (!dbProdError && dbProducts) {
+          const productStockMap = {};
+          dbProducts.forEach(p => {
+            productStockMap[p.id] = p.stock_quantity;
+          });
+
+          for (const item of productItems) {
+            const currentStock = productStockMap[item.id];
+            if (currentStock !== undefined && currentStock !== null) {
+              if (currentStock < (item.qty || 1)) {
+                toast.error(`Out of Stock: Only ${currentStock} units of "${item.name}" are available.`);
+                setIsPlacingOrder(false);
+                setShowConfirm(false);
+                return;
+              }
+            }
+          }
+        }
+      }
+
       // 1. Resolve User ID (UUID) from Supabase if not a valid UUID
       if (!resolvedUserId && userObj) {
         const phoneNo = userObj.phoneNumber?.replace('+91', '') || userObj.phone?.replace('+91', '');
@@ -471,8 +500,8 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
 
         const groupSubtotal = items.reduce((sum, item) => sum + item.price * (item.qty || 1), 0);
         const orderPayload = {
-          total_amount: groupSubtotal,
-          subtotal: parseFloat((groupSubtotal / 1.05).toFixed(2)),
+          total_amount: parseFloat((groupSubtotal * 1.05).toFixed(2)),
+          subtotal: groupSubtotal,
           status: 'PENDING',
           payment_status: 'PENDING',
           delivery_fee: 0,
@@ -544,7 +573,10 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
             price_at_purchase: item.price
           }));
           const { error: itemError } = await supabase.from('order_items').insert(orderItems);
-          if (itemError) console.warn("Order items save error:", itemError);
+          if (itemError) {
+            console.warn("Order items save error:", itemError);
+            throw new Error(`Failed to save items: ${itemError.message || itemError}`);
+          }
 
 
 
@@ -982,7 +1014,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
             <div className="price-breakdown-v3" style={{ borderTop: '1px dashed #e2e8f0', borderBottom: '1px dashed #e2e8f0', padding: '12px 0', margin: '12px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748b' }}>
                 <span>Item Subtotal</span>
-                <span>₹{(totalPrice / 1.05).toFixed(2)}</span>
+                <span>₹{totalPrice.toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748b' }}>
                 <span>Delivery Partner Fee</span>
@@ -990,7 +1022,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#94a3b8' }}>
                 <span>Taxes & Charges (CGST 2.5% + SGST 2.5%)</span>
-                <span>₹{(totalPrice - (totalPrice / 1.05)).toFixed(2)}</span>
+                <span>₹{(totalPrice * 0.05).toFixed(2)}</span>
               </div>
             </div>
 
@@ -999,7 +1031,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
                 <span>{t('total')} ({totalItems} items)</span>
                 {totalPrice > 1000 && <span className="savings-badge">{t('savings')} ₹150 with Neighbor Discount</span>}
               </div>
-              <strong>₹{totalPrice.toLocaleString()}</strong>
+              <strong>₹{(totalPrice * 1.05).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
             </div>
             <button 
               className={`cart-checkout-btn ${(!isProfileComplete || !userAddress || !isSupportedArea) ? 'needs-address' : ''}`} 

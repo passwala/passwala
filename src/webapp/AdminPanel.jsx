@@ -1208,9 +1208,7 @@ const AdminPanel = ({ onLogout, location }) => {
                   zoom={13} 
                   scrollWheelZoom={true}
                   style={{ height: '100%', width: '100%', zIndex: 1 }}
-                  maxBounds={[[5.0, 65.0], [38.0, 98.0]]}
                   minZoom={5}
-                  maxBoundsViscosity={1.0}
                 >
                   <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
