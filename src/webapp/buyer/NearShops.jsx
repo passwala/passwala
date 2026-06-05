@@ -369,7 +369,7 @@ const NearShops = ({ location, userCoords }) => {
                         position={[lat, lng]} 
                         icon={isService ? blueIcon : orangeIcon}
                         eventHandlers={{
-                          click: () => isService ? toast(`Connecting to ${item.name}...`) : handleOpenShop(item),
+                          click: () => handleOpenShop(item),
                         }}
                       >
                       <Popup>
@@ -377,7 +377,7 @@ const NearShops = ({ location, userCoords }) => {
                           <h4 style={{ margin: '0 0 4px 0', fontSize: '14px' }}>{item.name}</h4>
                           <p style={{ margin: 0, fontSize: '11px', color: '#666' }}>{item.category}</p>
                           <button 
-                            onClick={() => isService ? toast.success(`Calling ${item.name}...`) : handleOpenShop(item)}
+                            onClick={() => handleOpenShop(item)}
                             style={{ 
                               marginTop: '8px', 
                               background: isService ? '#3b82f6' : 'var(--primary)', 
@@ -390,7 +390,7 @@ const NearShops = ({ location, userCoords }) => {
                               fontWeight: 'bold'
                             }}
                           >
-                            {isService ? 'Book Service' : 'View Catalog'}
+                            {isService ? 'View Services' : 'View Catalog'}
                           </button>
                         </div>
                       </Popup>

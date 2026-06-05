@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './Navbar.css';
 
-const Navbar = ({ isAuthenticated, user, onLogout, onOpenProfile, onOpenAI, onJoin }) => {
+const Navbar = ({ isAuthenticated, user, onOpenProfile, onJoin }) => {
   const [scrolled, setScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 

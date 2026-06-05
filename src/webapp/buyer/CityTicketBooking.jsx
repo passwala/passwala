@@ -88,7 +88,7 @@ async function fetchRoadRoute(pickup, dropoff) {
 }
 
 // Component to handle map clicks
-function MapClickHandler({ activeInput, onMapClick }) {
+function MapClickHandler({ onMapClick }) {
   useMapEvents({
     click: async (e) => {
       const { lat, lng } = e.latlng;
@@ -117,7 +117,7 @@ function FitBounds({ pickup, dropoff }) {
   return null;
 }
 
-const CityTicketBooking = ({ onBack, user }) => {
+const CityTicketBooking = ({ user }) => {
   const navigate = useNavigate();
   const [pickup, setPickup] = useState(null);
   const [dropoff, setDropoff] = useState(null);
@@ -128,7 +128,6 @@ const CityTicketBooking = ({ onBack, user }) => {
   const [locating, setLocating] = useState(false);
   const [dbRoutes, setDbRoutes] = useState([]);
   const [dbVehicles, setDbVehicles] = useState([]);
-  const [mapCursor, setMapCursor] = useState('crosshair');
 
   const center = [23.0225, 72.5714];
 
@@ -222,7 +221,7 @@ const CityTicketBooking = ({ onBack, user }) => {
         setLocating(false);
         toast.success(`Your location: ${name}`, { icon: '📍', duration: 2500 });
       },
-      (err) => {
+      () => {
         setLocating(false);
         toast.error('Could not get your location');
       },
@@ -284,7 +283,7 @@ const CityTicketBooking = ({ onBack, user }) => {
           : 'Tap on the map to set your Drop-off Location'}
       </div>
 
-      <div className="cr-map-area" style={{ cursor: mapCursor }}>
+      <div className="cr-map-area" style={{ cursor: 'crosshair' }}>
         <MapContainer
           center={center}
           zoom={13}
@@ -297,7 +296,7 @@ const CityTicketBooking = ({ onBack, user }) => {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             maxZoom={19}
           />
-          <MapClickHandler activeInput={activeInput} onMapClick={handleMapClick} />
+          <MapClickHandler onMapClick={handleMapClick} />
           <FitBounds pickup={pickup} dropoff={dropoff} />
 
           {pickup && (

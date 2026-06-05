@@ -1172,15 +1172,16 @@ export const VendorOrders = ({ storeId, businessType }) => {
 
   React.useEffect(() => {
     fetchOrders(true);
+    const targetTable = businessType === 'service' ? 'service_bookings' : 'orders';
     const channel = supabase
       .channel('vendor-orders-sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: targetTable }, () => {
         fetchOrders(false);
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [fetchOrders]);
+  }, [fetchOrders, businessType]);
 
   // Offline / Online detection
   React.useEffect(() => {
@@ -1256,30 +1257,54 @@ export const VendorOrders = ({ storeId, businessType }) => {
         }
       }
 
-      const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
-      if (error) throw error;
-
       if (isService) {
-        const orderObj = orders.find(o => o.id === orderId);
-        if (orderObj && isValidUuid(storeId)) {
-          const serviceItem = orderObj.order_items?.find(item => item.product_id);
-          const serviceId = serviceItem ? serviceItem.product_id : null;
+        const { error: bookingErr } = await supabase
+          .from('service_bookings')
+          .update({ status: newStatus })
+          .eq('id', orderId);
+        if (bookingErr) throw bookingErr;
 
-          let query = supabase
-            .from('service_bookings')
-            .update({ status: newStatus })
-            .eq('user_id', orderObj.user_id)
-            .eq('provider_id', storeId);
-
+        if (originalOrder && isValidUuid(storeId)) {
+          const serviceId = originalOrder.service_id;
           if (serviceId && isValidUuid(serviceId)) {
-            query = query.eq('service_id', serviceId);
-          }
+            // Find corresponding order(s) in orders table
+            let { data: matchedItems } = await supabase
+              .from('order_items')
+              .select('order_id, orders!inner(user_id, store_id, status)')
+              .eq('product_id', serviceId)
+              .eq('orders.user_id', originalOrder.user_id)
+              .eq('orders.store_id', storeId);
 
-          const { error: bookingErr } = await query;
-          if (bookingErr) {
-            console.warn("Could not sync status to service_bookings:", bookingErr.message);
+            // Fallback: If no exact store_id match is found (e.g. store_id fell back to shop during checkout), match by service and user
+            if (!matchedItems || matchedItems.length === 0) {
+              const { data: fallbackItems } = await supabase
+                .from('order_items')
+                .select('order_id, orders!inner(user_id, store_id, status)')
+                .eq('product_id', serviceId)
+                .eq('orders.user_id', originalOrder.user_id);
+              matchedItems = fallbackItems;
+            }
+
+            if (matchedItems && matchedItems.length > 0) {
+              const activeOrderIds = matchedItems
+                .filter(item => item.orders && item.orders.status !== 'DELIVERED' && item.orders.status !== 'CANCELLED')
+                .map(item => item.order_id);
+
+              if (activeOrderIds.length > 0) {
+                const { error: orderErr } = await supabase
+                  .from('orders')
+                  .update({ status: newStatus })
+                  .in('id', activeOrderIds);
+                if (orderErr) {
+                  console.warn("Could not sync status to orders:", orderErr.message);
+                }
+              }
+            }
           }
         }
+      } else {
+        const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
+        if (error) throw error;
       }
 
       // Background fetch to ensure consistency after optimistic update

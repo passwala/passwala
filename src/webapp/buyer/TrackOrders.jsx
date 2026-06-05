@@ -528,7 +528,7 @@ function RideTrackingMap({ booking }) {
         if (booking.driverLocation?.lat) pts.push([booking.driverLocation.lat, booking.driverLocation.lng]);
         leafletMapRef.current.fitBounds(L.latLngBounds(pts), { padding: [40, 40], maxZoom: 15 });
       }, 200);
-    } catch(e) {}
+    } catch(e) { console.warn('Map fitBounds size calc warning:', e); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [booking.driverLocation, routePoints]);
 
@@ -862,7 +862,10 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
     const storeAddress = order.stores?.address || 'Ahmedabad, Gujarat';
     // GSTIN: stores table doesn't have this column yet — show placeholder or Mahadev GSTIN
     const isMahadev    = storeName.toLowerCase().includes('mahadev');
-    const storeGSTIN   = order.stores?.gstin || (isMahadev ? '24AAAMH4812K1Z9' : 'Not Registered');
+    const isShiv       = storeName.toLowerCase().includes('shiv');
+    const storeGSTIN   = order.stores?.gstin || 
+                         (isMahadev ? '24AAAMH4812K1Z9' : 
+                          (isShiv ? '24BCBR78R78UF1Z' : 'Not Registered'));
     const storePhone   = order.stores?.phone || '';
 
     // ── Buyer / Customer info (name from users join, address from addresses)

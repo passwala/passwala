@@ -10,14 +10,14 @@ const CATEGORIES = [
   'Live Shows', 'Sports Events', 'Festival Events'
 ];
 
-const EventHub = ({ onBack }) => {
+const EventHub = () => {
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchEvents = async () => {
+  const fetchEvents = React.useCallback(async () => {
     setLoading(true);
     try {
       const baseUrl = import.meta.env.VITE_API_URL || '';
@@ -31,7 +31,7 @@ const EventHub = ({ onBack }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeCategory, searchQuery]);
 
   useEffect(() => {
     // Add debounce for search query
@@ -39,7 +39,7 @@ const EventHub = ({ onBack }) => {
       fetchEvents();
     }, 500);
     return () => clearTimeout(delayDebounceFn);
-  }, [activeCategory, searchQuery]);
+  }, [fetchEvents]);
 
   const formatDate = (dateString) => {
     const options = { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };

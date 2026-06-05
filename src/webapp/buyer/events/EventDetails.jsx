@@ -141,18 +141,25 @@ const EventDetails = ({ user }) => {
         <div className="ed-section">
           <h3><MapIcon size={18} className="inline mr-2" /> Venue Map</h3>
           <div className="ed-map-container">
-            <MapContainer 
-              center={[event.venue_lat, event.venue_lng]} 
-              zoom={15} 
-              style={{ height: '100%', width: '100%', borderRadius: '16px' }}
-              dragging={false}
-              zoomControl={false}
-            >
-              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-              <Marker position={[event.venue_lat, event.venue_lng]}>
-                <Popup>{event.venue_name}</Popup>
-              </Marker>
-            </MapContainer>
+            {event.venue_lat && event.venue_lng && !isNaN(parseFloat(event.venue_lat)) && !isNaN(parseFloat(event.venue_lng)) ? (
+              <MapContainer 
+                center={[parseFloat(event.venue_lat), parseFloat(event.venue_lng)]} 
+                zoom={15} 
+                style={{ height: '100%', width: '100%', borderRadius: '16px' }}
+                dragging={false}
+                zoomControl={false}
+              >
+                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <Marker position={[parseFloat(event.venue_lat), parseFloat(event.venue_lng)]}>
+                  <Popup>{event.venue_name}</Popup>
+                </Marker>
+              </MapContainer>
+            ) : (
+              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', borderRadius: '16px', color: '#64748b' }}>
+                <MapPin size={32} style={{ marginBottom: '8px', opacity: 0.4 }} />
+                <p style={{ margin: 0, fontWeight: 600 }}>{event.venue_name || 'Venue location not available'}</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

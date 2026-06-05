@@ -107,12 +107,22 @@ const VendorPortal = ({ user, onLogout }) => {
 
       let foundStoreId = vendorData?.id;
       if (!foundStoreId) {
-        const { data: vend } = await supabase.from('vendors').select('id').eq('phone', phone).maybeSingle();
-        if (vend) {
-          foundStoreId = vend.id;
-        } else {
+        if (businessType === 'service') {
           const { data: prov } = await supabase.from('service_providers').select('id').eq('phone', phone).maybeSingle();
-          if (prov) foundStoreId = prov.id;
+          if (prov) {
+            foundStoreId = prov.id;
+          } else {
+            const { data: vend } = await supabase.from('vendors').select('id').eq('phone', phone).maybeSingle();
+            if (vend) foundStoreId = vend.id;
+          }
+        } else {
+          const { data: vend } = await supabase.from('vendors').select('id').eq('phone', phone).maybeSingle();
+          if (vend) {
+            foundStoreId = vend.id;
+          } else {
+            const { data: prov } = await supabase.from('service_providers').select('id').eq('phone', phone).maybeSingle();
+            if (prov) foundStoreId = prov.id;
+          }
         }
       }
 
@@ -235,29 +245,29 @@ const VendorPortal = ({ user, onLogout }) => {
       const isLocallyCompleted = localStorage.getItem('vProfileCompleted') === 'true';
 
       if (supabase) {
-        // First check vendors table
+        // First check service_providers table (prioritize service providers)
         let { data, error } = await supabase
-          .from('vendors')
+          .from('service_providers')
           .select('*')
           .eq('phone', phone)
           .maybeSingle();
 
-        let detectedType = 'shop';
+        let detectedType = 'service';
 
-        // If not found in vendors, check service_providers
+        // If not found in service_providers, check vendors
         if (!data && !error) {
-          const { data: sData, error: sError } = await supabase
-            .from('service_providers')
+          const { data: vData, error: vError } = await supabase
+            .from('vendors')
             .select('*')
             .eq('phone', phone)
             .maybeSingle();
-          if (sData) {
-            data = sData;
-            detectedType = 'service';
+          if (vData) {
+            data = vData;
+            detectedType = 'shop';
           }
-          error = sError;
+          error = vError;
         } else if (data) {
-          detectedType = 'shop';
+          detectedType = 'service';
         }
 
         if (error && !isLocallyCompleted) throw error;

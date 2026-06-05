@@ -4,7 +4,6 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 import QRCode from 'react-qr-code';
 import { ArrowLeft, MapPin, Navigation, Share2, XCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { supabase } from '../../supabase';
 
 const RideTicket = () => {
   const location = useLocation();
@@ -70,26 +69,33 @@ const RideTicket = () => {
       </div>
 
       <div style={{ flex: 1, position: 'relative' }}>
-        <MapContainer center={driverLoc} zoom={14} style={{ height: '100%', width: '100%' }}>
-          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-          
-          <Marker position={[booking.pickup_lat, booking.pickup_lng]}><Popup>Pickup</Popup></Marker>
-          <Marker position={[booking.drop_lat, booking.drop_lng]}><Popup>Dropoff</Popup></Marker>
-          
-          <Marker position={driverLoc}>
-            <Popup>Vehicle Live Location</Popup>
-          </Marker>
+        {booking.pickup_lat && booking.pickup_lng && booking.drop_lat && booking.drop_lng ? (
+          <MapContainer center={driverLoc} zoom={14} style={{ height: '100%', width: '100%' }}>
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            
+            <Marker position={[parseFloat(booking.pickup_lat), parseFloat(booking.pickup_lng)]}><Popup>Pickup</Popup></Marker>
+            <Marker position={[parseFloat(booking.drop_lat), parseFloat(booking.drop_lng)]}><Popup>Dropoff</Popup></Marker>
+            
+            <Marker position={driverLoc}>
+              <Popup>Vehicle Live Location</Popup>
+            </Marker>
 
-          <Polyline 
-            positions={[
-              driverLoc,
-              [booking.pickup_lat, booking.pickup_lng]
-            ]} 
-            color="#3b82f6" 
-            weight={4}
-            dashArray="5, 10"
-          />
-        </MapContainer>
+            <Polyline 
+              positions={[
+                driverLoc,
+                [parseFloat(booking.pickup_lat), parseFloat(booking.pickup_lng)]
+              ]} 
+              color="#3b82f6" 
+              weight={4}
+              dashArray="5, 10"
+            />
+          </MapContainer>
+        ) : (
+          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', color: '#94a3b8', flexDirection: 'column', gap: '8px' }}>
+            <span style={{ fontSize: '2rem' }}>🗺️</span>
+            <p style={{ margin: 0, fontWeight: 600 }}>Map unavailable</p>
+          </div>
+        )}
       </div>
 
       <div style={{ 
@@ -129,7 +135,7 @@ const RideTicket = () => {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div>
               <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ticket ID</p>
-              <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>{booking.qr_code_hash.split('-')[2]}</h4>
+              <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>{booking.qr_code_hash ? booking.qr_code_hash.split('-')[2] || booking.qr_code_hash.substring(0, 8).toUpperCase() : 'N/A'}</h4>
             </div>
             <div>
               <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Seats Booked</p>

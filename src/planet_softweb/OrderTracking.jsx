@@ -79,7 +79,6 @@ export default function OrderTracking({ orderId, onBack }) {
         return step;
       });
 
-      await window.supabaseClient;
       const { error } = await window.supabase
         .from('delivery_tracking')
         .update({

@@ -179,24 +179,61 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
           // Check if it exists in service_providers (for service orders)
           const { data: serviceProv } = await supabase
             .from('service_providers')
-            .select('id, business_name')
+            .select('id, business_name, user_id, phone, address')
             .eq('id', resolvedStoreId)
             .maybeSingle();
 
           if (serviceProv) {
-            // Auto-upsert to stores table to satisfy foreign key constraint
-            const { error: upsertErr } = await supabase.from('stores').upsert({
-              id: resolvedStoreId,
-              vendor_id: null,
-              name: serviceProv.business_name || 'Service Provider',
-              address: 'Service Area',
-              lat: 23.0225,
-              lng: 72.5714,
-              is_active: true
-            });
-            if (upsertErr) {
-               console.warn("Auto-upsert to stores failed (top level):", upsertErr);
-               resolvedStoreId = null; // will fallback later
+            // Ensure vendor record exists for this service provider (since stores require NOT NULL unique vendor_id)
+            let vendorId = null;
+            if (serviceProv.user_id) {
+              const { data: existingVendor } = await supabase
+                .from('vendors')
+                .select('id')
+                .eq('user_id', serviceProv.user_id)
+                .maybeSingle();
+
+              if (existingVendor) {
+                vendorId = existingVendor.id;
+              } else {
+                const { data: newVendor, error: vendorErr } = await supabase
+                  .from('vendors')
+                  .insert([{
+                    user_id: serviceProv.user_id,
+                    phone: serviceProv.phone || `temp_${Date.now()}`,
+                    name: serviceProv.business_name || 'Service Provider',
+                    business_name: serviceProv.business_name || 'Service Provider',
+                    is_verified: true,
+                    profile_completed: true
+                  }])
+                  .select('id')
+                  .single();
+
+                if (!vendorErr && newVendor) {
+                  vendorId = newVendor.id;
+                } else {
+                  console.warn("Could not insert vendor record for service provider (top level):", vendorErr?.message);
+                }
+              }
+            }
+
+            if (vendorId) {
+              // Auto-upsert to stores table to satisfy foreign key constraint
+              const { error: upsertErr } = await supabase.from('stores').upsert({
+                id: resolvedStoreId,
+                vendor_id: vendorId,
+                name: serviceProv.business_name || 'Service Provider',
+                address: serviceProv.address || 'Service Area',
+                lat: 23.0225,
+                lng: 72.5714,
+                is_open: true
+              });
+              if (upsertErr) {
+                 console.warn("Auto-upsert to stores failed (top level):", upsertErr);
+                 resolvedStoreId = null; // will fallback later
+              }
+            } else {
+              resolvedStoreId = null;
             }
             // Since we upserted it, resolvedStoreId is now a valid stores.id
           } else {
@@ -371,24 +408,61 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
           // Check if it exists in service_providers (for service orders)
           const { data: serviceProv } = await supabase
             .from('service_providers')
-            .select('id, business_name')
+            .select('id, business_name, user_id, phone, address')
             .eq('id', currentResolvedStoreId)
             .maybeSingle();
 
           if (serviceProv) {
-            // Auto-upsert to stores table to satisfy foreign key constraint
-            const { error: upsertErr } = await supabase.from('stores').upsert({
-              id: currentResolvedStoreId,
-              vendor_id: null,
-              name: serviceProv.business_name || 'Service Provider',
-              address: 'Service Area',
-              lat: 23.0225,
-              lng: 72.5714,
-              is_active: true
-            });
-            if (upsertErr) {
-               console.warn("Auto-upsert to stores failed:", upsertErr);
-               currentResolvedStoreId = storeIdFallback;
+            // Ensure vendor record exists for this service provider (since stores require NOT NULL unique vendor_id)
+            let vendorId = null;
+            if (serviceProv.user_id) {
+              const { data: existingVendor } = await supabase
+                .from('vendors')
+                .select('id')
+                .eq('user_id', serviceProv.user_id)
+                .maybeSingle();
+
+              if (existingVendor) {
+                vendorId = existingVendor.id;
+              } else {
+                const { data: newVendor, error: vendorErr } = await supabase
+                  .from('vendors')
+                  .insert([{
+                    user_id: serviceProv.user_id,
+                    phone: serviceProv.phone || `temp_${Date.now()}`,
+                    name: serviceProv.business_name || 'Service Provider',
+                    business_name: serviceProv.business_name || 'Service Provider',
+                    is_verified: true,
+                    profile_completed: true
+                  }])
+                  .select('id')
+                  .single();
+
+                if (!vendorErr && newVendor) {
+                  vendorId = newVendor.id;
+                } else {
+                  console.warn("Could not insert vendor record for service provider (loop):", vendorErr?.message);
+                }
+              }
+            }
+
+            if (vendorId) {
+              // Auto-upsert to stores table to satisfy foreign key constraint
+              const { error: upsertErr } = await supabase.from('stores').upsert({
+                id: currentResolvedStoreId,
+                vendor_id: vendorId,
+                name: serviceProv.business_name || 'Service Provider',
+                address: serviceProv.address || 'Service Area',
+                lat: 23.0225,
+                lng: 72.5714,
+                is_open: true
+              });
+              if (upsertErr) {
+                 console.warn("Auto-upsert to stores failed:", upsertErr);
+                 currentResolvedStoreId = storeIdFallback;
+              }
+            } else {
+              currentResolvedStoreId = storeIdFallback;
             }
           } else {
              currentResolvedStoreId = storeIdFallback;
