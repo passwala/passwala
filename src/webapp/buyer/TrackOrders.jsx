@@ -691,7 +691,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
             .from('orders')
             .select(`
               *,
-              stores(name, address, lat, lng),
+              stores(name, address, lat, lng, vendor_id),
               addresses(*),
               delivery_tracking(rider_id),
               users!orders_user_id_fkey(full_name, phone),
