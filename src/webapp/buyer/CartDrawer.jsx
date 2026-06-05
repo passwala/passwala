@@ -472,7 +472,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
         const groupSubtotal = items.reduce((sum, item) => sum + item.price * (item.qty || 1), 0);
         const orderPayload = {
           total_amount: groupSubtotal,
-          subtotal: groupSubtotal,
+          subtotal: parseFloat((groupSubtotal / 1.05).toFixed(2)),
           status: 'PENDING',
           payment_status: 'PENDING',
           delivery_fee: 0,
