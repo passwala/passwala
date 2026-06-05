@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, MapPin, CheckCircle, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, User, MapPin, CheckCircle, ShieldCheck, CreditCard, Ticket } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import './RideCheckout.css';
 
 const RideCheckout = () => {
   const location = useLocation();
@@ -12,16 +13,37 @@ const RideCheckout = () => {
 
   if (!pickup || !dropoff || !rideData) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <p>No ride data found. Please go back and search again.</p>
-        <button onClick={() => navigate('/city-ride')}>Back to Search</button>
+      <div style={{ padding: '3rem 2rem', textAlign: 'center', fontFamily: 'Inter, sans-serif' }}>
+        <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>No ride data found. Please go back and search again.</p>
+        <button 
+          onClick={() => navigate('/city-ride')} 
+          style={{ 
+            background: 'var(--primary)', 
+            color: 'white', 
+            border: 'none', 
+            padding: '0.75rem 1.5rem', 
+            borderRadius: '12px', 
+            fontWeight: 700, 
+            cursor: 'pointer' 
+          }}
+        >
+          Back to Search
+        </button>
       </div>
     );
   }
 
   const selectedVehicle = rideData.vehicles[0]; // Auto select first available for now
   const pricePerSeat = rideData.estimatedPrice;
-  const totalPrice = pricePerSeat * seatCount;
+  const basePrice = pricePerSeat * seatCount;
+
+  // Indian GST Tax Calculation (5% total: 2.5% CGST + 2.5% SGST)
+  const CGST_RATE = 0.025; // 2.5%
+  const SGST_RATE = 0.025; // 2.5%
+  const cgstAmount = Number((basePrice * CGST_RATE).toFixed(2));
+  const sgstAmount = Number((basePrice * SGST_RATE).toFixed(2));
+  const totalTax = Number((cgstAmount + sgstAmount).toFixed(2));
+  const totalPrice = Number((basePrice + totalTax).toFixed(2));
 
   const handleBookTicket = async () => {
     if (!user) {
@@ -73,87 +95,111 @@ const RideCheckout = () => {
   };
 
   return (
-    <div style={{ background: 'var(--bg-surface)', minHeight: '100vh', paddingBottom: '100px' }}>
-      <div style={{ background: 'white', padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: 'var(--shadow-sm)' }}>
-        <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><ArrowLeft /></button>
-        <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>Confirm Ride</h2>
+    <div className="ride-checkout-container">
+      <div className="rc-header">
+        <button onClick={() => navigate(-1)} className="rc-back-btn">
+          <ArrowLeft size={20} />
+        </button>
+        <h2>Confirm Ride</h2>
       </div>
 
-      <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: 'var(--shadow-sm)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Route Details</span>
-            <span style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', padding: '4px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 800 }}>{rideData.distanceKm} km</span>
+      <div className="rc-body">
+        {/* Route Details Card */}
+        <div className="rc-card">
+          <div className="rc-route-header">
+            <span className="rc-route-title">Route Details</span>
+            <span className="rc-route-badge">
+              <Navigation size={12} style={{ transform: 'rotate(45deg)' }} /> {rideData.distanceKm} km
+            </span>
           </div>
           
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '4px' }}>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e' }}></div>
-              <div style={{ width: 2, height: 30, background: 'var(--border-light)', margin: '4px 0' }}></div>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444' }}></div>
+          <div className="rc-route-timeline">
+            <div className="rc-timeline-visual">
+              <div className="rc-timeline-dot-start"></div>
+              <div className="rc-timeline-line"></div>
+              <div className="rc-timeline-dot-end"></div>
             </div>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Pickup</p>
-                <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>{pickup.name}</h4>
+            <div className="rc-route-locations">
+              <div className="rc-location-item">
+                <p>Pickup Location</p>
+                <h4>{pickup.name}</h4>
               </div>
-              <div>
-                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Drop-off</p>
-                <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>{dropoff.name}</h4>
+              <div className="rc-location-item">
+                <p>Drop-off Location</p>
+                <h4>{dropoff.name}</h4>
               </div>
             </div>
           </div>
         </div>
 
-        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: 'var(--shadow-sm)' }}>
-           <h4 style={{ margin: '0 0 1rem 0', color: 'var(--text-secondary)' }}>Select Seats</h4>
-           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-             <span style={{ fontSize: '1rem', fontWeight: 600 }}>Passengers</span>
-             <div style={{ display: 'flex', alignItems: 'center', gap: '15px', background: 'var(--bg-surface)', padding: '5px 15px', borderRadius: '20px' }}>
-               <button 
-                 onClick={() => setSeatCount(Math.max(1, seatCount - 1))}
-                 style={{ border: 'none', background: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--primary)' }}
-               >-</button>
-               <span style={{ fontSize: '1.2rem', fontWeight: 800 }}>{seatCount}</span>
-               <button 
-                 onClick={() => setSeatCount(Math.min(selectedVehicle.available_seats, seatCount + 1))}
-                 style={{ border: 'none', background: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--primary)' }}
-               >+</button>
-             </div>
-           </div>
-           <p style={{ margin: '1rem 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-             {selectedVehicle.available_seats} seats currently available in {selectedVehicle.vehicle_type}
-           </p>
+        {/* Seat Selector Card */}
+        <div className="rc-card">
+          <h4 className="rc-section-title">
+            <Ticket size={18} color="var(--primary)" /> Select Seats
+          </h4>
+          <div className="rc-seat-selector">
+            <span className="rc-passenger-label">Passengers</span>
+            <div className="rc-counter-group">
+              <button 
+                onClick={() => setSeatCount(Math.max(1, seatCount - 1))}
+                className="rc-counter-btn"
+                disabled={seatCount <= 1}
+              >
+                -
+              </button>
+              <span className="rc-counter-value">{seatCount}</span>
+              <button 
+                onClick={() => setSeatCount(Math.min(selectedVehicle.available_seats, seatCount + 1))}
+                className="rc-counter-btn"
+                disabled={seatCount >= selectedVehicle.available_seats}
+              >
+                +
+              </button>
+            </div>
+          </div>
+          <p className="rc-seats-availability">
+            <ShieldCheck size={14} color="var(--primary)" />
+            {selectedVehicle.available_seats} seats currently available in {selectedVehicle.vehicle_type}
+          </p>
         </div>
 
-        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: 'var(--shadow-sm)' }}>
-          <h4 style={{ margin: '0 0 1rem 0', color: 'var(--text-secondary)' }}>Fare Summary</h4>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>Seat Price</span>
-            <span style={{ fontWeight: 600 }}>₹{pricePerSeat} x {seatCount}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>Taxes & Fees</span>
-            <span style={{ fontWeight: 600 }}>₹0</span>
-          </div>
-          <hr style={{ border: 'none', borderTop: '1px dashed var(--border-light)', margin: '1rem 0' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontWeight: 800, fontSize: '1.1rem' }}>Total Amount</span>
-            <span style={{ fontWeight: 800, fontSize: '1.5rem', color: 'var(--primary)' }}>₹{totalPrice}</span>
+        {/* Fare Summary Card */}
+        <div className="rc-card">
+          <h4 className="rc-section-title">
+            <CreditCard size={18} color="var(--primary)" /> Fare Summary
+          </h4>
+          <div className="rc-fare-summary">
+            <div className="rc-fare-row">
+              <span className="rc-fare-label">Base Seat Fare (₹{pricePerSeat} x {seatCount})</span>
+              <span className="rc-fare-value">₹{basePrice.toFixed(2)}</span>
+            </div>
+            <div className="rc-fare-row">
+              <span className="rc-fare-label">CGST (2.5%)</span>
+              <span className="rc-fare-value">₹{cgstAmount.toFixed(2)}</span>
+            </div>
+            <div className="rc-fare-row">
+              <span className="rc-fare-label">SGST (2.5%)</span>
+              <span className="rc-fare-value">₹{sgstAmount.toFixed(2)}</span>
+            </div>
+            <hr className="rc-divider" />
+            <div className="rc-total-row">
+              <span className="rc-total-label">Total Amount</span>
+              <span className="rc-total-value">₹{totalPrice.toFixed(2)}</span>
+            </div>
           </div>
         </div>
-
       </div>
 
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', padding: '1rem 1.5rem', boxShadow: '0 -10px 20px rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>Total Payable</p>
-          <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>₹{totalPrice}</h3>
+      {/* Fixed Bottom Action Bar */}
+      <div className="rc-bottom-bar">
+        <div className="rc-payable-info">
+          <p className="rc-payable-label">Total Payable</p>
+          <h3 className="rc-payable-value">₹{totalPrice.toFixed(2)}</h3>
         </div>
         <button 
           onClick={handleBookTicket}
           disabled={bookingLoading}
-          style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '1rem 2rem', borderRadius: '14px', fontWeight: 800, fontSize: '1rem', cursor: 'pointer', width: '50%' }}
+          className="rc-book-btn rc-pulse"
         >
           {bookingLoading ? 'Booking...' : 'Book Ticket'}
         </button>

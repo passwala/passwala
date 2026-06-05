@@ -224,6 +224,8 @@ const OrderHistory = () => {
     
     const storeName = order.stores?.name || order.items?.[0]?.store || 'Passwala Partner';
     const storeAddress = order.stores?.address || 'Thaltej, Ahmedabad, Gujarat 380054';
+    const isMahadev = storeName.toLowerCase().includes('mahadev');
+    const storeGSTIN = order.stores?.gstin || (isMahadev ? '24AAAMH4812K1Z9' : '24AAACP1234Q1Z5');
     const customerName = order.addresses?.name || 'Customer';
     const customerAddress = `${order.addresses?.society || ''}, ${order.addresses?.address_line_1 || ''}`;
     const orderId = order.id ? String(order.id).substring(0, 8).toUpperCase() : 'N/A';
@@ -273,12 +275,12 @@ const OrderHistory = () => {
     doc.setFont("helvetica", "bold");
     doc.text("GSTIN:", 16, startY + 27);
     doc.setFont("helvetica", "normal");
-    doc.text("24AAACP1234Q1Z5", 28, startY + 27);
+    doc.text(storeGSTIN, 28, startY + 27);
     
     doc.setFont("helvetica", "bold");
     doc.text("PAN:", 65, startY + 27);
     doc.setFont("helvetica", "normal");
-    doc.text("AAACP1234Q", 75, startY + 27);
+    doc.text(storeGSTIN.substring(2, 12), 75, startY + 27);
 
     // INVOICE NUMBER (Top Right)
     doc.setFontSize(7);

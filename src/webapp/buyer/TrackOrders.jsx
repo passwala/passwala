@@ -860,8 +860,9 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
     // ── Seller / Store info
     const storeName    = order.stores?.name || 'Passwala Partner Store';
     const storeAddress = order.stores?.address || 'Ahmedabad, Gujarat';
-    // GSTIN: stores table doesn't have this column yet — show placeholder
-    const storeGSTIN   = order.stores?.gstin || 'Not Registered';
+    // GSTIN: stores table doesn't have this column yet — show placeholder or Mahadev GSTIN
+    const isMahadev    = storeName.toLowerCase().includes('mahadev');
+    const storeGSTIN   = order.stores?.gstin || (isMahadev ? '24AAAMH4812K1Z9' : 'Not Registered');
     const storePhone   = order.stores?.phone || '';
 
     // ── Buyer / Customer info (name from users join, address from addresses)
@@ -944,7 +945,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
     doc.setFont('helvetica', 'bold');
     doc.text('PAN:', pA.x + 45, pA.y + 38);
     doc.setFont('helvetica', 'normal');
-    doc.text('N/A', pA.x + 55, pA.y + 38);
+    doc.text(storeGSTIN !== 'Not Registered' ? storeGSTIN.substring(2, 12) : 'N/A', pA.x + 55, pA.y + 38);
     doc.setFont('helvetica', 'bold');
     doc.text('State:', pA.x, pA.y + 43);
     doc.setFont('helvetica', 'normal');
