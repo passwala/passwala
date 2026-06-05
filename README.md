@@ -195,6 +195,10 @@ The platform has recently undergone a major round of stabilization and feature e
   - Seamless fallback checks matching user email accounts.
 - **Profile Image Bucket Uplink**: Added a backend Base64 image parser that decodes client photos in real-time and uploads them directly to the Supabase `user_profiles` storage bucket, providing permanent public URLs.
 
+### 🗺️ Interactive Map & Location Tracking Fixes
+- **Unconstrained Map Centering**: Removed `maxBounds` and `maxBoundsViscosity` restriction constraints from `<MapContainer>` components across `NearShops.jsx` and `AdminPanel.jsx`, resolving view lockups and allowing centering to work perfectly for all coordinates.
+- **Dynamic Recenter Binding**: Connected the `<RecenterMap>` custom Leaflet component to safely center the map dynamically when geolocation coords resolve post-mount.
+
 ### 🎨 Premium Orange & White UI Refinements
 - **Unified Glassmorphism**: Standardized dark and light modal backdrops with smooth translucent gradients and premium orange accent lines.
 - **Richer Micro-Interactions**: Polished the Customer web `CartDrawer` with reactive dynamic updates and physics-based checkout indicators.
