@@ -81,13 +81,13 @@ const NearShops = ({ location, userCoords }) => {
                 const getFallbackByName = (name = '') => {
                   const norm = name.toLowerCase();
                   if (norm.includes('ac') || norm.includes('appliance') || norm.includes('fridge') || norm.includes('washing')) {
-                    return '/water_purifier.png';
+                    return '/ac_repair.png';
                   }
                   if (norm.includes('clean') || norm.includes('sanitize') || norm.includes('maid') || norm.includes('wash')) {
                     return '/cleaning.png';
                   }
                   if (norm.includes('plumb') || norm.includes('leak') || norm.includes('pipe') || norm.includes('tap')) {
-                    return '/water_small.png';
+                    return '/plumbing.png';
                   }
                   if (norm.includes('electr') || norm.includes('wire') || norm.includes('fan') || norm.includes('switch')) {
                     return '/electrician.png';
