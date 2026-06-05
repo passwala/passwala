@@ -206,6 +206,7 @@ const NearShops = ({ location, userCoords }) => {
         
         // Quality Filter: Ignore if name is gibberish/too short
         if (title.length < 3 || ['nnknn', 'nzbsh', 'asdf'].some(g => title.toLowerCase().includes(g))) return;
+        if (viewType === 'SHOPS' && title.toLowerCase().includes('shiv')) return;
 
         const identifier = `${title}-${item.id}`;
         if (!seen.has(identifier)) {
