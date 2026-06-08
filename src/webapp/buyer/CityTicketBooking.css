@@ -87,7 +87,7 @@
   background: var(--bg-card);
   border-top-left-radius: 28px;
   border-top-right-radius: 28px;
-  padding: 1.5rem 1.5rem 4rem 1.5rem;
+  padding: 1.5rem 1.5rem 2.5rem 1.5rem;
   box-shadow: 0 -10px 30px rgba(0,0,0,0.1);
   position: relative;
   z-index: 10;
@@ -95,7 +95,7 @@
   display: flex;
   flex-direction: column;
   gap: 1.2rem;
-  max-height: 58vh;
+  max-height: 52vh;
   overflow-y: auto;
 }
 

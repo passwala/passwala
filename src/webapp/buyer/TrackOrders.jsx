@@ -216,7 +216,11 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
         try {
           const profile = 'driving';
           const publicUrl = `https://router.project-osrm.org/route/v1/${profile}/${startPt[1]},${startPt[0]};${endPt[1]},${endPt[0]}?overview=full&geometries=geojson`;
-          const res = await fetch(publicUrl);
+          const res = await fetch(publicUrl, {
+            headers: {
+              'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
+            }
+          });
           if (res.ok) {
             data = await res.json();
           }
@@ -363,17 +367,15 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
         if (routeToCustomerPoints.length > 0) {
           L.polyline(routeToCustomerPoints, {
             color: '#3b82f6',
-            weight: 4,
-            opacity: 0.5,
-            dashArray: '8, 8',
+            weight: 6,
+            opacity: 0.9,
             lineJoin: 'round'
           }).addTo(markerGroupRef.current);
         } else {
           L.polyline([storeLatLng, customerLatLng], {
             color: '#3b82f6',
-            weight: 4,
-            opacity: 0.5,
-            dashArray: '8, 8',
+            weight: 6,
+            opacity: 0.9,
             lineJoin: 'round'
           }).addTo(markerGroupRef.current);
         }
@@ -382,17 +384,15 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
           if (routeToStorePoints.length > 0) {
             L.polyline(routeToStorePoints, {
               color: '#94a3b8',
-              weight: 3,
-              opacity: 0.4,
-              dashArray: '4, 4',
+              weight: 6,
+              opacity: 0.9,
               lineJoin: 'round'
             }).addTo(markerGroupRef.current);
           } else {
             L.polyline([storeLatLng, riderLatLng], {
               color: '#94a3b8',
-              weight: 3,
-              opacity: 0.4,
-              dashArray: '4, 4',
+              weight: 6,
+              opacity: 0.9,
               lineJoin: 'round'
             }).addTo(markerGroupRef.current);
           }
@@ -517,7 +517,11 @@ function RideTrackingMap({ booking }) {
     const dLng = parseFloat(booking.drop_lng);
     if (!pLat || !dLat) return;
 
-    fetch(`https://router.project-osrm.org/route/v1/driving/${pLng},${pLat};${dLng},${dLat}?overview=full&geometries=geojson`)
+    fetch(`https://router.project-osrm.org/route/v1/driving/${pLng},${pLat};${dLng},${dLat}?overview=full&geometries=geojson`, {
+      headers: {
+        'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
+      }
+    })
       .then(r => r.json())
       .then(data => {
         if (data.code === 'Ok' && data.routes?.[0]) {
@@ -746,7 +750,6 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
               *,
               stores(name, address, lat, lng, vendor_id),
               addresses(*),
-              delivery_tracking(rider_id),
               users!orders_user_id_fkey(full_name, phone),
               order_items(
                 id,
@@ -760,6 +763,22 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
           
           if (!error && data) {
             dbOrders = data;
+            const orderIds = dbOrders.map(o => o.id);
+            if (orderIds.length > 0) {
+              const { data: trackingData, error: trackingError } = await supabase
+                .from('delivery_tracking')
+                .select('order_id, rider_id')
+                .in('order_id', orderIds);
+              if (!trackingError && trackingData) {
+                dbOrders = dbOrders.map(order => {
+                  const tracking = trackingData.filter(t => t.order_id === order.id);
+                  return {
+                    ...order,
+                    delivery_tracking: tracking
+                  };
+                });
+              }
+            }
           }
         } catch (dbErr) {
           console.warn("Database fetch offline, using local storage orders fallback:", dbErr);
@@ -1214,7 +1233,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
-    doc.text('Platform / Facilitator: Passwala • Planet Softweb Pvt. Ltd.', 14, finalY + 6);
+    doc.text('Platform / Facilitator: Passwala', 14, finalY + 6);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6);
     doc.text('CIN: U74999GJ2026PTC000000', 14, finalY + 11);
@@ -1284,13 +1303,13 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
          <div className="live-status">
            <div className="live-pulse"></div> 
            <span>
-             {activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED', 'PENDING'].includes(o.status)).length + rideBookings.filter(b => b.status === 'CONFIRMED').length} ACTIVE ORDERS
+             {activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status)).length + rideBookings.filter(b => b.status === 'CONFIRMED').length} ACTIVE ORDERS
            </span>
          </div>
       </div>
 
       <div className="orders-list-v2" style={{ paddingBottom: '120px' }}>
-        {loading ? <p>Syncing neighborhood cloud...</p> : activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED', 'PENDING'].includes(o.status)).map((order, i) => {
+        {loading ? <p>Syncing neighborhood cloud...</p> : activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status)).map((order, i) => {
           const progress = getProgress(order.status);
           const firstItem = order.items?.[0] || { name: 'Order' };
           const itemCount = order.items?.length || 0;
@@ -1359,13 +1378,13 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                   <div className="eta-timer">
                     <Clock size={20} className="pulse-text" />
                     <span>
-                      {order.status === 'PLACED' ? (isService ? 'Waiting for confirmation...' : 'Confirming order...') : 
+                      {order.status === 'PLACED' || order.status === 'PENDING' ? (isService ? 'Waiting for confirmation...' : 'Confirming order...') : 
                        ['DELIVERED', 'COMPLETED'].includes(order.status) ? (isService ? 'Completed!' : 'Arrived!') : 
                        <>Arriving in <strong>{order.eta || '10 mins'}</strong></>}
                     </span>
                   </div>
                   <p className="eta-status">
-                    {order.status === 'PLACED' ? (isService ? 'Waiting for service provider to confirm booking...' : 'Confirming order with nearby riders...') : 
+                    {order.status === 'PLACED' || order.status === 'PENDING' ? (isService ? 'Waiting for service provider to confirm booking...' : 'Confirming order with nearby riders...') : 
                      order.status === 'ACCEPTED' ? (isService ? 'Booking Confirmed, preparing service kit' : 'Rider Assigned, heading to the store') :
                      order.status === 'PREPARING' ? (isService ? 'Expert is preparing for service visit' : 'Rider is at the store picking up') :
                      order.status === 'SHIPPED' || order.status === 'DISPATCHED' ? (isService ? 'Expert is on the way to you' : 'Rider is on the way to you') : (isService ? 'Completed' : 'Delivered')}
@@ -1396,7 +1415,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
             </motion.div>
           );
         })}
-        {!loading && activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED', 'PENDING'].includes(o.status)).length === 0 && rideBookings.filter(b => b.status === 'CONFIRMED').length === 0 && (
+        {!loading && activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status)).length === 0 && rideBookings.filter(b => b.status === 'CONFIRMED').length === 0 && (
           <div className="empty-orders-placeholder-card" style={{ border: 'none', background: 'transparent', boxShadow: 'none' }}>
             <div className="placeholder-icon" style={{ background: '#f1f5f9', color: '#94a3b8' }}>📦</div>
             <h3 style={{ color: '#64748b' }}>No Active Orders</h3>

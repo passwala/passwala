@@ -108,4 +108,17 @@ export const AHMEDABAD_AREAS = [
   { name: 'Memnagar', lat: 23.0590, lng: 72.5421, aliases: ['380052', 'helmets crossing'] },
   { name: 'Gurukul', lat: 23.0498, lng: 72.5345, aliases: ['380052', 'gurukul road'] },
   { name: 'Sabarmati', lat: 23.0805, lng: 72.5800, aliases: ['380005', 'dharmanagar'] },
+  // Popular Landmarks and Specific Spots
+  { name: 'Paldi Bus Stop', lat: 23.0125, lng: 72.5620, aliases: ['paldi bus stand', 'st stand', 'paldi cross road', 'paldi station'] },
+  { name: 'GLS University', lat: 23.0335, lng: 72.5590, aliases: ['gls college', 'gls campus', 'law garden', 'gls university'] },
+  { name: 'Parimal Garden', lat: 23.0180, lng: 72.5570, aliases: ['parimal bagh', 'parimal park', 'ambawadi', 'parimal gardan'] },
+  { name: 'Law Garden', lat: 23.0270, lng: 72.5620, aliases: ['khau gali', 'law garden market', 'elisbridge'] },
+  { name: 'Lalbhai Dalpatbhai College of Engineering', lat: 23.0360, lng: 72.5475, aliases: ['ld college', 'ldce', 'ld campus'] },
+  { name: 'Kankaria Lake', lat: 22.9975, lng: 72.6000, aliases: ['kankaria talav', 'kankaria zoo', 'maninagar'] },
+  { name: 'Sabarmati Riverfront', lat: 23.0305, lng: 72.5780, aliases: ['riverfront park', 'sabarmati river'] },
+  { name: 'Ahmedabad Railway Station', lat: 23.0300, lng: 72.6005, aliases: ['kalupur station', 'kalupur railway station'] },
+  { name: 'Geeta Mandir Bus Stand', lat: 23.0160, lng: 72.5930, aliases: ['geeta mandir st stand', 'central bus station', 'st bus stand'] },
+  { name: 'Iscon Mega Mall', lat: 23.0298, lng: 72.5065, aliases: ['iscon mall', 'iscon circle', 'sg highway'] },
+  { name: 'Ahmedabad One Mall', lat: 23.0405, lng: 72.5275, aliases: ['alphaone mall', 'alpha one', 'vastrapur lake'] },
 ];
+

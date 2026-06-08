@@ -267,7 +267,11 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         try {
           const profile = 'cycling';
           const publicUrl = `https://router.project-osrm.org/route/v1/${profile}/${startPt[1]},${startPt[0]};${endPt[1]},${endPt[0]}?overview=full&geometries=geojson`;
-          const res = await fetch(publicUrl);
+          const res = await fetch(publicUrl, {
+            headers: {
+              'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
+            }
+          });
           if (res.ok) {
             data = await res.json();
           }
@@ -983,9 +987,13 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       // No active order - Do not show surrounding shops, only show Rider location
 
       // Re-center on Rider smoothly (only once or when requested)
-      if (riderLatLng && !hasCenteredRef.current) {
-        leafletMapRef.current.setView(riderLatLng, 14);
-        hasCenteredRef.current = true;
+      if (riderLatLng) {
+        if (!hasCenteredRef.current) {
+          leafletMapRef.current.setView(riderLatLng, 14);
+          hasCenteredRef.current = true;
+        } else {
+          leafletMapRef.current.panTo(riderLatLng);
+        }
       }
     }
   }, [mapCoords, activeOrder, incomingOrder, deliveryStep, nearbyStores, realStoreDistances, isOnline, osrmRouteToStore, osrmRouteToCustomer]);

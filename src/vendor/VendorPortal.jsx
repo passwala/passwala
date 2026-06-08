@@ -88,7 +88,21 @@ const VendorPortal = ({ user, onLogout }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showSuccessPop, setShowSuccessPop] = useState(false);
   const [storeId, setStoreId] = useState(null);
-  const [stats, setStats] = useState({ orders: 0, earnings: 0, pending: 0, rating: 0 });
+  const [stats, setStats] = useState({ 
+    orders: 0, 
+    earnings: 0, 
+    pending: 0, 
+    rating: 4.8,
+    weeklyData: [
+      { name: 'Mon', revenue: 0 },
+      { name: 'Tue', revenue: 0 },
+      { name: 'Wed', revenue: 0 },
+      { name: 'Thu', revenue: 0 },
+      { name: 'Fri', revenue: 0 },
+      { name: 'Sat', revenue: 0 },
+      { name: 'Sun', revenue: 0 }
+    ]
+  });
   const fileInputRef = React.useRef(null);
   const [profileImage, setProfileImage] = useState(localStorage.getItem('vProfileImage') || null);
 
@@ -101,7 +115,6 @@ const VendorPortal = ({ user, onLogout }) => {
 
       const phone = vendorData?.phone || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : null);
       if (!phone) {
-        setStats({ pending: 0, earnings: 0, orders: 0, rating: 4.8 });
         return;
       }
 
@@ -127,7 +140,6 @@ const VendorPortal = ({ user, onLogout }) => {
       }
 
       if (!foundStoreId) {
-        setStats({ pending: 0, earnings: 0, orders: 0, rating: 4.8 });
         return;
       }
 
@@ -141,22 +153,61 @@ const VendorPortal = ({ user, onLogout }) => {
 
       const totalEarnings = deliveredToday.reduce((sum, o) => sum + (o.total_amount || 0), 0);
 
-      // Fetch Real Rating from Stores Table
+      // Fetch Real Rating
       let realRating = 4.8;
-      const { data: storeData } = await supabase
-        .from('stores')
-        .select('rating')
-        .or(`vendor_id.eq.${foundStoreId},id.eq.${foundStoreId}`)
-        .maybeSingle();
-      if (storeData && typeof storeData.rating === 'number') {
-        realRating = storeData.rating;
+      if (businessType === 'service') {
+        const { data: provData } = await supabase
+          .from('service_providers')
+          .select('rating')
+          .eq('id', foundStoreId)
+          .maybeSingle();
+        if (provData && typeof provData.rating === 'number' && provData.rating > 0) {
+          realRating = provData.rating;
+        }
+      } else {
+        const { data: storeData } = await supabase
+          .from('stores')
+          .select('rating')
+          .or(`vendor_id.eq.${foundStoreId},id.eq.${foundStoreId}`)
+          .maybeSingle();
+        if (storeData && typeof storeData.rating === 'number' && storeData.rating > 0) {
+          realRating = storeData.rating;
+        }
       }
+
+      // Compute weekly chart data
+      const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const weeklyRevenueMap = {};
+      const chartDataList = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dayName = weekdays[d.getDay()];
+        const dateStr = d.toDateString();
+        weeklyRevenueMap[dateStr] = { name: dayName, revenue: 0 };
+        chartDataList.push(dateStr);
+      }
+
+      ordersList.forEach(order => {
+        if (order.status === 'DELIVERED' && order.created_at) {
+          const orderDate = new Date(order.created_at).toDateString();
+          if (weeklyRevenueMap[orderDate]) {
+            weeklyRevenueMap[orderDate].revenue += parseFloat(order.total_amount || 0);
+          }
+        }
+      });
+
+      const weeklyData = chartDataList.map(dateStr => ({
+        name: weeklyRevenueMap[dateStr].name,
+        revenue: Math.round(weeklyRevenueMap[dateStr].revenue)
+      }));
 
       setStats({
         pending: pendingList.length,
         earnings: totalEarnings,
         orders: deliveredToday.length,
-        rating: realRating 
+        rating: realRating,
+        weeklyData
       });
     } catch (err) {
       console.error("Stats fetch failed:", err);
@@ -405,7 +456,6 @@ const VendorPortal = ({ user, onLogout }) => {
             <div className="v-stat-icon v-icon-orange">
               <Clock size={24} />
             </div>
-            <div className="v-stat-badge-small" style={{ fontSize: '0.75rem', fontWeight: 800, padding: '4px 10px', borderRadius: '10px', background: 'rgba(249, 115, 22, 0.1)', color: '#f97316' }}>+12%</div>
           </div>
           <div className="v-stat-body" style={{ marginTop: '1rem' }}>
             <span className="v-stat-label">Live {businessType === 'shop' ? 'Orders' : 'Jobs'}</span>
@@ -432,7 +482,6 @@ const VendorPortal = ({ user, onLogout }) => {
             <div className="v-stat-icon v-icon-green">
               <IndianRupee size={24} />
             </div>
-            <div className="v-stat-badge-small" style={{ fontSize: '0.75rem', fontWeight: 800, padding: '4px 10px', borderRadius: '10px', background: '#f0fdf4', color: '#16a34a' }}>+5.4%</div>
           </div>
           <div className="v-stat-body" style={{ marginTop: '1rem' }}>
             <span className="v-stat-label">Today's Revenue</span>
@@ -459,7 +508,6 @@ const VendorPortal = ({ user, onLogout }) => {
             <div className="v-stat-icon v-icon-blue">
               <Star size={24} />
             </div>
-            <div className="v-stat-badge-small" style={{ fontSize: '0.75rem', fontWeight: 800, padding: '4px 10px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb' }}>Top 5%</div>
           </div>
           <div className="v-stat-body" style={{ marginTop: '1rem' }}>
             <span className="v-stat-label">{businessType === 'shop' ? 'Store Reputation' : 'Service Reputation'}</span>
@@ -490,15 +538,7 @@ const VendorPortal = ({ user, onLogout }) => {
           </div>
           <div className="v-chart-container" style={{ height: '300px', width: '100%', marginTop: '1rem' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={[
-                { name: 'Mon', revenue: 4000 },
-                { name: 'Tue', revenue: 7000 },
-                { name: 'Wed', revenue: 4500 },
-                { name: 'Thu', revenue: 9000 },
-                { name: 'Fri', revenue: 6500 },
-                { name: 'Sat', revenue: 8500 },
-                { name: 'Sun', revenue: 6000 }
-              ]}>
+              <AreaChart data={stats.weeklyData}>
                 <defs>
                   <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/>
@@ -855,6 +895,7 @@ const VendorPortal = ({ user, onLogout }) => {
                   <option value="">Select Category</option>
                   {businessType === 'shop' ? (
                     <>
+                      <option value="General Store">General Store</option>
                       <option value="Grocery & Essentials">Grocery & Essentials</option>
                       <option value="Fruits & Vegetables">Fruits & Vegetables</option>
                       <option value="Dairy, Bread & Eggs">Dairy, Bread & Eggs</option>
@@ -1093,6 +1134,7 @@ const VendorPortal = ({ user, onLogout }) => {
                 <option value="">Select Category</option>
                 {businessType === 'shop' ? (
                   <>
+                    <option value="General Store">General Store</option>
                     <option value="Grocery & Essentials">Grocery & Essentials</option>
                     <option value="Fruits & Vegetables">Fruits & Vegetables</option>
                     <option value="Dairy, Bread & Eggs">Dairy, Bread & Eggs</option>
@@ -1300,21 +1342,49 @@ const VendorPortal = ({ user, onLogout }) => {
                   }
 
                   let savedId = vendorData?.id;
+                  const cleanPayloadForRetry = (payload, errMessage) => {
+                    const clean = { ...payload };
+                    if (errMessage.includes('lat')) {
+                      delete clean.lat;
+                    }
+                    if (errMessage.includes('lng')) {
+                      delete clean.lng;
+                    }
+                    if (errMessage.includes('aadhar_no')) {
+                      delete clean.aadhar_no;
+                    }
+                    return clean;
+                  };
+
                   if (savedId) {
-                    const { error } = await supabase.from(targetTable).update(tablePayload).eq('id', savedId);
-                    if (error) throw error;
+                    let { error: updateErr } = await supabase.from(targetTable).update(tablePayload).eq('id', savedId);
+                    if (updateErr && (updateErr.message.includes('lat') || updateErr.message.includes('lng') || updateErr.message.includes('aadhar_no') || updateErr.message.includes('column'))) {
+                      const retryPayload = cleanPayloadForRetry(tablePayload, updateErr.message);
+                      let { error: retryErr } = await supabase.from(targetTable).update(retryPayload).eq('id', savedId);
+                      if (retryErr && (retryErr.message.includes('lat') || retryErr.message.includes('lng') || retryErr.message.includes('aadhar_no') || retryErr.message.includes('column'))) {
+                        const finalPayload = cleanPayloadForRetry(retryPayload, retryErr.message);
+                        const { error: finalErr } = await supabase.from(targetTable).update(finalPayload).eq('id', savedId);
+                        if (finalErr) throw finalErr;
+                      } else if (retryErr) {
+                        throw retryErr;
+                      }
+                    } else if (updateErr) {
+                      throw updateErr;
+                    }
                   } else {
                     let insertError = null;
                     let data = null;
 
-                    // Primary insert attempt (full payload including aadhar_no)
                     ({ data, error: insertError } = await supabase.from(targetTable).insert([tablePayload]).select().single());
 
-                    // If aadhar_no column doesn't exist yet (migration not run), retry without it
-                    if (insertError && insertError.message && insertError.message.includes('aadhar_no')) {
-                      console.warn('aadhar_no column missing in DB — retrying without it. Run migration: add_vendor_business_fields.sql');
-                      const { aadhar_no: _removed, ...payloadWithoutAadhar } = tablePayload;
-                      ({ data, error: insertError } = await supabase.from(targetTable).insert([payloadWithoutAadhar]).select().single());
+                    if (insertError && (insertError.message.includes('lat') || insertError.message.includes('lng') || insertError.message.includes('aadhar_no') || insertError.message.includes('column'))) {
+                      const retryPayload = cleanPayloadForRetry(tablePayload, insertError.message);
+                      ({ data, error: insertError } = await supabase.from(targetTable).insert([retryPayload]).select().single());
+                      
+                      if (insertError && (insertError.message.includes('lat') || insertError.message.includes('lng') || insertError.message.includes('aadhar_no') || insertError.message.includes('column'))) {
+                        const finalPayload = cleanPayloadForRetry(retryPayload, insertError.message);
+                        ({ data, error: insertError } = await supabase.from(targetTable).insert([finalPayload]).select().single());
+                      }
                     }
 
                     if (insertError) throw insertError;

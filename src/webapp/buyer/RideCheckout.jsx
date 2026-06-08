@@ -8,7 +8,7 @@ const RideCheckout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { pickup, dropoff, rideData, user } = location.state || {};
-  const [seatCount, setSeatCount] = useState(1);
+  const seatCount = 1;
   const [luggageWeight, setLuggageWeight] = useState(0); // default weight in kg
   const [bookingLoading, setBookingLoading] = useState(false);
 

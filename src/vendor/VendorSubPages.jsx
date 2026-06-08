@@ -2063,21 +2063,21 @@ export const VendorNotifications = ({ storeId, businessType }) => {
 };
 
 export const VendorSupport = () => {
-  const [showChat, setShowChat] = React.useState(false);
-  const [msg, setMsg] = React.useState('');
-  const [chatHistory, setChatHistory] = React.useState([
-    { sender: 'expert', text: 'Namaste! I am your dedicated Passwala Success Agent. I can help with payouts, inventory, or operational growth. How can I assist you today?', time: 'Just now' }
-  ]);
+  // const [showChat, setShowChat] = React.useState(false);
+  // const [msg, setMsg] = React.useState('');
+  // const [chatHistory, setChatHistory] = React.useState([
+  //   { sender: 'expert', text: 'Namaste! I am your dedicated Passwala Success Agent. I can help with payouts, inventory, or operational growth. How can I assist you today?', time: 'Just now' }
+  // ]);
   const [showArticles, setShowArticles] = React.useState(false);
 
-  const handleSend = (e) => {
-    e.preventDefault();
-    if (!msg.trim()) return;
-    const userMsg = { sender: 'vendor', text: msg, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-    const botReply = { sender: 'expert', text: 'Thank you for the update. I have flagged your account for priority review by our regional operations manager. Expect a resolution within 15-20 minutes.', time: 'Just now' };
-    setChatHistory([...chatHistory, userMsg, botReply]);
-    setMsg('');
-  };
+  // const handleSend = (e) => {
+  //   e.preventDefault();
+  //   if (!msg.trim()) return;
+  //   const userMsg = { sender: 'vendor', text: msg, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+  //   const botReply = { sender: 'expert', text: 'Thank you for the update. I have flagged your account for priority review by our regional operations manager. Expect a resolution within 15-20 minutes.', time: 'Just now' };
+  //   setChatHistory([...chatHistory, userMsg, botReply]);
+  //   setMsg('');
+  // };
 
   return (
     <div className="v-container animate-fade-in">
@@ -2112,19 +2112,22 @@ export const VendorSupport = () => {
         </motion.div>
 
         <motion.div
-          whileHover={{ y: -10 }}
+          whileHover={{ y: -5 }}
           className="v-data-card"
-          style={{ padding: '3rem', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid var(--v-primary)', boxShadow: '0 30px 60px -12px rgba(249, 115, 22, 0.15)' }}
+          style={{ padding: '3rem', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid #e2e8f0', position: 'relative' }}
         >
+          <div style={{ position: 'absolute', top: '16px', right: '16px', background: '#fff7ed', color: '#f97316', padding: '6px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>
+            Coming Soon
+          </div>
           <div>
-            <div style={{ width: '72px', height: '72px', background: '#fff7ed', borderRadius: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem auto', boxShadow: '0 10px 20px -5px rgba(249, 115, 22, 0.2)' }}>
-              <CheckCircle size={32} color="var(--v-primary)" />
+            <div style={{ width: '72px', height: '72px', background: '#f8fafc', borderRadius: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem auto', boxShadow: '0 10px 20px -5px rgba(148, 163, 184, 0.2)' }}>
+              <CheckCircle size={32} color="#94a3b8" />
             </div>
             <h3 style={{ fontWeight: 950, fontSize: '1.5rem', margin: '0 0 1rem 0', color: '#0f172a' }}>Priority Concierge</h3>
             <p style={{ fontSize: '1rem', color: '#64748b', lineHeight: 1.6, marginBottom: '2.5rem', fontWeight: 600 }}>Direct bypass to technical operations. Verified partners receive support in under 60 seconds.</p>
           </div>
-          <button className="v-btn-primary" style={{ width: '100%', padding: '18px', fontSize: '1rem' }} onClick={() => setShowChat(!showChat)}>
-            {showChat ? "Exit Consultation" : "Consult Success Agent"}
+          <button className="v-btn-outline" style={{ width: '100%', padding: '18px', fontSize: '1rem', cursor: 'not-allowed', color: '#94a3b8', borderColor: '#cbd5e1' }} disabled>
+            Coming Soon
           </button>
         </motion.div>
       </div>
@@ -2147,8 +2150,8 @@ export const VendorSupport = () => {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {showChat && (
+      {/* <AnimatePresence>
+        {false && (
           <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} style={{ marginBottom: '4rem', background: 'white', padding: '3.5rem', borderRadius: '40px', border: '1px solid var(--v-primary)', boxShadow: '0 40px 100px -20px rgba(249, 115, 22, 0.2)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '2rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -2193,7 +2196,7 @@ export const VendorSupport = () => {
             </form>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence> */ }
 
       <div style={{ marginTop: '5rem', padding: '2.5rem', background: 'linear-gradient(to right, #f8fafc, #f1f5f9)', borderRadius: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4rem', flexWrap: 'wrap', border: '1px solid #e2e8f0' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

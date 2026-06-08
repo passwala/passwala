@@ -7,7 +7,6 @@ import vendorRoutes from './routes/vendor.js';
 import adminRoutes from './routes/admin.js';
 import ridersRoutes from './routes/riders.js';
 import orderRoutes from './routes/orders.js';
-import planetSoftwebRoutes from './routes/planetSoftweb.js';
 import aiRoutes from './routes/ai.js';
 import cityRidesRoutes from './routes/city_rides.js';
 import eventRoutes from './routes/events.js';
@@ -110,7 +109,6 @@ app.use('/api/users', userRoutes);
 app.use('/api/vendor', vendorRoutes);
 app.use('/api/riders', ridersRoutes);
 app.use('/api/orders', orderRoutes);
-app.use('/api/planet-softweb', planetSoftwebRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/city-rides', cityRidesRoutes);
 app.use('/api/events', eventRoutes);
@@ -133,7 +131,11 @@ app.get('/api/route', async (req, res) => {
       }
     }
     const url = `https://router.project-osrm.org/route/v1/${profile}/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
+      }
+    });
     if (!response.ok) throw new Error('OSRM API failed');
     const data = await response.json();
     routeCache.set(cacheKey, { data, timestamp: Date.now() });

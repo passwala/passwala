@@ -239,9 +239,8 @@ const OrderHistory = () => {
     // Header Logo & Title
     doc.setFont("helvetica", "bold");
     doc.setFontSize(22);
-    // Planet Softweb logo style (green/black vibe like Blinkit, or their brand color)
-    doc.setTextColor(16, 185, 129); // Emerald green
-    doc.text("Planet Softweb", 14, 20);
+    doc.setTextColor(255, 118, 34); // Passwala orange
+    doc.text(storeName.toUpperCase(), 14, 20);
     
     doc.setFontSize(12);
     doc.setTextColor(0, 0, 0);
@@ -423,7 +422,7 @@ const OrderHistory = () => {
     doc.rect(14, finalY, 182, footerHeight);
     
     doc.setFont("helvetica", "bold");
-    doc.text("Planet Softweb Private Limited", 16, finalY + 5);
+    doc.text("Passwala Logistics & Delivery Partner Services", 16, finalY + 5);
     
     doc.text("GSTIN:", 16, finalY + 9);
     doc.setFont("helvetica", "normal");
@@ -463,8 +462,8 @@ const OrderHistory = () => {
     doc.text("Terms & Conditions:", 16, finalY + 5);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(6);
-    doc.text("1. If you have any issues or queries in respect of your order, please contact customer chat support through Planet Softweb platform or drop in email at", 16, finalY + 9);
-    doc.text("info@planetsoftweb.com.", 16, finalY + 12);
+    doc.text("1. If you have any issues or queries in respect of your order, please contact customer chat support through Passwala platform or drop in email at", 16, finalY + 9);
+    doc.text("support@passwala.in.", 16, finalY + 12);
     doc.text("2. Please note that we never ask for bank account details such as CVV, account number, UPI Pin etc. across our support channels. For your safety please do", 16, finalY + 16);
     doc.text("not share these details with anyone over any medium.", 16, finalY + 19);
     doc.text("3. MRP displayed on the platform is as printed on the product package. Actual MRP and amount payable may be a function of offers, discounts and/or the", 16, finalY + 23);

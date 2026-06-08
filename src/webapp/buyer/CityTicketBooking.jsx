@@ -4,7 +4,9 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, useMapEvents 
 import L from 'leaflet';
 import { MapPin, Search, Navigation, ArrowRight, Map, LocateFixed, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { AHMEDABAD_AREAS as ahmedabadAreas } from '../../utils/constants';
 import './CityTicketBooking.css';
+
 
 // Custom colored markers
 const createColoredMarker = (color) =>
@@ -116,7 +118,12 @@ async function reverseGeocode(lat, lng) {
 async function fetchRoadRoute(pickup, dropoff) {
   try {
     const res = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${pickup.lng},${pickup.lat};${dropoff.lng},${dropoff.lat}?overview=full&geometries=geojson&steps=false`
+      `https://router.project-osrm.org/route/v1/driving/${pickup.lng},${pickup.lat};${dropoff.lng},${dropoff.lat}?overview=full&geometries=geojson&steps=false`,
+      {
+        headers: {
+          'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
+        }
+      }
     );
     const data = await res.json();
     if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
@@ -169,8 +176,8 @@ const CityTicketBooking = ({ user, userCoords }) => {
   const [activeInput, setActiveInput] = useState('pickup');
   const [routePath, setRoutePath] = useState(null);
   const [distanceKm, setDistanceKm] = useState(null);
-  const [locating, setLocating] = useState(false);
-  const [dbRoutes, setDbRoutes] = useState([]);
+  // const [locating, setLocating] = useState(false);
+  // const [dbRoutes, setDbRoutes] = useState([]);
   const [dbVehicles, setDbVehicles] = useState([]);
   const [pickupSearchQuery, setPickupSearchQuery] = useState('');
   const [dropoffSearchQuery, setDropoffSearchQuery] = useState('');
@@ -184,18 +191,23 @@ const CityTicketBooking = ({ user, userCoords }) => {
       setDropoffSearchQuery(query);
     }
     
-    if (!query || query.trim().length < 2) {
+    if (!query || query.trim().length < 1) {
       setSearchResults([]);
       return;
     }
     
     const q = query.toLowerCase().trim().replace(/[.,]/g, '');
+    const queryTerms = q.split(/\s+/).filter(Boolean);
     
     // 1. Instant local matching from constants.js to provide 0ms autocomplete
-    const localMatches = ahmedabadAreas.filter(area => 
-      area.name.toLowerCase().includes(q) || 
-      (area.aliases || []).some(alias => alias.toLowerCase().includes(q))
-    ).map(area => ({
+    const localMatches = ahmedabadAreas.filter(area => {
+      const areaName = area.name.toLowerCase();
+      const areaAliases = (area.aliases || []).map(alias => alias.toLowerCase());
+      return queryTerms.every(term => 
+        areaName.includes(term) || 
+        areaAliases.some(alias => alias.includes(term))
+      );
+    }).map(area => ({
       display_name: `${area.name}, Ahmedabad, Gujarat, India`,
       lat: area.lat.toString(),
       lon: area.lng.toString(),
@@ -203,6 +215,7 @@ const CityTicketBooking = ({ user, userCoords }) => {
     }));
 
     setSearchResults(localMatches);
+
 
     // 2. Debounce external Nominatim calls by 500ms to avoid keypress rate-limit blocks
     if (searchDebounceRef.current) {
@@ -212,8 +225,9 @@ const CityTicketBooking = ({ user, userCoords }) => {
     if (query.trim().length >= 3) {
       searchDebounceRef.current = setTimeout(async () => {
         try {
+          const suffix = query.toLowerCase().includes('ahmedabad') ? '' : ', Ahmedabad, Gujarat';
           const res = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Ahmedabad')}&countrycodes=in&viewbox=72.40,22.85,72.80,23.25&bounded=1&limit=8`,
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + suffix)}&countrycodes=in&limit=20`,
             { 
               headers: { 
                 'Accept-Language': 'en',
@@ -228,7 +242,7 @@ const CityTicketBooking = ({ user, userCoords }) => {
           const data = await res.json();
           if (Array.isArray(data)) {
             const filtered = data.filter(item => 
-              item.display_name.toLowerCase().includes('ahmedabad')
+              isWithinAhmedabad(parseFloat(item.lat), parseFloat(item.lon))
             );
             const externalResults = filtered.length > 0 ? filtered : data;
             
@@ -254,8 +268,9 @@ const CityTicketBooking = ({ user, userCoords }) => {
   const triggerSearch = async (query, type) => {
     if (!query) return;
     try {
+      const suffix = query.toLowerCase().includes('ahmedabad') ? '' : ', Ahmedabad, Gujarat';
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Ahmedabad')}&countrycodes=in&viewbox=72.40,22.85,72.80,23.25&bounded=1&limit=1`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + suffix)}&countrycodes=in&limit=10`,
         { 
           headers: { 
             'Accept-Language': 'en',
@@ -265,7 +280,12 @@ const CityTicketBooking = ({ user, userCoords }) => {
       );
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
-        handleSearchResultSelect(data[0], type);
+        const match = data.find(item => isWithinAhmedabad(parseFloat(item.lat), parseFloat(item.lon)));
+        if (match) {
+          handleSearchResultSelect(match, type);
+        } else {
+          toast.error('Location found is outside Ahmedabad city limits.');
+        }
       } else {
         toast.error('No locations found matching search term');
       }
@@ -273,6 +293,8 @@ const CityTicketBooking = ({ user, userCoords }) => {
       console.error('Search trigger error:', e);
     }
   };
+
+
 
   const handleSearchResultSelect = (result, type) => {
     const lat = parseFloat(result.lat);
@@ -310,7 +332,7 @@ const CityTicketBooking = ({ user, userCoords }) => {
         const res = await fetch(`${baseUrl}/api/city-rides/routes`);
         const data = await res.json();
         if (data.success) {
-          setDbRoutes(data.routes || []);
+          // setDbRoutes(data.routes || []);
           setDbVehicles(data.vehicles || []);
         }
       } catch (e) {
@@ -420,66 +442,66 @@ const CityTicketBooking = ({ user, userCoords }) => {
   };
 
   // Use current location as pickup
-  const handleUseMyLocation = () => {
-    if (userCoords && userCoords.lat && userCoords.lng) {
-      setLocating(true);
-      if (!isWithinAhmedabad(userCoords.lat, userCoords.lng)) {
-        toast.error('Passwala City Rides are strictly available within Ahmedabad city limits only.');
-        setLocating(false);
-        return;
-      }
-      reverseGeocode(userCoords.lat, userCoords.lng).then((name) => {
-        setPickup({ lat: userCoords.lat, lng: userCoords.lng, name });
-        setPickupSearchQuery(name);
-        setActiveInput('dropoff');
-        setLocating(false);
-        toast.success(`Your location: ${name}`, { icon: '📍', duration: 2500 });
-      });
-      return;
-    }
-
-    if (!navigator.geolocation) {
-      toast.error('Geolocation not supported');
-      return;
-    }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        if (!isWithinAhmedabad(latitude, longitude)) {
-          toast.error('Passwala City Rides are strictly available within Ahmedabad city limits only.');
-          setLocating(false);
-          return;
-        }
-        const name = await reverseGeocode(latitude, longitude);
-        setPickup({ lat: latitude, lng: longitude, name });
-        setPickupSearchQuery(name);
-        setActiveInput('dropoff');
-        setLocating(false);
-        toast.success(`Your location: ${name}`, { icon: '📍', duration: 2500 });
-      },
-      () => {
-        setLocating(false);
-        toast.error('Could not get your location');
-      },
-      { enableHighAccuracy: true }
-    );
-  };
-
-  const handleBookAdminRoute = (route) => {
-    if (dbVehicles.length === 0) {
-      toast.error('No vehicles currently available.');
-      return;
-    }
-    const mockPickup = { name: route.start_area, lat: 23.0225, lng: 72.5714 };
-    const mockDropoff = { name: route.end_area, lat: 23.0300, lng: 72.5800 };
-    const rideData = {
-      vehicles: dbVehicles,
-      distanceKm: route.distance_km,
-      estimatedPrice: route.base_price,
-    };
-    navigate('/ride-checkout', { state: { pickup: mockPickup, dropoff: mockDropoff, rideData, user } });
-  };
+  // const handleUseMyLocation = () => {
+  //   if (userCoords && userCoords.lat && userCoords.lng) {
+  //     setLocating(true);
+  //     if (!isWithinAhmedabad(userCoords.lat, userCoords.lng)) {
+  //       toast.error('Passwala City Rides are strictly available within Ahmedabad city limits only.');
+  //       setLocating(false);
+  //       return;
+  //     }
+  //     reverseGeocode(userCoords.lat, userCoords.lng).then((name) => {
+  //       setPickup({ lat: userCoords.lat, lng: userCoords.lng, name });
+  //       setPickupSearchQuery(name);
+  //       setActiveInput('dropoff');
+  //       setLocating(false);
+  //       toast.success(`Your location: ${name}`, { icon: '📍', duration: 2500 });
+  //     });
+  //     return;
+  //   }
+  // 
+  //   if (!navigator.geolocation) {
+  //     toast.error('Geolocation not supported');
+  //     return;
+  //   }
+  //   setLocating(true);
+  //   navigator.geolocation.getCurrentPosition(
+  //     async (pos) => {
+  //       const { latitude, longitude } = pos.coords;
+  //       if (!isWithinAhmedabad(latitude, longitude)) {
+  //         toast.error('Passwala City Rides are strictly available within Ahmedabad city limits only.');
+  //         setLocating(false);
+  //         return;
+  //       }
+  //       const name = await reverseGeocode(latitude, longitude);
+  //       setPickup({ lat: latitude, lng: longitude, name });
+  //       setPickupSearchQuery(name);
+  //       setActiveInput('dropoff');
+  //       setLocating(false);
+  //       toast.success(`Your location: ${name}`, { icon: '📍', duration: 2500 });
+  //     },
+  //     () => {
+  //       setLocating(false);
+  //       toast.error('Could not get your location');
+  //     },
+  //     { enableHighAccuracy: true }
+  //   );
+  // };
+  // 
+  // const handleBookAdminRoute = (route) => {
+  //   if (dbVehicles.length === 0) {
+  //     toast.error('No vehicles currently available.');
+  //     return;
+  //   }
+  //   const mockPickup = { name: route.start_area, lat: 23.0225, lng: 72.5714 };
+  //   const mockDropoff = { name: route.end_area, lat: 23.0300, lng: 72.5800 };
+  //   const rideData = {
+  //     vehicles: dbVehicles,
+  //     distanceKm: route.distance_km,
+  //     estimatedPrice: route.base_price,
+  //   };
+  //   navigate('/ride-checkout', { state: { pickup: mockPickup, dropoff: mockDropoff, rideData, user } });
+  // };
 
   const handleSearchRide = async () => {
     if (!pickup || !dropoff) {

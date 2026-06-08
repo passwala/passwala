@@ -8,10 +8,24 @@ import { useSecureLocation } from '../hooks/useSecureLocation';
 import { AHMEDABAD_AREAS as ahmedabadAreas } from '../utils/constants';
 import './LocationSelector.css';
 
+const AHMEDABAD_BOUNDS = {
+  minLat: 22.9,
+  maxLat: 23.25,
+  minLng: 72.4,
+  maxLng: 72.7
+};
+
+function isWithinAhmedabad(lat, lng) {
+  return (
+    lat >= AHMEDABAD_BOUNDS.minLat &&
+    lat <= AHMEDABAD_BOUNDS.maxLat &&
+    lng >= AHMEDABAD_BOUNDS.minLng &&
+    lng <= AHMEDABAD_BOUNDS.maxLng
+  );
+}
+
 const LocationSelector = ({ currentLocation, onLocationChange }) => {
   const navigate = useNavigate();
-
-
 
   const handleSelect = (areaObj) => {
     onLocationChange(areaObj.name, { lat: areaObj.lat, lng: areaObj.lng });
@@ -27,6 +41,53 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
   };
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const searchDebounceRef = React.useRef(null);
+
+  const handleSearchChange = (val) => {
+    setSearchTerm(val);
+    if (!val || val.trim().length < 3) {
+      setSearchResults([]);
+      return;
+    }
+
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+
+    setSearching(true);
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const suffix = val.toLowerCase().includes('ahmedabad') ? '' : ', Ahmedabad, Gujarat';
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val + suffix)}&countrycodes=in&limit=20`,
+          {
+            headers: {
+              'Accept-Language': 'en',
+              'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
+            }
+          }
+        );
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          const filtered = data.filter(place => 
+            isWithinAhmedabad(parseFloat(place.lat), parseFloat(place.lon))
+          ).map(place => ({
+            name: place.display_name,
+            lat: parseFloat(place.lat),
+            lng: parseFloat(place.lon)
+          }));
+          setSearchResults(filtered);
+        }
+      } catch (err) {
+        console.error('Nominatim search failed in LocationSelector:', err);
+      } finally {
+        setSearching(false);
+      }
+    }, 500);
+  };
+
   
   const { lat, lng, error, errorCode, isMock, address, loading, startTracking, stopTracking } = useSecureLocation();
 
@@ -106,9 +167,9 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
           <Search size={20} className="search-icon-v3" />
           <input 
             type="text" 
-            placeholder="Search neighborhood..." 
+            placeholder="Search neighborhood, shop, or address..." 
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
         </div>
       </div>
@@ -143,26 +204,47 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
            <h3 className="section-label-v3">EXPLORE AHMEDABAD</h3>
            
            <div className="neighborhood-grid">
-             {filteredAreas.length > 0 ? (
-               filteredAreas.map((area) => (
-                 <button 
-                   key={area.name} 
-                   className={`neighborhood-item ${currentLocation === area.name ? 'selected' : ''}`}
-                   onClick={() => handleSelect(area)}
-                 >
-                   <div className="neighborhood-icon-box">
-                      <MapPin size={18} />
-                   </div>
-                   <div className="neighborhood-meta">
-                      <strong>{area.name.split(',')[0]}</strong>
-                      <span>Ahmedabad</span>
-                   </div>
-                   {currentLocation === area.name && <CheckCircle2 size={20} className="selection-tick" />}
-                 </button>
-               ))
+             {filteredAreas.length > 0 || searchResults.length > 0 ? (
+               <>
+                 {filteredAreas.map((area) => (
+                   <button 
+                     key={area.name} 
+                     className={`neighborhood-item ${currentLocation === area.name ? 'selected' : ''}`}
+                     onClick={() => handleSelect(area)}
+                   >
+                     <div className="neighborhood-icon-box">
+                        <MapPin size={18} />
+                     </div>
+                     <div className="neighborhood-meta">
+                        <strong>{area.name.split(',')[0]}</strong>
+                        <span>Ahmedabad</span>
+                     </div>
+                     {currentLocation === area.name && <CheckCircle2 size={20} className="selection-tick" />}
+                   </button>
+                 ))}
+
+                 {searchResults.map((area, idx) => (
+                   <button 
+                     key={`ext-${idx}`} 
+                     className={`neighborhood-item ${currentLocation === area.name ? 'selected' : ''}`}
+                     onClick={() => handleSelect(area)}
+                   >
+                     <div className="neighborhood-icon-box" style={{ background: 'rgba(255, 118, 34, 0.1)', color: '#ff7622' }}>
+                        <MapPin size={18} />
+                     </div>
+                     <div className="neighborhood-meta">
+                        <strong>{area.name.split(',')[0]}</strong>
+                        <span style={{ fontSize: '10px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '180px' }}>
+                          {area.name.split(',').slice(1, 4).join(',')}
+                        </span>
+                     </div>
+                     {currentLocation === area.name && <CheckCircle2 size={20} className="selection-tick" />}
+                   </button>
+                 ))}
+               </>
              ) : (
                <div className="no-results-location">
-                  <p>No neighborhoods found matching "{searchTerm}"</p>
+                  <p>{searching ? 'Searching addresses...' : `No neighborhoods or addresses found matching "${searchTerm}"`}</p>
                </div>
              )}
            </div>
@@ -173,3 +255,4 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
 };
 
 export default LocationSelector;
+

@@ -63,7 +63,11 @@ export async function getOSRMRoute(startLat, startLng, endLat, endLng, profile =
   if (!data) {
     try {
       const publicUrl = `https://router.project-osrm.org/route/v1/${profile}/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
-      const res = await fetch(publicUrl);
+      const res = await fetch(publicUrl, {
+        headers: {
+          'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
+        }
+      });
       if (res.ok) {
         data = await res.json();
       }

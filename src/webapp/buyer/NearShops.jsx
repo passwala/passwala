@@ -251,10 +251,8 @@ const NearShops = ({ location, userCoords }) => {
     try {
       setLoading(true);
       const table = viewType === 'SHOPS' ? 'vendors' : 'service_providers';
-      const { data, error } = await supabase
-        .from(table) 
-        .select('*')
-        .limit(100);
+      const query = supabase.from(table).select(viewType === 'SHOPS' ? '*, stores(*)' : '*');
+      const { data, error } = await query.limit(100);
       
       if (error) throw error;
       
@@ -272,20 +270,20 @@ const NearShops = ({ location, userCoords }) => {
         if (!seen.has(identifier)) {
           seen.add(identifier);
           
-          let lat = item.lat;
-          let lng = item.lng;
+          let lat = item.lat || item.stores?.lat;
+          let lng = item.lng || item.stores?.lng;
 
           uniqueItems.push({
             id: item.id,
             name: title,
             category: item.category || (viewType === 'SHOPS' ? 'General' : 'Professional Service'),
-            rating: item.rating || (viewType === 'SERVICES' ? 4.5 : 0),
+            rating: item.rating || item.stores?.rating || (viewType === 'SERVICES' ? 4.5 : 0),
             // distance will be updated asynchronously below
             distance: 'N/A',
             lat: lat,
             lng: lng,
-            address: item.address,
-            image: item.photo_url || (viewType === 'SHOPS' ? "/essentials.png" : "/expert_services.png"),
+            address: item.address || item.stores?.address,
+            image: item.photo_url || item.stores?.logo_url || (viewType === 'SHOPS' ? "/essentials.png" : "/expert_services.png"),
             isOpen: true,
             verified: item.is_verified || false,
             type: viewType
@@ -313,8 +311,11 @@ const NearShops = ({ location, userCoords }) => {
             item.lat = lat;
             item.lng = lng;
             try {
-              const dbTable = viewType === 'SHOPS' ? 'vendors' : 'service_providers';
-              await supabase.from(dbTable).update({ lat, lng }).eq('id', item.id);
+              if (viewType === 'SHOPS') {
+                await supabase.from('stores').update({ lat, lng }).eq('vendor_id', item.id);
+              } else {
+                await supabase.from('service_providers').update({ lat, lng }).eq('id', item.id);
+              }
             } catch (dbErr) {
               console.warn('Failed to persist geocoded coordinates:', dbErr);
             }

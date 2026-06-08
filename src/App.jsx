@@ -45,7 +45,6 @@ const Wallet = React.lazy(() => import('./webapp/profile_pages/Wallet'));
 const PrivacySecurity = React.lazy(() => import('./webapp/profile_pages/PrivacySecurity'));
 const HelpSupport = React.lazy(() => import('./webapp/profile_pages/HelpSupport'));
 const AppSettings = React.lazy(() => import('./webapp/profile_pages/AppSettings'));
-const PlanetSoftweb = React.lazy(() => import('./planet_softweb/PlanetSoftweb'));
 const NeighborhoodHub = React.lazy(() => import('./webapp/buyer/NeighborhoodHub'));
 const CityTicketBooking = React.lazy(() => import('./webapp/buyer/CityTicketBooking'));
 const RideCheckout = React.lazy(() => import('./webapp/buyer/RideCheckout'));
@@ -581,7 +580,6 @@ const AppContent = ({
                   <Route path="/settings" element={effectiveUser ? <AppSettings isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/" />} />
                   <Route path="/select-location" element={effectiveUser ? <LocationSelector currentLocation={location} onLocationChange={setLocation} /> : <Navigate to="/" />} />
                   <Route path="/complete-profile" element={effectiveUser ? <CustomerDetails user={effectiveUser} onComplete={(addr, name) => { setIsProfileComplete(true); setUserAddress(addr); if (name) { setUser(prev => ({ ...prev, displayName: name })); } navigate('/'); }} /> : <Navigate to="/" />} />
-                  <Route path="/planet-softweb" element={<PlanetSoftweb />} />
                 </Routes>
               </Suspense>
             </main>

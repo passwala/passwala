@@ -160,7 +160,12 @@ router.get('/search', async (req, res) => {
     let distanceKm = 0;
     try {
       const osrmRes = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${pLng},${pLat};${dLng},${dLat}?overview=false`
+        `https://router.project-osrm.org/route/v1/driving/${pLng},${pLat};${dLng},${dLat}?overview=false`,
+        {
+          headers: {
+            'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
+          }
+        }
       );
       const osrmData = await osrmRes.json();
       if (osrmData.code === 'Ok' && osrmData.routes && osrmData.routes.length > 0) {

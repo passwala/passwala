@@ -123,7 +123,11 @@ const RideTicket = () => {
         const endLat = parseFloat(booking.pickup_lat);
         
         const url = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
-        const res = await fetch(url);
+        const res = await fetch(url, {
+          headers: {
+            'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
+          }
+        });
         if (res.ok) {
           const data = await res.json();
           if (data.routes && data.routes.length > 0) {
@@ -151,7 +155,11 @@ const RideTicket = () => {
         const endLat = parseFloat(booking.drop_lat);
 
         const url = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
-        const res = await fetch(url);
+        const res = await fetch(url, {
+          headers: {
+            'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
+          }
+        });
         if (res.ok) {
           const data = await res.json();
           if (data.routes && data.routes.length > 0) {
