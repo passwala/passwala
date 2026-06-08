@@ -175,38 +175,79 @@ const CityTicketBooking = ({ user, userCoords }) => {
   const [pickupSearchQuery, setPickupSearchQuery] = useState('');
   const [dropoffSearchQuery, setDropoffSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const searchDebounceRef = React.useRef(null);
 
-  const handleLocationSearch = async (query, type) => {
+  const handleLocationSearch = (query, type) => {
     if (type === 'pickup') {
       setPickupSearchQuery(query);
     } else {
       setDropoffSearchQuery(query);
     }
     
-    if (!query || query.trim().length < 3) {
+    if (!query || query.trim().length < 2) {
       setSearchResults([]);
       return;
     }
     
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Ahmedabad')}&countrycodes=in&viewbox=72.40,22.85,72.80,23.25&bounded=1&limit=8`,
-        { 
-          headers: { 
-            'Accept-Language': 'en',
-            'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
-          } 
+    const q = query.toLowerCase().trim().replace(/[.,]/g, '');
+    
+    // 1. Instant local matching from constants.js to provide 0ms autocomplete
+    const localMatches = ahmedabadAreas.filter(area => 
+      area.name.toLowerCase().includes(q) || 
+      (area.aliases || []).some(alias => alias.toLowerCase().includes(q))
+    ).map(area => ({
+      display_name: `${area.name}, Ahmedabad, Gujarat, India`,
+      lat: area.lat.toString(),
+      lon: area.lng.toString(),
+      is_local: true
+    }));
+
+    setSearchResults(localMatches);
+
+    // 2. Debounce external Nominatim calls by 500ms to avoid keypress rate-limit blocks
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+
+    if (query.trim().length >= 3) {
+      searchDebounceRef.current = setTimeout(async () => {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Ahmedabad')}&countrycodes=in&viewbox=72.40,22.85,72.80,23.25&bounded=1&limit=8`,
+            { 
+              headers: { 
+                'Accept-Language': 'en',
+                'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
+              } 
+            }
+          );
+          if (res.status === 429) {
+            console.warn('Nominatim rate limit (429) hit. Displaying local cache matches only.');
+            return;
+          }
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            const filtered = data.filter(item => 
+              item.display_name.toLowerCase().includes('ahmedabad')
+            );
+            const externalResults = filtered.length > 0 ? filtered : data;
+            
+            setSearchResults(prev => {
+              const merged = [...prev];
+              externalResults.forEach(ext => {
+                const extName = ext.display_name.split(',')[0].toLowerCase();
+                const exists = merged.some(local => local.display_name.split(',')[0].toLowerCase() === extName);
+                if (!exists) {
+                  merged.push(ext);
+                }
+              });
+              return merged;
+            });
+          }
+        } catch (e) {
+          console.error('Search error:', e);
         }
-      );
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        const filtered = data.filter(item => 
-          item.display_name.toLowerCase().includes('ahmedabad')
-        );
-        setSearchResults(filtered.length > 0 ? filtered : data);
-      }
-    } catch (e) {
-      console.error('Search error:', e);
+      }, 500);
     }
   };
 
