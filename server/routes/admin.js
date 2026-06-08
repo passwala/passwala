@@ -1,6 +1,8 @@
 import express from 'express';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
+import fs from 'fs/promises';
+import path from 'path';
 import supabase from '../supabase.js';
 import { authLimiter } from '../utils/rateLimiter.js';
 
@@ -491,13 +493,17 @@ router.get('/people_map', async (req, res) => {
             { data: vendorsList, error: vErr },
             { data: ridersList, error: rErr },
             { data: providersList, error: pErr },
-            { data: storesList, error: sErr }
+            { data: storesList, error: sErr },
+            { data: addressesList, error: addrErr },
+            { data: riderLocationsList, error: rLocErr }
         ] = await Promise.all([
             supabase.from('users').select('*'),
             supabase.from('vendors').select('*'),
             supabase.from('riders').select('*'),
             supabase.from('service_providers').select('*'),
-            supabase.from('stores').select('*')
+            supabase.from('stores').select('*'),
+            supabase.from('addresses').select('*'),
+            supabase.from('rider_locations').select('*')
         ]);
 
         if (uErr) throw uErr;
@@ -505,6 +511,8 @@ router.get('/people_map', async (req, res) => {
         if (rErr) throw rErr;
         if (pErr) throw pErr;
         if (sErr) throw sErr;
+        if (addrErr) throw addrErr;
+        if (rLocErr) throw rLocErr;
 
         res.status(200).json({
             success: true,
@@ -513,7 +521,9 @@ router.get('/people_map', async (req, res) => {
                 vendorsList,
                 ridersList,
                 providersList,
-                storesList
+                storesList,
+                addressesList,
+                riderLocationsList
             }
         });
     } catch (error) {
@@ -694,6 +704,56 @@ router.delete('/delete', async (req, res) => {
         res.status(200).json({ success: true, message: 'Deleted successfully' });
     } catch (error) {
         console.error(`❌ Admin Delete Error [${table}]:`, error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Helper to get platform settings path regardless of process.cwd()
+const getSettingsPath = () => {
+    return process.cwd().endsWith('server')
+        ? path.join(process.cwd(), 'platform_settings.json')
+        : path.join(process.cwd(), 'server', 'platform_settings.json');
+};
+
+// GET /api/admin/settings - load platform settings from server/platform_settings.json
+router.get('/settings', async (req, res) => {
+    try {
+        const settingsPath = getSettingsPath();
+        let settings = {
+            appName: 'Passwala',
+            supportEmail: 'ops@passwala.com',
+            maintenanceMode: false,
+            maxDeliveryRange: 10,
+            baseDeliveryFee: 30,
+            freeDeliveryThreshold: 499,
+            liveSync: true,
+            ridePricePerKm: 8
+        };
+        try {
+            const fileData = await fs.readFile(settingsPath, 'utf8');
+            settings = JSON.parse(fileData);
+        } catch (e) {
+            // File doesn't exist yet, return defaults
+        }
+        res.status(200).json({ success: true, settings });
+    } catch (error) {
+        console.error('❌ Get Settings Error:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/admin/settings - save platform settings to server/platform_settings.json
+router.post('/settings', async (req, res) => {
+    try {
+        const { settings } = req.body;
+        if (!settings) {
+            return res.status(400).json({ error: 'Settings payload is required' });
+        }
+        const settingsPath = getSettingsPath();
+        await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
+        res.status(200).json({ success: true, settings });
+    } catch (error) {
+        console.error('❌ Save Settings Error:', error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });

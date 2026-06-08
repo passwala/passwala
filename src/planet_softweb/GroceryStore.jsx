@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Plus, Minus, Trash2, Tag, Percent, ArrowRight, ShieldCheck, MapPin } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { supabase } from '../supabase';
 
 const PRESET_PRODUCTS = [
   { id: 'prod_apples_123456789012345678901234', name: 'Organic Royal Gala Apples', desc: 'Fresh crisp apples straight from Himalayan orchards.', price: 180, image: '🍎', tax_category: 'fresh' },
@@ -38,7 +39,7 @@ export default function GroceryStore({ onCheckoutSuccess, userId }) {
     const syncProducts = async () => {
       try {
         // Fetch products from database
-        await window.supabaseClient;
+        await supabase;
         // If they exist, we could fetch, but PRESET_PRODUCTS ensures offline instant functionality!
       } catch (err) {
         console.warn('DB product loading fallback');

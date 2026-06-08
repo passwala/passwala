@@ -563,10 +563,10 @@ const AppContent = ({
 
                   {/* Common Application Routes (Suspended correctly) */}
                   <Route path="/near-shops" element={effectiveUser ? <NearShops onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/" />} />
-                  <Route path="/expert-services" element={effectiveUser ? <ExpertServices onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
+                  <Route path="/expert-services" element={effectiveUser ? <ExpertServices onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/" />} />
                   <Route path="/neighbors" element={effectiveUser ? <NeighborsCommunity onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
                   <Route path="/track-orders" element={effectiveUser ? <TrackOrders user={effectiveUser} userCoords={userCoords} onBack={() => navigate('/')} /> : <Navigate to="/" />} />
-                  <Route path="/city-ride" element={effectiveUser ? <CityTicketBooking user={effectiveUser} onBack={() => navigate('/')} /> : <Navigate to="/" />} />
+                  <Route path="/city-ride" element={effectiveUser ? <CityTicketBooking user={effectiveUser} userCoords={userCoords} onBack={() => navigate('/')} /> : <Navigate to="/" />} />
                   <Route path="/ride-checkout" element={effectiveUser ? <RideCheckout /> : <Navigate to="/" />} />
                   <Route path="/ride-ticket" element={effectiveUser ? <RideTicket /> : <Navigate to="/" />} />
                   <Route path="/events" element={effectiveUser ? <EventHub onBack={() => navigate('/')} /> : <Navigate to="/" />} />

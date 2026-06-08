@@ -59,6 +59,8 @@ CREATE TABLE service_providers (
     rating            DECIMAL(3,2)  DEFAULT 0.0,
     is_verified       BOOLEAN       DEFAULT FALSE,
     profile_completed BOOLEAN       DEFAULT FALSE,
+    lat               DOUBLE PRECISION,
+    lng               DOUBLE PRECISION,
     created_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -113,6 +115,8 @@ CREATE TABLE vendors (
     aadhar_no         VARCHAR(20),                   -- Encrypted / masked
     is_verified       BOOLEAN      DEFAULT FALSE,
     profile_completed BOOLEAN      DEFAULT FALSE,
+    lat               DOUBLE PRECISION,
+    lng               DOUBLE PRECISION,
     created_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

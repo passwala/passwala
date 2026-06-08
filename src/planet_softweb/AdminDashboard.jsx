@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { RefreshCw, TrendingUp, DollarSign, BookOpen, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { supabase } from '../supabase';
 
 export default function AdminDashboard({ onSelectOrder }) {
   const [analytics, setAnalytics] = useState(null);
@@ -20,7 +21,7 @@ export default function AdminDashboard({ onSelectOrder }) {
       setAnalytics(analyticData);
 
       // 2. Fetch recent orders from PostgreSQL
-      const { data: dbOrders, error } = await window.supabase
+      const { data: dbOrders, error } = await supabase
         .from('orders')
         .select('*, users(full_name, phone)')
         .order('created_at', { ascending: false });
@@ -49,7 +50,7 @@ export default function AdminDashboard({ onSelectOrder }) {
   useEffect(() => {
     loadAdminData();
 
-    const channel = window.supabase
+    const channel = supabase
       .channel('admin-dashboard-updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
         loadAdminData();
@@ -57,7 +58,7 @@ export default function AdminDashboard({ onSelectOrder }) {
       .subscribe();
 
     return () => {
-      window.supabase.removeChannel(channel);
+      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -65,20 +66,20 @@ export default function AdminDashboard({ onSelectOrder }) {
     setIsProcessing(true);
     try {
       if (newStatus === 'CANCELLED') {
-        const { data: items } = await window.supabase.from('order_items').select('product_id, quantity').eq('order_id', orderId);
+        const { data: items } = await supabase.from('order_items').select('product_id, quantity').eq('order_id', orderId);
         if (items && items.length > 0) {
           for (const item of items) {
             if (item.product_id) {
-              const { data: prod } = await window.supabase.from('products').select('stock_quantity').eq('id', item.product_id).maybeSingle();
+              const { data: prod } = await supabase.from('products').select('stock_quantity').eq('id', item.product_id).maybeSingle();
               if (prod) {
-                await window.supabase.from('products').update({ stock_quantity: (prod.stock_quantity || 0) + item.quantity }).eq('id', item.product_id);
+                await supabase.from('products').update({ stock_quantity: (prod.stock_quantity || 0) + item.quantity }).eq('id', item.product_id);
               }
             }
           }
         }
       }
 
-      const { error } = await window.supabase
+      const { error } = await supabase
         .from('orders')
         .update({ status: newStatus })
         .eq('id', orderId);

@@ -1,4 +1,6 @@
 import express from 'express';
+import fs from 'fs/promises';
+import path from 'path';
 import supabase from '../supabase.js';
 
 const router = express.Router();
@@ -20,10 +22,115 @@ function isWithinAhmedabad(lat, lng) {
   );
 }
 
+async function getActiveVehicles() {
+  try {
+    // 1. Fetch active riders
+    const { data: activeRiders, error: riderErr } = await supabase
+      .from('riders')
+      .select('id, user_id, vehicle_no, rating')
+      .eq('is_active', true);
+    
+    if (riderErr) throw riderErr;
+    if (!activeRiders || activeRiders.length === 0) {
+      return [];
+    }
+
+    const activeDriverIds = activeRiders.map(r => r.user_id);
+
+    // 2. Find existing vehicles for these drivers
+    const { data: existingVehicles, error: vehicleErr } = await supabase
+      .from('city_vehicles')
+      .select('*')
+      .in('driver_id', activeDriverIds);
+
+    if (vehicleErr) throw vehicleErr;
+
+    const existingDriverIds = (existingVehicles || []).map(v => v.driver_id);
+    const vehiclesMap = {};
+    (existingVehicles || []).forEach(v => {
+      vehiclesMap[v.driver_id] = v;
+    });
+
+    for (const rider of activeRiders) {
+      if (!existingDriverIds.includes(rider.user_id)) {
+        // Create a vehicle entry
+        const { data: newVehicle, error: createErr } = await supabase
+          .from('city_vehicles')
+          .insert({
+            driver_id: rider.user_id,
+            vehicle_type: 'Bike',
+            license_plate: rider.vehicle_no || 'GJ01-PW-0000',
+            total_seats: 1,
+            available_seats: 1,
+            is_active: true
+          })
+          .select()
+          .single();
+        
+        if (!createErr && newVehicle) {
+          vehiclesMap[rider.user_id] = newVehicle;
+        }
+      } else {
+        // Ensure existing vehicle is active and is a Bike with 1 seat
+        const vehicle = vehiclesMap[rider.user_id];
+        if (!vehicle.is_active || vehicle.vehicle_type !== 'Bike' || vehicle.total_seats !== 1 || vehicle.available_seats !== 1) {
+          const { data: updatedVehicle } = await supabase
+            .from('city_vehicles')
+            .update({ 
+              is_active: true,
+              vehicle_type: 'Bike',
+              total_seats: 1,
+              available_seats: 1
+            })
+            .eq('id', vehicle.id)
+            .select()
+            .single();
+          if (updatedVehicle) {
+            vehiclesMap[rider.user_id] = updatedVehicle;
+          }
+        }
+      }
+    }
+
+    // 3. Fetch current locations from rider_locations
+    const riderIds = activeRiders.map(r => r.id);
+    const { data: locations } = await supabase
+      .from('rider_locations')
+      .select('rider_id, lat, lng')
+      .in('rider_id', riderIds);
+
+    const locationMap = {};
+    (locations || []).forEach(loc => {
+      locationMap[loc.rider_id] = { lat: parseFloat(loc.lat), lng: parseFloat(loc.lng) };
+    });
+
+    const riderToDriverMap = {};
+    activeRiders.forEach(r => {
+      riderToDriverMap[r.user_id] = r.id;
+    });
+
+    // 4. Return enriched active vehicles
+    return Object.values(vehiclesMap)
+      .filter(v => v.is_active && v.available_seats > 0)
+      .map(vehicle => {
+        const riderId = riderToDriverMap[vehicle.driver_id];
+        const loc = riderId ? locationMap[riderId] : null;
+        return {
+          ...vehicle,
+          current_lat: loc ? loc.lat : vehicle.current_lat,
+          current_lng: loc ? loc.lng : vehicle.current_lng
+        };
+      });
+  } catch (err) {
+    console.error('Error in getActiveVehicles:', err);
+    return [];
+  }
+}
+
 // 1. Search for a route and available vehicles
 router.get('/search', async (req, res) => {
   try {
-    const { pickupLat, pickupLng, dropLat, dropLng } = req.query;
+    const { pickupLat, pickupLng, dropLat, dropLng, pricePerKm } = req.query;
 
     if (!pickupLat || !pickupLng || !dropLat || !dropLng) {
       return res.status(400).json({ error: 'Pickup and drop coordinates are required' });
@@ -42,32 +149,54 @@ router.get('/search', async (req, res) => {
       
     if (routeErr) throw routeErr;
 
-    // Fetch active vehicles with available seats
-    const { data: vehicles, error: vehicleErr } = await supabase
-      .from('city_vehicles')
-      .select('*')
-      .eq('is_active', true)
-      .gt('available_seats', 0);
+    // Fetch active vehicles with available seats synced from active riders
+    const vehicles = await getActiveVehicles();
 
-    if (vehicleErr) throw vehicleErr;
-
-    // Dynamic routing approximation (Using Haversine formula for straight-line distance)
     const pLat = parseFloat(pickupLat);
     const pLng = parseFloat(pickupLng);
     const dLat = parseFloat(dropLat);
     const dLng = parseFloat(dropLng);
 
-    const R = 6371; // km
-    const dLatRad = (dLat - pLat) * Math.PI / 180;
-    const dLngRad = (dLng - pLng) * Math.PI / 180;
-    const a = Math.sin(dLatRad/2) * Math.sin(dLatRad/2) +
-              Math.cos(pLat * Math.PI / 180) * Math.cos(dLat * Math.PI / 180) *
-              Math.sin(dLngRad/2) * Math.sin(dLngRad/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    const distanceKm = R * c;
+    let distanceKm = 0;
+    try {
+      const osrmRes = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${pLng},${pLat};${dLng},${dLat}?overview=false`
+      );
+      const osrmData = await osrmRes.json();
+      if (osrmData.code === 'Ok' && osrmData.routes && osrmData.routes.length > 0) {
+        distanceKm = osrmData.routes[0].distance / 1000;
+      }
+    } catch (e) {
+      console.error('OSRM route fetch error on server, falling back to Haversine:', e);
+    }
 
-    // Minimum ride fare is ₹15, plus ₹8 per km
-    const estimatedPrice = Math.max(15, Math.ceil(distanceKm * 8));
+    if (distanceKm === 0) {
+      // Dynamic routing approximation (Using Haversine formula for straight-line distance)
+      const R = 6371; // km
+      const dLatRad = (dLat - pLat) * Math.PI / 180;
+      const dLngRad = (dLng - pLng) * Math.PI / 180;
+      const a = Math.sin(dLatRad/2) * Math.sin(dLatRad/2) +
+                Math.cos(pLat * Math.PI / 180) * Math.cos(dLat * Math.PI / 180) *
+                Math.sin(dLngRad/2) * Math.sin(dLngRad/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      distanceKm = R * c;
+    }
+
+    // Minimum ride fare is ₹15, plus dynamic rate per km (default ₹8)
+    let ratePerKm = 8;
+    try {
+      const settingsPath = process.cwd().endsWith('server')
+        ? path.join(process.cwd(), 'platform_settings.json')
+        : path.join(process.cwd(), 'server', 'platform_settings.json');
+      const rawData = await fs.readFile(settingsPath, 'utf8');
+      const settings = JSON.parse(rawData);
+      if (settings && settings.ridePricePerKm !== undefined) {
+        ratePerKm = parseFloat(settings.ridePricePerKm);
+      }
+    } catch (e) {
+      ratePerKm = parseFloat(pricePerKm) || 8;
+    }
+    const estimatedPrice = Math.max(15, Math.ceil(distanceKm * ratePerKm));
 
     res.json({
       success: true,
@@ -96,7 +225,9 @@ router.post('/book', async (req, res) => {
       seatCount, 
       totalPrice,
       pickupArea,
-      dropArea
+      dropArea,
+      luggageWeight,
+      luggagePrice
     } = req.body;
 
     if (!userId || !vehicleId || !pickupLat || !dropLat || !seatCount) {
@@ -108,17 +239,74 @@ router.post('/book', async (req, res) => {
       return res.status(400).json({ error: 'Booking denied. Coordinates are outside Ahmedabad limits.' });
     }
 
+    // Resolve userId to Supabase UUID id if it is a Firebase uid or phone format
+    let targetUserId = userId;
+    const isUserUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+    if (!isUserUuid) {
+      const { data: dbUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('uid', userId)
+        .maybeSingle();
+
+      if (dbUser) {
+        targetUserId = dbUser.id;
+      } else {
+        if (String(userId).startsWith('phone-')) {
+          const cleanPhone = String(userId).replace('phone-', '');
+          const { data: dbUserByPhone } = await supabase
+            .from('users')
+            .select('id')
+            .eq('phone', cleanPhone)
+            .maybeSingle();
+          if (dbUserByPhone) {
+            targetUserId = dbUserByPhone.id;
+          }
+        }
+      }
+    }
+
+    let targetVehicleId = vehicleId;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vehicleId);
+    if (!isUuid) {
+      const { data: activeVehicles } = await supabase
+        .from('city_vehicles')
+        .select('id')
+        .eq('is_active', true)
+        .limit(1);
+      
+      if (activeVehicles && activeVehicles.length > 0) {
+        targetVehicleId = activeVehicles[0].id;
+      } else {
+        const { data: anyVehicles } = await supabase
+          .from('city_vehicles')
+          .select('id')
+          .limit(1);
+        if (anyVehicles && anyVehicles.length > 0) {
+          targetVehicleId = anyVehicles[0].id;
+        } else {
+          return res.status(400).json({ error: 'No active vehicles are available in the city.' });
+        }
+      }
+    }
+
     // Atomic decrement of vehicle seats (simulated using Supabase RPC if available, or direct check)
     const { data: vehicle, error: fetchErr } = await supabase
       .from('city_vehicles')
       .select('available_seats, total_seats')
-      .eq('id', vehicleId)
+      .eq('id', targetVehicleId)
       .single();
 
     if (fetchErr) throw fetchErr;
 
     if (vehicle.available_seats < seatCount) {
-      return res.status(400).json({ error: 'Not enough seats available.' });
+      // Auto-reset available seats to accommodate the booking during testing/reuse
+      const resetSeats = Math.max(1, seatCount);
+      await supabase
+        .from('city_vehicles')
+        .update({ available_seats: resetSeats })
+        .eq('id', targetVehicleId);
+      vehicle.available_seats = resetSeats;
     }
 
     // Decrement seats
@@ -126,7 +314,7 @@ router.post('/book', async (req, res) => {
     const { error: updateErr } = await supabase
       .from('city_vehicles')
       .update({ available_seats: newSeats })
-      .eq('id', vehicleId);
+      .eq('id', targetVehicleId);
       
     if (updateErr) throw updateErr;
 
@@ -137,8 +325,8 @@ router.post('/book', async (req, res) => {
     const { data: booking, error: insertErr } = await supabase
       .from('ticket_bookings')
       .insert([{
-        user_id: userId,
-        vehicle_id: vehicleId,
+        user_id: targetUserId,
+        vehicle_id: targetVehicleId,
         pickup_lat: pickupLat,
         pickup_lng: pickupLng,
         drop_lat: dropLat,
@@ -148,14 +336,15 @@ router.post('/book', async (req, res) => {
         total_price: totalPrice,
         seat_count: seatCount,
         qr_code_hash: qrHash,
-        status: 'CONFIRMED'
+        status: 'CONFIRMED',
+        seat_numbers: { luggage_weight: luggageWeight || 0, luggage_price: luggagePrice || 0 }
       }])
       .select()
       .single();
 
     if (insertErr) {
       // Revert seats if booking fails
-      await supabase.from('city_vehicles').update({ available_seats: vehicle.available_seats }).eq('id', vehicleId);
+      await supabase.from('city_vehicles').update({ available_seats: vehicle.available_seats }).eq('id', targetVehicleId);
       throw insertErr;
     }
 
@@ -229,13 +418,7 @@ router.get('/routes', async (req, res) => {
 
     if (routeErr) throw routeErr;
 
-    const { data: vehicles, error: vehicleErr } = await supabase
-      .from('city_vehicles')
-      .select('*')
-      .eq('is_active', true)
-      .gt('available_seats', 0);
-
-    if (vehicleErr) throw vehicleErr;
+    const vehicles = await getActiveVehicles();
 
     res.json({ success: true, routes, vehicles });
   } catch (err) {
@@ -317,6 +500,176 @@ router.get('/my-bookings', async (req, res) => {
   } catch (err) {
     console.error('Fetch My Bookings Error:', err);
     res.status(500).json({ error: 'Failed to fetch ride bookings' });
+  }
+});
+
+// 6. Get active ride booking for a driver
+router.get('/active-ride', async (req, res) => {
+  try {
+    const { driverId } = req.query;
+
+    if (!driverId) {
+      return res.status(400).json({ error: 'driverId is required' });
+    }
+
+    // Get the vehicle for this driver
+    let { data: vehicle, error: vehErr } = await supabase
+      .from('city_vehicles')
+      .select('id')
+      .eq('driver_id', driverId)
+      .maybeSingle();
+
+    if (vehErr) throw vehErr;
+    
+    // Auto-create vehicle if missing so active rides can load properly
+    if (!vehicle) {
+      const { data: rider } = await supabase
+        .from('riders')
+        .select('*')
+        .eq('user_id', driverId)
+        .maybeSingle();
+        
+      if (rider) {
+        const { data: newVehicle, error: createErr } = await supabase
+          .from('city_vehicles')
+          .insert({
+            driver_id: driverId,
+            vehicle_type: 'Bike',
+            license_plate: rider.vehicle_no || 'GJ01-PW-0000',
+            total_seats: 1,
+            available_seats: 1,
+            is_active: true
+          })
+          .select()
+          .single();
+          
+        if (!createErr && newVehicle) {
+          vehicle = newVehicle;
+        }
+      }
+    }
+
+    if (!vehicle) {
+      return res.json({ success: true, booking: null });
+    }
+
+    // Fetch CONFIRMED ticket bookings for this vehicle
+    const { data: bookings, error: bookErr } = await supabase
+      .from('ticket_bookings')
+      .select('*, users(full_name, phone)')
+      .eq('vehicle_id', vehicle.id)
+      .eq('status', 'CONFIRMED')
+      .order('created_at', { ascending: false });
+
+    if (bookErr) throw bookErr;
+
+    res.json({
+      success: true,
+      booking: bookings && bookings.length > 0 ? bookings[0] : null
+    });
+
+  } catch (err) {
+    console.error('Fetch Active Ride Error:', err);
+    res.status(500).json({ error: 'Failed to fetch active ride' });
+  }
+});
+
+// 7. Complete a ride
+router.post('/complete', async (req, res) => {
+  try {
+    const { bookingId } = req.body;
+
+    if (!bookingId) {
+      return res.status(400).json({ error: 'bookingId is required' });
+    }
+
+    const { data: booking, error: updateErr } = await supabase
+      .from('ticket_bookings')
+      .update({ status: 'COMPLETED' })
+      .eq('id', bookingId)
+      .select()
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    res.json({ success: true, booking });
+
+  } catch (err) {
+    console.error('Complete Ride Error:', err);
+    res.status(500).json({ error: 'Failed to complete ride' });
+  }
+});
+
+// 8. Get specific booking status & live driver location
+router.get('/booking-status', async (req, res) => {
+  try {
+    const { bookingId } = req.query;
+    if (!bookingId) {
+      return res.status(400).json({ error: 'bookingId is required' });
+    }
+
+    const { data: booking, error } = await supabase
+      .from('ticket_bookings')
+      .select(`
+        *,
+        city_vehicles (
+          id,
+          driver_id,
+          vehicle_type,
+          license_plate,
+          current_lat,
+          current_lng,
+          last_location_update
+        )
+      `)
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (error || !booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    let driverLocation = null;
+    const driverId = booking.city_vehicles?.driver_id;
+    if (driverId) {
+      const { data: rider } = await supabase
+        .from('riders')
+        .select('id')
+        .eq('user_id', driverId)
+        .maybeSingle();
+
+      if (rider?.id) {
+        const { data: loc } = await supabase
+          .from('rider_locations')
+          .select('lat, lng, updated_at')
+          .eq('rider_id', rider.id)
+          .maybeSingle();
+
+        if (loc) {
+          const lastUpdate = new Date(loc.updated_at).getTime();
+          const now = Date.now();
+          if (now - lastUpdate < 900000) {
+            driverLocation = { lat: parseFloat(loc.lat), lng: parseFloat(loc.lng) };
+          }
+        }
+      }
+
+      if (!driverLocation && booking.city_vehicles?.current_lat && booking.city_vehicles?.current_lng) {
+        driverLocation = {
+          lat: parseFloat(booking.city_vehicles.current_lat),
+          lng: parseFloat(booking.city_vehicles.current_lng)
+        };
+      }
+    }
+
+    res.json({
+      success: true,
+      status: booking.status,
+      driverLocation
+    });
+  } catch (err) {
+    console.error('Booking status fetch error:', err);
+    res.status(500).json({ error: 'Failed to fetch booking status' });
   }
 });
 

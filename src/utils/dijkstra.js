@@ -43,25 +43,44 @@ export async function getOSRMRoute(startLat, startLng, endLat, endLng, profile =
 
   if (!startLat || !startLng || !endLat || !endLng) return fallback;
 
+  let data = null;
   try {
-    const baseUrl = import.meta.env.VITE_API_URL || '';
+    let baseUrl = import.meta.env.VITE_API_URL || '';
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      if (baseUrl.includes('localhost:') || baseUrl.includes('127.0.0.1:')) {
+        baseUrl = `${window.location.protocol}//${window.location.hostname}:3004`;
+      }
+    }
     const url = `${baseUrl}/api/route?startLat=${startLat}&startLng=${startLng}&endLat=${endLat}&endLng=${endLng}&profile=${profile}`;
     const res = await fetch(url);
-    if (!res.ok) throw new Error('OSRM Public API returned ' + res.status);
-    
-    const data = await res.json();
-    if (data.routes && data.routes.length > 0) {
-      const route = data.routes[0];
-      const coords = route.geometry.coordinates.map(pt => [pt[1], pt[0]]);
-      return {
-        distanceKm: parseFloat((route.distance / 1000).toFixed(1)),
-        durationMins: Math.round(route.duration / 60),
-        polyline: coords,
-        success: true
-      };
+    if (res.ok) {
+      data = await res.json();
     }
   } catch (err) {
-    console.warn("OSRM API failed, falling back to Haversine:", err.message);
+    console.warn("Backend OSRM proxy failed, trying public OSRM directly:", err.message);
+  }
+
+  if (!data) {
+    try {
+      const publicUrl = `https://router.project-osrm.org/route/v1/${profile}/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
+      const res = await fetch(publicUrl);
+      if (res.ok) {
+        data = await res.json();
+      }
+    } catch (err) {
+      console.warn("Direct public OSRM fetch failed:", err.message);
+    }
+  }
+
+  if (data && data.routes && data.routes.length > 0) {
+    const route = data.routes[0];
+    const coords = route.geometry.coordinates.map(pt => [pt[1], pt[0]]);
+    return {
+      distanceKm: parseFloat((route.distance / 1000).toFixed(1)),
+      durationMins: Math.round(route.duration / 60),
+      polyline: coords,
+      success: true
+    };
   }
 
   return fallback;

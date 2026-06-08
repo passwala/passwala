@@ -269,14 +269,14 @@ function RiderProfile({ user, onLogout, stats, riderId }) {
             <p style={{ fontSize: '0.75rem', color: 'var(--rider-text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 0.25rem 0' }}>Acceptance</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <CheckCircle size={20} color="var(--rider-text-secondary)" />
-                <span style={{ fontSize: '1.25rem', fontWeight: 900 }}>-</span>
+                <span style={{ fontSize: '1.25rem', fontWeight: 900 }}>{stats?.acceptanceRate ?? 100}%</span>
             </div>
          </div>
          <div className="rider-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <p style={{ fontSize: '0.75rem', color: 'var(--rider-text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 0.25rem 0' }}>Cancellation</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <XCircle size={20} color="var(--rider-text-secondary)" />
-                <span style={{ fontSize: '1.25rem', fontWeight: 900 }}>-</span>
+                <span style={{ fontSize: '1.25rem', fontWeight: 900 }}>{stats?.cancellationRate ?? 0}%</span>
             </div>
          </div>
       </div>

@@ -1,0 +1,10 @@
+{
+  "appName": "Passwala",
+  "supportEmail": "ops@passwala.com",
+  "maintenanceMode": false,
+  "maxDeliveryRange": 10,
+  "baseDeliveryFee": 30,
+  "freeDeliveryThreshold": 499,
+  "liveSync": true,
+  "ridePricePerKm": 11
+}

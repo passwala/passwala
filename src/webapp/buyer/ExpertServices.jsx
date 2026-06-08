@@ -16,8 +16,9 @@ import './ExpertServices.css';
 import { supabase } from '../../supabase';
 import { useTranslation } from '../LanguageContext';
 import { useCart } from '../../context/CartContext';
+import { getStraightLineDistance } from '../../utils/dijkstra';
 
-const ExpertServices = ({ onBack, location }) => {
+const ExpertServices = ({ onBack, location, userCoords }) => {
   const { t } = useTranslation();
   const { addToCart } = useCart();
   const currentArea = location?.split(',')[0] || 'your area';
@@ -39,10 +40,14 @@ const ExpertServices = ({ onBack, location }) => {
 
   useEffect(() => {
     fetchExperts();
-    window.addEventListener('storage', fetchExperts);
-    return () => {
-      window.removeEventListener('storage', fetchExperts);
-    };
+    if (supabase) {
+      const channel = supabase.channel('services-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'services' }, fetchExperts)
+        .subscribe();
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
   }, []);
 
   useEffect(() => {
@@ -70,6 +75,8 @@ const ExpertServices = ({ onBack, location }) => {
             rating,
             is_verified,
             about,
+            lat,
+            lng,
             users (
               full_name,
               photo_url
@@ -115,6 +122,10 @@ const ExpertServices = ({ onBack, location }) => {
             (rawPhoto.startsWith('http://') || rawPhoto.startsWith('https://') || rawPhoto.startsWith('data:') || rawPhoto.startsWith('/'));
           const expertPhoto = isValidPhoto ? rawPhoto : getCategoryPhoto(category);
 
+          const dist = userCoords && provider.lat && provider.lng
+            ? getStraightLineDistance(userCoords.lat, userCoords.lng, provider.lat, provider.lng).toFixed(1)
+            : null;
+
           return {
             id: s.id,
             title: s.title,
@@ -127,7 +138,8 @@ const ExpertServices = ({ onBack, location }) => {
             experience: provider.experience ? `${provider.experience} years exp` : null,
             verified: provider.is_verified || false,
             description: s.description,
-            providerId: provider.id
+            providerId: provider.id,
+            distance: dist
           };
         });
 
@@ -227,7 +239,11 @@ const ExpertServices = ({ onBack, location }) => {
                       </div>
                     )}
                   </div>
-                  <span className="expert-type">{expert.category}{expert.experience ? ` • ${expert.experience}` : ''}</span>
+                  <span className="expert-type">
+                    {expert.category}
+                    {expert.experience ? ` • ${expert.experience}` : ''}
+                    {expert.distance && ` • ${expert.distance} km away`}
+                  </span>
                    {expert.description && (
                      <p className="expert-description-snippet">{expert.description}</p>
                    )}
@@ -241,11 +257,6 @@ const ExpertServices = ({ onBack, location }) => {
                   <strong>₹{expert.price || 199}</strong>
                </div>
                 <div className="expert-actions">
-                   <button className="chat-btn" onClick={() => {
-                     toast.dismiss();
-                     toast.success(`Opening Passwala Help Bot for ${expert.name}...`);
-                     window.dispatchEvent(new CustomEvent('open-ai-chat', { detail: { expert } }));
-                   }}><MessageCircle size={18} /></button>
                    <button 
                      className="hire-btn"
                      onClick={() => {

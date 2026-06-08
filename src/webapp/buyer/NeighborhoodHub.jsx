@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Plus, Sparkles, Sunrise, Users, ShoppingBasket, MapPin, X, Check, Clock } from 'lucide-react';
 import { useTranslation } from '../LanguageContext';
@@ -9,8 +10,50 @@ import { useCart } from '../../context/CartContext';
 import './NeighborhoodHub.css';
 
 const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const { addToCart, setCartOpen } = useCart();
+
+  const [activeRideBooking, setActiveRideBooking] = useState(null);
+
+  useEffect(() => {
+    if (!user) return;
+    const uid = user.id || user.uid;
+    if (!uid) return;
+
+    const fetchActiveRide = async () => {
+      try {
+        const baseUrl = import.meta.env.VITE_API_URL || '';
+        const res = await fetch(`${baseUrl}/api/city-rides/my-bookings?userId=${uid}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.bookings) {
+            // Find first active ride (CONFIRMED status)
+            const active = data.bookings.find(b => b.status === 'CONFIRMED');
+            setActiveRideBooking(active || null);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch active ride on hub:', e);
+      }
+    };
+
+    fetchActiveRide();
+
+    // Real-time subscription for instant updates without page refresh
+    const rideSub = supabase
+      .channel('hub_ride_booking_updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_bookings' }, (payload) => {
+        fetchActiveRide();
+      })
+      .subscribe();
+
+    const interval = setInterval(fetchActiveRide, 8000);
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(rideSub);
+    };
+  }, [user]);
 
   // State management for interactive features
   const [activeModal, setActiveModal] = useState(null); // 'GROUP_ORDER' | 'MORNING_DELIVERY' | null
@@ -224,6 +267,25 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
       style={{ paddingBottom: '120px' }}
     >
       <div className="hub-container">
+        {/* Dynamic Active Ride Booking Banner */}
+        {activeRideBooking && (
+          <div className="completion-banner" style={{ borderStyle: 'solid', background: 'linear-gradient(135deg, rgba(234, 88, 12, 0.1) 0%, var(--bg-surface) 100%)', borderColor: '#ea580c' }}>
+            <div className="banner-icon-box" style={{ background: '#ea580c', color: 'white' }}>
+              <span style={{ fontSize: '1.25rem' }}>🚕</span>
+            </div>
+            <div className="banner-text-content">
+              <h4>Active City Ride Booked</h4>
+              <p>Your ride from <strong>{activeRideBooking.pickup_area}</strong> to <strong>{activeRideBooking.drop_area}</strong> is confirmed.</p>
+            </div>
+            <button 
+              className="complete-now-btn" 
+              style={{ background: '#ea580c' }} 
+              onClick={() => navigate('/ride-ticket', { state: { booking: activeRideBooking, vehicle: activeRideBooking.city_vehicles } })}
+            >
+              VIEW TICKET
+            </button>
+          </div>
+        )}
         {/* Dynamic Join Active Pool Alert */}
         {joinedPool && (
           <div className="completion-banner" style={{ borderStyle: 'solid', background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, var(--bg-surface) 100%)', borderColor: '#3b82f6' }}>
@@ -264,7 +326,13 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
           {cards.map((card, i) => (
             <motion.div 
               key={i} 
-              onClick={() => onNavigate(card.view)}
+              onClick={() => {
+                if (card.view === 'NEIGHBORS') {
+                  toast.success("Coming soon!", { icon: '✨' });
+                } else {
+                  onNavigate(card.view);
+                }
+              }}
               whileHover={{ scale: 1.05, translateY: -10 }}
               initial={{ opacity: 0, x: -20 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -288,7 +356,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
 
         {/* AI & Morning Delivery Features Row */}
         <div className="ai-hub-row">
-           <div className="ai-feature-card glass" onClick={handleSmartBasket}>
+           <div className="ai-feature-card glass" onClick={() => toast.success("Coming soon!", { icon: '✨' })}>
               <div className="ai-icon-box">
                 <Sparkles size={24} color="var(--primary)" />
               </div>
@@ -298,7 +366,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
               </div>
            </div>
            
-           <div className="ai-feature-card glass highlight" onClick={() => setActiveModal('MORNING_DELIVERY')}>
+           <div className="ai-feature-card glass highlight" onClick={() => toast.success("Coming soon!", { icon: '✨' })}>
               <div className="ai-icon-box">
                 <Sunrise size={24} color="#f59e0b" />
               </div>
@@ -308,7 +376,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
               </div>
            </div>
            
-           <div className="ai-feature-card glass" onClick={() => setActiveModal('GROUP_ORDER')}>
+           <div className="ai-feature-card glass" onClick={() => toast.success("Coming soon!", { icon: '✨' })}>
               <div className="ai-icon-box">
                 <Users size={24} color="#3b82f6" />
               </div>
@@ -337,7 +405,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
                  <span>{liveStats.pro} VERIFIED EXPERTS</span>
               </div>
             </div>
-            <button className="post-request-btn">
+            <button className="post-request-btn" onClick={() => toast.success("Coming soon!", { icon: '✨' })}>
               POST REQUEST <Plus size={20} />
             </button>
           </div>

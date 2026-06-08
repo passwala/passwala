@@ -3,6 +3,7 @@ import { Package, Truck, Compass, CheckCircle2, ChevronRight, RefreshCw, ArrowLe
 import { toast } from 'react-hot-toast';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import { supabase } from '../supabase';
 
 export default function OrderTracking({ orderId, onBack }) {
   const [trackingData, setTrackingData] = useState(null);
@@ -28,7 +29,7 @@ export default function OrderTracking({ orderId, onBack }) {
   useEffect(() => {
     fetchTracking();
 
-    const channel = window.supabase
+    const channel = supabase
       .channel(`tracking-${orderId}`)
       .on('postgres_changes', { 
         event: '*', 
@@ -41,7 +42,7 @@ export default function OrderTracking({ orderId, onBack }) {
       .subscribe();
 
     return () => {
-      window.supabase.removeChannel(channel);
+      supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
@@ -79,7 +80,7 @@ export default function OrderTracking({ orderId, onBack }) {
         return step;
       });
 
-      const { error } = await window.supabase
+      const { error } = await supabase
         .from('delivery_tracking')
         .update({
           status: nextStatus,

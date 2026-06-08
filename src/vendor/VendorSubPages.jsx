@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getOSRMRoute } from '../utils/dijkstra';
+import { AHMEDABAD_AREA_COORDS } from '../utils/constants';
 
 export const ConfirmModal = ({ isOpen, title, message, confirmText, cancelText, onConfirm, onCancel, type = 'danger' }) => {
   return (
@@ -615,7 +616,7 @@ function VendorOrderTrackingMap({ order, riderCoords, businessType }) {
   const mapRef = React.useRef(null);
   const leafletMapRef = React.useRef(null);
   const markerGroupRef = React.useRef(null);
-  const boundsFitted = React.useRef(false);
+const boundsFitted = React.useRef(false);
   const [osrmRoutePoints, setOsrmRoutePoints] = React.useState([]);
 
   // Coordinate Resolution State
@@ -626,16 +627,15 @@ function VendorOrderTrackingMap({ order, riderCoords, businessType }) {
   const geocodeAddress = async (address) => {
     if (!address) return null;
     
-    // Precision corrections for known areas that geocode poorly
-    const lower = address.toLowerCase();
-    if (lower.includes('thaltej')) return [23.0500, 72.5186]; // Deep Thaltej instead of SG Highway
-    if (lower.includes('gota')) return [23.0805, 72.5323];
-    if (lower.includes('satellite')) return [23.0293, 72.5137];
-    if (lower.includes('paldi')) return [23.0113, 72.5634];
-
+    // Check AHMEDABAD_AREA_COORDS first using shared constants
+    const lower = address.toLowerCase().replace(/[.,]/g, '');
+    for (const [key, coords] of Object.entries(AHMEDABAD_AREA_COORDS)) {
+      if (lower.includes(key)) return coords;
+    }
+  
     try {
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ', Ahmedabad, Gujarat, India')}&limit=1`;
-      const res = await fetch(url, { headers: { 'User-Agent': 'Passwalaa-App' } });
+      const res = await fetch(url, { headers: { 'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)' } });
       if (res.ok) {
         const data = await res.json();
         if (data && data.length > 0) {

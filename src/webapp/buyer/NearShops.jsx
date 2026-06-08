@@ -53,6 +53,61 @@ function RecenterMap({ coords }) {
   return null;
 }
 
+function FitBounds({ userCoords, shops }) {
+  const map = useMap();
+  useEffect(() => {
+    const pts = [];
+    if (userCoords?.lat && userCoords?.lng) {
+      pts.push([userCoords.lat, userCoords.lng]);
+    }
+    shops.forEach(s => {
+      const lat = parseFloat(s.lat);
+      const lng = parseFloat(s.lng);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        pts.push([lat, lng]);
+      }
+    });
+
+    if (pts.length > 1) {
+      map.fitBounds(L.latLngBounds(pts), { padding: [48, 48], maxZoom: 15 });
+    } else if (pts.length === 1) {
+      map.setView(pts[0], 14);
+    }
+  }, [userCoords, shops, map]);
+  return null;
+}
+
+function LocateButton({ userCoords }) {
+  const map = useMap();
+  if (!userCoords?.lat || !userCoords?.lng) return null;
+  return (
+    <button 
+      onClick={() => map.setView([userCoords.lat, userCoords.lng], 15)}
+      style={{
+        position: 'absolute',
+        bottom: '16px',
+        right: '16px',
+        zIndex: 1000,
+        background: 'white',
+        border: '1px solid #cbd5e1',
+        borderRadius: '50%',
+        width: '40px',
+        height: '40px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+        color: '#ff7622'
+      }}
+      title="Re-center to my location"
+      type="button"
+    >
+      <Navigation size={18} fill="#ff7622" />
+    </button>
+  );
+}
+
 const NearShops = ({ location, userCoords }) => {
   const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
@@ -179,7 +234,7 @@ const NearShops = ({ location, userCoords }) => {
         ? address 
         : `${address}, Ahmedabad, Gujarat, India`; // Fallback, could be enhanced with user location string
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchString)}&limit=1`;
-      const res = await fetch(url, { headers: { 'User-Agent': 'Passwalaa-App' } });
+      const res = await fetch(url, { headers: { 'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)' } });
       if (res.ok) {
         const data = await res.json();
         if (data && data.length > 0) {
@@ -238,7 +293,15 @@ const NearShops = ({ location, userCoords }) => {
         }
       });
       
-      const itemsWithDistance = await Promise.all(uniqueItems.map(async (item) => {
+      const withConcurrency = async (items, fn, limit = 5) => {
+        const results = [];
+        for (let i = 0; i < items.length; i += limit) {
+          results.push(...await Promise.all(items.slice(i, i + limit).map(fn)));
+        }
+        return results;
+      };
+
+      const itemsWithDistance = await withConcurrency(uniqueItems, async (item) => {
         let lat = item.lat;
         let lng = item.lng;
         
@@ -249,6 +312,12 @@ const NearShops = ({ location, userCoords }) => {
             lng = coords.lng;
             item.lat = lat;
             item.lng = lng;
+            try {
+              const dbTable = viewType === 'SHOPS' ? 'vendors' : 'service_providers';
+              await supabase.from(dbTable).update({ lat, lng }).eq('id', item.id);
+            } catch (dbErr) {
+              console.warn('Failed to persist geocoded coordinates:', dbErr);
+            }
           }
         }
         
@@ -257,7 +326,7 @@ const NearShops = ({ location, userCoords }) => {
         }
         const routeInfo = await getOSRMRoute(userCoords.lat, userCoords.lng, lat, lng);
         return { ...item, distance: routeInfo.distanceKm.toFixed(1) };
-      }));
+      }, 5);
 
       setShops(itemsWithDistance);
     } catch (err) {
@@ -270,8 +339,6 @@ const NearShops = ({ location, userCoords }) => {
 
   useEffect(() => {
     fetchData();
-    const timer = setTimeout(() => setLoading(false), 3000);
-    return () => clearTimeout(timer);
   }, [location, fetchData]);
 
   const filteredShops = shops.filter(shop => 
@@ -416,7 +483,8 @@ const NearShops = ({ location, userCoords }) => {
                     );
                   })}
                 
-                <RecenterMap coords={userCoords} />
+                 <FitBounds userCoords={userCoords} shops={filteredShops} />
+                 <LocateButton userCoords={userCoords} />
              </MapContainer>
              
              {/* Pulse overlay */}
@@ -474,15 +542,7 @@ const NearShops = ({ location, userCoords }) => {
                           </div>
                        </div>
                     </div>
-                   <button 
-                     className="visit-shop-btn"
-                     onClick={(e) => { 
-                       e.stopPropagation(); 
-                       handleOpenShop(shop); 
-                     }}
-                   >
-                     {shop.type === 'SERVICES' ? t('book_expert') : t('order_now')}
-                   </button>
+
                </Motion.div>
              ))
            ) : (

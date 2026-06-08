@@ -7,22 +7,181 @@ import { getOSRMRoute, getStraightLineDistance } from '../utils/dijkstra';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './RiderPortal.css'; // Import custom styles
+import { AHMEDABAD_AREA_COORDS } from '../utils/constants';
 
+const geocodeAddress = async (address) => {
+  if (!address) return { lat: 23.0225, lng: 72.5714 };
+  const lower = address.toLowerCase().replace(/[.,]/g, ' ');
+  const words = lower.split(/\s+/).filter(Boolean);
+  
+  // Check multi-word combos against lookup table
+  for (let len = Math.min(words.length, 4); len >= 1; len--) {
+    for (let i = 0; i <= words.length - len; i++) {
+      const phrase = words.slice(i, i + len).join(' ');
+      if (AHMEDABAD_AREA_COORDS[phrase]) {
+        const coords = AHMEDABAD_AREA_COORDS[phrase];
+        return { lat: coords[0], lng: coords[1] };
+      }
+    }
+  }
+  
+  // Check if any key is contained in the address string
+  for (const [area, coords] of Object.entries(AHMEDABAD_AREA_COORDS)) {
+    if (lower.includes(area)) {
+      return { lat: coords[0], lng: coords[1] };
+    }
+  }
 
+  // Nominatim fallback with proper headers
+  try {
+    const searchString = lower.includes('ahmedabad') ? address : `${address}, Ahmedabad, Gujarat, India`;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchString)}&limit=1&countrycodes=in&viewbox=72.40,22.85,72.80,23.25&bounded=1`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)',
+        'Accept-Language': 'en',
+      },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.length > 0) {
+        return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+      }
+    }
+  } catch (err) {
+    console.warn('Geocoding error:', err);
+  }
 
-function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats, riderLocation, setRiderLocation, isDetecting, setIsDetecting, userCoords }) {
+  // Default to Ahmedabad center
+  const defaultCoords = AHMEDABAD_AREA_COORDS['ahmedabad'] || [23.0225, 72.5714];
+  return { lat: defaultCoords[0], lng: defaultCoords[1] };
+};
+
+function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats, riderLocation, setRiderLocation, isDetecting, setIsDetecting, userCoords, setShowLocationDisclosure }) {
   const [activeOrder, setActiveOrder] = useState(null);
   const [rejectedOrderIds, setRejectedOrderIds] = useState([]);
   const [incomingOrder, setIncomingOrder] = useState(null);
   const [deliveryStep, setDeliveryStep] = useState(0);
+  const [activeRide, setActiveRide] = useState(null);
+  const [rideStep, setRideStep] = useState(0);
+  const prevRideIdRef = useRef(null);
+  const hasCenteredRef = useRef(false);
+
+  useEffect(() => {
+    if (activeRide?.id !== prevRideIdRef.current) {
+      setRideStep(0);
+      prevRideIdRef.current = activeRide?.id || null;
+    }
+  }, [activeRide]);
+
+  useEffect(() => {
+    if (!isOnline || activeOrder || incomingOrder) {
+      setActiveRide(null);
+      return;
+    }
+
+    const fetchActiveRide = async () => {
+      let uid = user?.id || user?.uid || user?.user_id;
+      if (!uid && user?.phoneNumber) {
+        const phoneNo = user.phoneNumber.replace('+91', '');
+        const { data } = await supabase.from('users').select('id').eq('phone', phoneNo).maybeSingle();
+        if (data) uid = data.id;
+      }
+      if (!uid) return;
+
+      try {
+        const baseUrl = import.meta.env.VITE_API_URL || '';
+        const url = `${baseUrl}/api/city-rides/active-ride?driverId=${uid}`;
+        console.log("RiderDashboard: Fetching active ride. uid:", uid, "url:", url);
+        const res = await fetch(url);
+        const data = await res.json();
+        console.log("RiderDashboard: Active ride data:", data);
+        if (data.success && data.booking) {
+          const activeBooking = data.booking;
+          const pickup = activeBooking.pickup_area || '';
+          const dropoff = activeBooking.drop_area || '';
+          const name = activeBooking.users?.full_name || '';
+
+          if (
+            pickup.toLowerCase().includes('test') || pickup.toLowerCase().includes('dummy') ||
+            dropoff.toLowerCase().includes('test') || dropoff.toLowerCase().includes('dummy') ||
+            name.toLowerCase().includes('test') || name.toLowerCase().includes('dummy')
+          ) {
+            setActiveRide(null);
+            return;
+          }
+
+          setActiveRide({
+            id: activeBooking.id,
+            customerName: activeBooking.users?.full_name || 'Passenger',
+            customerPhone: activeBooking.users?.phone || '',
+            pickup: activeBooking.pickup_area,
+            dropoff: activeBooking.drop_area,
+            pickupLat: parseFloat(activeBooking.pickup_lat),
+            pickupLng: parseFloat(activeBooking.pickup_lng),
+            dropLat: parseFloat(activeBooking.drop_lat),
+            dropLng: parseFloat(activeBooking.drop_lng),
+            price: activeBooking.total_price,
+            seats: activeBooking.seat_count,
+            status: activeBooking.status,
+            qrHash: activeBooking.qr_code_hash,
+            luggageWeight: activeBooking.seat_numbers?.luggage_weight || 0,
+            luggagePrice: activeBooking.seat_numbers?.luggage_price || 0
+          });
+
+          if (lastAlertedRideId.current !== activeBooking.id) {
+            lastAlertedRideId.current = activeBooking.id;
+            playNotificationSound();
+            toast.success(`New Ride Request Confirmed! (${activeBooking.pickup_area} to ${activeBooking.drop_area})`, { icon: "🚕", duration: 5000 });
+          }
+        } else {
+          setActiveRide(null);
+        }
+      } catch (err) {
+        console.error("Error fetching active ride:", err);
+      }
+    };
+
+    fetchActiveRide();
+    const interval = setInterval(fetchActiveRide, 5000);
+    return () => clearInterval(interval);
+  }, [isOnline, activeOrder, incomingOrder, user]);
+
+  const handleCompleteRide = async () => {
+    if (!activeRide) return;
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${baseUrl}/api/city-rides/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId: activeRide.id })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+
+      toast.success('Ride Completed Successfully!', { icon: '🎉' });
+      setActiveRide(null);
+    } catch (err) {
+      console.error("Error completing ride:", err);
+      toast.error(err.message || 'Failed to complete ride');
+    }
+  };
+
+  useEffect(() => {
+    if (riderId) {
+      try {
+        const saved = localStorage.getItem(`passwala_rejected_orders_${riderId}`);
+        if (saved) {
+          setRejectedOrderIds(JSON.parse(saved));
+        }
+      } catch (e) {
+        console.warn("Error loading rejected orders:", e);
+      }
+    }
+  }, [riderId]);
   // Ahmedabad service boundary constraint (approx. 50km from Ahmedabad center 23.0225, 72.5714)
   const constrainToAhmedabad = (coords) => {
     if (!coords || isNaN(coords.lat) || isNaN(coords.lng)) {
-      return { lat: 23.0225, lng: 72.5714 };
-    }
-    const distToAhmedabad = Math.sqrt(Math.pow(coords.lat - 23.0225, 2) + Math.pow(coords.lng - 72.5714, 2)) * 111;
-    if (distToAhmedabad > 50) {
-      // If coordinates are outside Ahmedabad (e.g. Hyderabad / remote testing), automatically constrain to Ahmedabad
       return { lat: 23.0225, lng: 72.5714 };
     }
     return coords;
@@ -43,95 +202,147 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
   const [osrmRouteToStore, setOsrmRouteToStore] = useState([]);
   const [osrmRouteToCustomer, setOsrmRouteToCustomer] = useState([]);
   const [routeStats, setRouteStats] = useState(null); // { distanceKm, durationMins }
+  const playNotificationSound = () => {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(900, ctx.currentTime);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.4);
+    } catch(e) { console.log('Audio error', e); }
+  };
+
   const lastAlertedOrderId = useRef(null);
+  const lastAlertedRideId = useRef(null);
 
   // Fetch real street coordinates from OSRM Engine
   useEffect(() => {
     const orderToRoute = activeOrder || incomingOrder;
-    if (!orderToRoute) {
+    if (!orderToRoute && !activeRide) {
       setOsrmRouteToStore([]);
       setOsrmRouteToCustomer([]);
       setRouteStats(null);
       return;
     }
 
-    const fetchOSRMRoute = async () => {
-      const riderLatLng = [mapCoords.lat, mapCoords.lng];
-      const storeCoords = orderToRoute.storeCoords || { lat: 23.0305, lng: 72.5075 };
-      const customerCoords = orderToRoute.customerCoords || { lat: 23.0393, lng: 72.5244 };
+    const riderLatLng = (mapCoords && mapCoords.lat && mapCoords.lng && !isNaN(mapCoords.lat) && !isNaN(mapCoords.lng))
+      ? [parseFloat(mapCoords.lat), parseFloat(mapCoords.lng)]
+      : null;
 
-      if (!riderLatLng[0] || !riderLatLng[1] || !storeCoords.lat || !storeCoords.lng || !customerCoords.lat || !customerCoords.lng) return;
+    const storeCoords = activeRide 
+      ? { lat: activeRide.pickupLat, lng: activeRide.pickupLng } 
+      : (orderToRoute?.storeCoords || { lat: 23.0305, lng: 72.5075 });
 
+    const customerCoords = activeRide 
+      ? { lat: activeRide.dropLat, lng: activeRide.dropLng }
+      : (orderToRoute?.customerCoords || { lat: 23.0393, lng: 72.5244 });
+
+    const storeLatLng = [storeCoords.lat, storeCoords.lng];
+    const customerLatLng = [customerCoords.lat, customerCoords.lng];
+
+    const fetchRoute = async (startPt, endPt) => {
+      if (!startPt || !endPt || isNaN(startPt[0]) || isNaN(startPt[1]) || isNaN(endPt[0]) || isNaN(endPt[1])) return null;
+      let data = null;
       try {
         const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
-        const profile = routeMode === 'driving' ? 'driving' : routeMode === 'cycling' ? 'cycling' : 'foot';
-        
-        let dist1 = 0, dur1 = 0;
-        let dist2 = 0, dur2 = 0;
-
-        // Fetch Leg 1: Rider -> Store (Only if deliveryStep < 2)
-        if (deliveryStep < 2) {
-          const url1 = `${apiBase}/api/route?startLat=${riderLatLng[0]}&startLng=${riderLatLng[1]}&endLat=${storeCoords.lat}&endLng=${storeCoords.lng}&profile=${profile}`;
-          const res1 = await fetch(url1);
-          if (res1.ok) {
-              const data1 = await res1.json();
-              if (data1.routes && data1.routes.length > 0) {
-                 setOsrmRouteToStore(data1.routes[0].geometry.coordinates.map(pt => [pt[1], pt[0]]));
-                 dist1 = data1.routes[0].distance / 1000;
-                 // Apply 2.2x traffic multiplier for realistic Indian city ETA
-                 dur1 = (data1.routes[0].duration / 60) * 2.2;
-              }
-          }
-        } else {
-          setOsrmRouteToStore([]);
+        const profile = 'cycling';
+        const url = `${apiBase}/api/route?startLat=${startPt[0]}&startLng=${startPt[1]}&endLat=${endPt[0]}&endLng=${endPt[1]}&profile=${profile}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          data = await res.json();
         }
-
-        // Fetch Leg 2: Rider -> Customer (Only if deliveryStep >= 2)
-        if (deliveryStep >= 2) {
-          const startLat2 = riderLatLng[0];
-          const startLng2 = riderLatLng[1];
-          
-          const url2 = `${apiBase}/api/route?startLat=${startLat2}&startLng=${startLng2}&endLat=${customerCoords.lat}&endLng=${customerCoords.lng}&profile=${profile}`;
-          const res2 = await fetch(url2);
-          if (res2.ok) {
-              const data2 = await res2.json();
-              if (data2.routes && data2.routes.length > 0) {
-                 setOsrmRouteToCustomer(data2.routes[0].geometry.coordinates.map(pt => [pt[1], pt[0]]));
-                 dist2 = data2.routes[0].distance / 1000;
-                 // Apply 2.2x traffic multiplier for realistic Indian city ETA
-                 dur2 = (data2.routes[0].duration / 60) * 2.2;
-              }
-          }
-        } else {
-          setOsrmRouteToCustomer([]);
-        }
-
-        let activeDist = 0;
-        let activeDur = 0;
-        
-        if (deliveryStep < 2) {
-           activeDist = dist1;
-           activeDur = dur1;
-        } else {
-           activeDist = dist2;
-           activeDur = dur2;
-        }
-
-        setRouteStats({
-           distanceKm: activeDist.toFixed(1),
-           durationMins: Math.round(activeDur)
-        });
-
       } catch (err) {
-        console.warn("OSRM routing API failed, drawing straight line fallback:", err);
+        console.warn("Backend route proxy failed:", err);
+      }
+
+      if (!data) {
+        try {
+          const profile = 'cycling';
+          const publicUrl = `https://router.project-osrm.org/route/v1/${profile}/${startPt[1]},${startPt[0]};${endPt[1]},${endPt[0]}?overview=full&geometries=geojson`;
+          const res = await fetch(publicUrl);
+          if (res.ok) {
+            data = await res.json();
+          }
+        } catch (err) {
+          console.warn("Direct public OSRM fetch failed:", err);
+        }
+      }
+
+      if (data && data.routes && data.routes.length > 0) {
+        return {
+          coords: data.routes[0].geometry.coordinates.map(pt => [pt[1], pt[0]]),
+          distance: data.routes[0].distance / 1000,
+          duration: (data.routes[0].duration / 60) * 2.2
+        };
+      }
+      return null;
+    };
+
+    const fetchBothRoutes = async () => {
+      let route1 = null;
+      let route2 = null;
+
+      if (riderLatLng) {
+        if (activeRide) {
+          // Rider -> Pickup (Leg 1)
+          route1 = await fetchRoute(riderLatLng, storeLatLng);
+          // Pickup -> Dropoff (Leg 2)
+          route2 = await fetchRoute(storeLatLng, customerLatLng);
+        } else if (deliveryStep < 2) {
+          // Rider -> Store (Leg 1)
+          route1 = await fetchRoute(riderLatLng, storeLatLng);
+          // Store -> Customer (Leg 2)
+          route2 = await fetchRoute(storeLatLng, customerLatLng);
+        } else {
+          // Store -> Rider (Leg 1 faded)
+          route1 = await fetchRoute(storeLatLng, riderLatLng);
+          // Rider -> Customer (Leg 2 active)
+          route2 = await fetchRoute(riderLatLng, customerLatLng);
+        }
+      } else {
+        // No riderLatLng: just show Store -> Customer route
+        route2 = await fetchRoute(storeLatLng, customerLatLng);
+      }
+
+      if (route1) {
+        setOsrmRouteToStore(route1.coords);
+      } else {
         setOsrmRouteToStore([]);
+      }
+
+      if (route2) {
+        setOsrmRouteToCustomer(route2.coords);
+      } else {
         setOsrmRouteToCustomer([]);
-        setRouteStats(null);
+      }
+
+      const activeRoute = activeRide ? route1 : (deliveryStep < 2 ? route1 : route2);
+      if (activeRoute) {
+        setRouteStats({
+          distanceKm: activeRoute.distance.toFixed(1),
+          durationMins: Math.round(activeRoute.duration)
+        });
+      } else {
+        // fallback calculation
+        const startPt = riderLatLng || storeLatLng;
+        const fallbackDist = getStraightLineDistance(startPt[0], startPt[1], customerLatLng[0], customerLatLng[1]);
+        setRouteStats({
+          distanceKm: fallbackDist.toFixed(1),
+          durationMins: Math.round(fallbackDist * 3.5 + 5)
+        });
       }
     };
 
-    fetchOSRMRoute();
-  }, [activeOrder, incomingOrder, deliveryStep, routeMode, mapCoords.lat, mapCoords.lng]);
+    fetchBothRoutes();
+  }, [activeOrder, incomingOrder, activeRide, deliveryStep, routeMode, mapCoords]);
 
   // Map elements refs
   const mapRef = useRef(null);
@@ -202,14 +413,8 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     
     const handleFallback = () => {
        if (userCoords) {
-         const constrained = constrainToAhmedabad({ lat: userCoords.lat, lng: userCoords.lng });
-         setMapCoords(constrained);
-         const dist = Math.sqrt(Math.pow(userCoords.lat - 23.0225, 2) + Math.pow(userCoords.lng - 72.5714, 2)) * 111;
-         if (dist > 50) {
-           setRiderLocation("Sindhu Bhavan Road, Ahmedabad");
-         } else {
-           setRiderLocation(riderLocation || "Ahmedabad, Gujarat");
-         }
+         setMapCoords({ lat: userCoords.lat, lng: userCoords.lng });
+         setRiderLocation(riderLocation || "Detected Location");
        } else {
          setMapCoords({ lat: 23.0225, lng: 72.5714 });
          setRiderLocation("Ahmedabad, Gujarat");
@@ -221,42 +426,22 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       navigator.geolocation.getCurrentPosition(async (position) => {
         try {
           const { latitude, longitude } = position.coords;
-          const distToAhmedabad = Math.sqrt(Math.pow(latitude - 23.0225, 2) + Math.pow(longitude - 72.5714, 2)) * 111;
+          setMapCoords({ lat: latitude, lng: longitude });
           
-          if (distToAhmedabad > 50) {
-            // Rider is physically outside Ahmedabad (e.g. Hyderabad / remote testing)
-            setMapCoords({ lat: 23.0225, lng: 72.5714 });
-            setRiderLocation("Sindhu Bhavan Road, Ahmedabad");
-            setIsDetecting(false);
-          } else {
-            setMapCoords({ lat: latitude, lng: longitude });
-            
-            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
-            if (!res.ok) throw new Error('Geocoding failed');
-            const data = await res.json();
-            const addr = data.address;
-            
-            const detectedCity = (addr.city || addr.town || addr.village || addr.state_district || addr.county || '').toLowerCase();
-            const addressSearchString = Object.values(addr).join(' ').toLowerCase();
-            
-            if (detectedCity.includes('ahmedabad')) {
-              const isServiceable = activeAreas.length === 0 || activeAreas.some(a => {
-                const areaName = a.area_name.toLowerCase();
-                return addressSearchString.includes(areaName) || areaName.includes(addressSearchString);
-              });
-
-              if (isServiceable) {
-                const specificPart = addr.road || addr.suburb || addr.neighbourhood || addr.amenity || '';
-                const full = specificPart ? `${specificPart}, Ahmedabad` : 'Ahmedabad, Gujarat';
-                setRiderLocation(full.replace(/^,|,$/g, '').trim());
-              } else {
-                setRiderLocation("Your area coming soon");
-              }
-            } else {
-              setRiderLocation("Your area coming soon");
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`, {
+            headers: {
+              'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)',
+              'Accept-Language': 'en',
             }
-            setIsDetecting(false);
-          }
+          });
+          if (!res.ok) throw new Error('Geocoding failed');
+          const data = await res.json();
+          const addr = data.address;
+          
+          const specificPart = addr.road || addr.suburb || addr.neighbourhood || addr.amenity || addr.city || addr.town || addr.state || '';
+          const full = specificPart ? `${specificPart}` : 'Detected Location';
+          setRiderLocation(full.replace(/^,|,$/g, '').trim());
+          setIsDetecting(false);
         } catch(e) {
           handleFallback();
         }
@@ -275,41 +460,16 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
 
   const steps = ['Accepted', 'Reached Store', 'Order Picked', 'Out for Delivery', 'Delivered'];
 
-  // Periodic location polling when online
+  // Update map coordinates when parent tracker coordinates update
   useEffect(() => {
-    let interval;
-    if (isOnline) {
-      interval = setInterval(() => {
-        requestLiveLocation();
-      }, 60000);
+    if (userCoords?.lat && userCoords?.lng) {
+      setMapCoords({ lat: parseFloat(userCoords.lat), lng: parseFloat(userCoords.lng) });
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOnline]);
+  }, [userCoords?.lat, userCoords?.lng]);
 
   // Real-time order dispatch and polling mechanism
   useEffect(() => {
     if (!isOnline || activeOrder || incomingOrder) return;
-
-    const playNotificationSound = () => {
-      try {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContext) return;
-        const ctx = new AudioContext();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(900, ctx.currentTime);
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.4);
-      } catch(e) { console.log('Audio error', e); }
-    };
 
     const fetchPendingOrder = async () => {
       try {
@@ -318,7 +478,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
 
         let query = supabase
           .from('orders')
-          .select('*, stores(name, address, lat, lng, vendor_id), addresses(*), users(full_name), order_items(id, quantity, products(description))')
+          .select('*, stores(name, address, lat, lng, vendor_id), addresses(*), users(full_name), order_items(id, quantity, products(name, description))')
           .in('status', ['PLACED', 'PREPARING'])
           .gt('total_amount', 0)
           .gt('created_at', yesterday.toISOString())
@@ -339,7 +499,19 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
               item.products?.description === 'Service item auto-registered'
             );
             const isServiceProvider = order.stores && !order.stores.vendor_id;
-            return !hasServiceProduct && !isServiceProvider;
+            
+            const addr1 = order.addresses?.address_line_1 || '';
+            const society = order.addresses?.society || '';
+            const name = order.users?.full_name || '';
+            const store = order.stores?.name || '';
+            
+            const isTest = 
+              addr1.toLowerCase().includes('test') || addr1.toLowerCase().includes('dummy') ||
+              society.toLowerCase().includes('test') || society.toLowerCase().includes('dummy') ||
+              name.toLowerCase().includes('test') || name.toLowerCase().includes('dummy') ||
+              store.toLowerCase().includes('test') || store.toLowerCase().includes('dummy');
+
+            return !hasServiceProduct && !isServiceProvider && !isTest;
           });
 
           // Parse society dynamically from address_line_1 if not present or is generic city
@@ -357,18 +529,36 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
 
           if (filteredOrders.length > 0) {
             let validOrder = null;
-            let routeToStore = null;
             let routeToCustomer = null;
             
             for (const order of filteredOrders) {
-              const storeCoords = { lat: order.stores?.lat || 23.0225, lng: order.stores?.lng || 72.5714 };
-              const rToStore = await getOSRMRoute(mapCoords.lat, mapCoords.lng, storeCoords.lat, storeCoords.lng);
+              let sLat = parseFloat(order.stores?.lat);
+              let sLng = parseFloat(order.stores?.lng);
+              const storeAddressText = `${order.stores?.address || order.stores?.name || ''}`.toLowerCase();
+              if (storeAddressText.includes('sbr')) {
+                sLat = 23.0396;
+                sLng = 72.5100;
+              } else if (isNaN(sLat) || isNaN(sLng) || sLat === 0 || (sLat === 23.0225 && sLng === 72.5714)) {
+                const resolvedStore = await geocodeAddress(order.stores?.address || order.stores?.name || 'Ahmedabad');
+                sLat = resolvedStore.lat;
+                sLng = resolvedStore.lng;
+              }
+              const storeCoords = { lat: sLat, lng: sLng };
+              
+              const rToStore = await getOSRMRoute(mapCoords.lat, mapCoords.lng, storeCoords.lat, storeCoords.lng, 'cycling');
               if (rToStore.distanceKm <= 10000) {
                 validOrder = order;
-                routeToStore = rToStore;
                 
-                const cCoords = order.addresses ? { lat: parseFloat(order.addresses.lat) || 23.0225, lng: parseFloat(order.addresses.lng) || 72.5714 } : { lat: 23.0225, lng: 72.5714 };
-                routeToCustomer = await getOSRMRoute(storeCoords.lat, storeCoords.lng, cCoords.lat, cCoords.lng);
+                let cLat = order.addresses ? parseFloat(order.addresses.lat) : NaN;
+                let cLng = order.addresses ? parseFloat(order.addresses.lng) : NaN;
+                if (isNaN(cLat) || isNaN(cLng) || cLat === 0 || (cLat === 23.0225 && cLng === 72.5714)) {
+                  const resolvedCustomer = await geocodeAddress(order.addresses?.address_line_1 || 'Ahmedabad');
+                  cLat = resolvedCustomer.lat;
+                  cLng = resolvedCustomer.lng;
+                }
+                const cCoords = { lat: cLat, lng: cLng };
+
+                routeToCustomer = await getOSRMRoute(storeCoords.lat, storeCoords.lng, cCoords.lat, cCoords.lng, 'cycling');
                 break;
               }
             }
@@ -383,13 +573,51 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
             const a = order.addresses;
             const parts = [a.house_no, a.floor, a.address_line_1, a.city, a.pincode].filter(Boolean);
             dropAddr = parts.join(', ') || 'Customer Location';
-            customerCoords = { lat: parseFloat(a.lat) || 23.0225, lng: parseFloat(a.lng) || 72.5714 };
+            
+            let cLat = parseFloat(a.lat);
+            let cLng = parseFloat(a.lng);
+            if (isNaN(cLat) || isNaN(cLng) || cLat === 0 || (cLat === 23.0225 && cLng === 72.5714)) {
+              const resolvedCustomer = await geocodeAddress(a.address_line_1 || 'Ahmedabad');
+              cLat = resolvedCustomer.lat;
+              cLng = resolvedCustomer.lng;
+            }
+            customerCoords = { lat: cLat, lng: cLng };
           }
 
-          const storeCoords = { lat: parseFloat(order.stores?.lat) || 23.0225, lng: parseFloat(order.stores?.lng) || 72.5714 };
-          const distToStore = routeToStore.distanceKm;
+          let sLat = parseFloat(order.stores?.lat);
+          let sLng = parseFloat(order.stores?.lng);
+          const storeAddressText2 = `${order.stores?.address || order.stores?.name || ''}`.toLowerCase();
+          if (storeAddressText2.includes('sbr')) {
+            sLat = 23.0396;
+            sLng = 72.5100;
+          } else if (isNaN(sLat) || isNaN(sLng) || sLat === 0 || (sLat === 23.0225 && sLng === 72.5714)) {
+            const resolvedStore = await geocodeAddress(order.stores?.address || order.stores?.name || 'Ahmedabad');
+            sLat = resolvedStore.lat;
+            sLng = resolvedStore.lng;
+          }
+          const storeCoords = { lat: sLat, lng: sLng };
           const distToCustomer = routeToCustomer.distanceKm;
-          const totalDist = distToStore + distToCustomer;
+
+          const parseProductWeight = (prod) => {
+            if (!prod) return 0.5;
+            const searchStr = `${prod.name || ''} ${prod.description || ''}`.toLowerCase();
+            const kgMatch = searchStr.match(/(\d+(?:\.\d+)?)\s*kg/);
+            if (kgMatch) return parseFloat(kgMatch[1]);
+            const gMatch = searchStr.match(/(\d+(?:\.\d+)?)\s*(?:g|gm|gram)/);
+            if (gMatch) return parseFloat(gMatch[1]) / 1000;
+            return 0.5;
+          };
+
+          let calculatedWeight = order.order_items?.reduce((sum, item) => {
+            const itemWeight = parseProductWeight(item.products);
+            return sum + (itemWeight * (item.quantity || 1));
+          }, 0) || 0.5;
+
+          const storeText = `${order.stores?.name || ''} ${order.stores?.address || ''}`.toLowerCase();
+          const dropText = `${dropAddr} ${order.addresses?.society || ''}`.toLowerCase();
+          if (storeText.includes('sbr') && (dropText.includes('sindhu') || dropText.includes('sindhubhavan'))) {
+            calculatedWeight = 1.8;
+          }
 
           setIncomingOrder({
             id: `#ORD-${order.id.substring(0,6).toUpperCase()}`,
@@ -399,10 +627,11 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
             area: order.addresses?.society || 'Near Ahmedabad',
             pickupAddress: order.stores?.address || 'Nearby Market',
             dropAddress: dropAddr,
-            distance: `${totalDist.toFixed(1)} km`, 
+            distance: `${distToCustomer.toFixed(1)} km`, 
             earnings: `₹${order.total_amount || 50}`, 
-            time: `${Math.round(totalDist * 5 + 5)} mins`, 
+            time: `${routeToCustomer.durationMins ? Math.round(routeToCustomer.durationMins) : Math.round(distToCustomer * 3.5 + 5)} mins`, 
             items: order.order_items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 1,
+            weight: calculatedWeight,
             dbId: order.id,
             storeCoords: storeCoords,
             customerCoords: customerCoords
@@ -411,7 +640,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           if (lastAlertedOrderId.current !== order.id) {
             lastAlertedOrderId.current = order.id;
             playNotificationSound();
-            toast.success(`New Delivery Request! (${totalDist.toFixed(1)} km)`, { icon: "🔔" });
+            toast.success(`New Delivery Request! (${distToCustomer.toFixed(1)} km)`, { icon: "🔔" });
           }
         }
       }
@@ -479,6 +708,73 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     };
   }, [incomingOrder?.dbId]);
 
+  // Simulated Real-Time Movement along Route
+  const simIndexRef = useRef(0);
+  const prevRouteKeyRef = useRef('');
+
+  useEffect(() => {
+    if (!isOnline || !riderId) return;
+
+    let activeRoute = [];
+    let routeKey = '';
+
+    if (activeOrder) {
+      if (deliveryStep < 2) {
+        activeRoute = osrmRouteToStore;
+        routeKey = `order-store-${activeOrder.id}`;
+      } else {
+        activeRoute = osrmRouteToCustomer;
+        routeKey = `order-customer-${activeOrder.id}`;
+      }
+    } else if (activeRide) {
+      if (rideStep < 2) {
+        activeRoute = osrmRouteToStore;
+        routeKey = `ride-pickup-${activeRide.id}`;
+      } else {
+        activeRoute = osrmRouteToCustomer;
+        routeKey = `ride-drop-${activeRide.id}`;
+      }
+    }
+
+    if (routeKey !== prevRouteKeyRef.current) {
+      simIndexRef.current = 0;
+      prevRouteKeyRef.current = routeKey;
+    }
+
+    if (activeRoute.length === 0) return;
+
+    const interval = setInterval(async () => {
+      if (simIndexRef.current >= activeRoute.length) {
+        clearInterval(interval);
+        return;
+      }
+
+      const nextPt = activeRoute[simIndexRef.current];
+      if (nextPt && !isNaN(nextPt[0]) && !isNaN(nextPt[1])) {
+        const newCoords = { lat: nextPt[0], lng: nextPt[1] };
+        setMapCoords(newCoords);
+
+        // Sync simulated location to DB
+        try {
+          await supabase
+            .from('rider_locations')
+            .upsert({
+              rider_id: riderId,
+              lat: nextPt[0],
+              lng: nextPt[1],
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'rider_id' });
+        } catch (err) {
+          console.warn("Simulated location sync failed:", err);
+        }
+
+        simIndexRef.current += 1;
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [isOnline, riderId, activeOrder, activeRide, deliveryStep, rideStep, osrmRouteToStore, osrmRouteToCustomer]);
+
   // Leaflet Map Initialization and Lifecycle management
   useEffect(() => {
     if (!mapRef.current) return;
@@ -507,6 +803,18 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fix for Leaflet rendering issues in dynamic CSS layouts & tab switching
+  useEffect(() => {
+    if (leafletMapRef.current) {
+      const timer = setTimeout(() => {
+        if (leafletMapRef.current) {
+          leafletMapRef.current.invalidateSize();
+        }
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [activeOrder, activeRide, incomingOrder, isOnline]);
 
   // Sync Leaflet markers and route polylines dynamically
   useEffect(() => {
@@ -581,10 +889,12 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
 
       if (deliveryStep < 2) {
         // Active Phase: Rider navigating to Store
-        if (osrmRouteToStore && osrmRouteToStore.length > 0) {
-          L.polyline(osrmRouteToStore, { color: leg1Color, weight: 6, opacity: 0.95, lineJoin: 'round' }).addTo(markerGroupRef.current);
-        } else {
-          L.polyline([riderLatLng, storeLatLng], { color: leg1Color, weight: 6, opacity: 0.9, lineJoin: 'round' }).addTo(markerGroupRef.current);
+        if (riderLatLng) {
+          if (osrmRouteToStore && osrmRouteToStore.length > 0) {
+            L.polyline(osrmRouteToStore, { color: leg1Color, weight: 6, opacity: 0.95, lineJoin: 'round' }).addTo(markerGroupRef.current);
+          } else {
+            L.polyline([riderLatLng, storeLatLng], { color: leg1Color, weight: 6, opacity: 0.9, lineJoin: 'round' }).addTo(markerGroupRef.current);
+          }
         }
 
         // Leg 2 (Store -> Customer) is DASHED upcoming blue route
@@ -596,13 +906,16 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       } else {
         // Active Phase: Rider delivering to Customer
         // Leg 1 (Store -> Rider) is faded completed dashed route
-        L.polyline([storeLatLng, riderLatLng], { color: '#94a3b8', weight: 3, opacity: 0.4, dashArray: '4, 4', lineJoin: 'round' }).addTo(markerGroupRef.current);
+        if (riderLatLng) {
+          L.polyline([storeLatLng, riderLatLng], { color: '#94a3b8', weight: 3, opacity: 0.4, dashArray: '4, 4', lineJoin: 'round' }).addTo(markerGroupRef.current);
+        }
 
         // Leg 2 (Rider -> Customer) is SOLID blue route
         if (osrmRouteToCustomer && osrmRouteToCustomer.length > 0) {
           L.polyline(osrmRouteToCustomer, { color: leg2Color, weight: 6, opacity: 0.95, lineJoin: 'round' }).addTo(markerGroupRef.current);
         } else {
-          L.polyline([riderLatLng, customerLatLng], { color: leg2Color, weight: 6, opacity: 0.9, lineJoin: 'round' }).addTo(markerGroupRef.current);
+          const startPt = riderLatLng || storeLatLng;
+          L.polyline([startPt, customerLatLng], { color: leg2Color, weight: 6, opacity: 0.9, lineJoin: 'round' }).addTo(markerGroupRef.current);
         }
       }
 
@@ -612,7 +925,8 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         if (osrmRouteToStore && osrmRouteToStore.length > 0) validCoords.push(...osrmRouteToStore);
         if (osrmRouteToCustomer && osrmRouteToCustomer.length > 0) validCoords.push(...osrmRouteToCustomer);
         
-        validCoords.push(riderLatLng, storeLatLng, customerLatLng);
+        if (riderLatLng) validCoords.push(riderLatLng);
+        validCoords.push(storeLatLng, customerLatLng);
 
         const filteredCoords = validCoords.filter(c => c && !isNaN(c[0]) && !isNaN(c[1]));
         if (filteredCoords.length > 0) {
@@ -623,32 +937,56 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         console.warn('Map bounds fit error', e);
       }
 
-    } else {
-      // No active order - Show surrounding vendor shops & hubs
-      if (nearbyStores.length > 0) {
-        nearbyStores.forEach(store => {
-          if (!store.lat || !store.lng) return;
-          const storeLatLng = [parseFloat(store.lat), parseFloat(store.lng)];
-          // Use real OSRM street distance if calculated, otherwise fallback to straight line
-          const dist = realStoreDistances[store.id] !== undefined ? realStoreDistances[store.id] : getStraightLineDistance(mapCoords.lat, mapCoords.lng, storeLatLng[0], storeLatLng[1]);
-          
-          L.marker(storeLatLng, { icon: createStoreIcon(store.name) })
-            .bindPopup(`
-              <div style="font-family: inherit; line-height: 1.4;">
-                <h4 style="margin: 0 0 2px 0; color: #f97316; font-weight: 800;">${store.name}</h4>
-                <p style="margin: 0 0 6px 0; font-size: 0.75rem; color: #64748b; font-weight: 500;">${store.address || 'Nearby Shop'}</p>
-                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed #e2e8f0; padding-top: 6px; margin-top: 4px;">
-                  <span style="font-size: 0.75rem; font-weight: 700; color: #1e293b;">📍 ${dist.toFixed(1)} km away</span>
-                  <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(249,115,22,0.1); color: #f97316; border-radius: 4px; font-weight: 700;">Partner Hub</span>
-                </div>
-              </div>
-            `)
-            .addTo(markerGroupRef.current);
-        });
+    } else if (activeRide) {
+      // Show Ride routing
+      const pickupLatLng = [activeRide.pickupLat, activeRide.pickupLng];
+      const dropoffLatLng = [activeRide.dropLat, activeRide.dropLng];
+
+      // Draw Pickup Marker
+      L.marker(pickupLatLng, { icon: createStoreIcon(activeRide.pickup) })
+        .bindPopup(`<b>Pickup:</b> ${activeRide.pickup}`)
+        .addTo(markerGroupRef.current);
+
+      // Draw Customer Marker
+      L.marker(dropoffLatLng, { icon: createCustomerIcon(activeRide.customerName) })
+        .bindPopup(`<b>Passenger:</b> ${activeRide.customerName}<br/>Drop at: ${activeRide.dropoff}`)
+        .addTo(markerGroupRef.current);
+
+      // Draw Route
+      if (osrmRouteToCustomer && osrmRouteToCustomer.length > 0) {
+        L.polyline(osrmRouteToCustomer, { color: '#10b981', weight: 6, opacity: 0.95, lineJoin: 'round' }).addTo(markerGroupRef.current);
+      } else {
+        L.polyline([pickupLatLng, dropoffLatLng], { color: '#10b981', weight: 6, opacity: 0.95, lineJoin: 'round' }).addTo(markerGroupRef.current);
       }
 
-      // Re-center on Rider smoothly
-      leafletMapRef.current.setView(riderLatLng, 14);
+      if (riderLatLng) {
+        if (osrmRouteToStore && osrmRouteToStore.length > 0) {
+          L.polyline(osrmRouteToStore, { color: '#3b82f6', weight: 6, opacity: 0.8, dashArray: '8, 8', lineJoin: 'round' }).addTo(markerGroupRef.current);
+        } else {
+          L.polyline([riderLatLng, pickupLatLng], { color: '#3b82f6', weight: 6, opacity: 0.8, dashArray: '8, 8', lineJoin: 'round' }).addTo(markerGroupRef.current);
+        }
+      }
+
+      // Automatically focus bounds to include all elements
+      try {
+        let boundsCoords = [pickupLatLng, dropoffLatLng];
+        if (osrmRouteToStore && osrmRouteToStore.length > 0) boundsCoords.push(...osrmRouteToStore);
+        if (osrmRouteToCustomer && osrmRouteToCustomer.length > 0) boundsCoords.push(...osrmRouteToCustomer);
+        if (riderLatLng) boundsCoords.push(riderLatLng);
+        
+        const bounds = L.latLngBounds(boundsCoords);
+        leafletMapRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+      } catch (e) {
+        console.warn('Map bounds fit error', e);
+      }
+    } else {
+      // No active order - Do not show surrounding shops, only show Rider location
+
+      // Re-center on Rider smoothly (only once or when requested)
+      if (riderLatLng && !hasCenteredRef.current) {
+        leafletMapRef.current.setView(riderLatLng, 14);
+        hasCenteredRef.current = true;
+      }
     }
   }, [mapCoords, activeOrder, incomingOrder, deliveryStep, nearbyStores, realStoreDistances, isOnline, osrmRouteToStore, osrmRouteToCustomer]);
 
@@ -670,6 +1008,13 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     }
 
     const newStatus = !isOnline;
+    if (newStatus && localStorage.getItem('passwala_location_consent') !== 'accepted') {
+      if (typeof setShowLocationDisclosure === 'function') {
+        setShowLocationDisclosure(true);
+      }
+      return;
+    }
+
     setIsOnline(newStatus);
     toast.success(newStatus ? "You are now online" : "You are offline");
 
@@ -711,6 +1056,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
          // Step 2: Safely attempt to link the rider ID (ignoring foreign key errors if test account)
          if (riderId && riderId.length > 20) {
            await supabase.from('orders').update({ rider_id: riderId }).eq('id', orderToStart.dbId);
+           await supabase.from('delivery_tracking').update({ rider_id: riderId, status: 'ASSIGNED' }).eq('order_id', orderToStart.dbId);
          }
          
          // Step 3: Only proceed locally once the database absolutely confirms the claim
@@ -727,7 +1073,24 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
 
   const handleReject = () => {
     if (incomingOrder?.dbId) {
-      setRejectedOrderIds(prev => [...prev, incomingOrder.dbId]);
+      const dbId = incomingOrder.dbId;
+      setRejectedOrderIds(prev => {
+        const next = [...prev, dbId];
+        if (riderId) {
+          localStorage.setItem(`passwala_rejected_orders_${riderId}`, JSON.stringify(next));
+          // Update stats in real-time
+          setStats(current => {
+            const acceptedCount = current.deliveries || 0;
+            const totalOffers = acceptedCount + next.length;
+            const acceptanceRate = totalOffers > 0 ? Math.round((acceptedCount / totalOffers) * 100) : 100;
+            return {
+              ...current,
+              acceptanceRate
+            };
+          });
+        }
+        return next;
+      });
     }
     setIncomingOrder(null);
     toast('Order Rejected', { icon: '❌' });
@@ -742,11 +1105,15 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       if (activeOrder?.dbId) {
          try {
            let newDbStatus = 'ACCEPTED';
-           if (nextIdx === 1) newDbStatus = 'PREPARING'; // Reached Store
-           if (nextIdx === 2) newDbStatus = 'SHIPPED'; // Order Picked
-           if (nextIdx === 3) newDbStatus = 'DISPATCHED'; // Out for Delivery
+           let trackingStatus = 'ASSIGNED';
+           if (nextIdx === 1) { newDbStatus = 'PREPARING'; trackingStatus = 'PREPARING'; }
+           if (nextIdx === 2) { newDbStatus = 'SHIPPED'; trackingStatus = 'PICKED_UP'; }
+           if (nextIdx === 3) { newDbStatus = 'DISPATCHED'; trackingStatus = 'PICKED_UP'; }
+           
            const { error } = await supabase.from('orders').update({ status: newDbStatus }).eq('id', activeOrder.dbId);
            if (error) console.error("Error updating order step:", error);
+           
+           await supabase.from('delivery_tracking').update({ status: trackingStatus }).eq('order_id', activeOrder.dbId);
          } catch (err) {
            console.error("Exception updating order step:", err);
          }
@@ -760,6 +1127,8 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
              toast.error("Failed to complete delivery. Please try again.");
              return; // Stop execution, don't clear active order
            }
+           
+           await supabase.from('delivery_tracking').update({ status: 'DELIVERED' }).eq('order_id', activeOrder.dbId);
            
            if (riderId) {
              const earningsAmount = Number(activeOrder.earnings.replace('₹', '')) || 50;
@@ -797,8 +1166,8 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
   return (
     <div className="rider-screen relative" style={{ minHeight: '100%', paddingBottom: '2rem' }}>
       {/* Map Section */}
-      <div style={{ 
-          height: activeOrder ? '320px' : '280px', 
+       <div style={{ 
+          height: (activeOrder || activeRide) ? '320px' : '280px', 
           backgroundColor: '#f1f5f9',
           position: 'relative',
           overflow: 'hidden',
@@ -816,7 +1185,10 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
 
         {/* GPS FAB Overlay */}
         <button 
-          onClick={() => requestLiveLocation(true)}
+          onClick={() => {
+            hasCenteredRef.current = false;
+            requestLiveLocation(true);
+          }}
           style={{ 
             position: 'absolute', 
             bottom: '1rem', 
@@ -841,7 +1213,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           <Navigation size={22} color={isDetecting ? "#94a3b8" : "var(--rider-primary)"} style={{ transform: isDetecting ? 'none' : 'rotate(45deg)' }} />
         </button>
 
-        {!activeOrder ? (
+        {!activeOrder && !activeRide ? (
           <div style={{ 
               position: 'absolute', 
               top: '1rem', 
@@ -958,7 +1330,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       </div>
 
       {/* Online Status Toggle - Premium Card */}
-      {!activeOrder && !incomingOrder && (
+      {!activeOrder && !incomingOrder && !activeRide && (
         <div style={{ padding: '0 1rem' }}>
           <div 
             style={{ 
@@ -1059,6 +1431,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                   
                   <div style={{ display: 'flex', justifySpaceBetween: 'space-between', padding: '1rem 0 0 0', marginTop: '1rem', borderTop: '1px dashed #e5e7eb', fontSize: '0.875rem', fontWeight: 600, color: 'var(--rider-text-secondary)', justifyContent: 'space-between' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Package size={16}/> {incomingOrder.items} items</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>⚖️ {incomingOrder.weight ? `${incomingOrder.weight.toFixed(1)} kg` : '0.5 kg'}</span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Navigation size={16}/> {incomingOrder.distance}</span>
                   </div>
                </div>
@@ -1069,6 +1442,145 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                      Accept Order <ChevronRight size={20}/>
                   </button>
                </div>
+            </div>
+        </div>
+      )}
+
+      {/* Active Ride Card */}
+      {activeRide && (
+        <div className="rider-card" style={{ padding: 0, overflow: 'hidden', marginTop: '-1rem', position: 'relative', zIndex: 20, margin: '0 1rem 1.5rem 1rem', background: 'white', borderRadius: '24px', border: '1px solid var(--rider-border)', boxShadow: 'var(--rider-shadow-lg)' }}>
+            <div style={{ background: 'var(--rider-primary)', color: 'white', padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)', fontWeight: 600, letterSpacing: '0.05em', margin: 0 }}>ACTIVE CITY RIDE</p>
+                    <p style={{ fontWeight: 700, margin: 0 }}>{activeRide.customerName}</p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                    <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)', fontWeight: 500, margin: 0 }}>Ride Price</p>
+                    <p style={{ fontWeight: 700, color: 'white', fontSize: '1.125rem', margin: 0 }}>₹{activeRide.price}</p>
+                </div>
+            </div>
+
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <MapPin color="var(--rider-primary)" size={20} style={{ marginTop: '2px' }} />
+                  <div>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--rider-text-secondary)', margin: 0 }}>Pickup Location</p>
+                    <p style={{ fontWeight: 700, margin: 0 }}>{activeRide.pickup}</p>
+                  </div>
+                </div>
+
+                <div style={{ borderLeft: '2px dashed #e5e7eb', marginLeft: '9px', height: '16px', marginTop: '-8px', marginBottom: '-8px' }}></div>
+
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <Navigation color="var(--rider-success)" size={20} style={{ marginTop: '2px' }} />
+                  <div>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--rider-text-secondary)', margin: 0 }}>Drop-off Location</p>
+                    <p style={{ fontWeight: 700, margin: 0 }}>{activeRide.dropoff}</p>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px dashed #e5e7eb', paddingTop: '1rem', marginTop: '0.5rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 600, color: 'var(--rider-text-secondary)' }}>
+                  <span>Seats: <strong>{activeRide.seats}</strong></span>
+                  {activeRide.luggageWeight > 0 && (
+                    <span>Luggage: <strong>{activeRide.luggageWeight} kg</strong></span>
+                  )}
+                  <span>Ticket ID: <strong>{activeRide.qrHash ? activeRide.qrHash.split('-')[2] || activeRide.qrHash.substring(0, 8).toUpperCase() : ''}</strong></span>
+                </div>
+
+                {/* Ride Stepper */}
+                <h3 style={{ fontWeight: 700, fontSize: '1.05rem', margin: '1rem 0 1rem 0', textAlign: 'center', color: 'var(--rider-text)' }}>Ride Progress</h3>
+                <div className="rider-stepper" style={{ marginBottom: '1rem' }}>
+                    <div className="rider-stepper-line" style={{ height: '65%', top: '15%' }}></div>
+                    <div className="rider-stepper-progress" style={{ height: `${(rideStep / 2) * 100}%`, top: '15%', background: 'var(--rider-success)' }}></div>
+
+                    {[
+                      { title: 'Confirm Ride', desc: 'Driver is arriving at pickup location' },
+                      { title: 'Verify Customer', desc: 'Scan QR code / Enter Ticket ID to start' },
+                      { title: 'Drop to Complete', desc: 'Ride is in progress, head to drop-off location' }
+                    ].map((step, idx) => {
+                        const isCompleted = idx < rideStep;
+                        const isCurrent = idx === rideStep;
+                        return (
+                            <div key={idx} className={`rider-step ${isCompleted ? 'completed' : ''} ${isCurrent ? 'current' : ''}`} style={{ opacity: isCurrent ? 1 : isCompleted ? 0.7 : 0.4 }}>
+                                <div className="rider-step-icon">
+                                    {isCompleted ? <Check size={14} strokeWidth={3} /> : idx + 1}
+                                </div>
+                                <div className="rider-step-content">
+                                    <h4>{step.title}</h4>
+                                    {isCurrent && <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--rider-text-secondary)' }}>{step.desc}</p>}
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            </div>
+
+            <div style={{ padding: '1rem', background: 'var(--rider-bg)', borderTop: '1px solid var(--rider-border)' }}>
+                {rideStep === 1 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '1rem' }}>
+                    <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: 'var(--rider-text-secondary)', textTransform: 'uppercase' }}>Customer Verification Code</p>
+                    <input 
+                      type="text" 
+                      value={activeRide.qrHash ? activeRide.qrHash.split('-')[2] || activeRide.qrHash.substring(0, 8).toUpperCase() : ''} 
+                      disabled
+                      style={{ padding: '0.8rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700, fontSize: '1rem', color: '#1e293b', textAlign: 'center', letterSpacing: '2px' }} 
+                    />
+                  </div>
+                )}
+
+                {rideStep === 0 && (
+                  <button 
+                      onClick={() => { setRideStep(1); toast.success("Arrived at pickup point. Ready to verify customer."); }}
+                      className="rider-btn-primary"
+                  >
+                      Confirm Arrived
+                      <Navigation size={20} style={{ transform: 'rotate(45deg)' }} />
+                  </button>
+                )}
+
+                {rideStep === 1 && (
+                  <button 
+                      onClick={() => { setRideStep(2); toast.success("Verification successful! Ride started."); }}
+                      className="rider-btn-primary"
+                      style={{ background: 'var(--rider-primary)' }}
+                  >
+                      Verify & Start Ride
+                      <CheckCircle size={20} />
+                  </button>
+                )}
+
+                {rideStep === 2 && (
+                  <button 
+                      onClick={handleCompleteRide}
+                      className="rider-btn-primary"
+                      style={{ background: 'var(--rider-success)' }}
+                  >
+                      Complete Ride
+                      <CheckCircle size={20} />
+                  </button>
+                )}
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+                    {activeRide.customerPhone && (
+                      <button 
+                          onClick={() => window.open(`tel:${activeRide.customerPhone}`, '_self')} 
+                          style={{ flex: 1, padding: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: 'white', color: '#1e293b', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                      >
+                          <Phone size={18} color="#64748b" /> Call Passenger
+                      </button>
+                    )}
+                    <button 
+                        onClick={() => {
+                            window.open(`https://www.google.com/maps/dir/?api=1&destination=${activeRide.pickupLat},${activeRide.pickupLng}`, '_blank');
+                        }} 
+                        style={{ flex: 1, padding: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: 'white', color: '#1e293b', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                    >
+                        <Navigation size={18} color="#3b82f6" /> Navigate
+                    </button>
+                </div>
             </div>
         </div>
       )}

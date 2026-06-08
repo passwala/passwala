@@ -232,16 +232,28 @@ router.post('/payment/verify', userAuth, async (req, res) => {
     try {
       const { data: updatedOrders } = await supabase
         .from('orders')
-        .select('user_id, store_id')
+        .select('id, user_id, store_id')
         .in('id', orderIds);
 
       if (updatedOrders && updatedOrders.length > 0) {
         for (const ord of updatedOrders) {
-          await supabase
-            .from('service_bookings')
-            .update({ status: finalOrderStatus })
-            .eq('user_id', ord.user_id)
-            .eq('provider_id', ord.store_id);
+          // Fetch order items to get the specific service_id
+          const { data: orderItems } = await supabase
+            .from('order_items')
+            .select('product_id')
+            .eq('order_id', ord.id);
+
+          if (orderItems && orderItems.length > 0) {
+            for (const item of orderItems) {
+              await supabase
+                .from('service_bookings')
+                .update({ status: finalOrderStatus })
+                .eq('user_id', ord.user_id)
+                .eq('provider_id', ord.store_id)
+                .eq('service_id', item.product_id)
+                .eq('status', 'PENDING');
+            }
+          }
         }
       }
     } catch (bookingErr) {

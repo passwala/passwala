@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import QRCode from 'react-qr-code';
+import { QRCode } from 'react-qr-code';
 import { ArrowLeft, Download, XCircle, Calendar, MapPin } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, MapPin, CheckCircle, ShieldCheck, CreditCard, Ticket } from 'lucide-react';
+import { ArrowLeft, User, MapPin, CheckCircle, ShieldCheck, CreditCard, Ticket, Navigation, Package } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import './RideCheckout.css';
 
@@ -9,6 +9,7 @@ const RideCheckout = () => {
   const navigate = useNavigate();
   const { pickup, dropoff, rideData, user } = location.state || {};
   const [seatCount, setSeatCount] = useState(1);
+  const [luggageWeight, setLuggageWeight] = useState(0); // default weight in kg
   const [bookingLoading, setBookingLoading] = useState(false);
 
   if (!pickup || !dropoff || !rideData) {
@@ -33,17 +34,50 @@ const RideCheckout = () => {
     );
   }
 
-  const selectedVehicle = rideData.vehicles[0]; // Auto select first available for now
+  const selectedVehicle = rideData.vehicles && rideData.vehicles[0] ? {
+    ...rideData.vehicles[0],
+    vehicle_type: 'Bike',
+    available_seats: 1,
+    total_seats: 1
+  } : {
+    id: 'default-bike',
+    vehicle_type: 'Bike',
+    available_seats: 1,
+    total_seats: 1
+  };
+
+  // Calculate distance using Latitude & Longitude coordinates
+  const getCoordinateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  const distance = getCoordinateDistance(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
+  const displayDistance = parseFloat(distance.toFixed(2));
+
   const pricePerSeat = rideData.estimatedPrice;
   const basePrice = pricePerSeat * seatCount;
+  
+  // Luggage Fare calculation: weight (kg) * distance (km) * 11 (rate per kg per km)
+  const LUGGAGE_RATE_PER_KG_KM = 11;
+  const luggagePrice = luggageWeight > 0 ? Number((luggageWeight * displayDistance * LUGGAGE_RATE_PER_KG_KM).toFixed(2)) : 0;
+
+  const fareBeforeTax = basePrice + luggagePrice;
 
   // Indian GST Tax Calculation (5% total: 2.5% CGST + 2.5% SGST)
   const CGST_RATE = 0.025; // 2.5%
   const SGST_RATE = 0.025; // 2.5%
-  const cgstAmount = Number((basePrice * CGST_RATE).toFixed(2));
-  const sgstAmount = Number((basePrice * SGST_RATE).toFixed(2));
+  const cgstAmount = Number((fareBeforeTax * CGST_RATE).toFixed(2));
+  const sgstAmount = Number((fareBeforeTax * SGST_RATE).toFixed(2));
   const totalTax = Number((cgstAmount + sgstAmount).toFixed(2));
-  const totalPrice = Number((basePrice + totalTax).toFixed(2));
+  const totalPrice = Number((fareBeforeTax + totalTax).toFixed(2));
 
   const handleBookTicket = async () => {
     if (!user) {
@@ -64,7 +98,7 @@ const RideCheckout = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: user.id,
+          userId: user.id || user.uid,
           vehicleId: selectedVehicle.id,
           pickupLat: pickup.lat,
           pickupLng: pickup.lng,
@@ -73,7 +107,9 @@ const RideCheckout = () => {
           pickupArea: pickup.name,
           dropArea: dropoff.name,
           seatCount,
-          totalPrice
+          totalPrice,
+          luggageWeight,
+          luggagePrice
         })
       });
 
@@ -97,9 +133,6 @@ const RideCheckout = () => {
   return (
     <div className="ride-checkout-container">
       <div className="rc-header">
-        <button onClick={() => navigate(-1)} className="rc-back-btn">
-          <ArrowLeft size={20} />
-        </button>
         <h2>Confirm Ride</h2>
       </div>
 
@@ -132,35 +165,54 @@ const RideCheckout = () => {
           </div>
         </div>
 
-        {/* Seat Selector Card */}
+
+
+        {/* Luggage Details Card */}
         <div className="rc-card">
           <h4 className="rc-section-title">
-            <Ticket size={18} color="var(--primary)" /> Select Seats
+            <Package size={18} color="var(--primary)" /> Luggage Details
           </h4>
-          <div className="rc-seat-selector">
-            <span className="rc-passenger-label">Passengers</span>
-            <div className="rc-counter-group">
-              <button 
-                onClick={() => setSeatCount(Math.max(1, seatCount - 1))}
-                className="rc-counter-btn"
-                disabled={seatCount <= 1}
-              >
-                -
-              </button>
-              <span className="rc-counter-value">{seatCount}</span>
-              <button 
-                onClick={() => setSeatCount(Math.min(selectedVehicle.available_seats, seatCount + 1))}
-                className="rc-counter-btn"
-                disabled={seatCount >= selectedVehicle.available_seats}
-              >
-                +
-              </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.5rem 0' }}>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              Luggage Rate: <strong style={{ color: 'var(--primary)' }}>₹11 per kg per km</strong>
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '0.25rem' }}>
+              <label style={{ fontSize: '0.9rem', fontWeight: 600 }}>Weight:</label>
+              <input 
+                type="number" 
+                min="0" 
+                max="50" 
+                step="0.1"
+                value={luggageWeight} 
+                onChange={(e) => setLuggageWeight(Math.max(0, parseFloat(e.target.value) || 0))}
+                style={{ 
+                  width: '80px', 
+                  padding: '6px 10px', 
+                  borderRadius: '8px', 
+                  border: '1px solid var(--border-light, #e2e8f0)', 
+                  fontWeight: 700,
+                  fontSize: '1rem',
+                  textAlign: 'center'
+                }} 
+              />
+              <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)' }}>kg</span>
+              <input 
+                type="range" 
+                min="0" 
+                max="50" 
+                step="0.1"
+                value={luggageWeight} 
+                onChange={(e) => setLuggageWeight(parseFloat(e.target.value) || 0)}
+                style={{ flex: 1, accentColor: 'var(--primary, #ff7622)', height: '6px', cursor: 'pointer' }}
+              />
             </div>
+            {luggageWeight > 0 && (
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: 'var(--primary)', fontWeight: 700 }}>
+                Luggage price is calculated using exact Latitude & Longitude coordinate distance ({displayDistance} km):<br/>
+                ₹11 × {luggageWeight} kg × {displayDistance} km = ₹{luggagePrice.toFixed(2)}
+              </p>
+            )}
           </div>
-          <p className="rc-seats-availability">
-            <ShieldCheck size={14} color="var(--primary)" />
-            {selectedVehicle.available_seats} seats currently available in {selectedVehicle.vehicle_type}
-          </p>
         </div>
 
         {/* Fare Summary Card */}
@@ -173,6 +225,12 @@ const RideCheckout = () => {
               <span className="rc-fare-label">Base Seat Fare (₹{pricePerSeat} x {seatCount})</span>
               <span className="rc-fare-value">₹{basePrice.toFixed(2)}</span>
             </div>
+            {luggageWeight > 0 && (
+              <div className="rc-fare-row">
+                <span className="rc-fare-label">Luggage Fee (₹11 × {luggageWeight} kg × {displayDistance} km)</span>
+                <span className="rc-fare-value">₹{luggagePrice.toFixed(2)}</span>
+              </div>
+            )}
             <div className="rc-fare-row">
               <span className="rc-fare-label">CGST (2.5%)</span>
               <span className="rc-fare-value">₹{cgstAmount.toFixed(2)}</span>
@@ -201,7 +259,7 @@ const RideCheckout = () => {
           disabled={bookingLoading}
           className="rc-book-btn rc-pulse"
         >
-          {bookingLoading ? 'Booking...' : 'Book Ticket'}
+          {bookingLoading ? 'Booking...' : 'Book Ride'}
         </button>
       </div>
     </div>

@@ -26,7 +26,6 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
     navigate(-1);
   };
 
-  const [detecting, setDetecting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
   const { lat, lng, error, errorCode, isMock, address, loading, startTracking, stopTracking } = useSecureLocation();
@@ -46,16 +45,14 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
       }
     } catch (err) {
       toast.error('Automatic detection unavailable. Please select your area manually.', { id: 'geo' });
-    } finally {
-      setDetecting(false);
     }
   }, [onLocationChange]);
+
   React.useEffect(() => {
     if (lat && lng && address) {
       onLocationChange(address, { lat, lng });
       toast.success(`Securely Located: ${address}`, { id: 'geo' });
       stopTracking();
-      setDetecting(false);
     }
   }, [lat, lng, address, onLocationChange, stopTracking]);
 
@@ -66,7 +63,6 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
       } else {
         toast.error(`Error: ${error}`, { id: 'geo' });
       }
-      setDetecting(false);
       stopTracking();
       fallbackToIP();
     }
@@ -76,13 +72,14 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
     return () => stopTracking();
   }, [stopTracking]);
 
-  const filteredAreas = ahmedabadAreas.filter(area => 
-    area.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredAreas = ahmedabadAreas.filter(area => {
+    const q = searchTerm.toLowerCase();
+    return area.name.toLowerCase().includes(q) || 
+      (area.aliases || []).some(alias => alias.toLowerCase().includes(q));
+  });
 
   const detectLocation = () => {
-    if (detecting || loading) return;
-    setDetecting(true);
+    if (loading) return;
     toast.loading('Initializing secure GPS tracker...', { id: 'geo' });
     startTracking();
   };
@@ -123,7 +120,7 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
              <Navigation size={24} color="#ff7622" />
           </div>
           <div className="detect-info">
-             <strong>{detecting ? 'Locating...' : 'Detect My Exact Neighborhood'}</strong>
+             <strong>{loading ? 'Locating...' : 'Detect My Exact Neighborhood'}</strong>
              <span>Enable GPS for high accuracy</span>
           </div>
         </div>

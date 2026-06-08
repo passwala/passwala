@@ -5,7 +5,7 @@ import './RiderPortal.css'; // Import custom styles
 import { supabase } from '../supabase';
 import { getStraightLineDistance } from '../utils/dijkstra';
 
-function RiderEarnings({ _user, riderId, stats, isOnline, sessionStartTime }) {
+function RiderEarnings({ _user, riderId, isOnline, sessionStartTime }) {
     const [deliveries, setDeliveries] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
     const [timeRange, setTimeRange] = React.useState('today');
@@ -34,10 +34,9 @@ function RiderEarnings({ _user, riderId, stats, isOnline, sessionStartTime }) {
             if (riderId) {
                 setLoading(true);
                 let query = supabase
-                    .from('orders')
-                    .select('id, created_at, total_amount, delivery_fee, stores (name, lat, lng), addresses (address_line_1, city, lat, lng), rider_earnings (amount)')
-                    .eq('rider_id', riderId)
-                    .eq('status', 'DELIVERED');
+                    .from('rider_earnings')
+                    .select('id, amount, created_at, orders (id, created_at, total_amount, delivery_fee, stores (name, lat, lng), addresses (address_line_1, city, lat, lng))')
+                    .eq('rider_id', riderId);
                 
                 // Add time range filtering
                 if (timeRange === 'today') {
@@ -60,10 +59,11 @@ function RiderEarnings({ _user, riderId, stats, isOnline, sessionStartTime }) {
                 
                 if (data) {
                     setDeliveries(data.map(d => {
-                        const storeLat = d.stores?.lat ? parseFloat(d.stores.lat) : null;
-                        const storeLng = d.stores?.lng ? parseFloat(d.stores.lng) : null;
-                        const addrLat = d.addresses?.lat ? parseFloat(d.addresses.lat) : null;
-                        const addrLng = d.addresses?.lng ? parseFloat(d.addresses.lng) : null;
+                        const order = d.orders;
+                        const storeLat = order?.stores?.lat ? parseFloat(order.stores.lat) : null;
+                        const storeLng = order?.stores?.lng ? parseFloat(order.stores.lng) : null;
+                        const addrLat = order?.addresses?.lat ? parseFloat(order.addresses.lat) : null;
+                        const addrLng = order?.addresses?.lng ? parseFloat(order.addresses.lng) : null;
 
                         let distanceStr = '1.2 km';
                         if (storeLat !== null && storeLng !== null && addrLat !== null && addrLng !== null) {
@@ -71,13 +71,11 @@ function RiderEarnings({ _user, riderId, stats, isOnline, sessionStartTime }) {
                             distanceStr = `${dist.toFixed(1)} km`;
                         }
 
-                        // Earning precedence: 1) rider_earnings amount, 2) delivery_fee, 3) fallback default of 50
-                        const earnAmount = d.rider_earnings?.[0]?.amount 
-                            ? Number(d.rider_earnings[0].amount) 
-                            : (d.delivery_fee ? Number(d.delivery_fee) : 50);
+                        const earnAmount = Number(d.amount) || 50;
+                        const orderIdVal = order?.id || d.id;
 
                         return {
-                            id: `#ORD-${d.id.toString().substring(0, 6).toUpperCase()}`,
+                            id: `#ORD-${orderIdVal.toString().substring(0, 6).toUpperCase()}`,
                             amount: earnAmount,
                             time: new Date(d.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                             distance: distanceStr
@@ -105,13 +103,13 @@ function RiderEarnings({ _user, riderId, stats, isOnline, sessionStartTime }) {
             Total Earnings ({timeRange.charAt(0).toUpperCase() + timeRange.slice(1)})
          </p>
          <h3 style={{ fontSize: '3rem', fontWeight: 900, marginBottom: '1rem', display: 'flex', alignItems: 'center' }}>
-            ₹{timeRange === 'today' ? stats.earnings : (deliveries.reduce((sum, d) => sum + d.amount, 0))}
+            ₹{deliveries.reduce((sum, d) => sum + d.amount, 0)}
          </h3>
          
          <div className="rider-grid-2" style={{ borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '1rem' }}>
             <div>
                <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)' }}>Deliveries</p>
-               <p style={{ fontSize: '1.25rem', fontWeight: 700 }}>{timeRange === 'today' ? stats.deliveries : deliveries.length}</p>
+               <p style={{ fontSize: '1.25rem', fontWeight: 700 }}>{deliveries.length}</p>
             </div>
             <div>
                <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)' }}>Online Time</p>
@@ -207,11 +205,13 @@ function RiderEarnings({ _user, riderId, stats, isOnline, sessionStartTime }) {
                 ))}
             </div>
          ) : (
-            <div style={{ textAlign: 'center', padding: '2rem 1rem', background: 'white', borderRadius: '16px', border: '1px solid var(--rider-border)' }}>
-               <Clock size={32} color="#d1d5db" style={{ margin: '0 auto 0.5rem auto' }} />
-               <p style={{ fontWeight: 600, color: 'var(--rider-text-secondary)', margin: 0 }}>No deliveries yet.</p>
-               <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: '0.25rem 0 0 0' }}>Go online to start earning!</p>
-            </div>
+             <div style={{ textAlign: 'center', padding: '2rem 1rem', background: 'white', borderRadius: '16px', border: '1px solid var(--rider-border)' }}>
+                <Clock size={32} color="#d1d5db" style={{ margin: '0 auto 0.5rem auto' }} />
+                <p style={{ fontWeight: 600, color: 'var(--rider-text-secondary)', margin: 0 }}>No deliveries yet.</p>
+                <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: '0.25rem 0 0 0' }}>
+                   {isOnline ? 'Stay online to receive orders!' : 'Go online to start earning!'}
+                </p>
+             </div>
          )}
       </div>
     </div>

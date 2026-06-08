@@ -1,9 +1,9 @@
 import rateLimit from 'express-rate-limit';
 
-// Standard rate limiter for API endpoints (e.g. 100 requests per 15 minutes)
+// Standard rate limiter for API endpoints (allowing higher limit for real-time polling)
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per `windowMs`
+  max: 5000, // Limit each IP to 5000 requests per `windowMs` to support real-time polling
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   message: {

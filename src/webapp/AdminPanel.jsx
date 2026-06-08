@@ -307,14 +307,18 @@ const AdminPanel = ({ onLogout, location }) => {
   const [data, setData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [stats, setStats] = useState({ users: 0, services: 0, apps: 0, bookings: 0 });
-  const [platformSettings, setPlatformSettings] = useState({
-    appName: 'Passwala',
-    supportEmail: 'ops@passwala.com',
-    maintenanceMode: false,
-    maxDeliveryRange: 10,
-    baseDeliveryFee: 30,
-    freeDeliveryThreshold: 499,
-    liveSync: true
+  const [platformSettings, setPlatformSettings] = useState(() => {
+    const saved = localStorage.getItem('passwala_platform_settings');
+    return saved ? JSON.parse(saved) : {
+      appName: 'Passwala',
+      supportEmail: 'ops@passwala.com',
+      maintenanceMode: false,
+      maxDeliveryRange: 10,
+      baseDeliveryFee: 30,
+      freeDeliveryThreshold: 499,
+      liveSync: true,
+      ridePricePerKm: 8
+    };
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const mainViewRef = useRef(null);
@@ -427,6 +431,27 @@ const AdminPanel = ({ onLogout, location }) => {
     }
   }, [onLogout]);
 
+  const fetchPlatformSettings = useCallback(async () => {
+    try {
+      const adminKey = sessionStorage.getItem('admin_token') || '';
+      const res = await fetch(`${API_URL}/api/admin/settings`, {
+        headers: { 'x-admin-key': adminKey }
+      });
+      if (res.status === 401) {
+        toast.error('Session expired. Please login again.');
+        onLogout();
+        return;
+      }
+      const json = await res.json();
+      if (json.success && json.settings) {
+        setPlatformSettings(json.settings);
+        localStorage.setItem('passwala_platform_settings', JSON.stringify(json.settings));
+      }
+    } catch (err) {
+      console.error('Failed to fetch platform settings:', err);
+    }
+  }, [onLogout]);
+
   const handlePurgeMockData = () => {
     setShowPurgeConfirm(true);
   };
@@ -475,7 +500,7 @@ const AdminPanel = ({ onLogout, location }) => {
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to fetch people map data');
 
-      const { usersList, vendorsList, ridersList, providersList, storesList } = json.data;
+      const { usersList, vendorsList, ridersList, providersList, storesList, addressesList, riderLocationsList } = json.data;
 
       const storeMap = {};
       if (storesList) {
@@ -484,52 +509,47 @@ const AdminPanel = ({ onLogout, location }) => {
         });
       }
 
-      // Hash function for stable offsets in Ahmedabad
-      const getStableCoords = (id, role) => {
-        let hash = 0;
-        const inputStr = id || 'random-id';
-        for (let i = 0; i < inputStr.length; i++) {
-          hash = inputStr.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        
-        let radius = 0.035;
-        let baseLat = 23.0225;
-        let baseLng = 72.5714;
-        
-        if (role === 'Rider') {
-          baseLat = 23.025; baseLng = 72.565; radius = 0.045;
-        } else if (role === 'Vendor') {
-          baseLat = 23.018; baseLng = 72.555; radius = 0.03;
-        } else if (role === 'Provider') {
-          baseLat = 23.035; baseLng = 72.585; radius = 0.04;
-        }
-        
-        const latOffset = ((hash & 0xFF) / 255.0 - 0.5) * radius;
-        const lngOffset = (((hash >> 8) & 0xFF) / 255.0 - 0.5) * radius;
-        
-        return {
-          lat: baseLat + latOffset,
-          lng: baseLng + lngOffset
-        };
-      };
+      // Address mapping for buyers (users)
+      const userAddressMap = {};
+      if (addressesList) {
+        addressesList.forEach(addr => {
+          if (addr.lat && addr.lng) {
+            if (!userAddressMap[addr.user_id] || addr.is_default) {
+              userAddressMap[addr.user_id] = { lat: parseFloat(addr.lat), lng: parseFloat(addr.lng) };
+            }
+          }
+        });
+      }
+
+      // Rider location mapping
+      const riderLocMap = {};
+      if (riderLocationsList) {
+        riderLocationsList.forEach(rl => {
+          if (rl.lat && rl.lng) {
+            riderLocMap[rl.rider_id] = { lat: parseFloat(rl.lat), lng: parseFloat(rl.lng) };
+          }
+        });
+      }
 
       // Map Users (Buyers)
       if (usersList) {
         usersList.forEach(user => {
           if (user.role === 'BUYER' || !user.role) {
-            const coords = getStableCoords(user.id, 'Buyer');
-            combined.push({
-              id: user.id,
-              name: user.full_name || 'Buyer ' + user.phone.slice(-4),
-              phone: user.phone,
-              email: user.email || 'N/A',
-              role: 'Buyer',
-              status: 'Active',
-              iconColor: 'green',
-              lat: coords.lat,
-              lng: coords.lng,
-              meta: { role: 'BUYER', email: user.email }
-            });
+            const coords = userAddressMap[user.id];
+            if (coords) {
+              combined.push({
+                id: user.id,
+                name: user.full_name || 'Buyer ' + user.phone.slice(-4),
+                phone: user.phone,
+                email: user.email || 'N/A',
+                role: 'Buyer',
+                status: 'Active',
+                iconColor: 'green',
+                lat: coords.lat,
+                lng: coords.lng,
+                meta: { role: 'BUYER', email: user.email }
+              });
+            }
           }
         });
       }
@@ -538,57 +558,66 @@ const AdminPanel = ({ onLogout, location }) => {
       if (vendorsList) {
         vendorsList.forEach(vendor => {
           const store = storeMap[vendor.id];
-          const coords = getStableCoords(vendor.id, 'Vendor');
-          combined.push({
-            id: vendor.id,
-            name: vendor.business_name || vendor.name || (store ? store.name : 'Merchant Partner'),
-            phone: vendor.phone,
-            email: vendor.category || 'General Store',
-            role: 'Vendor',
-            status: vendor.is_verified ? 'Verified Partner' : 'Pending Verification',
-            iconColor: 'orange',
-            lat: (store && store.lat) ? store.lat : coords.lat,
-            lng: (store && store.lng) ? store.lng : coords.lng,
-            meta: { category: vendor.category, license: vendor.license_no, storeName: store?.name }
-          });
+          const lat = (store && store.lat) ? parseFloat(store.lat) : (vendor.lat ? parseFloat(vendor.lat) : null);
+          const lng = (store && store.lng) ? parseFloat(store.lng) : (vendor.lng ? parseFloat(vendor.lng) : null);
+          if (lat && lng) {
+            combined.push({
+              id: vendor.id,
+              name: vendor.business_name || vendor.name || (store ? store.name : 'Merchant Partner'),
+              phone: vendor.phone,
+              email: vendor.category || 'General Store',
+              role: 'Vendor',
+              status: vendor.is_verified ? 'Verified Partner' : 'Pending Verification',
+              iconColor: 'orange',
+              lat,
+              lng,
+              meta: { category: vendor.category, license: vendor.license_no, storeName: store?.name }
+            });
+          }
         });
       }
 
       // Map Riders
       if (ridersList) {
         ridersList.forEach(rider => {
-          const coords = getStableCoords(rider.id, 'Rider');
-          combined.push({
-            id: rider.id,
-            name: 'Rider ' + (rider.vehicle_no || rider.id.slice(0, 4)),
-            phone: rider.license_no || 'N/A',
-            email: rider.vehicle_no || 'Standard Transport',
-            role: 'Rider',
-            status: rider.is_active ? 'On Duty' : 'Offline',
-            iconColor: 'red',
-            lat: rider.lat || coords.lat,
-            lng: rider.lng || coords.lng,
-            meta: { rating: rider.rating || '4.8', deliveries: rider.total_deliveries || '120+' }
-          });
+          const lat = riderLocMap[rider.id]?.lat || (rider.lat ? parseFloat(rider.lat) : null);
+          const lng = riderLocMap[rider.id]?.lng || (rider.lng ? parseFloat(rider.lng) : null);
+          if (lat && lng) {
+            combined.push({
+              id: rider.id,
+              name: 'Rider ' + (rider.vehicle_no || rider.id.slice(0, 4)),
+              phone: rider.license_no || 'N/A',
+              email: rider.vehicle_no || 'Standard Transport',
+              role: 'Rider',
+              status: rider.is_active ? 'On Duty' : 'Offline',
+              iconColor: 'red',
+              lat,
+              lng,
+              meta: { rating: rider.rating || '4.8', deliveries: rider.total_deliveries || '120+' }
+            });
+          }
         });
       }
 
       // Map Service Providers
       if (providersList) {
         providersList.forEach(provider => {
-          const coords = getStableCoords(provider.id, 'Provider');
-          combined.push({
-            id: provider.id,
-            name: provider.business_name || provider.name || 'Home Expert',
-            phone: provider.phone,
-            email: provider.category_id || 'Services',
-            role: 'Provider',
-            status: provider.is_verified ? 'Verified Expert' : 'Regular Provider',
-            iconColor: 'violet',
-            lat: coords.lat,
-            lng: coords.lng,
-            meta: { business: provider.business_name, rating: provider.rating || '4.5' }
-          });
+          const lat = provider.lat ? parseFloat(provider.lat) : null;
+          const lng = provider.lng ? parseFloat(provider.lng) : null;
+          if (lat && lng) {
+            combined.push({
+              id: provider.id,
+              name: provider.business_name || provider.name || 'Home Expert',
+              phone: provider.phone,
+              email: provider.category_id || 'Services',
+              role: 'Provider',
+              status: provider.is_verified ? 'Verified Expert' : 'Regular Provider',
+              iconColor: 'violet',
+              lat,
+              lng,
+              meta: { business: provider.business_name, rating: provider.rating || '4.5' }
+            });
+          }
         });
       }
 
@@ -665,13 +694,14 @@ const AdminPanel = ({ onLogout, location }) => {
   useEffect(() => {
     fetchStats();
     fetchReferences();
+    fetchPlatformSettings();
     if (activeAdminTab === 'people_map') {
       fetchPeopleMapData();
     } else {
       fetchData();
     }
     localStorage.setItem('admin_active_tab', activeAdminTab);
-  }, [activeAdminTab, fetchData, fetchPeopleMapData, fetchReferences, fetchStats]);
+  }, [activeAdminTab, fetchData, fetchPeopleMapData, fetchReferences, fetchStats, fetchPlatformSettings]);
 
   const handleExecuteDelete = async () => {
     if (!deleteConfirmId) return;
@@ -1501,8 +1531,33 @@ const AdminPanel = ({ onLogout, location }) => {
   };
 
   const renderSettings = () => {
-    const handleSaveLocalSettings = () => {
-      toast.success('System settings saved successfully!');
+    const handleSaveLocalSettings = async () => {
+      try {
+        const adminKey = sessionStorage.getItem('admin_token') || '';
+        const response = await fetch(`${API_URL}/api/admin/settings`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-admin-key': adminKey 
+          },
+          body: JSON.stringify({ settings: platformSettings })
+        });
+        if (response.status === 401) {
+          toast.error('Session expired. Please login again.');
+          onLogout();
+          return;
+        }
+        const result = await response.json();
+        if (result.success) {
+          localStorage.setItem('passwala_platform_settings', JSON.stringify(platformSettings));
+          toast.success('System settings saved successfully!');
+        } else {
+          throw new Error(result.error || 'Failed to save settings');
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error('Failed to save settings: ' + err.message);
+      }
     };
 
     const handleClearCache = () => {
@@ -1584,6 +1639,15 @@ const AdminPanel = ({ onLogout, location }) => {
                   type="number"
                   value={platformSettings.freeDeliveryThreshold}
                   onChange={e => setPlatformSettings({ ...platformSettings, freeDeliveryThreshold: parseInt(e.target.value) || 0 })}
+                  style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.95rem', fontWeight: 600, color: '#0f172a' }}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>RIDE PRICE PER KM (₹)</label>
+                <input
+                  type="number"
+                  value={platformSettings.ridePricePerKm !== undefined ? platformSettings.ridePricePerKm : 8}
+                  onChange={e => setPlatformSettings({ ...platformSettings, ridePricePerKm: parseInt(e.target.value) || 0 })}
                   style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.95rem', fontWeight: 600, color: '#0f172a' }}
                 />
               </div>

@@ -11,6 +11,7 @@ const EventDetails = ({ user }) => {
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState('');
+  const [venueCoords, setVenueCoords] = useState(null);
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -53,6 +54,22 @@ const EventDetails = ({ user }) => {
     }, 1000);
 
     return () => clearInterval(interval);
+  }, [event]);
+
+  useEffect(() => {
+    if (event?.venue_lat && event?.venue_lng && !isNaN(parseFloat(event.venue_lat)) && !isNaN(parseFloat(event.venue_lng))) {
+      setVenueCoords({ lat: parseFloat(event.venue_lat), lng: parseFloat(event.venue_lng) });
+    } else if (event?.venue_name) {
+      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(event.venue_name + ', Ahmedabad')}&limit=1`,
+        { headers: { 'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)' } })
+      .then(r => r.json())
+      .then(d => {
+        if (d && d[0]) {
+          setVenueCoords({ lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) });
+        }
+      })
+      .catch(err => console.warn('Event venue geocoding error:', err));
+    }
   }, [event]);
 
   if (loading) {
@@ -141,16 +158,16 @@ const EventDetails = ({ user }) => {
         <div className="ed-section">
           <h3><MapIcon size={18} className="inline mr-2" /> Venue Map</h3>
           <div className="ed-map-container">
-            {event.venue_lat && event.venue_lng && !isNaN(parseFloat(event.venue_lat)) && !isNaN(parseFloat(event.venue_lng)) ? (
+            {venueCoords ? (
               <MapContainer 
-                center={[parseFloat(event.venue_lat), parseFloat(event.venue_lng)]} 
+                center={[venueCoords.lat, venueCoords.lng]} 
                 zoom={15} 
                 style={{ height: '100%', width: '100%', borderRadius: '16px' }}
                 dragging={false}
                 zoomControl={false}
               >
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                <Marker position={[parseFloat(event.venue_lat), parseFloat(event.venue_lng)]}>
+                <Marker position={[venueCoords.lat, venueCoords.lng]}>
                   <Popup>{event.venue_name}</Popup>
                 </Marker>
               </MapContainer>

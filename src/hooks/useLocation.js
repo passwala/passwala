@@ -21,6 +21,8 @@ export const useLocation = () => {
   };
 
   useEffect(() => {
+    let cancelled = false;
+
     const autoDetectLocation = async () => {
       const savedLoc = localStorage.getItem('passwala_location');
       // If location is already set to something specific (not the default neutral 'India' or generic placeholder), skip detection
@@ -31,12 +33,12 @@ export const useLocation = () => {
           async (position) => {
             try {
               const { latitude, longitude } = position.coords;
-              updateCoords({ lat: latitude, lng: longitude });
+              if (!cancelled) updateCoords({ lat: latitude, lng: longitude });
               
               // We reverse-geocode coordinates using openstreetmap (public API)
               const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18`, {
                 headers: {
-                  'User-Agent': 'Passwala/1.0 (karan@example.com)'
+                  'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
                 }
               });
               const data = await res.json();
@@ -46,29 +48,29 @@ export const useLocation = () => {
 
                 if (area && city) {
                   const preUpdateLoc = localStorage.getItem('passwala_location');
-                  updateLocation(`${area}, ${city}`);
-                  if (!preUpdateLoc || preUpdateLoc === 'Detecting Location...' || preUpdateLoc === DEFAULT_LOCATION) {
+                  if (!cancelled) updateLocation(`${area}, ${city}`);
+                  if (!cancelled && (!preUpdateLoc || preUpdateLoc === 'Detecting Location...' || preUpdateLoc === DEFAULT_LOCATION)) {
                     toast.success(`Located: ${area}`, { icon: '📍', id: 'auto-geo' });
                   }
                   return;
                 } else if (city) {
                   const state = data.address.state || '';
-                  updateLocation(`${city}${state ? `, ${state}` : ''}`);
+                  if (!cancelled) updateLocation(`${city}${state ? `, ${state}` : ''}`);
                   return;
                 }
               }
             } catch (err) {
               console.warn('GPS Reverse Geocode failed, falling back to IP');
-              fetchIPLocation();
+              if (!cancelled) fetchIPLocation();
             }
           },
           (error) => {
             console.warn('GPS Denied or Failed:', error);
-            fetchIPLocation();
+            if (!cancelled) fetchIPLocation();
           },
         );
       } else {
-        fetchIPLocation();
+        if (!cancelled) fetchIPLocation();
       }
     };
 
@@ -82,9 +84,9 @@ export const useLocation = () => {
         
         const data = await res.json();
         if (data && data.cityName && data.regionName) {
-          updateLocation(`${data.cityName}, ${data.regionName}`);
+          if (!cancelled) updateLocation(`${data.cityName}, ${data.regionName}`);
           if (data.latitude && data.longitude) {
-            updateCoords({ lat: parseFloat(data.latitude), lng: parseFloat(data.longitude) });
+            if (!cancelled) updateCoords({ lat: parseFloat(data.latitude), lng: parseFloat(data.longitude) });
           }
         }
       } catch (e) {
@@ -93,6 +95,9 @@ export const useLocation = () => {
     };
 
     autoDetectLocation();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

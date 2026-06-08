@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Package, Truck, CheckCircle, Clock, MapPin, ChevronRight, MessageCircle, X, Store, CreditCard, Wrench, Download, Bike, Navigation } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -19,7 +20,8 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
   const markerGroupRef = useRef(null);
   const boundsFitted = useRef(false);
   const hasFittedBounds = useRef(false);
-  const [routePoints, setRoutePoints] = useState([]);
+  const [routeToStorePoints, setRouteToStorePoints] = useState([]);
+  const [routeToCustomerPoints, setRouteToCustomerPoints] = useState([]);
   
   // Coordinate Resolution State
   const [storeLatLng, setStoreLatLng] = useState(null);
@@ -101,13 +103,9 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
       // Resolve Store
       let storePos = null;
       if (isService && providerDetails) {
-        if (providerDetails.address?.toLowerCase().includes('gota')) {
-           storePos = [23.0805, 72.5323]; // Hardcode Gota for demo precision
-        } else {
-           const addr = providerDetails.address || 'Ahmedabad';
-           storePos = await geocodeAddress(addr);
-           if (!storePos) storePos = [23.0305, 72.5075];
-        }
+        const addr = providerDetails.address || 'Ahmedabad';
+        storePos = await geocodeAddress(addr);
+        if (!storePos) storePos = [23.0305, 72.5075];
       } else {
         if (order.stores?.lat && order.stores?.lng) {
           storePos = [parseFloat(order.stores.lat), parseFloat(order.stores.lng)];
@@ -177,14 +175,14 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
 
   // Fix for Leaflet rendering issues in dynamic CSS layouts
   useEffect(() => {
-    if (leafletMapRef.current) {
-      const timer = setTimeout(() => {
-        if (leafletMapRef.current) {
-          leafletMapRef.current.invalidateSize();
-        }
-      }, 350);
-      return () => clearTimeout(timer);
-    }
+    if (!mapRef.current || !leafletMapRef.current) return;
+    const ro = new ResizeObserver(() => {
+      if (leafletMapRef.current) {
+        leafletMapRef.current.invalidateSize({ animate: false });
+      }
+    });
+    ro.observe(mapRef.current);
+    return () => ro.disconnect();
   }, []);
 
   // Fetch OSRM Dynamic Route
@@ -195,39 +193,76 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
       ? [parseFloat(riderCoords.lat), parseFloat(riderCoords.lng)] 
       : null;
 
-    // Removed simulated riderLatLng to avoid showing fake locations
-
-
-    let start;
-    let end;
-    
-    if (riderLatLng) {
-      start = riderLatLng;
-      end = (['ACCEPTED', 'PREPARING'].includes(order.status) && !isService) ? storeLatLng : customerLatLng;
-    } else {
-      start = storeLatLng;
-      end = customerLatLng;
-    }
-
-    const fetchOSRMRoute = async () => {
+    const fetchRoute = async (startPt, endPt) => {
+      let data = null;
       try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.routes && data.routes.length > 0) {
-            const coords = data.routes[0].geometry.coordinates.map(pt => [pt[1], pt[0]]);
-            setRoutePoints(coords);
-            return;
+        let baseUrl = import.meta.env.VITE_API_URL || '';
+        if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+          if (baseUrl.includes('localhost:') || baseUrl.includes('127.0.0.1:')) {
+            baseUrl = `${window.location.protocol}//${window.location.hostname}:3004`;
           }
         }
-        setRoutePoints([]);
+        const profile = 'driving';
+        const url = `${baseUrl}/api/route?startLat=${startPt[0]}&startLng=${startPt[1]}&endLat=${endPt[0]}&endLng=${endPt[1]}&profile=${profile}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          data = await res.json();
+        }
       } catch (err) {
-        setRoutePoints([]);
+        console.warn("Backend route proxy failed:", err);
+      }
+
+      if (!data) {
+        try {
+          const profile = 'driving';
+          const publicUrl = `https://router.project-osrm.org/route/v1/${profile}/${startPt[1]},${startPt[0]};${endPt[1]},${endPt[0]}?overview=full&geometries=geojson`;
+          const res = await fetch(publicUrl);
+          if (res.ok) {
+            data = await res.json();
+          }
+        } catch (err) {
+          console.warn("Direct public OSRM fetch failed:", err);
+        }
+      }
+
+      if (data && data.routes && data.routes.length > 0) {
+        return data.routes[0].geometry.coordinates.map(pt => [pt[1], pt[0]]);
+      }
+      return [];
+    };
+
+    const fetchBothRoutes = async () => {
+      if (isService) {
+        if (riderLatLng) {
+          const pts = await fetchRoute(riderLatLng, customerLatLng);
+          setRouteToCustomerPoints(pts);
+          setRouteToStorePoints([]);
+        } else {
+          setRouteToStorePoints([]);
+          setRouteToCustomerPoints([]);
+        }
+      } else {
+        if (riderLatLng) {
+          if (['ACCEPTED', 'PREPARING'].includes(order.status)) {
+            const leg1 = await fetchRoute(riderLatLng, storeLatLng);
+            const leg2 = await fetchRoute(storeLatLng, customerLatLng);
+            setRouteToStorePoints(leg1);
+            setRouteToCustomerPoints(leg2);
+          } else {
+            const leg1 = await fetchRoute(storeLatLng, riderLatLng);
+            const leg2 = await fetchRoute(riderLatLng, customerLatLng);
+            setRouteToStorePoints(leg1);
+            setRouteToCustomerPoints(leg2);
+          }
+        } else {
+          const path = await fetchRoute(storeLatLng, customerLatLng);
+          setRouteToCustomerPoints(path);
+          setRouteToStorePoints([]);
+        }
       }
     };
 
-    fetchOSRMRoute();
+    fetchBothRoutes();
   }, [order.status, riderCoords, storeLatLng, customerLatLng, isService, providerDetails]);
 
   useEffect(() => {
@@ -270,12 +305,8 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
     let riderLatLng = (riderCoords && riderCoords.lat && riderCoords.lng) 
       ? [parseFloat(riderCoords.lat), parseFloat(riderCoords.lng)] 
       : null;
-    
-    // Removed simulated riderLatLng to avoid showing fake locations
-
 
     // Plot Markers
-    // Always plot the base location (store or service provider base)
     L.marker(storeLatLng, { icon: createStoreIcon() })
       .bindPopup(`<b>${isService ? 'Service Provider Base' : 'Store Hub'}:</b> ${isService && providerDetails ? (providerDetails.business_name || providerDetails.name) : (order.stores?.name || 'Partner Store')}`)
       .addTo(markerGroupRef.current);
@@ -293,8 +324,8 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
     // Connect with polylines
     if (isService) {
       if (riderLatLng) {
-        if (routePoints.length > 0) {
-          L.polyline(routePoints, {
+        if (routeToCustomerPoints.length > 0) {
+          L.polyline(routeToCustomerPoints, {
             color: '#10b981',
             weight: 6,
             opacity: 0.9,
@@ -312,8 +343,8 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
     } else {
       if (order.status === 'ACCEPTED' || order.status === 'PREPARING') {
         if (riderLatLng) {
-          if (routePoints.length > 0) {
-            L.polyline(routePoints, {
+          if (routeToStorePoints.length > 0) {
+            L.polyline(routeToStorePoints, {
               color: '#f97316',
               weight: 6,
               opacity: 0.9,
@@ -329,25 +360,45 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
           }
         }
 
-        L.polyline([storeLatLng, customerLatLng], {
-          color: '#3b82f6',
-          weight: 4,
-          opacity: 0.5,
-          dashArray: '8, 8',
-          lineJoin: 'round'
-        }).addTo(markerGroupRef.current);
-      } else {
-        if (riderLatLng) {
-          L.polyline([storeLatLng, riderLatLng], {
-            color: '#94a3b8',
-            weight: 3,
-            opacity: 0.4,
-            dashArray: '4, 4',
+        if (routeToCustomerPoints.length > 0) {
+          L.polyline(routeToCustomerPoints, {
+            color: '#3b82f6',
+            weight: 4,
+            opacity: 0.5,
+            dashArray: '8, 8',
             lineJoin: 'round'
           }).addTo(markerGroupRef.current);
+        } else {
+          L.polyline([storeLatLng, customerLatLng], {
+            color: '#3b82f6',
+            weight: 4,
+            opacity: 0.5,
+            dashArray: '8, 8',
+            lineJoin: 'round'
+          }).addTo(markerGroupRef.current);
+        }
+      } else {
+        if (riderLatLng) {
+          if (routeToStorePoints.length > 0) {
+            L.polyline(routeToStorePoints, {
+              color: '#94a3b8',
+              weight: 3,
+              opacity: 0.4,
+              dashArray: '4, 4',
+              lineJoin: 'round'
+            }).addTo(markerGroupRef.current);
+          } else {
+            L.polyline([storeLatLng, riderLatLng], {
+              color: '#94a3b8',
+              weight: 3,
+              opacity: 0.4,
+              dashArray: '4, 4',
+              lineJoin: 'round'
+            }).addTo(markerGroupRef.current);
+          }
 
-          if (routePoints.length > 0) {
-            L.polyline(routePoints, {
+          if (routeToCustomerPoints.length > 0) {
+            L.polyline(routeToCustomerPoints, {
               color: '#3b82f6',
               weight: 6,
               opacity: 0.9,
@@ -362,8 +413,8 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
             }).addTo(markerGroupRef.current);
           }
         } else {
-          if (routePoints.length > 0) {
-            L.polyline(routePoints, {
+          if (routeToCustomerPoints.length > 0) {
+            L.polyline(routeToCustomerPoints, {
               color: '#3b82f6',
               weight: 6,
               opacity: 0.9,
@@ -400,14 +451,15 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
             }
           }
           
-          if (routePoints && routePoints.length > 0) {
-            bounds.extend(routePoints);
+          if (routeToStorePoints && routeToStorePoints.length > 0) {
+            bounds.extend(routeToStorePoints);
+          }
+          if (routeToCustomerPoints && routeToCustomerPoints.length > 0) {
+            bounds.extend(routeToCustomerPoints);
           }
           
-          // ONLY fit bounds if we haven't done it fully yet
-          if (!boundsFitted.current || (routePoints && routePoints.length > 0 && boundsFitted.current === 'initial')) {
+          if (bounds.isValid()) {
             leafletMapRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 15, animate: true });
-            boundsFitted.current = (routePoints && routePoints.length > 0) ? true : 'initial';
           }
         }, 150);
       }
@@ -415,7 +467,7 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
       console.warn('Map boundary fit failed', e);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order.status, riderCoords, routePoints, storeLatLng, customerLatLng]);
+  }, [order.status, riderCoords, routeToStorePoints, routeToCustomerPoints, storeLatLng, customerLatLng]);
 
   return (
     <div 
@@ -536,6 +588,7 @@ function RideTrackingMap({ booking }) {
 }
 
 const TrackOrders = ({ onBack, user, userCoords }) => {
+  const navigate = useNavigate();
   const [activeOrders, setActiveOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
@@ -824,11 +877,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
       const activeRider = Array.isArray(data) ? data[0] : data;
       
       if (activeRider) {
-        const lastUpdate = new Date(activeRider.updated_at).getTime();
-        const now = Date.now();
-        if (now - lastUpdate < 120000) { // Active in last 2 mins
-          setRiderCoords({ lat: parseFloat(activeRider.lat), lng: parseFloat(activeRider.lng) });
-        }
+        setRiderCoords({ lat: parseFloat(activeRider.lat), lng: parseFloat(activeRider.lng) });
       }
     };
     getInitialPos();
@@ -1192,6 +1241,29 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
       const { error } = await supabase.from('orders').update({ status: 'CANCELLED' }).eq('id', orderId);
       
       if (error) throw new Error(error.message || 'Failed to cancel order');
+
+      // Also update any matching service_bookings status to 'CANCELLED'
+      try {
+        const { data: orderItems } = await supabase
+          .from('order_items')
+          .select('product_id, orders!inner(user_id, store_id)')
+          .eq('order_id', orderId);
+
+        if (orderItems && orderItems.length > 0) {
+          for (const item of orderItems) {
+            if (item.orders) {
+              await supabase
+                .from('service_bookings')
+                .update({ status: 'CANCELLED' })
+                .eq('user_id', item.orders.user_id)
+                .eq('provider_id', item.orders.store_id)
+                .eq('service_id', item.product_id);
+            }
+          }
+        }
+      } catch (syncErr) {
+        console.warn("Could not sync order cancellation to service_bookings:", syncErr);
+      }
       
       toast.success("Order cancelled successfully");
       setCancelPromptId(null);
@@ -1300,7 +1372,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', position: 'relative', zIndex: 20 }}>
-                  {['PENDING', 'PLACED', 'ORDERED', 'ACCEPTED', 'PREPARING'].includes(order.status) && (
+                  {['PENDING', 'PLACED', 'ORDERED', 'ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED'].includes(order.status) && (
                     <button className="rider-contact-btn" style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', padding: '0 12px' }} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCancelPromptId(order.id); }}>
                       Cancel
                     </button>
@@ -1421,8 +1493,9 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                     >Cancel</button>
                     <button
                       className="rider-contact-btn"
-                      onClick={() => toast(`QR: ${booking.qr_code_hash}`, { icon: '🎟️', duration: 5000 })}
-                    >🎟️ Show QR</button>
+                      style={{ background: 'var(--primary)', color: 'white', border: 'none' }}
+                      onClick={() => navigate('/ride-ticket', { state: { booking, vehicle: booking.city_vehicles } })}
+                    >🎟️ View Ticket</button>
                   </div>
                 </div>
               </motion.div>

@@ -10,8 +10,9 @@ import { supabase } from '../supabase';
 function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
   const [activeTab, setActiveTab] = useState('DASHBOARD');
   const [isOnline, setIsOnline] = useState(false);
+  const [showLocationDisclosure, setShowLocationDisclosure] = useState(false);
   const [riderId, setRiderId] = useState(user?.rider_id || '');
-  const [stats, setStats] = useState({ earnings: 0, deliveries: 0 });
+  const [stats, setStats] = useState({ earnings: 0, deliveries: 0, acceptanceRate: 100, cancellationRate: 0 });
   const mainScrollRef = useRef(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [currentCoords, setCurrentCoords] = useState(null);
@@ -56,33 +57,57 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
           
           if (earningsError) throw earningsError;
 
-          // Fetch actual delivered orders count as a fallback
-          const { count: deliveriesCount } = await supabase
-            .from('orders')
-            .select('*', { count: 'exact', head: true })
-            .eq('rider_id', rid)
-            .eq('status', 'DELIVERED');
+          // Fetch delivery tracking to calculate acceptance and cancellation rates
+          const { data: trackingData } = await supabase
+            .from('delivery_tracking')
+            .select('order_id, status, orders(status)')
+            .eq('rider_id', rid);
+
+          let rejectedOrderIds = [];
+          try {
+            const saved = localStorage.getItem(`passwala_rejected_orders_${rid}`);
+            if (saved) {
+              rejectedOrderIds = JSON.parse(saved);
+            }
+          } catch (e) {
+            console.warn("Failed to parse rejected order IDs from localStorage", e);
+          }
+
+          const acceptedCount = trackingData ? trackingData.length : 0;
+          const rejectedCount = rejectedOrderIds.length;
+          const totalOffers = acceptedCount + rejectedCount;
+          const acceptanceRate = totalOffers > 0 ? Math.round((acceptedCount / totalOffers) * 100) : 100;
+
+          const cancelledCount = trackingData ? trackingData.filter(item => 
+            item.status === 'CANCELLED' || item.orders?.status === 'CANCELLED'
+          ).length : 0;
+          const cancellationRate = acceptedCount > 0 ? Math.round((cancelledCount / acceptedCount) * 100) : 0;
 
           if (earningsData) {
             const total = earningsData.reduce((sum, item) => sum + Number(item.amount), 0);
-            const actualDeliveries = deliveriesCount || 0;
             setStats({
               earnings: total,
-              deliveries: Math.max(earningsData.length, actualDeliveries)
+              deliveries: earningsData.length,
+              acceptanceRate,
+              cancellationRate
             });
           }
         } catch (err) {
-          console.warn("Stats fetch failed, defaulting to zero");
+          console.warn("Stats fetch failed, defaulting to zero", err);
           setStats({
             earnings: 0,
-            deliveries: 0
+            deliveries: 0,
+            acceptanceRate: 100,
+            cancellationRate: 0
           });
         }
       } else {
         // Default to zero for new or invalid riders
         setStats({
           earnings: 0,
-          deliveries: 0
+          deliveries: 0,
+          acceptanceRate: 100,
+          cancellationRate: 0
         });
       }
     };
@@ -95,6 +120,8 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rider_earnings', filter: `rider_id=eq.${riderId}` }, 
         () => initRider())
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `rider_id=eq.${riderId}` }, 
+        () => initRider())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'delivery_tracking', filter: `rider_id=eq.${riderId}` }, 
         () => initRider())
       .subscribe();
 
@@ -186,7 +213,7 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
   }, [isOnline, sessionStartTime]);
 
   const renderContent = () => {
-    const commonProps = { user, riderId, stats, setStats, isOnline, sessionStartTime };
+    const commonProps = { user, riderId, stats, setStats, isOnline, sessionStartTime, setShowLocationDisclosure };
     switch (activeTab) {
       case 'DASHBOARD': return <RiderDashboard {...commonProps} setIsOnline={setIsOnline} riderLocation={location} setRiderLocation={setLocation} isDetecting={isDetecting} setIsDetecting={setIsDetecting} userCoords={currentCoords || userCoords} />;
       case 'EARNINGS': return <RiderEarnings {...commonProps} />;
@@ -210,7 +237,18 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
           </div>
         </div>
         <div 
-          onClick={() => setIsOnline(!isOnline)} 
+          onClick={() => {
+            if (!isOnline && localStorage.getItem('passwala_location_consent') !== 'accepted') {
+              setShowLocationDisclosure(true);
+            } else {
+              const nextStatus = !isOnline;
+              setIsOnline(nextStatus);
+              let id = user?.id || user?.uid || user?.user_id;
+              if (id) {
+                supabase.from('riders').update({ is_active: nextStatus }).eq('user_id', id).then();
+              }
+            }
+          }} 
           style={{ 
             cursor: 'pointer',
             padding: '0.4rem 0.8rem',
@@ -265,6 +303,100 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
             onClick={() => setActiveTab('PROFILE')} 
           />
       </nav>
+
+      {/* Prominent Disclosure Modal for App Store & Play Store Location Policy Compliance */}
+      {showLocationDisclosure && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1.5rem'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '24px',
+            padding: '2rem',
+            maxWidth: '420px',
+            width: '100%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            textAlign: 'center',
+            border: '1px solid rgba(226, 232, 240, 0.8)'
+          }}>
+            <div style={{
+              background: 'rgba(249, 115, 22, 0.1)',
+              color: 'var(--rider-primary, #f97316)',
+              width: '64px',
+              height: '64px',
+              borderRadius: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.5rem auto'
+            }}>
+              <Bike size={32} />
+            </div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.75rem 0' }}>
+              Background Location Tracking Disclosure
+            </h3>
+            <p style={{ fontSize: '0.875rem', color: '#475569', lineHeight: 1.6, margin: '0 0 1.5rem 0', textAlign: 'left' }}>
+              Passwala Rider collects location data to track your coordinates and display live delivery routes to customers in real-time, <strong>even when the app is closed or not in use</strong>, while you are set to <strong>Online</strong>.
+            </p>
+            <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '1rem', marginBottom: '1.5rem', textAlign: 'left' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Features requiring background location:</div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.8rem', color: '#475569', lineHeight: 1.5 }}>
+                <li>Real-time order tracking for customers</li>
+                <li>Optimal delivery route recommendations</li>
+                <li>Accurate estimation of delivery payouts and times</li>
+              </ul>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button 
+                onClick={() => setShowLocationDisclosure(false)}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  borderRadius: '12px',
+                  border: '1px solid #cbd5e1',
+                  background: 'white',
+                  color: '#475569',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Decline
+              </button>
+              <button 
+                onClick={() => {
+                  localStorage.setItem('passwala_location_consent', 'accepted');
+                  setShowLocationDisclosure(false);
+                  setIsOnline(true);
+                  let id = user?.id || user?.uid || user?.user_id;
+                  if (id) {
+                    supabase.from('riders').update({ is_active: true }).eq('user_id', id).then();
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: 'var(--rider-primary, #f97316)',
+                  color: 'white',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Accept & Proceed
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

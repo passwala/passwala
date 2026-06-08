@@ -56,8 +56,9 @@ export const NotificationProvider = ({ children }) => {
   };
 
   const addNotification = (notif) => {
+    const textVal = notif.text || notif.message || notif.body || '';
     setNotifications(prev => [
-      { id: Date.now(), read: false, time: 'Just now', ...notif },
+      { id: Date.now(), read: false, time: 'Just now', ...notif, text: textVal },
       ...prev,
     ]);
   };

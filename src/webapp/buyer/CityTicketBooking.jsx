@@ -6,14 +6,6 @@ import { MapPin, Search, Navigation, ArrowRight, Map, LocateFixed, X } from 'luc
 import { toast } from 'react-hot-toast';
 import './CityTicketBooking.css';
 
-// Fix for default Leaflet markers in React
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
-
 // Custom colored markers
 const createColoredMarker = (color) =>
   new L.DivIcon({
@@ -34,6 +26,23 @@ const createColoredMarker = (color) =>
 const pickupIcon = createColoredMarker('#22c55e');
 const dropoffIcon = createColoredMarker('#ef4444');
 
+const vehicleIcon = new L.DivIcon({
+  className: '',
+  html: `<div style="
+    width:38px; height:38px;
+    background:#ff6b00;
+    border:3px solid white;
+    border-radius:50%;
+    box-shadow:0 4px 10px rgba(0,0,0,0.3);
+    display:flex; align-items:center; justify-content:center;
+  ">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(45deg);"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+  </div>`,
+  iconSize: [38, 38],
+  iconAnchor: [19, 19],
+  popupAnchor: [0, -19]
+});
+
 const POPULAR_ROUTES = [
   { name: 'CG Road', lat: 23.0375, lng: 72.5567 },
   { name: 'Maninagar', lat: 22.9996, lng: 72.6021 },
@@ -44,12 +53,47 @@ const POPULAR_ROUTES = [
   { name: 'SG Highway', lat: 23.0566, lng: 72.5218 },
 ];
 
+const AHMEDABAD_BOUNDS = {
+  minLat: 22.9,
+  maxLat: 23.25,
+  minLng: 72.4,
+  maxLng: 72.7
+};
+
+function isWithinAhmedabad(lat, lng) {
+  return (
+    lat >= AHMEDABAD_BOUNDS.minLat &&
+    lat <= AHMEDABAD_BOUNDS.maxLat &&
+    lng >= AHMEDABAD_BOUNDS.minLng &&
+    lng <= AHMEDABAD_BOUNDS.maxLng
+  );
+}
+
+// Closest area helper
+function getClosestAreaName(lat, lng) {
+  let closestName = 'Ahmedabad';
+  let minDistance = Infinity;
+  for (const route of POPULAR_ROUTES) {
+    const d = Math.sqrt((route.lat - lat) ** 2 + (route.lng - lng) ** 2);
+    if (d < minDistance) {
+      minDistance = d;
+      closestName = route.name;
+    }
+  }
+  return `${closestName} Area`;
+}
+
 // Reverse geocode a lat/lng to a human-readable name
 async function reverseGeocode(lat, lng) {
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16&addressdetails=1`,
-      { headers: { 'Accept-Language': 'en' } }
+      { 
+        headers: { 
+          'Accept-Language': 'en',
+          'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
+        } 
+      }
     );
     const data = await res.json();
     if (data && data.display_name) {
@@ -65,7 +109,7 @@ async function reverseGeocode(lat, lng) {
   } catch (e) {
     console.error('Geocode error:', e);
   }
-  return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  return getClosestAreaName(lat, lng);
 }
 
 // Fetch real road route from OSRM
@@ -117,7 +161,7 @@ function FitBounds({ pickup, dropoff }) {
   return null;
 }
 
-const CityTicketBooking = ({ user }) => {
+const CityTicketBooking = ({ user, userCoords }) => {
   const navigate = useNavigate();
   const [pickup, setPickup] = useState(null);
   const [dropoff, setDropoff] = useState(null);
@@ -128,6 +172,92 @@ const CityTicketBooking = ({ user }) => {
   const [locating, setLocating] = useState(false);
   const [dbRoutes, setDbRoutes] = useState([]);
   const [dbVehicles, setDbVehicles] = useState([]);
+  const [pickupSearchQuery, setPickupSearchQuery] = useState('');
+  const [dropoffSearchQuery, setDropoffSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+
+  const handleLocationSearch = async (query, type) => {
+    if (type === 'pickup') {
+      setPickupSearchQuery(query);
+    } else {
+      setDropoffSearchQuery(query);
+    }
+    
+    if (!query || query.trim().length < 3) {
+      setSearchResults([]);
+      return;
+    }
+    
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Ahmedabad')}&countrycodes=in&viewbox=72.40,22.85,72.80,23.25&bounded=1&limit=8`,
+        { 
+          headers: { 
+            'Accept-Language': 'en',
+            'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
+          } 
+        }
+      );
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        const filtered = data.filter(item => 
+          item.display_name.toLowerCase().includes('ahmedabad')
+        );
+        setSearchResults(filtered.length > 0 ? filtered : data);
+      }
+    } catch (e) {
+      console.error('Search error:', e);
+    }
+  };
+
+  const triggerSearch = async (query, type) => {
+    if (!query) return;
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Ahmedabad')}&countrycodes=in&viewbox=72.40,22.85,72.80,23.25&bounded=1&limit=1`,
+        { 
+          headers: { 
+            'Accept-Language': 'en',
+            'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
+          } 
+        }
+      );
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        handleSearchResultSelect(data[0], type);
+      } else {
+        toast.error('No locations found matching search term');
+      }
+    } catch (e) {
+      console.error('Search trigger error:', e);
+    }
+  };
+
+  const handleSearchResultSelect = (result, type) => {
+    const lat = parseFloat(result.lat);
+    const lng = parseFloat(result.lon);
+    
+    if (!isWithinAhmedabad(lat, lng)) {
+      toast.error('Passwala City Rides are strictly available within Ahmedabad city limits only.');
+      return;
+    }
+    
+    const parts = result.display_name.split(',');
+    const name = parts.slice(0, 3).join(', ').trim();
+    const loc = { lat, lng, name };
+    
+    if (type === 'pickup') {
+      setPickup(loc);
+      setPickupSearchQuery(name);
+      setActiveInput('dropoff');
+      toast.success(`Pickup set: ${name}`, { icon: '🟢' });
+    } else {
+      setDropoff(loc);
+      setDropoffSearchQuery(name);
+      toast.success(`Drop-off set: ${name}`, { icon: '🔴' });
+    }
+    setSearchResults([]);
+  };
 
   const center = [23.0225, 72.5714];
 
@@ -148,6 +278,41 @@ const CityTicketBooking = ({ user }) => {
     };
     fetchDbRoutes();
   }, []);
+
+  // Automatically fetch current location on mount as pickup location
+  useEffect(() => {
+    const resolveInitialLocation = async () => {
+      if (userCoords && userCoords.lat && userCoords.lng) {
+        const name = await reverseGeocode(userCoords.lat, userCoords.lng);
+        setPickup({ lat: userCoords.lat, lng: userCoords.lng, name });
+        setPickupSearchQuery(name);
+        setActiveInput('dropoff');
+      } else if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            const { latitude, longitude } = pos.coords;
+            const name = await reverseGeocode(latitude, longitude);
+            setPickup({ lat: latitude, lng: longitude, name });
+            setPickupSearchQuery(name);
+            setActiveInput('dropoff');
+          },
+          (error) => {
+            console.log('Auto-geolocation error or permission denied:', error);
+            // Fallback to Ahmedabad default center
+            const defaultLat = 23.0225;
+            const defaultLng = 72.5714;
+            reverseGeocode(defaultLat, defaultLng).then((name) => {
+              setPickup({ lat: defaultLat, lng: defaultLng, name });
+              setPickupSearchQuery(name);
+              setActiveInput('dropoff');
+            });
+          },
+          { enableHighAccuracy: true }
+        );
+      }
+    };
+    resolveInitialLocation();
+  }, [userCoords]);
 
   // Fetch real road route whenever both points are set
   useEffect(() => {
@@ -179,14 +344,20 @@ const CityTicketBooking = ({ user }) => {
   // Handle map click
   const handleMapClick = useCallback(
     async (lat, lng) => {
+      if (!isWithinAhmedabad(lat, lng)) {
+        toast.error('Passwala City Rides are strictly available within Ahmedabad city limits only.');
+        return;
+      }
       const name = await reverseGeocode(lat, lng);
       const loc = { lat, lng, name };
       if (activeInput === 'pickup') {
         setPickup(loc);
+        setPickupSearchQuery(name);
         setActiveInput('dropoff');
         toast.success(`Pickup: ${name}`, { icon: '🟢', duration: 2000 });
       } else {
         setDropoff(loc);
+        setDropoffSearchQuery(name);
         toast.success(`Drop-off: ${name}`, { icon: '🔴', duration: 2000 });
       }
     },
@@ -197,16 +368,35 @@ const CityTicketBooking = ({ user }) => {
   const handleLocationSelect = (loc) => {
     if (activeInput === 'pickup') {
       setPickup(loc);
+      setPickupSearchQuery(loc.name);
       setActiveInput('dropoff');
       toast.success(`Pickup: ${loc.name}`, { icon: '🟢', duration: 2000 });
     } else {
       setDropoff(loc);
+      setDropoffSearchQuery(loc.name);
       toast.success(`Drop-off: ${loc.name}`, { icon: '🔴', duration: 2000 });
     }
   };
 
   // Use current location as pickup
   const handleUseMyLocation = () => {
+    if (userCoords && userCoords.lat && userCoords.lng) {
+      setLocating(true);
+      if (!isWithinAhmedabad(userCoords.lat, userCoords.lng)) {
+        toast.error('Passwala City Rides are strictly available within Ahmedabad city limits only.');
+        setLocating(false);
+        return;
+      }
+      reverseGeocode(userCoords.lat, userCoords.lng).then((name) => {
+        setPickup({ lat: userCoords.lat, lng: userCoords.lng, name });
+        setPickupSearchQuery(name);
+        setActiveInput('dropoff');
+        setLocating(false);
+        toast.success(`Your location: ${name}`, { icon: '📍', duration: 2500 });
+      });
+      return;
+    }
+
     if (!navigator.geolocation) {
       toast.error('Geolocation not supported');
       return;
@@ -215,8 +405,14 @@ const CityTicketBooking = ({ user }) => {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
+        if (!isWithinAhmedabad(latitude, longitude)) {
+          toast.error('Passwala City Rides are strictly available within Ahmedabad city limits only.');
+          setLocating(false);
+          return;
+        }
         const name = await reverseGeocode(latitude, longitude);
         setPickup({ lat: latitude, lng: longitude, name });
+        setPickupSearchQuery(name);
         setActiveInput('dropoff');
         setLocating(false);
         toast.success(`Your location: ${name}`, { icon: '📍', duration: 2500 });
@@ -251,9 +447,19 @@ const CityTicketBooking = ({ user }) => {
     }
     setLoading(true);
     try {
+      const platformSettings = (() => {
+        try {
+          const saved = localStorage.getItem('passwala_platform_settings');
+          return saved ? JSON.parse(saved) : { ridePricePerKm: 8 };
+        } catch(e) {
+          return { ridePricePerKm: 8 };
+        }
+      })();
+      const pricePerKm = platformSettings.ridePricePerKm !== undefined ? platformSettings.ridePricePerKm : 8;
+
       const baseUrl = import.meta.env.VITE_API_URL || '';
       const response = await fetch(
-        `${baseUrl}/api/city-rides/search?pickupLat=${pickup.lat}&pickupLng=${pickup.lng}&dropLat=${dropoff.lat}&dropLng=${dropoff.lng}`
+        `${baseUrl}/api/city-rides/search?pickupLat=${pickup.lat}&pickupLng=${pickup.lng}&dropLat=${dropoff.lat}&dropLng=${dropoff.lng}&pricePerKm=${pricePerKm}`
       );
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to search rides');
@@ -267,6 +473,15 @@ const CityTicketBooking = ({ user }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatLocationDisplay = (loc) => {
+    if (!loc) return 'Tap map or choose below';
+    const coordsStr = `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`;
+    if (loc.name && loc.name !== coordsStr && !loc.name.includes(loc.lat.toFixed(4))) {
+      return `${coordsStr} (${loc.name})`;
+    }
+    return coordsStr;
   };
 
   return (
@@ -322,6 +537,22 @@ const CityTicketBooking = ({ user }) => {
               dashArray={null}
             />
           )}
+          {dbVehicles && dbVehicles.map(vehicle => {
+            const lat = parseFloat(vehicle.current_lat || vehicle.lat);
+            const lng = parseFloat(vehicle.current_lng || vehicle.lng);
+            if (isNaN(lat) || isNaN(lng) || lat === 0) return null;
+            return (
+              <Marker key={vehicle.id} position={[lat, lng]} icon={vehicleIcon}>
+                <Popup>
+                  <div style={{ fontFamily: 'inherit', fontSize: '0.82rem', lineHeight: '1.4' }}>
+                    <strong style={{ color: '#ff6b00' }}>🚌 Available Vehicle</strong><br />
+                    <span>Type: {vehicle.vehicle_type || 'Bike'}</span><br />
+                    <span>Plate: {vehicle.license_plate || 'GJ01-PW-0000'}</span>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
         </MapContainer>
 
         {/* Distance badge on map */}
@@ -333,58 +564,135 @@ const CityTicketBooking = ({ user }) => {
       </div>
 
       <div className="cr-booking-panel">
-        {/* Input Group */}
         <div className="cr-input-group">
-          <div
+          {/* Pickup Input Selector */}
+          <div 
             className={`cr-input-field ${activeInput === 'pickup' ? 'active' : ''}`}
             onClick={() => setActiveInput('pickup')}
           >
             <div className="cr-dot pickup-dot"></div>
             <div className="cr-input-content">
               <label>PICKUP LOCATION</label>
-              <span className={pickup ? 'has-value' : ''}>
-                {pickup ? pickup.name : 'Tap map or choose below'}
-              </span>
+              <input
+                type="text"
+                className="cr-real-input"
+                placeholder="Search pickup location or tap map..."
+                value={activeInput === 'pickup' ? pickupSearchQuery : (pickup ? formatLocationDisplay(pickup) : '')}
+                onChange={(e) => handleLocationSearch(e.target.value, 'pickup')}
+                onFocus={() => {
+                  setActiveInput('pickup');
+                  setPickupSearchQuery(pickup ? pickup.name : '');
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    triggerSearch(pickupSearchQuery, 'pickup');
+                  }
+                }}
+              />
             </div>
-            {pickup && (
+            {(pickupSearchQuery || pickup) && activeInput === 'pickup' && (
               <button
                 className="cr-clear-btn"
-                onClick={(e) => { e.stopPropagation(); setPickup(null); setActiveInput('pickup'); }}
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  setPickup(null); 
+                  setPickupSearchQuery(''); 
+                  setSearchResults([]); 
+                }}
               >
                 <X size={14} />
               </button>
+            )}
+            
+            {/* Pickup Results Dropdown */}
+            {activeInput === 'pickup' && searchResults.length > 0 && (
+              <div className="cr-search-results-dropdown">
+                {searchResults.map((result, index) => (
+                  <div
+                    key={index}
+                    className="cr-search-result-item"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSearchResultSelect(result, 'pickup');
+                    }}
+                  >
+                    <MapPin size={14} className="cr-pin-icon" />
+                    <div className="cr-result-text">
+                      <span className="cr-result-title">{result.display_name.split(',')[0]}</span>
+                      <span className="cr-result-subtitle">{result.display_name.split(',').slice(1).join(',')}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
           <div className="cr-route-line"></div>
 
-          <div
+          {/* Drop-off Input Selector */}
+          <div 
             className={`cr-input-field ${activeInput === 'dropoff' ? 'active' : ''}`}
             onClick={() => setActiveInput('dropoff')}
           >
             <div className="cr-dot dropoff-dot"></div>
             <div className="cr-input-content">
               <label>DROP-OFF LOCATION</label>
-              <span className={dropoff ? 'has-value' : ''}>
-                {dropoff ? dropoff.name : 'Tap map or choose below'}
-              </span>
+              <input
+                type="text"
+                className="cr-real-input"
+                placeholder="Search drop-off location or tap map..."
+                value={activeInput === 'dropoff' ? dropoffSearchQuery : (dropoff ? formatLocationDisplay(dropoff) : '')}
+                onChange={(e) => handleLocationSearch(e.target.value, 'dropoff')}
+                onFocus={() => {
+                  setActiveInput('dropoff');
+                  setDropoffSearchQuery(dropoff ? dropoff.name : '');
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    triggerSearch(dropoffSearchQuery, 'dropoff');
+                  }
+                }}
+              />
             </div>
-            {dropoff && (
+            {(dropoffSearchQuery || dropoff) && activeInput === 'dropoff' && (
               <button
                 className="cr-clear-btn"
-                onClick={(e) => { e.stopPropagation(); setDropoff(null); }}
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  setDropoff(null); 
+                  setDropoffSearchQuery(''); 
+                  setSearchResults([]); 
+                }}
               >
                 <X size={14} />
               </button>
             )}
+            
+            {/* Drop-off Results Dropdown */}
+            {activeInput === 'dropoff' && searchResults.length > 0 && (
+              <div className="cr-search-results-dropdown">
+                {searchResults.map((result, index) => (
+                  <div
+                    key={index}
+                    className="cr-search-result-item"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSearchResultSelect(result, 'dropoff');
+                    }}
+                  >
+                    <MapPin size={14} className="cr-pin-icon" />
+                    <div className="cr-result-text">
+                      <span className="cr-result-title">{result.display_name.split(',')[0]}</span>
+                      <span className="cr-result-subtitle">{result.display_name.split(',').slice(1).join(',')}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Use My Location */}
-        <button className="cr-locate-btn" onClick={handleUseMyLocation} disabled={locating}>
-          <LocateFixed size={16} />
-          {locating ? 'Detecting location...' : 'Use My Current Location as Pickup'}
-        </button>
+
 
         {/* Popular Areas */}
         <div className="cr-popular-areas">
@@ -420,38 +728,7 @@ const CityTicketBooking = ({ user }) => {
           )}
         </button>
 
-        {/* Admin / Verified Routes */}
-        <div className="admin-routes-container">
-          <h4><Map size={18} color="var(--primary)" /> Premium Verified Routes</h4>
-          {dbRoutes.length === 0 ? (
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', padding: '2rem' }}>
-              No active verified routes found.
-            </p>
-          ) : (
-            <div className="admin-routes-list">
-              {dbRoutes.map((route) => (
-                <div key={route.id} className="admin-route-card">
-                  <div className="admin-route-info">
-                    <div className="admin-route-locations">
-                      {route.start_area} <ArrowRight size={14} className="admin-route-arrow" /> {route.end_area}
-                    </div>
-                    <div className="admin-route-meta">
-                      <span className="admin-route-badge">
-                        <Navigation size={12} color="var(--primary)" /> {route.distance_km} km
-                      </span>
-                      <span className="admin-route-badge" style={{ color: '#22c55e', background: 'rgba(34,197,94,0.1)' }}>
-                        ₹{route.base_price}
-                      </span>
-                    </div>
-                  </div>
-                  <button className="admin-route-book-btn" onClick={() => handleBookAdminRoute(route)}>
-                    Book Now
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+
       </div>
     </div>
   );

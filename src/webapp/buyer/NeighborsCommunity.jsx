@@ -81,11 +81,14 @@ const NeighborsCommunity = ({ onBack, location }) => {
       <header className="community-header minimal">
 
         {/* Groups Horizontal Scroll */}
-        <div className="groups-container">
+        <div className="groups-container" style={{ position: 'relative' }}>
+          <div style={{ position: 'absolute', top: '0px', right: '12px', background: 'rgba(255, 118, 34, 0.1)', color: '#ff7622', fontSize: '9px', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', zIndex: 10, letterSpacing: '0.5px' }}>
+            COMING SOON
+          </div>
           {groups.map((group) => (
-            <div key={group.id} className="group-item" onClick={() => toast(`Joining ${group.name}...`)}>
+            <div key={group.id} className="group-item" style={{ opacity: 0.8 }} onClick={() => toast('Group hubs coming soon to Passwala!', { icon: '🚧' })}>
               <motion.div 
-                whileHover={{ scale: 1.1 }}
+                whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className={`group-circle ${group.isAction ? 'action-group' : ''}`}
                 style={!group.isAction ? { border: `2.5px solid ${group.color}`, color: group.color } : {}}

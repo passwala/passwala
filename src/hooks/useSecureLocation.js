@@ -31,10 +31,16 @@ export const useSecureLocation = () => {
   const prevCoordsRef = useRef(null);
   const lastTimeRef = useRef(null);
   const intervalRef = useRef(null);
+  const locationStateRef = useRef(locationState);
+  locationStateRef.current = locationState;
 
   const fetchAddress = async (lat, lng) => {
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`, {
+        headers: {
+          'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
+        }
+      });
       if (!res.ok) return { formatted: '', raw: null };
       const data = await res.json();
       const area = data.address?.suburb || data.address?.neighbourhood || data.address?.city || 'My Location';
@@ -88,7 +94,7 @@ export const useSecureLocation = () => {
     console.log(`[SecureGeo] Valid Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}, Acc: ${accuracy}m, Speed: ${calculatedSpeedKmH.toFixed(1)}km/h`);
 
     // Only reverse geocode if location shifted significantly (e.g., > 100 meters) to save API calls
-    let newAddressData = { formatted: locationState.address, raw: locationState.rawAddressObj };
+    let newAddressData = { formatted: locationStateRef.current.address, raw: locationStateRef.current.rawAddressObj };
     if (!prevCoordsRef.current || calculateDistance(prevCoordsRef.current.lat, prevCoordsRef.current.lng, latitude, longitude) > 0.1) {
       newAddressData = await fetchAddress(latitude, longitude);
     }
@@ -101,8 +107,8 @@ export const useSecureLocation = () => {
       lng: longitude,
       accuracy,
       speed: calculatedSpeedKmH,
-      address: newAddressData.formatted || locationState.address,
-      rawAddressObj: newAddressData.raw || locationState.rawAddressObj,
+      address: newAddressData.formatted || locationStateRef.current.address,
+      rawAddressObj: newAddressData.raw || locationStateRef.current.rawAddressObj,
       loading: false,
       error: null,
       errorCode: null,

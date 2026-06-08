@@ -73,7 +73,7 @@ const VendorPortal = ({ user, onLogout }) => {
   const [businessType, setBusinessType] = useState(() => localStorage.getItem('vBusinessType') || 'shop'); 
   const [formData, setFormData] = useState(() => {
     const saved = localStorage.getItem('vFormData');
-    return saved ? JSON.parse(saved) : { name: '', aadhar_no: '', business_name: '', license_no: '', address: '' };
+    return saved ? JSON.parse(saved) : { name: '', aadhar_no: '', business_name: '', license_no: '', address: '', lat: '', lng: '' };
   });
   
   useEffect(() => {
@@ -264,6 +264,15 @@ const VendorPortal = ({ user, onLogout }) => {
           if (vData) {
             data = vData;
             detectedType = 'shop';
+            const { data: storeData } = await supabase
+              .from('stores')
+              .select('lat, lng')
+              .eq('vendor_id', vData.id)
+              .maybeSingle();
+            if (storeData) {
+              data.lat = storeData.lat;
+              data.lng = storeData.lng;
+            }
           }
           error = vError;
         } else if (data) {
@@ -542,20 +551,45 @@ const VendorPortal = ({ user, onLogout }) => {
         toast.error("Identity verification failed.");
         return;
       }
+
+      let updatedLat = parseFloat(editFormData.lat !== undefined ? editFormData.lat : vendorData?.lat) || null;
+      let updatedLng = parseFloat(editFormData.lng !== undefined ? editFormData.lng : vendorData?.lng) || null;
+
+      const addressChanged = editFormData.address && editFormData.address !== vendorData?.address;
+      if (addressChanged && (!editFormData.lat || !editFormData.lng)) {
+        try {
+          const searchString = editFormData.address.toLowerCase().includes('ahmedabad') 
+            ? editFormData.address 
+            : `${editFormData.address}, Ahmedabad, Gujarat, India`;
+          const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchString)}&limit=1`;
+          const res = await fetch(url, { headers: { 'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)' } });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.length > 0) {
+              updatedLat = parseFloat(data[0].lat);
+              updatedLng = parseFloat(data[0].lon);
+              editFormData.lat = updatedLat;
+              editFormData.lng = updatedLng;
+            }
+          }
+        } catch (err) {
+          console.warn('Geocoding updated address failed:', err);
+        }
+      }
       
       // Instantly persist to state & localStorage
       const updatedName = editFormData.name || vendorData?.name;
       const updatedBusinessName = editFormData.business_name || vendorData?.business_name;
       const updatedAddress = editFormData.address || vendorData?.address;
       
-      setVendorData(prev => ({ ...prev, ...editFormData, phone: phone }));
-      setFormData(prev => ({ ...prev, ...editFormData }));
+      setVendorData(prev => ({ ...prev, ...editFormData, lat: updatedLat, lng: updatedLng, phone: phone }));
+      setFormData(prev => ({ ...prev, ...editFormData, lat: updatedLat, lng: updatedLng }));
       if (updatedBusinessName) localStorage.setItem('vBusinessName', updatedBusinessName);
       if (updatedName) localStorage.setItem('vOwnerName', updatedName);
       if (updatedAddress) localStorage.setItem('vAddress', updatedAddress);
       
       const savedForm = JSON.parse(localStorage.getItem('vFormData') || '{}');
-      localStorage.setItem('vFormData', JSON.stringify({ ...savedForm, ...editFormData }));
+      localStorage.setItem('vFormData', JSON.stringify({ ...savedForm, ...editFormData, lat: updatedLat, lng: updatedLng }));
 
       if (supabase && vendorData?.id && vendorData.id.length > 20) {
          try {
@@ -565,7 +599,9 @@ const VendorPortal = ({ user, onLogout }) => {
               address: editFormData.address,
               license_no: editFormData.license_no,
               category: editFormData.category,
-              aadhar_no: editFormData.aadhar_no ? editFormData.aadhar_no.replace(/\s/g, '') : null
+              aadhar_no: editFormData.aadhar_no ? editFormData.aadhar_no.replace(/\s/g, '') : null,
+              lat: updatedLat,
+              lng: updatedLng
            };
            if (targetTable === 'vendors') {
              updatePayload.name = editFormData.name;
@@ -583,8 +619,10 @@ const VendorPortal = ({ user, onLogout }) => {
              id: vendorData.id,
              vendor_id: vendorData.id,
              name: editFormData.business_name || vendorData.business_name,
-             address: editFormData.address || vendorData.address
-           });
+             address: editFormData.address || vendorData.address,
+             lat: updatedLat,
+             lng: updatedLng
+           }, { onConflict: 'id' });
          } catch (dbErr) {
            console.warn("Supabase profile sync skipped:", dbErr);
          }
@@ -694,7 +732,9 @@ const VendorPortal = ({ user, onLogout }) => {
       business_name: (resolvedVendor.business_name && resolvedVendor.business_name !== 'My Store') ? resolvedVendor.business_name : (savedForm.business_name || localStorage.getItem('vBusinessName') || resolvedVendor.business_name || 'My Store'),
       address: (resolvedVendor.address && resolvedVendor.address !== 'Local Area') ? resolvedVendor.address : (savedForm.address || localStorage.getItem('vAddress') || resolvedVendor.address || 'Local Area'),
       license_no: resolvedVendor.license_no || savedForm.license_no || 'Pending Verification',
-      id: resolvedVendor.id || savedForm.id || localStorage.getItem('vPartnerId') || '4289'
+      id: resolvedVendor.id || savedForm.id || localStorage.getItem('vPartnerId') || '4289',
+      lat: resolvedVendor.lat || savedForm.lat || '',
+      lng: resolvedVendor.lng || savedForm.lng || ''
     };
     const currentData = isEditingProfile ? editFormData : effectiveData;
 
@@ -858,6 +898,67 @@ const VendorPortal = ({ user, onLogout }) => {
                 <div className="v-input v-readonly" style={{ minHeight: '80px', padding: '14px 18px', background: '#f8fafc', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent', lineHeight: 1.6 }}>{currentData?.address || 'Address not set'}</div>
               }
             </div>
+
+            {isEditingProfile ? (
+              <div className="v-form-group" style={{ gridColumn: '1 / -1' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: '#475569', margin: 0 }}>
+                    <MapPin size={16} color="var(--v-primary)" /> STORE COORDINATES (GPS)
+                  </label>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition((pos) => {
+                          setEditFormData({
+                            ...editFormData,
+                            lat: pos.coords.latitude.toFixed(6),
+                            lng: pos.coords.longitude.toFixed(6)
+                          });
+                          toast.success("GPS Coordinates detected!");
+                        }, () => {
+                          toast.error("Failed to detect location. Please enter manually.");
+                        });
+                      } else {
+                        toast.error("Geolocation not supported by your browser.");
+                      }
+                    }}
+                    style={{ background: 'none', border: 'none', color: 'var(--v-primary, #f97316)', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <MapPin size={14} /> Auto-Detect GPS
+                  </button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <input 
+                    type="number" 
+                    step="any"
+                    placeholder="Latitude (e.g. 23.0225)" 
+                    className="v-input" 
+                    style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)' }} 
+                    value={currentData?.lat || ''} 
+                    onChange={e => setEditFormData({...editFormData, lat: e.target.value})} 
+                  />
+                  <input 
+                    type="number" 
+                    step="any"
+                    placeholder="Longitude (e.g. 72.5714)" 
+                    className="v-input" 
+                    style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)' }} 
+                    value={currentData?.lng || ''} 
+                    onChange={e => setEditFormData({...editFormData, lng: e.target.value})} 
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="v-form-group" style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: '#475569', marginBottom: '12px' }}>
+                  <MapPin size={16} color="var(--v-primary)" /> STORE COORDINATES (GPS)
+                </label>
+                <div className="v-input v-readonly" style={{ padding: '14px 18px', background: '#f8fafc', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>
+                  {currentData?.lat && currentData?.lng ? `Lat: ${currentData.lat}, Lng: ${currentData.lng}` : 'Not set'}
+                </div>
+              </div>
+            )}
           </div>
           
           <div style={{ marginTop: '3.5rem', display: 'flex', justifyContent: 'flex-end', gap: '1.25rem', borderTop: '1px solid var(--v-border)', paddingTop: '2.5rem', position: 'relative', zIndex: 1 }}>
@@ -1040,6 +1141,54 @@ const VendorPortal = ({ user, onLogout }) => {
                 onChange={e => setFormData({...formData, address: e.target.value})} 
               />
             </div>
+
+            <div className="v-form-group">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', margin: 0 }}>STORE COORDINATES (GPS)</label>
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    if (navigator.geolocation) {
+                      navigator.geolocation.getCurrentPosition((pos) => {
+                        setFormData({
+                          ...formData,
+                          lat: pos.coords.latitude.toFixed(6),
+                          lng: pos.coords.longitude.toFixed(6)
+                        });
+                        toast.success("GPS Coordinates detected!");
+                      }, () => {
+                        toast.error("Failed to detect location. Please enter manually.");
+                      });
+                    } else {
+                      toast.error("Geolocation not supported by your browser.");
+                    }
+                  }}
+                  style={{ background: 'none', border: 'none', color: 'var(--v-primary, #f97316)', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <MapPin size={12} /> Auto-Detect GPS
+                </button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <input 
+                  type="number" 
+                  step="any"
+                  placeholder="Latitude (e.g. 23.0225)" 
+                  className="v-input" 
+                  style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)' }} 
+                  value={formData.lat || ''} 
+                  onChange={e => setFormData({...formData, lat: e.target.value})} 
+                />
+                <input 
+                  type="number" 
+                  step="any"
+                  placeholder="Longitude (e.g. 72.5714)" 
+                  className="v-input" 
+                  style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)' }} 
+                  value={formData.lng || ''} 
+                  onChange={e => setFormData({...formData, lng: e.target.value})} 
+                />
+              </div>
+            </div>
           </div>
 
           <button 
@@ -1083,6 +1232,29 @@ const VendorPortal = ({ user, onLogout }) => {
               const toastId = toast.loading('Setting up your profile...');
               const currentPhone = vendorData?.phone || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : '9999999999');
               const targetTable = businessType === 'shop' ? 'vendors' : 'service_providers';
+
+              let coords = null;
+              if (!formData.lat || !formData.lng) {
+                try {
+                  const searchString = formData.address.toLowerCase().includes('ahmedabad') 
+                    ? formData.address 
+                    : `${formData.address}, Ahmedabad, Gujarat, India`;
+                  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchString)}&limit=1`;
+                  const res = await fetch(url, { headers: { 'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)' } });
+                  if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.length > 0) {
+                      coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+                    }
+                  }
+                } catch (err) {
+                  console.warn('Geocoding registration address failed:', err);
+                }
+              }
+
+              const finalLat = parseFloat(formData.lat) || (coords ? coords.lat : null);
+              const finalLng = parseFloat(formData.lng) || (coords ? coords.lng : null);
+
               const tablePayload = {
                 business_name: formData.business_name,
                 aadhar_no: formData.aadhar_no.replace(/\s/g, ''),
@@ -1090,7 +1262,9 @@ const VendorPortal = ({ user, onLogout }) => {
                 license_no: formData.license_no || '',
                 phone: currentPhone,
                 profile_completed: true,
-                name: formData.name
+                name: formData.name,
+                lat: finalLat,
+                lng: finalLng
               };
               if (businessType === 'shop') {
                 tablePayload.category = formData.category || 'Grocery';
@@ -1153,7 +1327,9 @@ const VendorPortal = ({ user, onLogout }) => {
                       id: savedId,
                       vendor_id: savedId,
                       name: tablePayload.business_name,
-                      address: tablePayload.address
+                      address: tablePayload.address,
+                      lat: finalLat,
+                      lng: finalLng
                     }, { onConflict: 'id' });
                     if (storeErr) {
                       console.warn('Stores upsert non-critical skip:', storeErr.message);
@@ -1161,7 +1337,7 @@ const VendorPortal = ({ user, onLogout }) => {
                   }
 
                   toast.success('Onboarding completed!', { id: toastId });
-                  setVendorData(prev => ({...prev, ...formData, id: savedId || '4289', business_name: tablePayload.business_name, address: tablePayload.address, profile_completed: true}));
+                  setVendorData(prev => ({...prev, ...formData, id: savedId || '4289', business_name: tablePayload.business_name, address: tablePayload.address, lat: finalLat, lng: finalLng, profile_completed: true}));
                   localStorage.setItem('vProfileCompleted', 'true');
                   setShowSuccessPop(true);
                 } catch (err) {
