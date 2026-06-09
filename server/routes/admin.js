@@ -204,15 +204,17 @@ router.get('/fetch', async (req, res) => {
                     try {
                         let { data: existingUser } = await supabase
                             .from('users')
-                            .select('id, full_name')
+                            .select('id, full_name, role')
                             .eq('phone', row.phone)
                             .maybeSingle();
+
+                        const targetRole = table === 'vendors' ? 'VENDOR' : (table === 'riders' ? 'RIDER' : 'SERVICE_PROVIDER');
 
                         if (!existingUser) {
                             const userPayload = {
                                 phone: row.phone,
                                 full_name: row.name || row.business_name || 'Partner',
-                                role: table === 'vendors' ? 'VENDOR' : (table === 'riders' ? 'RIDER' : 'SERVICE_PROVIDER')
+                                role: targetRole
                             };
                             const { data: newUser, error: insErr } = await supabase
                                 .from('users')
@@ -223,6 +225,11 @@ router.get('/fetch', async (req, res) => {
                             if (!insErr && newUser) {
                                 existingUser = newUser;
                             }
+                        } else if (existingUser.role !== targetRole) {
+                            await supabase
+                                .from('users')
+                                .update({ role: targetRole })
+                                .eq('id', existingUser.id);
                         }
 
                         if (existingUser) {
@@ -430,59 +437,12 @@ router.get('/stats', async (req, res) => {
     }
 });
 
-// POST /api/admin/purge — Perform deep purge of mock residue securely
+// POST /api/admin/purge — Perform deep purge of mock residue securely (DISABLED)
 router.post('/purge', async (req, res) => {
-    try {
-        const mockUserIds = [
-            '00000000-0000-0000-0000-000000000001', 
-            '00000000-0000-0000-0000-000000000002',
-            '00000000-0000-0000-0000-000000000003',
-            '00000000-0000-0000-0000-000000000004'
-        ];
-
-        // 1. Delete by specific IDs
-        await supabase.from('services').delete().in('id', ['88888888-8888-8888-8888-888888888888']);
-        await supabase.from('products').delete().in('id', ['55555555-5555-5555-5555-555555555555']);
-        await supabase.from('product_categories').delete().in('id', ['44444444-4444-4444-4444-444444444444']);
-        await supabase.from('service_categories').delete().in('id', ['77777777-7777-7777-7777-777777777777']);
-        await supabase.from('stores').delete().in('id', ['22222222-2222-2222-2222-222222222222']);
-        await supabase.from('service_providers').delete().in('id', ['66666666-6666-6666-6666-666666666666']);
-        await supabase.from('riders').delete().in('id', ['33333333-3333-3333-3333-333333333333']);
-        await supabase.from('vendors').delete().in('id', ['11111111-1111-1111-1111-111111111111']);
-        await supabase.from('users').delete().in('id', mockUserIds);
-
-        // 2. Delete by suspicious names and gibberish patterns
-        const suspiciousWords = [
-            'test', 'fake', 'nnknn', 'nzbsh', 'dummy', 'asdf', 
-            'bjkb', 'mmmmm', 'nmnm', 'nmn', 'kevall', 'plumber',
-            '99999', '66666', '88888', '77777', '11111', '00000',
-            'sample', 'demo', 'example', 'xyz', 'test', 'admin'
-        ];
-        
-        const tablesToClean = ['vendors', 'users', 'service_providers', 'stores', 'riders', 'services', 'products'];
-        
-        for (const word of suspiciousWords) {
-            for (const table of tablesToClean) {
-                const nameField = (table === 'users') ? 'full_name' : (table === 'products' || table === 'services' || table === 'stores') ? 'name' : 'business_name';
-                await supabase.from(table).delete().ilike(nameField, `%${word}%`);
-                
-                if (table !== 'products' && table !== 'services' && table !== 'product_categories' && table !== 'service_categories') {
-                    await supabase.from(table).delete().ilike('phone', `%${word}%`);
-                }
-            }
-        }
-
-        // 3. Delete exact duplicates or specific mock entries
-        await supabase.from('service_providers').delete().eq('business_name', 'Super Plumber');
-        await supabase.from('service_providers').delete().eq('phone', '6666666666');
-        await supabase.from('users').delete().eq('full_name', 'Kevallll');
-        await supabase.from('users').delete().eq('phone', '9999999999');
-
-        res.status(200).json({ success: true, message: 'Purge completed successfully' });
-    } catch (error) {
-        console.error('❌ Admin Purge Error:', error.message);
-        res.status(500).json({ success: false, error: error.message });
-    }
+    return res.status(403).json({ 
+        success: false, 
+        error: 'Database purge is disabled on this platform to protect data safety.' 
+    });
 });
 
 // GET /api/admin/people_map — Fetch coordinates for all community roles
@@ -568,9 +528,15 @@ router.post('/upsert', async (req, res) => {
             // Use existing name if we don't have a new one in the payload
             const newName = payload.full_name || payload.name || payload.business_name || (existingUser && existingUser.full_name) || 'Admin Created';
             
+            let userRole = 'BUYER';
+            if (table === 'vendors') userRole = 'VENDOR';
+            else if (table === 'riders') userRole = 'RIDER';
+            else if (table === 'service_providers') userRole = 'SERVICE_PROVIDER';
+
             const userPayload = {
                 phone: payload.phone,
-                full_name: newName
+                full_name: newName,
+                role: userRole
             };
 
             if (existingUser) {
@@ -682,30 +648,12 @@ router.post('/upsert', async (req, res) => {
     }
 });
 
-// DELETE /api/admin/delete — Securely delete any record
+// DELETE /api/admin/delete — Securely delete any record (DISABLED)
 router.delete('/delete', async (req, res) => {
-    const { table, id } = req.body;
-    
-    if (!table || !id) {
-        return res.status(400).json({ error: 'Table name and ID are required' });
-    }
-
-    if (!ALLOWED_ADMIN_TABLES.includes(table)) {
-        return res.status(400).json({ error: `Invalid table: ${table} is not whitelisted` });
-    }
-
-    try {
-        const { error } = await supabase
-            .from(table)
-            .delete()
-            .eq('id', id);
-
-        if (error) throw error;
-        res.status(200).json({ success: true, message: 'Deleted successfully' });
-    } catch (error) {
-        console.error(`❌ Admin Delete Error [${table}]:`, error.message);
-        res.status(500).json({ success: false, error: error.message });
-    }
+    return res.status(403).json({
+        success: false,
+        error: 'Database deletion is disabled on this platform to protect data safety.'
+    });
 });
 
 // Helper to get platform settings path regardless of process.cwd()

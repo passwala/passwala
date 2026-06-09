@@ -12,8 +12,6 @@ import {
   Settings, 
   LogOut,
   Camera,
-  Sun,
-  Moon,
   Globe,
   Trash2,
   MapPin
@@ -25,7 +23,6 @@ import './WebappProfile.css';
 const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser }) => {
   const { t, changeLanguage, currentLanguage, languages } = useTranslation();
   const [localPhoto, setLocalPhoto] = React.useState(user?.photoURL);
-  const [showDeleteModal, setShowDeleteModal] = React.useState(false);
   const [isEditingName, setIsEditingName] = React.useState(false);
   const [newName, setNewName] = React.useState(user?.displayName || '');
   const [isUpdatingName, setIsUpdatingName] = React.useState(false);
@@ -131,35 +128,6 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
     reader.readAsDataURL(file);
   };
 
-  const handleDeleteAccount = async () => {
-    setShowDeleteModal(false);
-    try {
-      const currentUser = auth.currentUser;
-      const searchId = user?.uid || user?.email || user?.phoneNumber;
-      const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
-      const token = await getAuthToken();
-      const res = await fetch(`${apiBase}/api/users/${encodeURIComponent(searchId)}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      // Explicitly sign out to clean Firebase state and prevent registration screen showing up on reload
-      await auth.signOut().catch(() => {});
-      if (currentUser) await currentUser.delete().catch(() => {});
-      
-      if (res.status === 200 || res.status === 404) {
-        toast.success('Account Deleted.');
-        localStorage.clear();
-        sessionStorage.clear();
-        setTimeout(() => window.location.href = '/', 1500);
-      }
-    } catch (err) {
-      toast.error('Delete failed.');
-    }
-  };
-
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -199,24 +167,6 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
       </div>
 
       <div className="profile-scroll-content">
-        <h3 className="section-label">{t('appearance')}</h3>
-        <div className="profile-menu-container">
-          <div className="profile-menu-item" onClick={onToggleTheme}>
-            <div className="menu-item-left">
-              <div className="menu-icon-box appearance">
-                {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-              </div>
-              <div className="menu-text">
-                <strong>{t('dark_mode')}</strong>
-                <span>{t('switch_theme')}</span>
-              </div>
-            </div>
-            <div className={`theme-toggle-switch ${isDarkMode ? 'active' : ''}`}>
-              <div className="switch-knob"></div>
-            </div>
-          </div>
-        </div>
-
         <h3 className="section-label">Language / ભાષા / भाषा</h3>
         <div className="language-pills-row">
           {Object.entries(languages).map(([code, lang]) => (
@@ -264,26 +214,7 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
           </button>
         </div>
 
-        <div className="profile-actions-footer">
-          <button className="delete-account-btn" onClick={() => setShowDeleteModal(true)}>
-             <Trash2 size={16} />
-             <span>{t('delete_account_permanently')}</span>
-          </button>
-        </div>
       </div>
-
-      {showDeleteModal && (
-        <div className="custom-modal-overlay" onClick={() => setShowDeleteModal(false)}>
-          <div className="custom-confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Delete Account?</h3>
-            <p>This action is permanent and cannot be undone.</p>
-            <div className="modal-actions-row">
-              <button className="modal-btn secondary" onClick={() => setShowDeleteModal(false)}>Cancel</button>
-              <button className="modal-btn delete" onClick={handleDeleteAccount}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
     </motion.div>
   );
 };

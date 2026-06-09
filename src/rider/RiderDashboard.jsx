@@ -1,6 +1,6 @@
 // Location Fixed with Real Premium Leaflet Mapping
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Navigation, Phone, CheckCircle, Package, Clock, ChevronRight, Check, RefreshCw, IndianRupee } from 'lucide-react';
+import { MapPin, Navigation, Phone, CheckCircle, Package, Clock, ChevronRight, Check, RefreshCw, IndianRupee, Maximize2, Minimize2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../supabase'; // Import supabase client
 import { getOSRMRoute, getStraightLineDistance } from '../utils/dijkstra';
@@ -66,6 +66,10 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
   const [rideStep, setRideStep] = useState(0);
   const prevRideIdRef = useRef(null);
   const hasCenteredRef = useRef(false);
+  const [mockLat, setMockLat] = useState('23.0225');
+  const [mockLng, setMockLng] = useState('72.5714');
+  const [showGpsSimulator, setShowGpsSimulator] = useState(false);
+  const [isFullMap, setIsFullMap] = useState(false);
 
   useEffect(() => {
     if (activeRide?.id !== prevRideIdRef.current) {
@@ -179,6 +183,122 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       }
     }
   }, [riderId]);
+
+  // Fetch active order for this rider if they have one ongoing in the database on mount/online
+  useEffect(() => {
+    if (!riderId || activeOrder) return;
+
+    const fetchActiveOrder = async () => {
+      try {
+        // 1. Query delivery_tracking to find the active order ID for this rider
+        const { data: trackingRecord, error: trackingErr } = await supabase
+          .from('delivery_tracking')
+          .select('order_id, status')
+          .eq('rider_id', riderId)
+          .neq('status', 'DELIVERED')
+          .neq('status', 'CANCELLED')
+          .limit(1)
+          .maybeSingle();
+
+        if (trackingErr || !trackingRecord?.order_id) return;
+
+        // 2. Fetch order details for the active order ID
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*, stores(name, address, lat, lng, vendor_id), addresses(*), users(full_name), order_items(id, quantity, products(name, description))')
+          .eq('id', trackingRecord.order_id)
+          .maybeSingle();
+
+        if (!error && data) {
+          // Resolve store and customer coords
+          let sLat = parseFloat(data.stores?.lat);
+          let sLng = parseFloat(data.stores?.lng);
+          if (isNaN(sLat) || isNaN(sLng) || sLat === 0) {
+            const resolvedStore = await geocodeAddress(data.stores?.address || data.stores?.name || 'Ahmedabad');
+            sLat = resolvedStore.lat;
+            sLng = resolvedStore.lng;
+          }
+          const storeCoords = { lat: sLat, lng: sLng };
+
+          let cLat = data.addresses ? parseFloat(data.addresses.lat) : NaN;
+          let cLng = data.addresses ? parseFloat(data.addresses.lng) : NaN;
+          if (isNaN(cLat) || isNaN(cLng) || cLat === 0) {
+            const resolvedCustomer = await geocodeAddress(data.addresses?.address_line_1 || 'Ahmedabad');
+            cLat = resolvedCustomer.lat;
+            cLng = resolvedCustomer.lng;
+          }
+          const customerCoords = { lat: cLat, lng: cLng };
+
+          let dropAddr = 'Customer Location';
+          if (data.addresses) {
+            const a = data.addresses;
+            const parts = [a.house_no, a.floor, a.address_line_1, a.city, a.pincode].filter(Boolean);
+            dropAddr = parts.join(', ') || 'Customer Location';
+          }
+
+          let stepIdx = 0;
+          if (data.status === 'PREPARING') stepIdx = 1;
+          if (data.status === 'SHIPPED') stepIdx = 2;
+          if (data.status === 'DISPATCHED') stepIdx = 3;
+
+          setActiveOrder({
+            id: `#ORD-${data.id.substring(0, 6).toUpperCase()}`,
+            store: data.stores?.name || 'Passwala Partner Store',
+            storeArea: data.stores?.address?.split(',')[0] || 'Nearby',
+            customerName: data.users?.full_name || 'Customer',
+            area: data.addresses?.society || 'Near Ahmedabad',
+            pickupAddress: data.stores?.address || 'Nearby Market',
+            dropAddress: dropAddr,
+            distance: 'calculating...',
+            earnings: `₹${data.total_amount || 50}`,
+            time: 'calculating...',
+            items: data.order_items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 1,
+            weight: 0.5,
+            dbId: data.id,
+            storeCoords,
+            customerCoords
+          });
+          setDeliveryStep(stepIdx);
+        }
+      } catch (err) {
+        console.error("Error fetching active order:", err);
+      }
+    };
+
+    fetchActiveOrder();
+  }, [riderId, isOnline, activeOrder]);
+
+  // Real-time active order status synchronization from DB
+  useEffect(() => {
+    if (!activeOrder?.dbId) return;
+
+    const channel = supabase
+      .channel(`active-order-${activeOrder.dbId}`)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'orders', 
+        filter: `id=eq.${activeOrder.dbId}` 
+      }, (payload) => {
+        if (['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(payload.new.status)) {
+          setActiveOrder(null);
+          setDeliveryStep(0);
+          toast.success(`Order is now ${payload.new.status}!`);
+        } else {
+          let nextIdx = 0;
+          if (payload.new.status === 'PREPARING') nextIdx = 1;
+          if (payload.new.status === 'SHIPPED') nextIdx = 2;
+          if (payload.new.status === 'DISPATCHED') nextIdx = 3;
+          
+          setDeliveryStep(nextIdx);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeOrder?.dbId]);
   // Ahmedabad service boundary constraint (approx. 50km from Ahmedabad center 23.0225, 72.5714)
   const constrainToAhmedabad = (coords) => {
     if (!coords || isNaN(coords.lat) || isNaN(coords.lng)) {
@@ -225,6 +345,9 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
 
   // Fetch real street coordinates from OSRM Engine
   useEffect(() => {
+    // If the simulation is already moving, do NOT recalculate the route
+    if (simIndexRef?.current > 0) return;
+
     const orderToRoute = activeOrder || incomingOrder;
     if (!orderToRoute && !activeRide) {
       setOsrmRouteToStore([]);
@@ -818,7 +941,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       }, 350);
       return () => clearTimeout(timer);
     }
-  }, [activeOrder, activeRide, incomingOrder, isOnline]);
+  }, [activeOrder, activeRide, incomingOrder, isOnline, isFullMap]);
 
   // Sync Leaflet markers and route polylines dynamically
   useEffect(() => {
@@ -996,7 +1119,36 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         }
       }
     }
-  }, [mapCoords, activeOrder, incomingOrder, deliveryStep, nearbyStores, realStoreDistances, isOnline, osrmRouteToStore, osrmRouteToCustomer]);
+  }, [mapCoords, activeOrder, incomingOrder, deliveryStep, nearbyStores, realStoreDistances, isOnline, osrmRouteToStore, osrmRouteToCustomer, activeRide]);
+
+  const handleUpdateMockGps = async () => {
+    const lat = parseFloat(mockLat);
+    const lng = parseFloat(mockLng);
+    if (isNaN(lat) || isNaN(lng)) {
+      toast.error("Invalid coordinates");
+      return;
+    }
+    const newCoords = { lat, lng };
+    setMapCoords(newCoords);
+    if (leafletMapRef.current) {
+      leafletMapRef.current.panTo([lat, lng]);
+    }
+    toast.success(`Mock GPS set to: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+    try {
+      if (riderId) {
+        await supabase
+          .from('rider_locations')
+          .upsert({
+            rider_id: riderId,
+            lat: lat,
+            lng: lng,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'rider_id' });
+      }
+    } catch (e) {
+      console.warn("Failed to sync mock location to DB:", e);
+    }
+  };
 
   const handleToggleOnline = async () => {
     let id = user?.id || user?.uid || user?.user_id;
@@ -1032,6 +1184,10 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           .from('riders')
           .update({ is_active: newStatus })
           .eq('user_id', id);
+        await supabase
+          .from('city_vehicles')
+          .update({ is_active: newStatus })
+          .eq('driver_id', id);
       }
     } catch (err) {
       console.warn("Status sync failed, using local only");
@@ -1064,7 +1220,32 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
          // Step 2: Safely attempt to link the rider ID (ignoring foreign key errors if test account)
          if (riderId && riderId.length > 20) {
            await supabase.from('orders').update({ rider_id: riderId }).eq('id', orderToStart.dbId);
-           await supabase.from('delivery_tracking').update({ rider_id: riderId, status: 'ASSIGNED' }).eq('order_id', orderToStart.dbId);
+           
+           const { data: existingTracking } = await supabase
+             .from('delivery_tracking')
+             .select('id')
+             .eq('order_id', orderToStart.dbId)
+             .maybeSingle();
+
+           if (existingTracking) {
+             await supabase
+               .from('delivery_tracking')
+               .update({
+                 rider_id: riderId,
+                 status: 'ASSIGNED',
+                 updated_at: new Date().toISOString()
+               })
+               .eq('order_id', orderToStart.dbId);
+           } else {
+             await supabase
+               .from('delivery_tracking')
+               .insert([{
+                 order_id: orderToStart.dbId,
+                 rider_id: riderId,
+                 status: 'ASSIGNED',
+                 updated_at: new Date().toISOString()
+               }]);
+           }
          }
          
          // Step 3: Only proceed locally once the database absolutely confirms the claim
@@ -1174,8 +1355,21 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
   return (
     <div className="rider-screen relative" style={{ minHeight: '100%', paddingBottom: '2rem' }}>
       {/* Map Section */}
-       <div style={{ 
-          height: (activeOrder || activeRide) ? '320px' : '280px', 
+       <div style={isFullMap ? {
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: '#f1f5f9',
+          overflow: 'hidden',
+          zIndex: 9999,
+          margin: 0,
+          borderRadius: 0,
+          boxShadow: 'none',
+          border: 'none'
+       } : { 
+          height: (activeOrder || activeRide) ? '220px' : '280px', 
           backgroundColor: '#f1f5f9',
           position: 'relative',
           overflow: 'hidden',
@@ -1190,6 +1384,33 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           ref={mapRef} 
           style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 1 }}
         ></div>
+
+        {/* Toggle Full Map Button */}
+        <button 
+          onClick={() => {
+            setIsFullMap(!isFullMap);
+          }}
+          style={{ 
+            position: 'absolute', 
+            top: '1rem', 
+            right: '1rem', 
+            width: '48px', 
+            height: '48px', 
+            borderRadius: '16px', 
+            background: 'white', 
+            border: 'none', 
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            cursor: 'pointer',
+            zIndex: 10,
+            transition: 'transform 0.2s'
+          }}
+          title={isFullMap ? "Exit Full Screen" : "Open Full Screen"}
+        >
+          {isFullMap ? <Minimize2 size={22} color="var(--rider-primary)" /> : <Maximize2 size={22} color="var(--rider-primary)" />}
+        </button>
 
         {/* GPS FAB Overlay */}
         <button 
@@ -1387,6 +1608,74 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                   </div>
                   <p style={{ fontSize: '1.75rem', fontWeight: 900, margin: 0, color: 'var(--rider-text)' }}>{stats.deliveries}</p>
               </div>
+          </div>
+
+          <div style={{ background: 'white', padding: '1.25rem', borderRadius: '24px', border: '1px solid var(--rider-border)', boxShadow: 'var(--rider-shadow)', marginTop: '1rem' }}>
+              <div 
+                  onClick={() => setShowGpsSimulator(!showGpsSimulator)} 
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+              >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Navigation size={18} color="var(--rider-primary)" style={{ transform: 'rotate(45deg)' }} />
+                    <span style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--rider-text)' }}>Developer GPS Simulator</span>
+                  </div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--rider-primary)', fontWeight: 700 }}>
+                    {showGpsSimulator ? 'Hide' : 'Show'}
+                  </span>
+              </div>
+              
+              {showGpsSimulator && (
+                  <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', borderTop: '1px solid var(--rider-border)', paddingTop: '1rem' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <div style={{ flex: 1 }}>
+                              <label style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--rider-text-secondary)', display: 'block', marginBottom: '4px' }}>LATITUDE</label>
+                              <input 
+                                  type="text" 
+                                  value={mockLat} 
+                                  onChange={(e) => setMockLat(e.target.value)} 
+                                  placeholder="e.g. 23.0225"
+                                  style={{ width: '100%', padding: '0.5rem', border: '1.5px solid var(--rider-border)', borderRadius: '8px', fontSize: '0.85rem', outline: 'none' }}
+                              />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                              <label style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--rider-text-secondary)', display: 'block', marginBottom: '4px' }}>LONGITUDE</label>
+                              <input 
+                                  type="text" 
+                                  value={mockLng} 
+                                  onChange={(e) => setMockLng(e.target.value)} 
+                                  placeholder="e.g. 72.5714"
+                                  style={{ width: '100%', padding: '0.5rem', border: '1.5px solid var(--rider-border)', borderRadius: '8px', fontSize: '0.85rem', outline: 'none' }}
+                              />
+                          </div>
+                      </div>
+                      <button 
+                          onClick={handleUpdateMockGps}
+                          style={{ width: '100%', padding: '0.6rem', background: 'var(--rider-primary)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
+                      >
+                          Set Exact Location
+                      </button>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+                          <button 
+                              onClick={() => { setMockLat('23.0225'); setMockLng('72.5714'); }}
+                              style={{ padding: '4px 8px', fontSize: '0.65rem', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                              Ahmedabad Center
+                          </button>
+                          <button 
+                              onClick={() => { setMockLat('23.0396'); setMockLng('72.5100'); }}
+                              style={{ padding: '4px 8px', fontSize: '0.65rem', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                              Sindhu Bhavan Road
+                          </button>
+                          <button 
+                              onClick={() => { setMockLat('23.0130'); setMockLng('72.5625'); }}
+                              style={{ padding: '4px 8px', fontSize: '0.65rem', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                              Paldi
+                          </button>
+                      </div>
+                  </div>
+              )}
           </div>
         </div>
       )}

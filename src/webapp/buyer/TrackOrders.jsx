@@ -653,8 +653,22 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
 
     // REAL-TIME: Listen for order status updates
     const sub = supabase.channel('order_updates')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, async (payload) => {
         let isService = false;
+        
+        let freshTracking = [];
+        try {
+          const { data: trackingData } = await supabase
+            .from('delivery_tracking')
+            .select('order_id, rider_id')
+            .eq('order_id', payload.new.id);
+          if (trackingData) {
+            freshTracking = trackingData;
+          }
+        } catch (e) {
+          console.warn("Error fetching tracking in real-time:", e);
+        }
+
         setActiveOrders(prev => {
           const matched = prev.find(o => o.id === payload.new.id);
           if (matched && (matched.items?.[0]?.type === 'service' || (matched.stores && !matched.stores.vendor_id))) {
@@ -667,7 +681,8 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                 ...payload.new,
                 items: o.items,
                 stores: o.stores || payload.new.stores,
-                addresses: o.addresses || payload.new.addresses
+                addresses: o.addresses || payload.new.addresses,
+                delivery_tracking: freshTracking.length > 0 ? freshTracking : o.delivery_tracking
               };
             }
             return o;
@@ -1396,9 +1411,6 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                       Cancel
                     </button>
                   )}
-                  <button className="rider-contact-btn" onClick={(e) => { e.preventDefault(); e.stopPropagation(); toast(`Opening chat with ${order.delivery_agent_name || 'Support'}...`); }}>
-                    <MessageCircle size={18} /> Chat
-                  </button>
                   
                   <button className="rider-contact-btn" style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedOrderDetails(order); }}>
                     Details

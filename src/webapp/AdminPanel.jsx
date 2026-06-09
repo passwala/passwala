@@ -306,6 +306,7 @@ const AdminPanel = ({ onLogout, location }) => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('ALL');
   const [stats, setStats] = useState({ users: 0, services: 0, apps: 0, bookings: 0 });
   const [platformSettings, setPlatformSettings] = useState(() => {
     const saved = localStorage.getItem('passwala_platform_settings');
@@ -961,11 +962,17 @@ const AdminPanel = ({ onLogout, location }) => {
     const uniqueEntries = [];
     const seenSignatures = new Set();
     filtered.forEach(item => {
-      // Filter out non-buyer roles from the Users tab
+      // Filter based on selected userRoleFilter in the Users tab
       if (currentTab.table === 'users') {
         const role = item.role ? item.role.toUpperCase() : 'BUYER';
-        if (role !== 'BUYER' && role !== 'USER') {
-          return; // Skip vendors, riders, admins etc.
+        if (userRoleFilter === 'BUYER' && role !== 'BUYER' && role !== 'USER') {
+          return;
+        }
+        if (userRoleFilter === 'RIDER' && role !== 'RIDER') {
+          return;
+        }
+        if (userRoleFilter === 'VENDOR' && role !== 'VENDOR' && role !== 'SERVICE_PROVIDER') {
+          return;
         }
       }
 
@@ -983,6 +990,36 @@ const AdminPanel = ({ onLogout, location }) => {
 
     return (
       <div className="admin-table-container">
+        {currentTab.table === 'users' && (
+          <div className="user-role-tabs" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', flexWrap: 'wrap' }}>
+            {[
+              { id: 'ALL', label: 'All Users' },
+              { id: 'BUYER', label: 'Buyer Side' },
+              { id: 'VENDOR', label: 'Vendor Side' },
+              { id: 'RIDER', label: 'Rider Side' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setUserRoleFilter(tab.id)}
+                style={{
+                  background: userRoleFilter === tab.id ? '#0f172a' : '#f1f5f9',
+                  color: userRoleFilter === tab.id ? 'white' : '#475569',
+                  border: 'none',
+                  borderRadius: '30px',
+                  padding: '8px 18px',
+                  fontWeight: 600,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 2px 5px rgba(0,0,0,0.02)'
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="table-actions">
           <div className="search-admin">
             <Search size={18} />
@@ -1054,10 +1091,13 @@ const AdminPanel = ({ onLogout, location }) => {
                         v = item.vendors.business_name || item.vendors.name || item.vendors.phone;
                       }
 
-                      // Flatten joined user data for display
+                      // Flatten joined user data for display, or fall back if reference is missing/null
                       if (item.users) {
                         if (k === 'phone' && !v) v = item.users.phone;
                         if (k === 'full_name' && !v) v = item.users.full_name;
+                      } else {
+                        if (k === 'phone' && !v) v = item.phone;
+                        if (k === 'full_name' && !v) v = item.full_name || item.name || item.business_name || 'No User Linked';
                       }
 
                       let displayVal = v === null || v === undefined ? 'N/A' : String(v);
@@ -1873,6 +1913,16 @@ CREATE TABLE IF NOT EXISTS service_areas (
                                 if (serv.provider_id) {
                                   nextData.provider_id = serv.provider_id;
                                 }
+                              }
+                            }
+
+                            // Automatically pre-populate phone and name when linking an existing user
+                            if (key === 'user_id' && val) {
+                              const selectedUser = usersList.find(u => u.id === val);
+                              if (selectedUser) {
+                                if (nextData.phone !== undefined) nextData.phone = selectedUser.phone || '';
+                                if (nextData.full_name !== undefined) nextData.full_name = selectedUser.full_name || '';
+                                if (nextData.name !== undefined) nextData.name = selectedUser.full_name || '';
                               }
                             }
                             

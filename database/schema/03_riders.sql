@@ -9,17 +9,11 @@
 -- Run in Supabase SQL Editor
 -- ================================================================
 
--- ── Drop dependent tables first (reverse FK order) ───────────────
-DROP TABLE IF EXISTS delivery_tracking CASCADE;
-DROP TABLE IF EXISTS rider_earnings    CASCADE;
-DROP TABLE IF EXISTS rider_locations   CASCADE;
-DROP TABLE IF EXISTS riders            CASCADE;
-
 -- ================================================================
 -- TABLE: riders
 -- Rider profile — linked to a user account
 -- ================================================================
-CREATE TABLE riders (
+CREATE TABLE IF NOT EXISTS riders (
     id               UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id          UUID         REFERENCES users(id) ON DELETE CASCADE UNIQUE NOT NULL,
     phone            VARCHAR(20),                  -- 10-digit, no +91 (denormalized for quick lookup)
@@ -38,7 +32,7 @@ CREATE TABLE riders (
 -- TABLE: rider_locations
 -- Real-time GPS location of each rider (one row per rider)
 -- ================================================================
-CREATE TABLE rider_locations (
+CREATE TABLE IF NOT EXISTS rider_locations (
     id        UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
     rider_id  UUID         REFERENCES riders(id) ON DELETE CASCADE UNIQUE NOT NULL,
     lat       DECIMAL(10,8) NOT NULL,
@@ -52,7 +46,7 @@ CREATE TABLE rider_locations (
 -- TABLE: rider_earnings
 -- Per-delivery payout record for each rider
 -- ================================================================
-CREATE TABLE rider_earnings (
+CREATE TABLE IF NOT EXISTS rider_earnings (
     id            UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
     rider_id      UUID         REFERENCES riders(id) ON DELETE CASCADE NOT NULL,
     order_id      UUID         REFERENCES orders(id) ON DELETE SET NULL,
@@ -66,7 +60,7 @@ CREATE TABLE rider_earnings (
 -- TABLE: delivery_tracking
 -- Live order tracking — links order ↔ rider with GPS steps
 -- ================================================================
-CREATE TABLE delivery_tracking (
+CREATE TABLE IF NOT EXISTS delivery_tracking (
     id             UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
     order_id       UUID         REFERENCES orders(id) ON DELETE CASCADE NOT NULL,
     rider_id       UUID         REFERENCES riders(id) ON DELETE SET NULL,

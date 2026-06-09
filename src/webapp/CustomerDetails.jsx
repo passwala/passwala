@@ -85,21 +85,27 @@ const CustomerDetails = ({ user, onComplete }) => {
     fetchAreas();
   }, []);
 
-  // Fetch existing data on mount
   useEffect(() => {
     const fetchProfileData = async () => {
       if (!user) return;
       
       const userId = user.id || user.uid;
+      const cleanPhone = (user.phoneNumber || user.phone || '').replace(/[\s\-().]/g, '').replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, '');
       
+      if (!userId && !cleanPhone) return;
+
       // 1. Fetch User Profile
-      const { data: profile } = await supabase
-        .from('users')
-        .select('*')
-        .eq('uid', userId)
-        .or(`phone.eq.${user.phoneNumber}`)
-        .single();
-        
+      let query = supabase.from('users').select('*');
+      if (userId && cleanPhone) {
+        query = query.or(`uid.eq.${userId},phone.eq.${cleanPhone}`);
+      } else if (userId) {
+        query = query.eq('uid', userId);
+      } else if (cleanPhone) {
+        query = query.eq('phone', cleanPhone);
+      }
+      
+      const { data: profile } = await query.maybeSingle();
+         
       if (profile) {
         setFormData(prev => ({
           ...prev,
@@ -110,10 +116,13 @@ const CustomerDetails = ({ user, onComplete }) => {
       }
 
       // 2. Fetch Default Address
+      const targetUserId = profile?.id || userId;
+      if (!targetUserId) return;
+
       const { data: address } = await supabase
         .from('addresses')
         .select('*')
-        .eq('user_id', profile?.id || userId)
+        .eq('user_id', targetUserId)
         .eq('is_default', true)
         .maybeSingle();
 

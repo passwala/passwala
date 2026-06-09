@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { toast } from 'react-hot-toast';
+import { auth } from '../firebase';
 import './Policies.css';
 
 const Policies = () => {
@@ -48,6 +49,7 @@ const Policies = () => {
         throw new Error('Please enter a valid 10-digit phone number');
       }
 
+      let userId = null;
       if (supabase) {
         // Query database to check if user exists
         const { data: userRecord, error: fetchErr } = await supabase
@@ -57,33 +59,64 @@ const Policies = () => {
           .maybeSingle();
 
         if (fetchErr) throw fetchErr;
+        
+        if (userRecord) {
+          userId = userRecord.id;
+        }
+      }
 
+      // If full purge requested, delete the user from database (cascading deletes handle dependants)
+      if (deletionScope === 'FULL' && userId && supabase) {
+        const { error: deleteErr } = await supabase
+          .from('users')
+          .delete()
+          .eq('id', userId);
+        
+        if (deleteErr) throw deleteErr;
+      }
+
+      if (supabase) {
         const scopeText = deletionScope === 'FULL' 
           ? 'Full Account Purge' 
           : `Specific Data Purge (${Object.keys(specificDataTypes).filter(k => specificDataTypes[k]).join(', ')})`;
 
-        // Insert deletion request into reports/logs or handle user metadata
+        // Insert deletion request into reports
         const requestPayload = {
           target_type: 'ACCOUNT_DELETION',
-          target_id: userRecord?.id || null,
+          target_id: userId,
           reason: `Scope: ${scopeText} | Role: ${deleteRole} | Phone: ${formattedPhone} | Reason: ${deleteReason}`,
-          status: 'PENDING_DELETION'
+          status: deletionScope === 'FULL' ? 'COMPLETED' : 'PENDING_DELETION'
         };
 
-        const { error: insertErr } = await supabase
-          .from('reports')
-          .insert([requestPayload]);
-
-        if (insertErr) throw insertErr;
+        await supabase.from('reports').insert([requestPayload]);
       }
 
+      // 2. Sign out of Firebase and clean session state
+      try {
+        await auth.signOut().catch(() => {});
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          await currentUser.delete().catch(() => {});
+        }
+      } catch (err) {
+        console.warn('Firebase session clean failed:', err);
+      }
+
+      // 3. Clear storage and local cookies
+      localStorage.clear();
+      sessionStorage.clear();
+
       setRequestSubmitted(true);
-      toast.success('Account deletion request queued successfully.');
+      toast.success(deletionScope === 'FULL' ? 'Account Deleted Successfully.' : 'Request registered successfully.');
+
+      // 4. Redirect to home / starting page
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1500);
+
     } catch (err) {
       console.error('Account deletion request failed:', err);
-      // Fallback behavior if database is unavailable or restricted
-      setRequestSubmitted(true);
-      toast.success('Request registered securely.');
+      toast.error(err.message || 'Deletion failed. Please try again.');
     } finally {
       setLoading(false);
     }

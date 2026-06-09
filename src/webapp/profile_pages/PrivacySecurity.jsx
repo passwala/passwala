@@ -19,69 +19,42 @@ import './ProfilePages.css';
 
 const PrivacySecurity = () => {
   const navigate = useNavigate();
-  const [showDeleteModal, setShowDeleteModal] = React.useState(false);
-
-  const handleDeleteAccount = async () => {
-    setShowDeleteModal(false);
-    const user = auth.currentUser;
-    let token = '';
-    if (user) {
+  const [securityStates, setSecurityStates] = React.useState(() => {
+    const saved = localStorage.getItem('passwala_security_settings');
+    if (saved) {
       try {
-        token = await user.getIdToken();
-      } catch (err) {
-        console.warn('Failed to get Firebase ID token:', err);
+        return JSON.parse(saved);
+      } catch (e) {
+        // ignore
       }
     }
-    
-    if (!token) {
-      const savedUserStr = localStorage.getItem('passwala_user');
-      const savedUser = savedUserStr ? JSON.parse(savedUserStr) : null;
-      const uid = savedUser?.uid || savedUser?.id || 'mock_user_123';
-      token = `mock_session_token_${uid}`;
-    }
+    return {
+      '2fa': true,
+      appLock: false
+    };
+  });
 
-    try {
-      const savedUserStr = localStorage.getItem('passwala_user');
-      const savedUser = savedUserStr ? JSON.parse(savedUserStr) : null;
-      const searchId = user?.uid || user?.email || user?.phoneNumber || savedUser?.uid || savedUser?.email || savedUser?.phoneNumber || 'mock_user_123';
-      
-      // 1. Delete from Database
-      const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
-      const res = await fetch(`${apiBase}/api/users/${encodeURIComponent(searchId)}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      // 2. Sign out and Delete from Firebase
-      try {
-        await auth.signOut().catch(() => {});
-        await user.delete().catch(() => {});
-      } catch (err) {
-        console.warn('Firebase user delete skipped:', err);
-      }
-
-      // 3. Cleanup
-      if (res.status === 200 || res.status === 404) {
-        toast.success('Account Deleted Successfully.');
-        localStorage.clear();
-        sessionStorage.clear();
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 1500);
-      } else {
-        throw new Error('Server deletion failed');
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error('Deletion failed. Please contact support.');
-    }
+  const handleToggle = (key, title) => {
+    const nextVal = !securityStates[key];
+    const next = { ...securityStates, [key]: nextVal };
+    setSecurityStates(next);
+    localStorage.setItem('passwala_security_settings', JSON.stringify(next));
+    toast.success(`${title} ${nextVal ? 'Enabled' : 'Disabled'}`);
   };
 
+  const getSecurityLevel = () => {
+    const { '2fa': twoFA, appLock } = securityStates;
+    if (twoFA && appLock) return { level: 'High', color: '#10b981', tip: 'Your account is fully secured.' };
+    if (twoFA || appLock) return { level: 'Medium', color: '#f59e0b', tip: 'Turn on App Lock to reach high security level.' };
+    return { level: 'Low', color: '#ef4444', tip: 'Turn on 2FA and App Lock to secure your account.' };
+  };
+
+  const securityInfo = getSecurityLevel();
+
+
   const securityItems = [
-    { id: 1, title: 'Two-Factor Authentication', subtitle: 'Enable 2FA for account safety', icon: <Smartphone size={20} />, enabled: true },
-    { id: 2, title: 'App Lock', subtitle: 'Secure app with biometric lock', icon: <Fingerprint size={20} />, enabled: false },
+    { id: 1, key: '2fa', title: 'Two-Factor Authentication', subtitle: 'Enable 2FA for account safety', icon: <Smartphone size={20} />, enabled: securityStates['2fa'] },
+    { id: 2, key: 'appLock', title: 'App Lock', subtitle: 'Secure app with biometric lock', icon: <Fingerprint size={20} />, enabled: securityStates.appLock },
     { id: 3, title: 'Privacy Policy', subtitle: 'Read our data usage policy', icon: <Eye size={20} />, chevron: true },
     { id: 4, title: 'Data Management', subtitle: 'Export or manage your data', icon: <Database size={20} />, chevron: true }
   ];
@@ -95,12 +68,19 @@ const PrivacySecurity = () => {
     >
       <main className="privacy-security-content">
         <div className="security-banner glass">
-           <ShieldAlert size={32} color="#f59e0b" />
+           <ShieldAlert size={32} color={securityInfo.color} />
            <div className="banner-text">
-              <strong>Account Security: Medium</strong>
-              <p>Turn on App Lock to reach high security level.</p>
+              <strong style={{ color: securityInfo.color }}>Account Security: {securityInfo.level}</strong>
+              <p>{securityInfo.tip}</p>
            </div>
-           <button className="enhance-btn" onClick={() => toast('Enhancing Security...')}>REPAIR</button>
+           {securityInfo.level !== 'High' && (
+             <button className="enhance-btn" onClick={() => {
+               const next = { '2fa': true, appLock: true };
+               setSecurityStates(next);
+               localStorage.setItem('passwala_security_settings', JSON.stringify(next));
+               toast.success('Security enhanced to High level!');
+             }}>REPAIR</button>
+           )}
         </div>
 
         <div className="section-header-compact">
@@ -112,10 +92,14 @@ const PrivacySecurity = () => {
              <div 
                key={item.id} 
                className="profile-menu-item no-border-hover"
-               style={{ cursor: item.chevron ? 'pointer' : 'default' }}
+               style={{ cursor: 'pointer' }}
                onClick={() => {
-                 if (item.id === 3) navigate('/privacy-policy');
-                 if (item.id === 4) navigate('/data-deletion');
+                 if (item.chevron) {
+                   if (item.id === 3) navigate('/privacy-policy');
+                   if (item.id === 4) navigate('/data-deletion');
+                 } else {
+                   handleToggle(item.key, item.title);
+                 }
                }}
              >
                 <div className="menu-item-left">
@@ -130,7 +114,7 @@ const PrivacySecurity = () => {
                 {item.chevron ? (
                   <ChevronRight size={18} color="var(--text-secondary)" />
                 ) : (
-                  <div className={`theme-toggle-switch ${item.enabled ? 'active' : ''}`} onClick={() => toast('Security policy update in progress.')}>
+                  <div className={`theme-toggle-switch ${item.enabled ? 'active' : ''}`}>
                     <div className="switch-knob"></div>
                   </div>
                 )}
@@ -138,62 +122,10 @@ const PrivacySecurity = () => {
            ))}
         </div>
 
-        <div className="section-header-compact">
-           <h3>ACCOUNT ACTIONS</h3>
-        </div>
-
-        <div className="profile-menu-container glass danger-zone-menu">
-           <div className="profile-menu-item danger-text" style={{ cursor: 'pointer' }} onClick={() => setShowDeleteModal(true)}>
-              <div className="menu-item-left">
-                 <div className="menu-icon-box danger-icon-bg"><Eye size={20} /></div>
-                 <div className="menu-text">
-                    <strong>Request My Data</strong>
-                    <span>Get a copy of your info</span>
-                 </div>
-              </div>
-           </div>
-           <div className="profile-menu-item danger-text" style={{ cursor: 'pointer' }} onClick={() => setShowDeleteModal(true)}>
-              <div className="menu-item-left">
-                 <div className="menu-icon-box danger-icon-bg"><Trash2 size={20} /></div>
-                 <div className="menu-text">
-                    <strong>Delete Account</strong>
-                    <span>Permanently erase account</span>
-                 </div>
-              </div>
-           </div>
-        </div>
-
         <div className="privacy-note">
            <Lock size={14} />
            <p>Your connection to Passwala is encrypted with 256-bit SSL technology. No one, not even Passwala, can see your real-time private location except for verified orders.</p>
         </div>
-
-        {/* --- CUSTOM DELETE MODAL --- */}
-        {showDeleteModal && (
-          <div className="custom-modal-overlay" onClick={() => setShowDeleteModal(false)}>
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="custom-confirm-modal"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="modal-icon-header delete-bg">
-                <Trash2 size={32} />
-              </div>
-              <h3>Delete Account?</h3>
-              <p>This will permanently remove your data, wallet balance, and order history. This action cannot be undone.</p>
-              
-              <div className="modal-actions-row">
-                <button className="modal-btn secondary" onClick={() => setShowDeleteModal(false)}>
-                  Cancel
-                </button>
-                <button className="modal-btn delete" onClick={handleDeleteAccount}>
-                  Yes, Delete
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
       </main>
     </motion.div>
   );

@@ -5,6 +5,7 @@ import L from 'leaflet';
 import { MapPin, Search, Navigation, ArrowRight, Map, LocateFixed, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { AHMEDABAD_AREAS as ahmedabadAreas } from '../../utils/constants';
+import { useTranslation } from '../LanguageContext';
 import './CityTicketBooking.css';
 
 
@@ -170,6 +171,7 @@ function FitBounds({ pickup, dropoff }) {
 
 const CityTicketBooking = ({ user, userCoords }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [pickup, setPickup] = useState(null);
   const [dropoff, setDropoff] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -608,7 +610,7 @@ const CityTicketBooking = ({ user, userCoords }) => {
               <Marker key={vehicle.id} position={[lat, lng]} icon={vehicleIcon}>
                 <Popup>
                   <div style={{ fontFamily: 'inherit', fontSize: '0.82rem', lineHeight: '1.4' }}>
-                    <strong style={{ color: '#ff6b00' }}>🚌 Available Vehicle</strong><br />
+                    <strong style={{ color: '#ff6b00' }}>🚌 {t('available_vehicle')}</strong><br />
                     <span>Type: {vehicle.vehicle_type || 'Bike'}</span><br />
                     <span>Plate: {vehicle.license_plate || 'GJ01-PW-0000'}</span>
                   </div>
@@ -621,7 +623,7 @@ const CityTicketBooking = ({ user, userCoords }) => {
         {/* Distance badge on map */}
         {distanceKm && (
           <div className="cr-distance-badge">
-            <Navigation size={12} /> {distanceKm} km road distance
+            <Navigation size={12} /> {distanceKm} km {t('route_details')}
           </div>
         )}
       </div>
@@ -635,11 +637,11 @@ const CityTicketBooking = ({ user, userCoords }) => {
           >
             <div className="cr-dot pickup-dot"></div>
             <div className="cr-input-content">
-              <label>PICKUP LOCATION</label>
+              <label>{t('pickup_location')}</label>
               <input
                 type="text"
                 className="cr-real-input"
-                placeholder="Search pickup location or tap map..."
+                placeholder={t('search_pickup_placeholder')}
                 value={activeInput === 'pickup' ? pickupSearchQuery : (pickup ? formatLocationDisplay(pickup) : '')}
                 onChange={(e) => handleLocationSearch(e.target.value, 'pickup')}
                 onFocus={() => {
@@ -699,11 +701,11 @@ const CityTicketBooking = ({ user, userCoords }) => {
           >
             <div className="cr-dot dropoff-dot"></div>
             <div className="cr-input-content">
-              <label>DROP-OFF LOCATION</label>
+              <label>{t('dropoff_location')}</label>
               <input
                 type="text"
                 className="cr-real-input"
-                placeholder="Search drop-off location or tap map..."
+                placeholder={t('search_dropoff_placeholder')}
                 value={activeInput === 'dropoff' ? dropoffSearchQuery : (dropoff ? formatLocationDisplay(dropoff) : '')}
                 onChange={(e) => handleLocationSearch(e.target.value, 'dropoff')}
                 onFocus={() => {
@@ -759,7 +761,7 @@ const CityTicketBooking = ({ user, userCoords }) => {
 
         {/* Popular Areas */}
         <div className="cr-popular-areas">
-          <h4>Popular Areas in Ahmedabad</h4>
+          <h4>{t('popular_areas')}</h4>
           <div className="cr-area-chips">
             {POPULAR_ROUTES.map((route, i) => (
               <button
@@ -787,7 +789,7 @@ const CityTicketBooking = ({ user, userCoords }) => {
           {loading ? (
             <div className="cr-spinner"></div>
           ) : (
-            <>Search Available Rides <Search size={18} /></>
+            <>{t('search_available_rides')} <Search size={18} /></>
           )}
         </button>
 

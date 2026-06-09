@@ -7,7 +7,7 @@ function RiderWallet({ stats }) {
   const transactions = [];
 
   const handlePayout = () => {
-    toast.success('Payout request of ₹1,500 initiated successfully!');
+    toast('Coming Soon!', { icon: '⏳' });
   };
 
   return (

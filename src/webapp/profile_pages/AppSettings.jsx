@@ -21,7 +21,7 @@ import './ProfilePages.css';
 
 const AppSettings = ({ isDarkMode, onToggleTheme }) => {
   const navigate = useNavigate();
-  const { currentLanguage } = useTranslation();
+  const { changeLanguage, currentLanguage, languages } = useTranslation();
 
   const [notificationSettings, setNotificationSettings] = useState({
     orders: true,
@@ -54,7 +54,7 @@ const AppSettings = ({ isDarkMode, onToggleTheme }) => {
                  <div className="menu-text">
                     <strong>Order Updates</strong>
                     <span>Get alerts for your active orders</span>
-                 </div>
+                  </div>
               </div>
               <div className={`theme-toggle-switch ${notificationSettings.orders ? 'active' : ''}`} onClick={() => toggleSetting('orders')}>
                  <div className="switch-knob"></div>
@@ -105,12 +105,19 @@ const AppSettings = ({ isDarkMode, onToggleTheme }) => {
                  <div className="switch-knob"></div>
               </div>
            </div>
-           <div className="profile-menu-item no-border-hover" onClick={() => navigate('/profile')}>
+           <div className="profile-menu-item no-border-hover" onClick={() => {
+              const keys = Object.keys(languages);
+              const currentIndex = keys.indexOf(currentLanguage);
+              const nextIndex = (currentIndex + 1) % keys.length;
+              const nextLang = keys[nextIndex];
+              changeLanguage(nextLang);
+              toast.success(`Language set to ${languages[nextLang].name}`);
+           }}>
               <div className="menu-item-left">
                  <div className="menu-icon-box" style={{ background: 'rgba(59, 130, 246, 0.08)', color: '#3b82f6' }}><Globe size={20} /></div>
                  <div className="menu-text">
                     <strong>App Language</strong>
-                    <span>Currently: {currentLanguage === 'en' ? 'English' : currentLanguage === 'hi' ? 'हिंदी' : 'Vernacular'}</span>
+                    <span>Currently: {languages[currentLanguage]?.name || 'English'}</span>
                  </div>
               </div>
               <ChevronRight size={18} color="var(--text-secondary)" />

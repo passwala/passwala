@@ -11,22 +11,11 @@
 -- Enable UUID extension (safe to re-run)
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ── Drop dependent tables first (reverse FK order) ───────────────
-DROP TABLE IF EXISTS ai_recommendations CASCADE;
-DROP TABLE IF EXISTS wallet_transactions CASCADE;
-DROP TABLE IF EXISTS order_items CASCADE;
-DROP TABLE IF EXISTS orders CASCADE;
-DROP TABLE IF EXISTS carts CASCADE;
-DROP TABLE IF EXISTS addresses CASCADE;
-DROP TABLE IF EXISTS notifications CASCADE;
-DROP VIEW  IF EXISTS buyers_view;
-DROP TABLE IF EXISTS users CASCADE;
-
 -- ================================================================
 -- TABLE: users
 -- Stores ALL platform users (role differentiates them)
 -- ================================================================
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id               UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
     phone            VARCHAR(20)  UNIQUE NOT NULL,
     full_name        VARCHAR(100),
@@ -46,7 +35,8 @@ CREATE TABLE users (
 -- Admin panel and reports use this to see ONLY buyers
 -- (role = 'BUYER') — riders and vendors are excluded
 -- ================================================================
-CREATE OR REPLACE VIEW buyers_view AS
+CREATE OR REPLACE VIEW buyers_view 
+WITH (security_invoker = true) AS
     SELECT
         id,
         phone,
@@ -65,7 +55,7 @@ CREATE OR REPLACE VIEW buyers_view AS
 -- TABLE: addresses
 -- Delivery addresses for buyers
 -- ================================================================
-CREATE TABLE addresses (
+CREATE TABLE IF NOT EXISTS addresses (
     id               UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id          UUID         REFERENCES users(id) ON DELETE CASCADE NOT NULL,
     address_line_1   TEXT         NOT NULL,
@@ -83,7 +73,7 @@ CREATE TABLE addresses (
 -- TABLE: wallet_transactions
 -- Buyer wallet credit/debit history
 -- ================================================================
-CREATE TABLE wallet_transactions (
+CREATE TABLE IF NOT EXISTS wallet_transactions (
     id               UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id          UUID         REFERENCES users(id) ON DELETE CASCADE NOT NULL,
     title            VARCHAR(255) NOT NULL,
@@ -98,7 +88,7 @@ CREATE TABLE wallet_transactions (
 -- TABLE: notifications
 -- In-app notifications for all roles (filtered by user_id)
 -- ================================================================
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
     id               UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id          UUID         REFERENCES users(id) ON DELETE CASCADE NOT NULL,
     title            VARCHAR(255) NOT NULL,

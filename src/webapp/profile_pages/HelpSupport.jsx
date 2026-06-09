@@ -8,13 +8,8 @@ import {
   Mail, 
   ChevronDown, 
   ChevronUp, 
-  Search, 
   ExternalLink,
-  MessageCircle,
-  Truck,
-  CreditCard as CreditCardIcon,
-  User as UserIcon,
-  ShieldCheck as ShieldCheckIcon
+  MessageCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
@@ -55,29 +50,6 @@ const HelpSupport = () => {
       className="profile-sub-page"
     >
       <main className="help-support-content">
-        <div className="search-bar-help glass">
-           <Search size={18} className="search-icon-help" />
-           <input type="text" placeholder="Search topics, orders, issues..." />
-        </div>
-
-        <div className="quick-help-categories">
-           <div className="help-cat-card glass" onClick={() => toast('Opening Order Support...')}>
-              <div className="help-cat-icon"><Truck size={24} color="#f59e0b" /></div>
-              <span>Orders</span>
-           </div>
-           <div className="help-cat-card glass" onClick={() => toast('Opening Payment Support...')}>
-              <div className="help-cat-icon"><CreditCardIcon size={24} color="#3b82f6" /></div>
-              <span>Payments</span>
-           </div>
-           <div className="help-cat-card glass" onClick={() => toast('Opening Account Support...')}>
-              <div className="help-cat-icon"><UserIcon size={24} color="#10b981" /></div>
-              <span>Account</span>
-           </div>
-           <div className="help-cat-card glass" onClick={() => toast('Opening Safety Support...')}>
-              <div className="help-cat-icon"><ShieldCheckIcon size={24} color="#ef4444" /></div>
-              <span>Safety</span>
-           </div>
-        </div>
 
         <div className="section-header-compact">
            <h3>TOP QUESTIONS</h3>
@@ -111,7 +83,7 @@ const HelpSupport = () => {
         </div>
 
         <div className="contact-methods">
-           <button className="contact-btn glass whatsapp-btn" onClick={() => toast('Opening WhatsApp Support...')}>
+           <button className="contact-btn glass whatsapp-btn" onClick={() => toast('Coming soon')}>
               <div className="contact-icon-box"><MessageCircle size={20} /></div>
               <div className="contact-text">
                  <strong>WhatsApp Support</strong>
@@ -119,7 +91,7 @@ const HelpSupport = () => {
               </div>
               <ExternalLink size={16} />
            </button>
-           <button className="contact-btn glass chat-btn" onClick={() => toast('Starting Live Chat...')}>
+           <button className="contact-btn glass chat-btn" onClick={() => toast('Coming soon')}>
               <div className="contact-icon-box"><MessageSquare size={20} /></div>
               <div className="contact-text">
                  <strong>Live Chat</strong>
@@ -127,7 +99,7 @@ const HelpSupport = () => {
               </div>
               <ExternalLink size={16} />
            </button>
-           <button className="contact-btn glass call-btn" onClick={() => toast('Calling Support Center...')}>
+           <button className="contact-btn glass call-btn" onClick={() => toast('Coming soon')}>
               <div className="contact-icon-box"><Phone size={20} /></div>
               <div className="contact-text">
                  <strong>Call Support</strong>

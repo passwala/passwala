@@ -24,7 +24,7 @@ import { CartProvider, useCart } from './context/CartContext'
 import CartDrawer from './webapp/buyer/CartDrawer'
 import { NotificationProvider, useNotifications } from './context/NotificationContext'
 import { SearchProvider } from './context/SearchContext'
-import { LanguageProvider } from './webapp/LanguageContext'
+import { LanguageProvider, useTranslation } from './webapp/LanguageContext'
 
 // Custom Hooks
 import { useAuth } from './hooks/useAuth'
@@ -276,6 +276,7 @@ const AppContent = ({
 }) => {
   const navigate = useNavigate();
   const locationPath = useLocation().pathname;
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (isAdminMode) {
@@ -409,7 +410,7 @@ const AppContent = ({
       ) : /* 1. Vendor Mode - Workspace takeover */
         (locationPath === '/vendor' || isVendorMode) ? (
           <VendorErrorBoundary>
-            {(!effectiveUser) ? (
+            {(!effectiveUser || (effectiveUser.role !== 'VENDOR' && effectiveUser.role !== 'ADMIN')) ? (
               <VendorAuth onLogin={(phone, profile) => {
                 const vendorObj = { ...profile, displayName: profile?.name || 'Vendor', phoneNumber: phone, role: 'VENDOR' };
                 setUser(vendorObj);
@@ -439,7 +440,7 @@ const AppContent = ({
         ) : (locationPath === '/rider' || isRiderMode) ? (
           /* Rider Mode - Dashboard takeover */
           <RiderErrorBoundary>
-            {(!effectiveUser) ? (
+            {(!effectiveUser || (effectiveUser.role !== 'RIDER' && effectiveUser.role !== 'ADMIN')) ? (
               <RiderAuth onLogin={(phone, profile) => {
                 const riderObj = { ...profile, displayName: profile.name, phoneNumber: phone, role: 'RIDER' };
                 setUser(riderObj);
@@ -481,16 +482,16 @@ const AppContent = ({
                   onOpenProfile={() => navigate('/profile')}
                   onBack={locationPath !== '/' ? () => navigate(-1) : null}
                   title={
-                    locationPath === '/profile' ? 'Profile' :
-                      locationPath === '/near-shops' ? 'Near Shops' :
-                        locationPath === '/expert-services' ? 'Local Experts' :
-                          locationPath === '/track-orders' ? 'Active Orders' :
-                            locationPath === '/neighbors' ? 'Community' :
-                              locationPath === '/order-history' ? 'Order History' :
-                                locationPath === '/wallet' ? 'Passwala Wallet' :
-                                  locationPath === '/privacy-security' ? 'Privacy & Security' :
-                                    locationPath === '/help-support' ? 'Help & Support' :
-                                      locationPath === '/settings' ? 'Settings' : null
+                    locationPath === '/profile' ? t('profile') :
+                      locationPath === '/near-shops' ? t('near_shops') :
+                        locationPath === '/expert-services' ? t('expert_services') :
+                          locationPath === '/track-orders' ? t('order_history') :
+                            locationPath === '/neighbors' ? t('community') :
+                              locationPath === '/order-history' ? t('order_history') :
+                                locationPath === '/wallet' ? t('passwala_wallet') :
+                                  locationPath === '/privacy-security' ? t('privacy_security') :
+                                    locationPath === '/help-support' ? t('help_support') :
+                                      locationPath === '/settings' ? t('settings') : null
                   }
                 />
               )
@@ -586,7 +587,13 @@ const AppContent = ({
 
             {/* 4. Global Footers/Navs */}
             {isWebappMode && effectiveUser && isProfileComplete && (
-              <BottomNav activeTab={currentView} onTabChange={(v) => navigate(v === 'DASHBOARD' ? '/' : v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'TRACKING' ? '/track-orders' : v === 'NEIGHBORS' ? '/neighbors' : v === 'PROFILE' ? '/profile' : '/')} />
+              <BottomNav activeTab={currentView} onTabChange={(v) => {
+                if (v === 'NEIGHBORS') {
+                  toast.success("Coming soon!", { icon: '✨' });
+                } else {
+                  navigate(v === 'DASHBOARD' ? '/' : v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'TRACKING' ? '/track-orders' : v === 'PROFILE' ? '/profile' : '/');
+                }
+              }} />
             )}
 
             {isWebMode && <Footer />}

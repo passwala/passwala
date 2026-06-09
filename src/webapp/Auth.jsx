@@ -5,7 +5,9 @@ import {
   Navigation, Search, Crosshair, ChevronRight
 } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
+import { supabase } from '../supabase';
 import './Auth.css';
+
 
 // Premium 3D Brand Illustration Assets
 import passwalaDeals from '../assets/passwala_deals.png';
@@ -115,14 +117,79 @@ const Auth = ({ onLogin }) => {
   const handleQuickLogin = async (credUser, authProvider) => {
     try {
       setLoading(true);
+      
+      let dbUser = null;
+      let dbAddress = null;
+      const cleanPhone = (credUser.phoneNumber || '').replace(/[\s\-().]/g, '').replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, '');
+      if (cleanPhone && supabase) {
+        try {
+          const { data: usr } = await supabase
+            .from('users')
+            .select('*')
+            .or(`uid.eq.${credUser.uid},phone.eq.${cleanPhone}`)
+            .maybeSingle();
+          if (usr) {
+            dbUser = usr;
+            const { data: addr } = await supabase
+              .from('addresses')
+              .select('*')
+              .eq('user_id', usr.id)
+              .eq('is_default', true)
+              .maybeSingle();
+            if (addr) {
+              dbAddress = addr;
+            }
+          }
+        } catch (dbErr) {
+          console.warn("Direct Supabase user fetch failed:", dbErr);
+        }
+      }
+
+      if (dbUser && dbAddress) {
+        const rawLine = dbAddress.address_line_1 || '';
+        const parts = rawLine.split(', ').map(p => p.trim());
+        let _hName = '';
+        let hNo = 'A-101';
+        let fl = '1st Floor';
+        let soc = dbAddress.city || 'Satellite';
+        if (parts.length === 4) {
+          [_hName, hNo, fl, soc] = parts;
+          fl = fl.replace('Floor ', '');
+        } else if (parts.length === 3) {
+          if (parts[1].startsWith('Floor ')) {
+            [hNo, fl, soc] = parts;
+            fl = fl.replace('Floor ', '');
+          } else {
+            [_hName, hNo, soc] = parts;
+          }
+        } else if (parts.length === 2) {
+          [hNo, soc] = parts;
+        }
+
+        const freshProfile = {
+          fullName: dbUser.full_name,
+          house_no: hNo,
+          floor: fl,
+          society: soc,
+          address: `${hNo}, ${soc}`
+        };
+        localStorage.setItem('local_user_profile', JSON.stringify(freshProfile));
+        localStorage.setItem('passwala_profile_complete', 'true');
+        localStorage.setItem('passwala_user_address', JSON.stringify(dbAddress));
+        if (dbAddress.lat && dbAddress.lng) {
+          localStorage.setItem('passwala_coords', JSON.stringify({ lat: dbAddress.lat, lng: dbAddress.lng }));
+        }
+        localStorage.setItem('passwala_location', soc);
+      }
+
       const userData = {
         uid: credUser.uid,
-        displayName: credUser.displayName || 'Passwalaa User',
+        displayName: dbUser?.full_name || credUser.displayName || 'Passwalaa User',
         phoneNumber: credUser.phoneNumber || null,
-        email: credUser.email || null,
-        photoURL: credUser.photoURL || null,
+        email: dbUser?.email || credUser.email || null,
+        photoURL: dbUser?.photo_url || credUser.photoURL || null,
         authProvider: authProvider,
-        role: 'buyer'
+        role: dbUser?.role?.toLowerCase() || 'buyer'
       };
 
       const API_URL = `${import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`)}/api/users`;

@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { 
@@ -38,24 +38,7 @@ const ExpertServices = ({ onBack, location, userCoords }) => {
 
   const [selectedSub, setSelectedSub] = useState('All');
 
-  useEffect(() => {
-    fetchExperts();
-    if (supabase) {
-      const channel = supabase.channel('services-changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'services' }, fetchExperts)
-        .subscribe();
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
-  }, []);
-
-  useEffect(() => {
-    setSelectedSub('All');
-    fetchExperts();
-  }, [activeTab]);
-
-  const fetchExperts = async () => {
+  const fetchExperts = useCallback(async () => {
     try {
       setLoading(true);
       if (!supabase) return;
@@ -151,7 +134,24 @@ const ExpertServices = ({ onBack, location, userCoords }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userCoords]);
+
+  useEffect(() => {
+    fetchExperts();
+    if (supabase) {
+      const channel = supabase.channel('services-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'services' }, fetchExperts)
+        .subscribe();
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [fetchExperts]);
+
+  useEffect(() => {
+    setSelectedSub('All');
+    fetchExperts();
+  }, [activeTab, fetchExperts]);
 
   const filteredExperts = experts.filter(e => {
     const mainMatch = activeTab === 'All' || 
@@ -176,7 +176,7 @@ const ExpertServices = ({ onBack, location, userCoords }) => {
           <Search size={18} className="search-icon-expert" />
           <input 
             type="text" 
-            placeholder="Describe issue (e.g. leaking tap, AC service)..." 
+            placeholder={t('describe_issue')} 
             onFocus={() => toast.success('AI: Tell me what happened, I will find the right expert.')}
           />
         </div>
@@ -188,7 +188,7 @@ const ExpertServices = ({ onBack, location, userCoords }) => {
               className={`tab-btn-v3 ${activeTab === tab ? 'active' : ''}`}
               onClick={() => setActiveTab(tab)}
             >
-              {tab === 'All' ? t('expert_services') : tab}
+              {tab === 'All' ? t('expert_services') : t(tab.toLowerCase().replace(' & ', '_'))}
             </button>
           ))}
         </div>
@@ -228,7 +228,7 @@ const ExpertServices = ({ onBack, location, userCoords }) => {
                       {expert.recommendations > 0 && (
                         <div className="neighbor-endorsement">
                            <UserCheck size={12} color="var(--primary)" />
-                           <span>{t('trust_badge').replace('{n}', expert.recommendations)} residents nearby</span>
+                           <span>{t('trust_badge').replace('{n}', expert.recommendations)}</span>
                         </div>
                       )}
                     </div>
@@ -240,9 +240,9 @@ const ExpertServices = ({ onBack, location, userCoords }) => {
                     )}
                   </div>
                   <span className="expert-type">
-                    {expert.category}
+                    {t((expert.category || '').toLowerCase().replace(' & ', '_'))}
                     {expert.experience ? ` • ${expert.experience}` : ''}
-                    {expert.distance && ` • ${expert.distance} km away`}
+                    {expert.distance && ` • ${t('km_away').replace('{dist}', expert.distance)}`}
                   </span>
                    {expert.description && (
                      <p className="expert-description-snippet">{expert.description}</p>
@@ -253,7 +253,7 @@ const ExpertServices = ({ onBack, location, userCoords }) => {
 
             <div className="expert-footer">
                <div className="expert-price">
-                  <span>Inspection Fee</span>
+                  <span>{t('inspection_fee')}</span>
                   <strong>₹{expert.price || 199}</strong>
                </div>
                 <div className="expert-actions">

@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, MapPin, CheckCircle, ShieldCheck, CreditCard, Ticket, Navigation, Package } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useTranslation } from '../LanguageContext';
 import './RideCheckout.css';
 
 const RideCheckout = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { pickup, dropoff, rideData, user } = location.state || {};
   const seatCount = 1;
   const [luggageWeight, setLuggageWeight] = useState(0); // default weight in kg
@@ -133,14 +135,14 @@ const RideCheckout = () => {
   return (
     <div className="ride-checkout-container">
       <div className="rc-header">
-        <h2>Confirm Ride</h2>
+        <h2>{t('confirm_ride')}</h2>
       </div>
 
       <div className="rc-body">
         {/* Route Details Card */}
         <div className="rc-card">
           <div className="rc-route-header">
-            <span className="rc-route-title">Route Details</span>
+            <span className="rc-route-title">{t('route_details')}</span>
             <span className="rc-route-badge">
               <Navigation size={12} style={{ transform: 'rotate(45deg)' }} /> {rideData.distanceKm} km
             </span>
@@ -154,11 +156,11 @@ const RideCheckout = () => {
             </div>
             <div className="rc-route-locations">
               <div className="rc-location-item">
-                <p>Pickup Location</p>
+                <p>{t('pickup_location')}</p>
                 <h4>{pickup.name}</h4>
               </div>
               <div className="rc-location-item">
-                <p>Drop-off Location</p>
+                <p>{t('dropoff_location')}</p>
                 <h4>{dropoff.name}</h4>
               </div>
             </div>
@@ -170,7 +172,7 @@ const RideCheckout = () => {
         {/* Luggage Details Card */}
         <div className="rc-card">
           <h4 className="rc-section-title">
-            <Package size={18} color="var(--primary)" /> Luggage Details
+            <Package size={18} color="var(--primary)" /> {t('luggage_options')}
           </h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.5rem 0' }}>
             <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
@@ -259,7 +261,7 @@ const RideCheckout = () => {
           disabled={bookingLoading}
           className="rc-book-btn rc-pulse"
         >
-          {bookingLoading ? 'Booking...' : 'Book Ride'}
+          {bookingLoading ? 'Booking...' : t('book_ticket_btn')}
         </button>
       </div>
     </div>

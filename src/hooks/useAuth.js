@@ -18,8 +18,15 @@ export const useAuth = () => {
     try {
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && !isSpecialMode) {
-          parsed.role = 'BUYER';
+        if (parsed) {
+          if (isSpecialMode) {
+            const expectedRole = appMode === 'rider' ? 'RIDER' : appMode === 'vendor' ? 'VENDOR' : 'ADMIN';
+            if (parsed.role !== expectedRole && parsed.role !== 'ADMIN') {
+              return null;
+            }
+          } else {
+            parsed.role = 'BUYER';
+          }
         }
         return parsed;
       }
@@ -76,6 +83,16 @@ export const useAuth = () => {
 
   const handleLogout = async (skipToast = false) => {
     try {
+      const userId = user?.id || user?.uid || user?.user_id;
+      if (userId && (user?.role === 'RIDER' || appMode === 'rider')) {
+        try {
+          await supabase.from('riders').update({ is_active: false }).eq('user_id', userId);
+          await supabase.from('city_vehicles').update({ is_active: false }).eq('driver_id', userId);
+        } catch (dbErr) {
+          console.warn('Failed to set rider/vehicle offline on logout:', dbErr);
+        }
+      }
+
       if (auth.currentUser) {
         await auth.signOut().catch(e => console.warn('Firebase Signout Skip:', e));
       }
@@ -128,7 +145,8 @@ export const useAuth = () => {
       const wasComplete = localStorage.getItem('passwala_profile_complete') === 'true';
 
       if (isSpecialMode) {
-        if (!manualUser) {
+        const expectedRole = appMode === 'rider' ? 'RIDER' : appMode === 'vendor' ? 'VENDOR' : 'ADMIN';
+        if (!manualUser || (manualUser.role !== expectedRole && manualUser.role !== 'ADMIN')) {
           setUser(null);
           setIsProfileComplete(false);
           setAuthLoading(false);
@@ -143,11 +161,39 @@ export const useAuth = () => {
 
       if (!u) {
         if (manualUser) {
-          const normalizedUser = {
+          const syncedManualUser = {
             ...manualUser,
             role: 'BUYER'
           };
-          setUser(normalizedUser);
+          const userPhone = manualUser.phone || manualUser.phoneNumber;
+          if (supabase && userPhone) {
+            try {
+              const cleanPhone = String(userPhone).replace(/[\s\-().]/g, '').replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, '');
+              const { data: usr } = await supabase.from('users')
+                .select('id, full_name, role, photo_url, phone')
+                .eq('phone', cleanPhone)
+                .maybeSingle();
+              if (usr) {
+                syncedManualUser.id = usr.id;
+                syncedManualUser.displayName = usr.full_name || manualUser.displayName || syncedManualUser.displayName;
+                syncedManualUser.photoURL = usr.photo_url || manualUser.photoURL || syncedManualUser.photoURL;
+                
+                const { data: addr } = await supabase.from('addresses').select('*').eq('user_id', usr.id).maybeSingle();
+                if (addr) {
+                  const parsed = parseAddressLine(addr.address_line_1);
+                  addr.house_no = parsed.house_no;
+                  addr.floor = parsed.floor;
+                  addr.society = parsed.society;
+                  setUserAddress(addr);
+                  localStorage.setItem('passwala_user_address', JSON.stringify(addr));
+                  setIsProfileComplete(true);
+                }
+              }
+            } catch (err) {
+              console.warn("Offline or sync failed for manualUser:", err);
+            }
+          }
+          setUser(syncedManualUser);
           setIsProfileComplete(wasComplete);
         } else {
           setUser(null);

@@ -28,10 +28,9 @@ const NotificationPanel = ({ onClose }) => {
           ) : (
             notifications.map(n => (
               <div key={n.id} className={`notif-item ${!n.read ? 'notif-item--unread' : ''}`}>
-                {!n.read && <div className="notif-dot"></div>}
-                
-                <div className="notif-icon-wrap" style={{ background: n.read ? '#f1f5f9' : '#fff0eb', color: n.read ? '#64748b' : '#ff6b35' }}>
+                <div className="notif-icon-wrap" style={{ position: 'relative', background: n.read ? '#f1f5f9' : '#fff0eb', color: n.read ? '#64748b' : '#ff6b35' }}>
                   <Bell size={18} />
+                  {!n.read && <div className="notif-dot"></div>}
                 </div>
                 
                 <div className="notif-content">

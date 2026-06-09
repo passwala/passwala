@@ -41,6 +41,15 @@ const blueIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
+const greenIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
 // Helper component to center map when coords change
 function RecenterMap({ coords }) {
   const map = useMap();
@@ -449,15 +458,15 @@ const NearShops = ({ location, userCoords }) => {
                     
                     const isService = item.type === 'SERVICES';
 
-                    return (
-                      <Marker 
-                        key={item.id} 
-                        position={[lat, lng]} 
-                        icon={isService ? blueIcon : orangeIcon}
-                        eventHandlers={{
-                          click: () => handleOpenShop(item),
-                        }}
-                      >
+                      return (
+                       <Marker 
+                         key={item.id} 
+                         position={[lat, lng]} 
+                         icon={isService ? greenIcon : orangeIcon}
+                         eventHandlers={{
+                           click: () => handleOpenShop(item),
+                         }}
+                       >
                       <Popup>
                         <div style={{ padding: '4px' }}>
                           <h4 style={{ margin: '0 0 4px 0', fontSize: '14px' }}>{item.name}</h4>
@@ -528,11 +537,13 @@ const NearShops = ({ location, userCoords }) => {
                               )}
                             </div>
                             <div className="shop-card-meta">
-                              <span className="shop-category-near">{shop.category || 'General'}</span>
-                              <span className="shop-distance-near">
-                                <Navigation size={12} />
-                                {shop.distance === 'N/A' ? 'Distance Unknown' : `${shop.distance} km from you`}
-                              </span>
+                              <span className="shop-category-near">{t((shop.category || 'general').toLowerCase().replace(' & ', '_'))}</span>
+                              {shop.type !== 'SERVICES' && (
+                                <span className="shop-distance-near">
+                                  <Navigation size={12} />
+                                  {shop.distance === 'N/A' ? t('distance_unknown') : t('km_from_you').replace('{dist}', shop.distance)}
+                                </span>
+                              )}
                               {shop.address && (
                                 <span className="shop-area-near">
                                   <MapPin size={12} />
@@ -543,7 +554,6 @@ const NearShops = ({ location, userCoords }) => {
                           </div>
                        </div>
                     </div>
-
                </Motion.div>
              ))
            ) : (
@@ -554,8 +564,8 @@ const NearShops = ({ location, userCoords }) => {
                style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748b' }}
              >
                 <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛍️</div>
-                <h4 style={{ fontWeight: 800, color: '#0f172a' }}>No matching shops found</h4>
-                <p style={{ fontSize: '0.9rem' }}>Try searching for a different category or store name in your area.</p>
+                <h4 style={{ fontWeight: 800, color: '#0f172a' }}>{t('no_shops_found')}</h4>
+                <p style={{ fontSize: '0.9rem' }}>{t('no_shops_found_sub')}</p>
              </Motion.div>
            )}
            </AnimatePresence>
@@ -581,7 +591,11 @@ const NearShops = ({ location, userCoords }) => {
                </button>
                <div style={{ flex: 1 }}>
                  <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800 }}>{selectedShop.name}</h2>
-                 <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>{selectedShop.distance} km • {selectedShop.type === 'SERVICES' ? 'Service Portfolio' : 'Digital Catalog'}</p>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
+                    {selectedShop.type === 'SERVICES' 
+                      ? t('service_portfolio') 
+                      : `${selectedShop.distance} km • ${t('digital_catalog')}`}
+                  </p>
                </div>
                
                <button 
@@ -626,7 +640,7 @@ const NearShops = ({ location, userCoords }) => {
 
             <div style={{ padding: '1rem' }}>
                <h3 style={{ margin: '0 0 1rem 0', fontWeight: 700, color: '#0f172a' }}>
-                 {selectedShop.type === 'SERVICES' ? 'Available Services' : 'Available Products'}
+                 {selectedShop.type === 'SERVICES' ? t('available_services') : t('available_products')}
                </h3>
                
                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '1rem' }}>
@@ -697,7 +711,7 @@ const NearShops = ({ location, userCoords }) => {
                                      onMouseDown={(e) => { if (!(selectedShop.type !== 'SERVICES' && product.stock <= 0)) e.currentTarget.style.transform = 'scale(0.95)'; }}
                                      onMouseUp={(e) => { if (!(selectedShop.type !== 'SERVICES' && product.stock <= 0)) e.currentTarget.style.transform = 'scale(1)'; }}
                                    >
-                                     {selectedShop.type !== 'SERVICES' && product.stock <= 0 ? 'Out of Stock' : <><Plus size={16} /> ADD</>}
+                                     {selectedShop.type !== 'SERVICES' && product.stock <= 0 ? t('out_of_stock') : <><Plus size={16} /> {t('add_to_cart')}</>}
                                    </button>
                                 );
                               })()}
@@ -710,7 +724,7 @@ const NearShops = ({ location, userCoords }) => {
                {shopCatalog.length === 0 && (
                  <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#94a3b8' }}>
                    <Package size={48} style={{ margin: '0 auto 1rem auto', opacity: 0.5 }} />
-                   <p>{selectedShop.type === 'SERVICES' ? 'No services available right now.' : 'No products available right now.'}</p>
+                   <p>{selectedShop.type === 'SERVICES' ? t('no_services_available') : t('no_products_available')}</p>
                  </div>
                )}
             </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, CreditCard, Smile, UserPlus, Map, DollarSign, CalendarCheck, ShieldCheck } from 'lucide-react';
+import { Search, CreditCard, Smile, UserPlus, Map, IndianRupee, CalendarCheck, ShieldCheck } from 'lucide-react';
 import './InfoSection.css';
 
 const InfoSection = () => {
@@ -52,7 +52,7 @@ const InfoSection = () => {
               <p>Accept city ride requests or deliver neighborhood packages using our smart GPS.</p>
             </div>
             <div className="step-card">
-              <div className="step-icon rider-icon"><DollarSign size={28} /></div>
+              <div className="step-icon rider-icon"><IndianRupee size={28} /></div>
               <h3>3. Get Paid Fast</h3>
               <p>Enjoy transparent earnings with low commissions and instant digital payouts.</p>
             </div>

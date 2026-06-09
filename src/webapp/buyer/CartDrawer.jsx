@@ -572,11 +572,34 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
             quantity: item.qty || 1,
             price_at_purchase: item.price
           }));
-          const { error: itemError } = await supabase.from('order_items').insert(orderItems);
-          if (itemError) {
-            console.warn("Order items save error:", itemError);
-            throw new Error(`Failed to save items: ${itemError.message || itemError}`);
-          }
+           const { error: itemError } = await supabase.from('order_items').insert(orderItems);
+           if (itemError) {
+             console.warn("Order items save error:", itemError);
+             throw new Error(`Failed to save items: ${itemError.message || itemError}`);
+           }
+
+           // Decrement stock in products table for physical products
+           for (const item of items) {
+             if (item.type !== 'service' && typeof item.id === 'string' && item.id.length === 36) {
+               try {
+                 const { data: prodData } = await supabase
+                   .from('products')
+                   .select('stock_quantity')
+                   .eq('id', item.id)
+                   .maybeSingle();
+                 
+                 if (prodData) {
+                   const newStock = Math.max(0, (prodData.stock_quantity || 0) - (item.qty || 1));
+                   await supabase
+                     .from('products')
+                     .update({ stock_quantity: newStock })
+                     .eq('id', item.id);
+                 }
+               } catch (stockErr) {
+                 console.warn("Could not decrement stock for item:", item.name, stockErr);
+               }
+             }
+           }
 
 
 

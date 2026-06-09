@@ -5,11 +5,9 @@
 -- it with the correct foreign key relationships, then explicitly 
 -- reloads the Supabase API schema cache.
 
--- 1. Drop existing broken table
-DROP TABLE IF EXISTS posts CASCADE;
 
 -- 2. Create correct table with foreign keys
-CREATE TABLE posts (
+CREATE TABLE IF NOT EXISTS posts (
     id               UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id          UUID         REFERENCES users(id) ON DELETE CASCADE,
     content          TEXT         NOT NULL,

@@ -35,11 +35,36 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
 
   useEffect(() => {
     const initRider = async () => {
-      let rid = riderId;
       let uid = user?.id || user?.uid || user?.user_id;
+      const isUUID = uid && uid.length === 36;
+      let resolvedUserId = uid;
 
-      if (!rid && uid) {
-        const { data } = await supabase.from('riders').select('id, is_active').eq('user_id', uid).maybeSingle();
+      if (!isUUID && uid) {
+        // Resolve from database
+        const phoneNo = user.phoneNumber?.replace('+91', '') || user.phone?.replace('+91', '');
+        const orFilters = [];
+        if (user.uid) orFilters.push(`uid.eq.${user.uid}`);
+        if (user.email) orFilters.push(`email.eq.${user.email}`);
+        if (phoneNo) {
+          orFilters.push(`phone.eq.${phoneNo}`);
+          orFilters.push(`phone.eq.+91${phoneNo}`);
+        }
+        
+        if (orFilters.length > 0) {
+          const { data: usr } = await supabase
+            .from('users')
+            .select('id')
+            .or(orFilters.join(','))
+            .maybeSingle();
+          if (usr) {
+            resolvedUserId = usr.id;
+          }
+        }
+      }
+
+      let rid = '';
+      if (resolvedUserId && resolvedUserId.length === 36) {
+        const { data } = await supabase.from('riders').select('id, is_active').eq('user_id', resolvedUserId).maybeSingle();
         if (data) {
           rid = data.id;
           setRiderId(rid);
@@ -154,7 +179,10 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
     checkStatus();
   }, [user]);
 
-  const [sessionStartTime, setSessionStartTime] = useState(null);
+  const [sessionStartTime, setSessionStartTime] = useState(() => {
+    const saved = localStorage.getItem(`passwala_rider_session_start_${riderId}`);
+    return saved ? parseInt(saved) : null;
+  });
 
   // 🛰️ Real-time Location Tracking Sync (watchPosition for Uber/Zepto-style tracking)
   useEffect(() => {
@@ -205,12 +233,21 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
   }, [isOnline, riderId]);
 
   useEffect(() => {
-    if (isOnline && !sessionStartTime) {
-      setSessionStartTime(Date.now());
-    } else if (!isOnline) {
+    if (isOnline) {
+      if (!sessionStartTime) {
+        const now = Date.now();
+        setSessionStartTime(now);
+        if (riderId) {
+          localStorage.setItem(`passwala_rider_session_start_${riderId}`, now.toString());
+        }
+      }
+    } else {
       setSessionStartTime(null);
+      if (riderId) {
+        localStorage.removeItem(`passwala_rider_session_start_${riderId}`);
+      }
     }
-  }, [isOnline, sessionStartTime]);
+  }, [isOnline, sessionStartTime, riderId]);
 
   const renderContent = () => {
     const commonProps = { user, riderId, stats, setStats, isOnline, sessionStartTime, setShowLocationDisclosure };
@@ -246,6 +283,7 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
               let id = user?.id || user?.uid || user?.user_id;
               if (id) {
                 supabase.from('riders').update({ is_active: nextStatus }).eq('user_id', id).then();
+                supabase.from('city_vehicles').update({ is_active: nextStatus }).eq('driver_id', id).then();
               }
             }
           }} 
@@ -378,6 +416,7 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
                   let id = user?.id || user?.uid || user?.user_id;
                   if (id) {
                     supabase.from('riders').update({ is_active: true }).eq('user_id', id).then();
+                    supabase.from('city_vehicles').update({ is_active: true }).eq('driver_id', id).then();
                   }
                 }}
                 style={{

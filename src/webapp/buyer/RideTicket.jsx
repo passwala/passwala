@@ -109,7 +109,7 @@ const RideTicket = () => {
       clearInterval(interval);
       supabase.removeChannel(bookingSub);
     };
-  }, [booking]);
+  }, [booking, navigate]);
 
   // Fetch OSRM route from driver to pickup
   useEffect(() => {

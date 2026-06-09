@@ -907,15 +907,39 @@ function VendorOrderMapWrapper({ order, businessType }) {
   }, []);
 
   React.useEffect(() => {
-    if (!order || !order.rider_id) {
+    if (!order) {
       setRiderCoords(null);
       return;
     }
 
-    const targetRiderId = order.rider_id;
+    let activeChannel = null;
+    let isMounted = true;
 
-    // Fetch Initial Location
-    const getInitialPos = async () => {
+    const setupRiderTracking = async () => {
+      let targetRiderId = order.rider_id;
+
+      // If rider_id is not directly on the order, try to fetch it from delivery_tracking
+      if (!targetRiderId) {
+        try {
+          const { data: dtData } = await supabase
+            .from('delivery_tracking')
+            .select('rider_id')
+            .eq('order_id', order.id)
+            .maybeSingle();
+          if (dtData && dtData.rider_id) {
+            targetRiderId = dtData.rider_id;
+          }
+        } catch (err) {
+          console.warn("Error fetching rider_id from delivery_tracking:", err);
+        }
+      }
+
+      if (!targetRiderId) {
+        if (isMounted) setRiderCoords(null);
+        return;
+      }
+
+      // Fetch Initial Location
       try {
         const { data } = await supabase
           .from('rider_locations')
@@ -923,38 +947,41 @@ function VendorOrderMapWrapper({ order, businessType }) {
           .eq('rider_id', targetRiderId)
           .maybeSingle();
 
-        if (data) {
-          const lastUpdate = new Date(data.updated_at).getTime();
-          const now = Date.now();
-          if (now - lastUpdate < 120000) { // Active in last 2 mins
-            setRiderCoords({ lat: parseFloat(data.lat), lng: parseFloat(data.lng) });
-          }
+        if (data && isMounted) {
+          setRiderCoords({ lat: parseFloat(data.lat), lng: parseFloat(data.lng) });
         }
       } catch (err) {
         console.warn("Error getting initial rider position:", err);
       }
-    };
-    getInitialPos();
 
-    // Listen to real-time coordinate updates
-    const channel = supabase
-      .channel(`vendor-rider-tracking-${order.id}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'rider_locations',
-        filter: `rider_id=eq.${targetRiderId}`
-      }, (payload) => {
-        if (payload.eventType === 'DELETE') {
-          setRiderCoords(null);
-        } else if (payload.new && payload.new.lat && payload.new.lng) {
-          setRiderCoords({ lat: parseFloat(payload.new.lat), lng: parseFloat(payload.new.lng) });
-        }
-      })
-      .subscribe();
+      // Listen to real-time coordinate updates
+      if (isMounted) {
+        activeChannel = supabase
+          .channel(`vendor-rider-tracking-${order.id}`)
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'rider_locations',
+            filter: `rider_id=eq.${targetRiderId}`
+          }, (payload) => {
+            if (!isMounted) return;
+            if (payload.eventType === 'DELETE') {
+              setRiderCoords(null);
+            } else if (payload.new && payload.new.lat && payload.new.lng) {
+              setRiderCoords({ lat: parseFloat(payload.new.lat), lng: parseFloat(payload.new.lng) });
+            }
+          })
+          .subscribe();
+      }
+    };
+
+    setupRiderTracking();
 
     return () => {
-      supabase.removeChannel(channel);
+      isMounted = false;
+      if (activeChannel) {
+        supabase.removeChannel(activeChannel);
+      }
     };
   }, [order]);
 

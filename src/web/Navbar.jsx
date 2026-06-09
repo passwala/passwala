@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './Navbar.css';
 
-const Navbar = ({ isAuthenticated, user, onOpenProfile, onJoin }) => {
+const Navbar = ({ isAuthenticated, user, _onOpenProfile, onJoin }) => {
   const [scrolled, setScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -40,7 +40,6 @@ const Navbar = ({ isAuthenticated, user, onOpenProfile, onJoin }) => {
              {isAuthenticated ? (
                <div style={{display: 'flex', gap: '15px', alignItems: 'center'}}>
                  <span style={{fontWeight: '600', color: 'var(--text-secondary)'}}>Hi, {user?.displayName?.split(' ')[0] || 'User'}</span>
-                 <button onClick={onOpenProfile} className="join-free-btn" style={{padding: '0.6rem 1.25rem'}}>Dashboard</button>
                </div>
              ) : (
                <button onClick={onJoin} className="join-free-btn">Get Started</button>
@@ -62,7 +61,7 @@ const Navbar = ({ isAuthenticated, user, onOpenProfile, onJoin }) => {
           <a href={`http://${window.location.hostname}:3003`} onClick={() => setIsMobileMenuOpen(false)}>Rider Portal</a>
           <hr style={{border: 'none', borderTop: '1px solid #eee'}} />
           {isAuthenticated ? (
-            <button onClick={() => { setIsMobileMenuOpen(false); onOpenProfile(); }} className="mobile-join-btn">Go to Dashboard</button>
+            <span style={{fontWeight: '600', color: 'var(--text-secondary)', padding: '10px 0', display: 'block', textAlign: 'center'}}>Hi, {user?.displayName?.split(' ')[0] || 'User'}</span>
           ) : (
             <button onClick={() => { setIsMobileMenuOpen(false); onJoin(); }} className="mobile-join-btn">Get Started</button>
           )}

@@ -144,10 +144,23 @@
 
 .notif-dot {
   position: absolute;
-  top: 14px; left: 8px;
-  width: 6px; height: 6px;
+  top: -2px;
+  right: -2px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background: #ff6b35;
+  border: 1.5px solid #fff8f5;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.notif-item:hover .notif-dot {
+  border-color: #fff4ef;
+}
+.dark .notif-dot {
+  border-color: #252535;
+}
+.dark .notif-item:hover .notif-dot {
+  border-color: #2a2a3e;
 }
 
 /* ── Empty ───────────────────────────────────────── */
