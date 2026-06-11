@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Package, Truck, CheckCircle, Clock, MapPin, ChevronRight, MessageCircle, X, Store, CreditCard, Wrench, Download, Bike, Navigation } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import L from 'leaflet';
+import { useGoogleMaps } from '../../hooks/useGoogleMaps';
 import './TrackOrders.css';
 import '../profile_pages/ProfilePages.css';
 import { supabase } from '../../supabase';
@@ -13,584 +13,298 @@ import autoTable from 'jspdf-autotable';
 import { useNotifications } from '../../context/NotificationContext';
 import { AHMEDABAD_AREA_COORDS } from '../../utils/constants';
 
-// High-end Sub-component for individual order tracking maps to safely manage isolated instances
+// ── Google Maps Order Tracking Map ───────────────────────────────────────────
 function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
-  const mapRef = useRef(null);
-  const leafletMapRef = useRef(null);
-  const markerGroupRef = useRef(null);
-  const boundsFitted = useRef(false);
-  const hasFittedBounds = useRef(false);
-  const [routeToStorePoints, setRouteToStorePoints] = useState([]);
-  const [routeToCustomerPoints, setRouteToCustomerPoints] = useState([]);
-  
-  // Coordinate Resolution State
+  const googleMapRef = useRef(null);
+  const googleMapInstance = useRef(null);
+  const activeMarkers = useRef([]);
+  const activePolylines = useRef([]);
+  const isMapReady = useRef(false);
+  const isGoogleLoaded = useGoogleMaps();
+
+  // Local state for coordinates and routes
   const [storeLatLng, setStoreLatLng] = useState(null);
   const [customerLatLng, setCustomerLatLng] = useState(null);
+  const [routeToStorePoints, setRouteToStorePoints] = useState([]);
+  const [routeToCustomerPoints, setRouteToCustomerPoints] = useState([]);
+  const [providerDetails, setProviderDetails] = useState(null);
 
-  // Dynamic Geocoding resolver helper
+  // Geocode helper using local lookup then Nominatim fallback
   const geocodeAddress = useCallback(async (address) => {
     if (!address) return null;
-
     const lower = address.toLowerCase().replace(/[.,]/g, ' ');
-
-    // Step 1: Check all words and multi-word combos against our expanded lookup table
     const words = lower.split(/\s+/).filter(Boolean);
-    // Check longest matches first (multi-word), then single words
     for (let len = Math.min(words.length, 4); len >= 1; len--) {
       for (let i = 0; i <= words.length - len; i++) {
         const phrase = words.slice(i, i + len).join(' ');
-        if (AHMEDABAD_AREA_COORDS[phrase]) {
-          return AHMEDABAD_AREA_COORDS[phrase];
-        }
+        if (AHMEDABAD_AREA_COORDS[phrase]) return AHMEDABAD_AREA_COORDS[phrase];
       }
     }
-    // Also check if any key is contained in the address string
     for (const [area, coords] of Object.entries(AHMEDABAD_AREA_COORDS)) {
       if (lower.includes(area)) return coords;
     }
-
-    // Step 2: Nominatim fallback with proper headers
     try {
-      const userCity = userCoords?.city || 'Ahmedabad';
-      const searchString = lower.includes(userCity.toLowerCase())
-        ? address
-        : `${address}, ${userCity}, Gujarat, India`;
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchString)}&limit=1&countrycodes=in&viewbox=72.40,22.85,72.80,23.25&bounded=1`;
-      const res = await fetch(url, {
-        headers: {
-          'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)',
-          'Accept-Language': 'en',
-        },
-      });
+      const city = userCoords?.city || 'Ahmedabad';
+      const q = lower.includes(city.toLowerCase()) ? address : `${address}, ${city}, Gujarat, India`;
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&countrycodes=in`;
+      const res = await fetch(url, { headers: { 'User-Agent': 'Passwalaa-App/1.0' } });
       if (res.ok) {
         const data = await res.json();
-        if (data && data.length > 0) {
-          return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-        }
+        if (data?.length > 0) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
       }
-    } catch (err) {
-      console.warn('Geocoding error:', err);
-    }
-
-    // Step 3: Default to Ahmedabad center
-    return AHMEDABAD_AREA_COORDS['ahmedabad'];
+    } catch (e) { console.warn('Geocoding error:', e); }
+    return AHMEDABAD_AREA_COORDS['ahmedabad'] || [23.0225, 72.5714];
   }, [userCoords?.city]);
 
-
-  const [providerDetails, setProviderDetails] = useState(null);
-
+  // Fetch service provider details if this is a service order
   useEffect(() => {
-    if (isService && order.items && order.items.length > 0) {
-      const serviceName = order.items[0].name;
-      const fetchProvider = async () => {
-        try {
-          const { data: serviceData } = await supabase.from('services').select('provider_id').ilike('title', `%${serviceName}%`).limit(1).maybeSingle();
-          if (serviceData?.provider_id) {
-            const { data: prov } = await supabase.from('service_providers').select('*').eq('id', serviceData.provider_id).maybeSingle();
-            if (prov) setProviderDetails(prov);
-          }
-        } catch (e) {
-          console.error('Error fetching provider:', e);
+    if (!isService || !order.items?.length) return;
+    const serviceName = order.items[0].name;
+    const fetchProvider = async () => {
+      try {
+        const { data: sd } = await supabase.from('services').select('provider_id').ilike('title', `%${serviceName}%`).limit(1).maybeSingle();
+        if (sd?.provider_id) {
+          const { data: prov } = await supabase.from('service_providers').select('*').eq('id', sd.provider_id).maybeSingle();
+          if (prov) setProviderDetails(prov);
         }
-      };
-      fetchProvider();
-    }
+      } catch (e) { console.error('Provider fetch error:', e); }
+    };
+    fetchProvider();
   }, [isService, order]);
 
+  // Track service provider in real-time
+  useEffect(() => {
+    if (!isService || !providerDetails?.id) return;
+    const channel = supabase.channel(`provider-${providerDetails.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'service_providers', filter: `id=eq.${providerDetails.id}` }, (payload) => {
+        if (payload.new?.lat != null) {
+          setProviderDetails(prev => ({ ...prev, lat: parseFloat(payload.new.lat), lng: parseFloat(payload.new.lng) }));
+        }
+      }).subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [isService, providerDetails?.id]);
+
+  // Resolve store + customer coordinates
   useEffect(() => {
     let active = true;
-    const resolvePositions = async () => {
-      // Resolve Store
+    const resolve = async () => {
       let storePos = null;
       if (isService && providerDetails) {
-        const addr = providerDetails.address || 'Ahmedabad';
-        storePos = await geocodeAddress(addr);
-        if (!storePos) storePos = [23.0305, 72.5075];
+        storePos = await geocodeAddress(providerDetails.address || 'Ahmedabad') || [23.0305, 72.5075];
+      } else if (order.stores?.lat && order.stores?.lng) {
+        storePos = [parseFloat(order.stores.lat), parseFloat(order.stores.lng)];
       } else {
-        if (order.stores?.lat && order.stores?.lng) {
-          storePos = [parseFloat(order.stores.lat), parseFloat(order.stores.lng)];
-        } else {
-          const addr = order.stores?.address || 'Ahmedabad';
-          storePos = await geocodeAddress(addr);
-          if (!storePos) storePos = [23.0305, 72.5075];
-        }
+        storePos = await geocodeAddress(order.stores?.address || 'Ahmedabad') || [23.0305, 72.5075];
       }
 
-      // Resolve Customer
       let custPos = null;
       if (order.addresses?.lat && order.addresses?.lng) {
         custPos = [parseFloat(order.addresses.lat), parseFloat(order.addresses.lng)];
       } else if (userCoords?.lat && userCoords?.lng) {
         custPos = [parseFloat(userCoords.lat), parseFloat(userCoords.lng)];
       } else {
-        const addr = order.addresses?.address_line_1 || 'Ahmedabad';
-        custPos = await geocodeAddress(addr);
-        if (!custPos) custPos = [23.0393, 72.5244];
+        custPos = await geocodeAddress(order.addresses?.address_line_1 || 'Ahmedabad') || [23.0393, 72.5244];
       }
 
-      if (active) {
-        setStoreLatLng(storePos);
-        setCustomerLatLng(custPos);
-      }
+      if (active) { setStoreLatLng(storePos); setCustomerLatLng(custPos); }
     };
-    resolvePositions();
+    resolve();
     return () => { active = false; };
   }, [order.stores, order.addresses, isService, providerDetails, userCoords?.lat, userCoords?.lng, geocodeAddress]);
 
-  useEffect(() => {
-    if (!mapRef.current) return;
-
-    // Initialize map
-    const defaultCenter = userCoords?.lat && userCoords?.lng 
-      ? [userCoords.lat, userCoords.lng] 
-      : [23.0225, 72.5714]; // Fallback to Ahmedabad center
-    leafletMapRef.current = L.map(mapRef.current, {
-      zoomControl: false,
-      attributionControl: false,
-      scrollWheelZoom: true,
-      dragging: true,
-      touchZoom: true,
-      doubleClickZoom: true,
-      boxZoom: true,
-      keyboard: true
-    }).setView(defaultCenter, 14);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      className: 'map-tiles'
-    }).addTo(leafletMapRef.current);
-
-    L.control.zoom({ position: 'topright' }).addTo(leafletMapRef.current);
-    markerGroupRef.current = L.featureGroup().addTo(leafletMapRef.current);
-
-    return () => {
-      if (leafletMapRef.current) {
-        leafletMapRef.current.remove();
-        leafletMapRef.current = null;
-        markerGroupRef.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Fix for Leaflet rendering issues in dynamic CSS layouts
-  useEffect(() => {
-    if (!mapRef.current || !leafletMapRef.current) return;
-    const ro = new ResizeObserver(() => {
-      if (leafletMapRef.current) {
-        leafletMapRef.current.invalidateSize({ animate: false });
-      }
-    });
-    ro.observe(mapRef.current);
-    return () => ro.disconnect();
-  }, []);
-
-  // Fetch OSRM Dynamic Route
+  // Fetch OSRM road routes
   useEffect(() => {
     if (!storeLatLng || !customerLatLng) return;
+    let riderLatLng = riderCoords?.lat && riderCoords?.lng
+      ? [parseFloat(riderCoords.lat), parseFloat(riderCoords.lng)]
+      : (isService && providerDetails?.lat && providerDetails?.lng
+        ? [parseFloat(providerDetails.lat), parseFloat(providerDetails.lng)]
+        : null);
 
-    let riderLatLng = (riderCoords && riderCoords.lat && riderCoords.lng) 
-      ? [parseFloat(riderCoords.lat), parseFloat(riderCoords.lng)] 
-      : null;
-
-    const fetchRoute = async (startPt, endPt) => {
-      let data = null;
+    const fetchRoute = async (start, end) => {
       try {
-        let baseUrl = import.meta.env.VITE_API_URL || '';
-        if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-          if (baseUrl.includes('localhost:') || baseUrl.includes('127.0.0.1:')) {
-            baseUrl = `${window.location.protocol}//${window.location.hostname}:3004`;
-          }
+        const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
+        const res = await fetch(url, { headers: { 'User-Agent': 'Passwalaa-App/1.0' } });
+        const data = await res.json();
+        if (data.code === 'Ok' && data.routes?.[0]) {
+          return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
         }
-        const profile = 'driving';
-        const url = `${baseUrl}/api/route?startLat=${startPt[0]}&startLng=${startPt[1]}&endLat=${endPt[0]}&endLng=${endPt[1]}&profile=${profile}`;
-        const res = await fetch(url);
-        if (res.ok) {
-          data = await res.json();
-        }
-      } catch (err) {
-        console.warn("Backend route proxy failed:", err);
-      }
-
-      if (!data) {
-        try {
-          const profile = 'driving';
-          const publicUrl = `https://router.project-osrm.org/route/v1/${profile}/${startPt[1]},${startPt[0]};${endPt[1]},${endPt[0]}?overview=full&geometries=geojson`;
-          const res = await fetch(publicUrl, {
-            headers: {
-              'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
-            }
-          });
-          if (res.ok) {
-            data = await res.json();
-          }
-        } catch (err) {
-          console.warn("Direct public OSRM fetch failed:", err);
-        }
-      }
-
-      if (data && data.routes && data.routes.length > 0) {
-        return data.routes[0].geometry.coordinates.map(pt => [pt[1], pt[0]]);
-      }
+      } catch (e) { console.warn('Route fetch error:', e); }
       return [];
     };
 
-    const fetchBothRoutes = async () => {
+    const fetchAll = async () => {
       if (isService) {
-        if (riderLatLng) {
-          const pts = await fetchRoute(riderLatLng, customerLatLng);
-          setRouteToCustomerPoints(pts);
-          setRouteToStorePoints([]);
+        if (riderLatLng) setRouteToCustomerPoints(await fetchRoute(riderLatLng, customerLatLng));
+        else { setRouteToStorePoints([]); setRouteToCustomerPoints([]); }
+      } else if (riderLatLng) {
+        if (['ACCEPTED', 'PREPARING'].includes(order.status)) {
+          setRouteToStorePoints(await fetchRoute(riderLatLng, storeLatLng));
+          setRouteToCustomerPoints(await fetchRoute(storeLatLng, customerLatLng));
         } else {
-          setRouteToStorePoints([]);
-          setRouteToCustomerPoints([]);
+          setRouteToStorePoints(await fetchRoute(storeLatLng, riderLatLng));
+          setRouteToCustomerPoints(await fetchRoute(riderLatLng, customerLatLng));
         }
       } else {
-        if (riderLatLng) {
-          if (['ACCEPTED', 'PREPARING'].includes(order.status)) {
-            const leg1 = await fetchRoute(riderLatLng, storeLatLng);
-            const leg2 = await fetchRoute(storeLatLng, customerLatLng);
-            setRouteToStorePoints(leg1);
-            setRouteToCustomerPoints(leg2);
-          } else {
-            const leg1 = await fetchRoute(storeLatLng, riderLatLng);
-            const leg2 = await fetchRoute(riderLatLng, customerLatLng);
-            setRouteToStorePoints(leg1);
-            setRouteToCustomerPoints(leg2);
-          }
-        } else {
-          const path = await fetchRoute(storeLatLng, customerLatLng);
-          setRouteToCustomerPoints(path);
-          setRouteToStorePoints([]);
-        }
+        setRouteToStorePoints([]);
+        setRouteToCustomerPoints(await fetchRoute(storeLatLng, customerLatLng));
       }
     };
-
-    fetchBothRoutes();
+    fetchAll();
   }, [order.status, riderCoords, storeLatLng, customerLatLng, isService, providerDetails]);
 
+  // ── Initialize Google Map once ────────────────────────────────────────────
   useEffect(() => {
-    if (!leafletMapRef.current || !markerGroupRef.current || !storeLatLng || !customerLatLng) return;
-
-    markerGroupRef.current.clearLayers();
-
-    // Custom DivIcons matching platform brand
-    const createRiderIcon = () => L.divIcon({
-      className: 'custom-leaflet-marker rider-marker',
-      html: `<div class="marker-container" style="background: #10b981; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative;">
-               <span class="pulse-ring" style="position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 3px solid #10b981; animation: marker-pulse 1.8s infinite; opacity: 0.6;"></span>
-               ${isService 
-                 ? `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`
-                 : `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(45deg);"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>`
-               }
-             </div>`,
-      iconSize: [42, 42],
-      iconAnchor: [21, 21]
+    if (!isGoogleLoaded || !googleMapRef.current || googleMapInstance.current) return;
+    const center = userCoords?.lat
+      ? { lat: userCoords.lat, lng: userCoords.lng }
+      : { lat: 23.0225, lng: 72.5714 };
+    googleMapInstance.current = new window.google.maps.Map(googleMapRef.current, {
+      center: center,
+      zoom: 14,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+      zoomControl: true,
+      zoomControlOptions: { position: window.google.maps.ControlPosition.RIGHT_TOP },
+      styles: [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }]
     });
+    isMapReady.current = true;
+    return () => {
+      activeMarkers.current.forEach(m => m.setMap(null));
+      activePolylines.current.forEach(p => p.setMap(null));
+      activeMarkers.current = [];
+      activePolylines.current = [];
+      googleMapInstance.current = null;
+      isMapReady.current = false;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGoogleLoaded]);
 
-    const createStoreIcon = () => L.divIcon({
-      className: 'custom-leaflet-marker store-marker',
-      html: `<div class="marker-container" style="background: #f97316; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; position: relative;">
-               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 17H2"/></svg>
-             </div>`,
-      iconSize: [42, 42],
-      iconAnchor: [21, 21]
+  // ── Helper: create SVG marker icon ──────────────────────────────────
+  const makeSvgIcon = (bgColor, svgPath, shape = 'circle') => {
+    const r = shape === 'rounded' ? '12' : '50%';
+    return {
+      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42"><rect x="0" y="0" width="42" height="42" rx="${r}" fill="${bgColor}" stroke="white" stroke-width="3"/><g transform="translate(10,10)">${svgPath}</g></svg>`
+      ),
+      scaledSize: new window.google.maps.Size(42, 42),
+      anchor: new window.google.maps.Point(21, 21)
+    };
+  };
+
+  // ── Draw markers and polylines whenever data changes ─────────────────
+  useEffect(() => {
+    if (!isMapReady.current || !googleMapInstance.current || !storeLatLng || !customerLatLng) return;
+
+    // Clear previous overlays
+    activeMarkers.current.forEach(m => m.setMap(null));
+    activePolylines.current.forEach(p => p.setMap(null));
+    activeMarkers.current = [];
+    activePolylines.current = [];
+
+    const map = googleMapInstance.current;
+    const riderPos = riderCoords?.lat && riderCoords?.lng
+      ? { lat: parseFloat(riderCoords.lat), lng: parseFloat(riderCoords.lng) }
+      : (isService && providerDetails?.lat && providerDetails?.lng
+        ? { lat: parseFloat(providerDetails.lat), lng: parseFloat(providerDetails.lng) }
+        : null);
+
+    const storePt = { lat: storeLatLng[0], lng: storeLatLng[1] };
+    const custPt  = { lat: customerLatLng[0], lng: customerLatLng[1] };
+
+    // Store marker
+    const storeMarker = new window.google.maps.Marker({
+      position: storePt, map,
+      title: isService && providerDetails ? (providerDetails.business_name || providerDetails.name) : (order.stores?.name || 'Partner Store'),
+      icon: makeSvgIcon('#f97316', '<rect x="1" y="5" width="20" height="16" rx="2" fill="none" stroke="white" stroke-width="2"/><path d="M5 5V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2" stroke="white" stroke-width="2" fill="none"/>', 'rounded')
     });
+    activeMarkers.current.push(storeMarker);
 
-    const createCustomerIcon = () => L.divIcon({
-      className: 'custom-leaflet-marker customer-marker',
-      html: `<div class="marker-container" style="background: #3b82f6; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative;">
-               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-             </div>`,
-      iconSize: [42, 42],
-      iconAnchor: [21, 21]
+    // Customer marker
+    const custMarker = new window.google.maps.Marker({
+      position: custPt, map,
+      title: order.addresses?.address_line_1 || 'Delivery Location',
+      icon: makeSvgIcon('#3b82f6', '<path d="m1 7 9-7 9 7v9a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2z" fill="none" stroke="white" stroke-width="2"/><polyline points="7 22 7 12 11 12 11 22" stroke="white" stroke-width="2" fill="none"/>')
     });
+    activeMarkers.current.push(custMarker);
 
-    let riderLatLng = (riderCoords && riderCoords.lat && riderCoords.lng) 
-      ? [parseFloat(riderCoords.lat), parseFloat(riderCoords.lng)] 
-      : null;
-
-    // Plot Markers
-    L.marker(storeLatLng, { icon: createStoreIcon() })
-      .bindPopup(`<b>${isService ? 'Service Provider Base' : 'Store Hub'}:</b> ${isService && providerDetails ? (providerDetails.business_name || providerDetails.name) : (order.stores?.name || 'Partner Store')}`)
-      .addTo(markerGroupRef.current);
-
-    L.marker(customerLatLng, { icon: createCustomerIcon() })
-      .bindPopup(`<b>${isService ? 'Your Location' : 'Your Delivery Location'}</b><br/>${order.addresses?.address_line_1 || ''}`)
-      .addTo(markerGroupRef.current);
-
-    if (riderLatLng) {
-      L.marker(riderLatLng, { icon: createRiderIcon() })
-        .bindPopup(`<b>${isService ? 'Service Expert' : 'Rider'}:</b> ${order.delivery_agent_name || 'Verified Partner'}`)
-        .addTo(markerGroupRef.current);
+    // Rider/Provider marker
+    if (riderPos) {
+      const riderMarker = new window.google.maps.Marker({
+        position: riderPos, map,
+        title: isService ? 'Service Expert' : `Rider: ${order.delivery_agent_name || 'Verified Partner'}`,
+        icon: makeSvgIcon('#10b981', isService
+          ? '<path d="M12 2c0 .6-.1 1.2-.4 1.7L7 12H4a1 1 0 0 0-1 1v1h18v-1a1 1 0 0 0-1-1h-3L12.4 3.7A3.5 3.5 0 0 0 12 2z" fill="white" fill-opacity="0.8"/>'
+          : '<polygon points="3 9 20 2 13 19 11 11 3 9" fill="none" stroke="white" stroke-width="2"/>'
+        )
+      });
+      activeMarkers.current.push(riderMarker);
     }
 
-    // Connect with polylines
+    // Draw polylines
+    const drawPoly = (pts, color, weight = 6, dashed = false) => {
+      if (!pts || pts.length < 2) return null;
+      const path = pts.map(p => ({ lat: p[0], lng: p[1] }));
+      const opts = { path, geodesic: true, strokeColor: color, strokeOpacity: dashed ? 0.0 : 0.9, strokeWeight: weight, map };
+      if (dashed) {
+        opts.icons = [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.8, strokeColor: color, scale: 3 }, offset: '0', repeat: '15px' }];
+      }
+      const poly = new window.google.maps.Polyline(opts);
+      activePolylines.current.push(poly);
+      return poly;
+    };
+
     if (isService) {
-      if (riderLatLng) {
-        if (routeToCustomerPoints.length > 0) {
-          L.polyline(routeToCustomerPoints, {
-            color: '#10b981',
-            weight: 6,
-            opacity: 0.9,
-            lineJoin: 'round'
-          }).addTo(markerGroupRef.current);
-        } else {
-          L.polyline([riderLatLng, customerLatLng], {
-            color: '#10b981',
-            weight: 6,
-            opacity: 0.9,
-            lineJoin: 'round'
-          }).addTo(markerGroupRef.current);
-        }
+      if (riderPos) {
+        const pts = routeToCustomerPoints.length > 0 ? routeToCustomerPoints : (riderPos ? [[riderPos.lat, riderPos.lng], customerLatLng] : null);
+        drawPoly(pts, '#10b981');
       }
     } else {
       if (order.status === 'ACCEPTED' || order.status === 'PREPARING') {
-        if (riderLatLng) {
-          if (routeToStorePoints.length > 0) {
-            L.polyline(routeToStorePoints, {
-              color: '#f97316',
-              weight: 6,
-              opacity: 0.9,
-              lineJoin: 'round'
-            }).addTo(markerGroupRef.current);
-          } else {
-            L.polyline([riderLatLng, storeLatLng], {
-              color: '#f97316',
-              weight: 6,
-              opacity: 0.9,
-              lineJoin: 'round'
-            }).addTo(markerGroupRef.current);
-          }
+        if (riderPos) {
+          const leg1 = routeToStorePoints.length > 0 ? routeToStorePoints : [[riderPos.lat, riderPos.lng], storeLatLng];
+          drawPoly(leg1, '#f97316');
         }
-
-        if (routeToCustomerPoints.length > 0) {
-          L.polyline(routeToCustomerPoints, {
-            color: '#3b82f6',
-            weight: 6,
-            opacity: 0.9,
-            lineJoin: 'round'
-          }).addTo(markerGroupRef.current);
-        } else {
-          L.polyline([storeLatLng, customerLatLng], {
-            color: '#3b82f6',
-            weight: 6,
-            opacity: 0.9,
-            lineJoin: 'round'
-          }).addTo(markerGroupRef.current);
-        }
+        const leg2 = routeToCustomerPoints.length > 0 ? routeToCustomerPoints : [storeLatLng, customerLatLng];
+        drawPoly(leg2, '#3b82f6');
       } else {
-        if (riderLatLng) {
-          if (routeToStorePoints.length > 0) {
-            L.polyline(routeToStorePoints, {
-              color: '#94a3b8',
-              weight: 6,
-              opacity: 0.9,
-              lineJoin: 'round'
-            }).addTo(markerGroupRef.current);
-          } else {
-            L.polyline([storeLatLng, riderLatLng], {
-              color: '#94a3b8',
-              weight: 6,
-              opacity: 0.9,
-              lineJoin: 'round'
-            }).addTo(markerGroupRef.current);
-          }
-
-          if (routeToCustomerPoints.length > 0) {
-            L.polyline(routeToCustomerPoints, {
-              color: '#3b82f6',
-              weight: 6,
-              opacity: 0.9,
-              lineJoin: 'round'
-            }).addTo(markerGroupRef.current);
-          } else {
-            L.polyline([riderLatLng, customerLatLng], {
-              color: '#3b82f6',
-              weight: 6,
-              opacity: 0.9,
-              lineJoin: 'round'
-            }).addTo(markerGroupRef.current);
-          }
+        if (riderPos) {
+          const leg1 = routeToStorePoints.length > 0 ? routeToStorePoints : [storeLatLng, [riderPos.lat, riderPos.lng]];
+          drawPoly(leg1, '#94a3b8', 4, true);
+          const leg2 = routeToCustomerPoints.length > 0 ? routeToCustomerPoints : [[riderPos.lat, riderPos.lng], customerLatLng];
+          drawPoly(leg2, '#3b82f6');
         } else {
-          if (routeToCustomerPoints.length > 0) {
-            L.polyline(routeToCustomerPoints, {
-              color: '#3b82f6',
-              weight: 6,
-              opacity: 0.9,
-              lineJoin: 'round'
-            }).addTo(markerGroupRef.current);
-          } else {
-            L.polyline([storeLatLng, customerLatLng], {
-              color: '#3b82f6',
-              weight: 6,
-              opacity: 0.9,
-              lineJoin: 'round'
-            }).addTo(markerGroupRef.current);
-          }
+          const leg2 = routeToCustomerPoints.length > 0 ? routeToCustomerPoints : [storeLatLng, customerLatLng];
+          drawPoly(leg2, '#3b82f6');
         }
       }
-    }
-
-    // Auto fit viewport - dynamically adjust when route or critical markers change
-    try {
-      if (leafletMapRef.current) {
-        setTimeout(() => {
-          if (!leafletMapRef.current) return;
-          leafletMapRef.current.invalidateSize();
-          let bounds;
-          if (isService) {
-            bounds = L.latLngBounds([customerLatLng]);
-            if (riderLatLng && !isNaN(riderLatLng[0]) && !isNaN(riderLatLng[1])) {
-              bounds.extend(riderLatLng);
-            }
-          } else {
-            bounds = L.latLngBounds([storeLatLng, customerLatLng]);
-            if (riderLatLng && !isNaN(riderLatLng[0]) && !isNaN(riderLatLng[1])) {
-              bounds.extend(riderLatLng);
-            }
-          }
-          
-          if (routeToStorePoints && routeToStorePoints.length > 0) {
-            bounds.extend(routeToStorePoints);
-          }
-          if (routeToCustomerPoints && routeToCustomerPoints.length > 0) {
-            bounds.extend(routeToCustomerPoints);
-          }
-          
-          if (bounds.isValid()) {
-            leafletMapRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 15, animate: true });
-          }
-        }, 150);
-      }
-    } catch (e) {
-      console.warn('Map boundary fit failed', e);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order.status, riderCoords, routeToStorePoints, routeToCustomerPoints, storeLatLng, customerLatLng]);
-
-  return (
-    <div 
-      ref={mapRef} 
-      style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 1 }}
-    ></div>
-  );
-}
-
-// ── Ride Booking Tracking Map ──────────────────────────────────────────────
-function RideTrackingMap({ booking }) {
-  const mapRef = useRef(null);
-  const leafletMapRef = useRef(null);
-  const layerGroupRef = useRef(null);
-  const [routePoints, setRoutePoints] = useState([]);
-
-  // Init map once
-  useEffect(() => {
-    if (!mapRef.current) return;
-    const center = [parseFloat(booking.pickup_lat) || 23.0225, parseFloat(booking.pickup_lng) || 72.5714];
-    leafletMapRef.current = L.map(mapRef.current, {
-      zoomControl: true,
-      attributionControl: false,
-      scrollWheelZoom: true,
-      dragging: true,
-      touchZoom: true,
-    }).setView(center, 13);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 })
-      .addTo(leafletMapRef.current);
-
-    layerGroupRef.current = L.featureGroup().addTo(leafletMapRef.current);
-
-    const timer = setTimeout(() => leafletMapRef.current?.invalidateSize(), 300);
-    return () => {
-      clearTimeout(timer);
-      if (leafletMapRef.current) { leafletMapRef.current.remove(); leafletMapRef.current = null; }
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Fetch OSRM road route between pickup and drop
-  useEffect(() => {
-    const pLat = parseFloat(booking.pickup_lat);
-    const pLng = parseFloat(booking.pickup_lng);
-    const dLat = parseFloat(booking.drop_lat);
-    const dLng = parseFloat(booking.drop_lng);
-    if (!pLat || !dLat) return;
-
-    fetch(`https://router.project-osrm.org/route/v1/driving/${pLng},${pLat};${dLng},${dLat}?overview=full&geometries=geojson`, {
-      headers: {
-        'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
-      }
-    })
-      .then(r => r.json())
-      .then(data => {
-        if (data.code === 'Ok' && data.routes?.[0]) {
-          setRoutePoints(data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]));
-        }
-      })
-      .catch(() => {});
-  }, [booking.pickup_lat, booking.pickup_lng, booking.drop_lat, booking.drop_lng]);
-
-  // Draw markers + route whenever data changes
-  useEffect(() => {
-    if (!leafletMapRef.current || !layerGroupRef.current) return;
-    layerGroupRef.current.clearLayers();
-
-    const mkPickup = L.divIcon({
-      className: '',
-      html: `<div style="width:18px;height:18px;background:#22c55e;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.3)"></div>`,
-      iconSize: [18, 18], iconAnchor: [9, 18]
-    });
-    const mkDrop = L.divIcon({
-      className: '',
-      html: `<div style="width:18px;height:18px;background:#ef4444;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.3)"></div>`,
-      iconSize: [18, 18], iconAnchor: [9, 18]
-    });
-    const mkDriver = L.divIcon({
-      className: '',
-      html: `<div style="width:42px;height:42px;background:#f97316;border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(249,115,22,.4)"><svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><circle cx='5.5' cy='17.5' r='3.5'/><circle cx='18.5' cy='17.5' r='3.5'/><path d='M15 6H9l-3 6h12l-3-6z'/><path d='M9 6V4'/></svg></div>`,
-      iconSize: [42, 42], iconAnchor: [21, 42]
-    });
-
-    const pLat = parseFloat(booking.pickup_lat);
-    const pLng = parseFloat(booking.pickup_lng);
-    const dLat = parseFloat(booking.drop_lat);
-    const dLng = parseFloat(booking.drop_lng);
-
-    if (pLat && pLng) L.marker([pLat, pLng], { icon: mkPickup })
-      .bindPopup(`<b>🟢 Pickup</b><br/>${booking.pickup_area}`).addTo(layerGroupRef.current);
-    if (dLat && dLng) L.marker([dLat, dLng], { icon: mkDrop })
-      .bindPopup(`<b>🔴 Drop-off</b><br/>${booking.drop_area}`).addTo(layerGroupRef.current);
-
-    // Driver location
-    if (booking.driverLocation?.lat && booking.driverLocation?.lng) {
-      L.marker([booking.driverLocation.lat, booking.driverLocation.lng], { icon: mkDriver })
-        .bindPopup('<b>🚌 Your Vehicle</b>').addTo(layerGroupRef.current);
-    }
-
-    // Route polyline
-    if (routePoints.length > 1) {
-      L.polyline(routePoints, { color: '#f97316', weight: 5, opacity: 0.85 }).addTo(layerGroupRef.current);
-    } else if (pLat && dLat) {
-      L.polyline([[pLat, pLng], [dLat, dLng]], { color: '#f97316', weight: 4, opacity: 0.6, dashArray: '8 6' }).addTo(layerGroupRef.current);
     }
 
     // Fit bounds
     try {
-      setTimeout(() => {
-        if (!leafletMapRef.current) return;
-        leafletMapRef.current.invalidateSize();
-        const pts = [[pLat, pLng], [dLat, dLng]];
-        if (booking.driverLocation?.lat) pts.push([booking.driverLocation.lat, booking.driverLocation.lng]);
-        leafletMapRef.current.fitBounds(L.latLngBounds(pts), { padding: [40, 40], maxZoom: 15 });
-      }, 200);
-    } catch(e) { console.warn('Map fitBounds size calc warning:', e); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [booking.driverLocation, routePoints]);
+      const bounds = new window.google.maps.LatLngBounds();
+      [storePt, custPt].forEach(p => bounds.extend(p));
+      if (riderPos) bounds.extend(riderPos);
+      [...(routeToStorePoints || []), ...(routeToCustomerPoints || [])].forEach(p => {
+        if (p && !isNaN(p[0]) && !isNaN(p[1])) bounds.extend({ lat: p[0], lng: p[1] });
+      });
+      if (!bounds.isEmpty()) {
+        setTimeout(() => {
+          if (googleMapInstance.current) googleMapInstance.current.fitBounds(bounds);
+        }, 150);
+      }
+    } catch (e) { console.warn('Map bounds error', e); }
 
-  return <div ref={mapRef} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 1 }} />;
+  }, [order.status, riderCoords, routeToStorePoints, routeToCustomerPoints, storeLatLng, customerLatLng, providerDetails, isService]);
+
+  return (
+    <div
+      ref={googleMapRef}
+      style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 1 }}
+    ></div>
+  );
 }
-
 const TrackOrders = ({ onBack, user, userCoords }) => {
   const navigate = useNavigate();
   const [activeOrders, setActiveOrders] = useState([]);

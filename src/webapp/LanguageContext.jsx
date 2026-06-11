@@ -63,6 +63,7 @@ export const languages = {
       join_floor_chat: 'JOIN FLOOR CHAT',
       book_pro: 'BOOK PRO',
       book_now_caps: 'BOOK NOW',
+      book_ticket: 'Book Ticket',
       
       // Near Shops / Experts Translations
       search_shops_items: 'Search shops, items...',
@@ -174,6 +175,7 @@ export const languages = {
       join_floor_chat: 'चैट में शामिल हों',
       book_pro: 'प्रो बुक करें',
       book_now_caps: 'अभी बुक करें',
+      book_ticket: 'टिकट बुक करें',
       
       // Near Shops / Experts Translations
       search_shops_items: 'दुकानें, सामान खोजें...',
@@ -285,6 +287,7 @@ export const languages = {
       join_floor_chat: 'ચેટમાં જોડાઓ',
       book_pro: 'પ્રો બુક કરો',
       book_now_caps: 'અત્યારે બુક કરો',
+      book_ticket: 'ટિકિટ બુક કરો',
       
       // Near Shops / Experts Translations
       search_shops_items: 'દુકાનો, વસ્તુઓ શોધો...',
@@ -396,6 +399,7 @@ export const languages = {
       join_floor_chat: 'चॅटमध्ये सामील व्हा',
       book_pro: 'प्रो बुक करा',
       book_now_caps: 'आता बुक करा',
+      book_ticket: 'तिकीट बुक करा',
       
       // Near Shops / Experts Translations
       search_shops_items: 'दुकाने, वस्तू शोधा...',

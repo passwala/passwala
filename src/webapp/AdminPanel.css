@@ -129,6 +129,9 @@
   font-size: 0.9rem;
   transition: all 0.2s ease;
   border-left: 3px solid transparent;
+  cursor: pointer;
+  border: none;
+  outline: none;
 }
 
 .nav-item:hover {

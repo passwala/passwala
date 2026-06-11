@@ -40,9 +40,7 @@ import {
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@supabase/supabase-js';
 import { toast } from 'react-hot-toast';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import GoogleMapWrapper from '../utils/GoogleMapWrapper';
 import './AdminPanel.css';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -176,116 +174,74 @@ const tabSections = [
   {
     label: 'Main',
     items: [
-      { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-      { id: 'people_map', label: 'People Map', icon: Map, table: 'users' },
-      { id: 'users', label: 'Users', icon: Users, table: 'users' },
-      { id: 'vendors', label: 'Vendors', icon: ShoppingBag, table: 'vendors' },
-      { id: 'riders', label: 'Riders', icon: Truck, table: 'riders' },
+      { id: 'dashboard_panel', label: 'Dashboard', icon: BarChart3 },
+      { id: 'people_map_panel', label: 'People Map', icon: Map, table: 'users' },
+      { id: 'users_panel', label: 'Users', icon: Users, table: 'users' },
+      { id: 'vendors_panel', label: 'Vendors', icon: ShoppingBag, table: 'vendors' },
+      { id: 'riders_panel', label: 'Riders', icon: Truck, table: 'riders' },
     ]
   },
   {
     label: 'Services',
     items: [
-      { id: 'providers', label: 'Service Providers', icon: Heart, table: 'service_providers' },
-      { id: 'services', label: 'Service List', icon: Briefcase, table: 'services' },
-      { id: 'bookings', label: 'Bookings', icon: Calendar, table: 'service_bookings' },
+      { id: 'providers_panel', label: 'Service Providers', icon: Heart, table: 'service_providers' },
+      { id: 'services_panel', label: 'Service List', icon: Briefcase, table: 'services' },
+      { id: 'bookings_panel', label: 'Bookings', icon: Calendar, table: 'service_bookings' },
     ]
   },
   {
     label: 'Marketplace',
     items: [
-      { id: 'stores', label: 'Stores', icon: ShoppingBag, table: 'stores' },
-      { id: 'products', label: 'Products', icon: Package, table: 'products' },
-      { id: 'orders', label: 'Product Orders', icon: ShoppingBag, table: 'orders' },
-      { id: 'payments', label: 'Payments', icon: CreditCard, table: 'service_bookings' },
-      { id: 'deals', label: 'Deals & Offers', icon: Tag, table: 'deals' },
+      { id: 'stores_panel', label: 'Stores', icon: ShoppingBag, table: 'stores' },
+      { id: 'products_panel', label: 'Products', icon: Package, table: 'products' },
+      { id: 'orders_panel', label: 'Product Orders', icon: ShoppingBag, table: 'orders' },
+      { id: 'payments_panel', label: 'Payments', icon: CreditCard, table: 'service_bookings' },
+      { id: 'deals_panel', label: 'Deals & Offers', icon: Tag, table: 'deals' },
     ]
   },
   {
     label: 'Content',
     items: [
-      { id: 'community', label: 'Community', icon: MessageSquare, table: 'posts' },
-      { id: 'notifications', label: 'Notifications', icon: Bell, table: 'notifications' },
+      { id: 'community_panel', label: 'Community', icon: MessageSquare, table: 'posts' },
+      { id: 'notifications_panel', label: 'Notifications', icon: Bell, table: 'notifications' },
     ]
   },
   {
     label: 'City & Events',
     items: [
-      { id: 'city_routes', label: 'City Routes', icon: Navigation, table: 'city_routes' },
-      { id: 'city_vehicles', label: 'City Vehicles', icon: Truck, table: 'city_vehicles' },
-      { id: 'ticket_bookings', label: 'Ride Bookings', icon: MapPin, table: 'ticket_bookings' },
-      { id: 'events', label: 'Events', icon: Sparkles, table: 'events' },
-      { id: 'event_bookings', label: 'Event Bookings', icon: Calendar, table: 'event_bookings' }
+      { id: 'city_routes_panel', label: 'City Routes', icon: Navigation, table: 'city_routes' },
+      { id: 'city_vehicles_panel', label: 'City Vehicles', icon: Truck, table: 'city_vehicles' },
+      { id: 'ticket_bookings_panel', label: 'Ride Bookings', icon: MapPin, table: 'ticket_bookings' },
+      { id: 'events_panel', label: 'Events', icon: Sparkles, table: 'events' },
+      { id: 'event_bookings_panel', label: 'Event Bookings', icon: Calendar, table: 'event_bookings' }
     ]
   },
   {
     label: 'System',
     items: [
-      { id: 'areas', label: 'Service Areas', icon: MapPin, table: 'service_areas' },
-      { id: 'reports', label: 'Reports', icon: TrendingUp },
-      { id: 'settings', label: 'Settings', icon: Settings },
+      { id: 'areas_panel', label: 'Service Areas', icon: MapPin, table: 'service_areas' },
+      { id: 'reports_panel', label: 'Reports', icon: TrendingUp },
+      { id: 'settings_panel', label: 'Settings', icon: Settings },
     ]
   }
 ];
 
 // Mock data removed as platform is now fully integrated with Supabase.
 
-// --- Leaflet Colored Icons for Admin Map ---
-const mapRedIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
+// --- Google Maps SVG Icons for Admin Map ---
+const getAdminMapMarkerSvg = (color) => `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42">
+  <ellipse cx="16" cy="38" rx="8" ry="4" fill="rgba(0,0,0,0.2)"/>
+  <path d="M16 0C8.27 0 2 6.27 2 14c0 9.75 14 28 14 28S30 23.75 30 14C30 6.27 23.73 0 16 0z" fill="${color}"/>
+  <circle cx="16" cy="14" r="7" fill="white" fill-opacity="0.8"/>
+</svg>`;
 
-const mapGreenIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-const mapOrangeIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-const mapVioletIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-const mapBlueIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-// Helper to center Map on selected coordinates
-function MapRecenter({ coords }) {
-  const map = useMap();
-  useEffect(() => {
-    if (coords) {
-      map.setView([coords.lat, coords.lng], 15, { animate: true });
-    }
-  }, [coords, map]);
-  return null;
-}
+const ADMIN_MARKER_COLORS = {
+  red: '#ef4444',
+  green: '#22c55e',
+  orange: '#f97316',
+  violet: '#a855f7',
+  blue: '#3b82f6'
+};
 
 const TABS = tabSections.flatMap(s => s.items);
 
@@ -302,7 +258,7 @@ const formatDateForInput = (val) => {
 };
 
 const AdminPanel = ({ onLogout, location }) => {
-  const [activeAdminTab, setActiveAdminTab] = useState(() => localStorage.getItem('admin_active_tab') || 'dashboard');
+  const [activeAdminTab, setActiveAdminTab] = useState(() => localStorage.getItem('admin_active_tab') || 'dashboard_panel');
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -632,7 +588,7 @@ const AdminPanel = ({ onLogout, location }) => {
   }, [onLogout]);
 
   const fetchData = useCallback(async () => {
-    if (['dashboard', 'people_map', 'reports', 'settings'].includes(activeAdminTab)) {
+    if (['dashboard_panel', 'people_map_panel', 'reports_panel', 'settings_panel'].includes(activeAdminTab)) {
       setLoading(false);
       return;
     }
@@ -696,7 +652,7 @@ const AdminPanel = ({ onLogout, location }) => {
     fetchStats();
     fetchReferences();
     fetchPlatformSettings();
-    if (activeAdminTab === 'people_map') {
+    if (activeAdminTab === 'people_map_panel') {
       fetchPeopleMapData();
     } else {
       fetchData();
@@ -1071,37 +1027,44 @@ const AdminPanel = ({ onLogout, location }) => {
                       
                       // Flatten relation data for display in the table cells
                       if (k === 'user_id' && item.users) {
-                        v = `${item.users.full_name || 'No Name'} (${item.users.phone})`;
+                        v = `${item.users?.full_name || 'No Name'} (${item.users?.phone || 'No Phone'})`;
                       } else if (k === 'service_id' && item.services) {
-                        v = item.services.title;
+                        v = item.services?.title;
                       } else if (k === 'provider_id' && item.service_providers) {
-                        v = item.service_providers.business_name || 'No Name';
+                        v = item.service_providers?.business_name || 'No Name';
                       } else if (k === 'address_id' && item.addresses) {
-                        v = `${item.addresses.address_line_1 || ''} (${item.addresses.society || item.addresses.city || ''})`.trim();
+                        v = `${item.addresses?.address_line_1 || ''} (${item.addresses?.society || item.addresses?.city || ''})`.trim();
                         if (v === '()') v = 'N/A';
                       } else if (k === 'store_id' && item.stores) {
-                        v = item.stores.name;
+                        v = item.stores?.name;
                       } else if (k === 'category_id') {
                         if (currentTab.table === 'products' && item.product_categories) {
-                          v = item.product_categories.name;
+                          v = item.product_categories?.name;
                         } else if (currentTab.table === 'services' && item.service_categories) {
-                          v = item.service_categories.name;
+                          v = item.service_categories?.name;
                         }
                       } else if (k === 'vendor_id' && item.vendors) {
-                        v = item.vendors.business_name || item.vendors.name || item.vendors.phone;
+                        v = item.vendors?.business_name || item.vendors?.name || item.vendors?.phone;
                       }
 
                       // Flatten joined user data for display, or fall back if reference is missing/null
                       if (item.users) {
-                        if (k === 'phone' && !v) v = item.users.phone;
-                        if (k === 'full_name' && !v) v = item.users.full_name;
+                        if (k === 'phone' && !v) v = item.users?.phone;
+                        if (k === 'full_name' && !v) v = item.users?.full_name;
                       } else {
                         if (k === 'phone' && !v) v = item.phone;
                         if (k === 'full_name' && !v) v = item.full_name || item.name || item.business_name || 'No User Linked';
                       }
 
-                      let displayVal = v === null || v === undefined ? 'N/A' : String(v);
-                      if (['price', 'discount_price', 'total_amount', 'amount', 'subtotal', 'delivery_fee'].includes(k) && v !== null && v !== undefined) {
+                       let displayVal = v === null || v === undefined ? 'N/A' : String(v);
+                      if (k === 'phone' && displayVal.startsWith('np_')) {
+                        const rawId = displayVal.replace('np_', '');
+                        if (rawId.startsWith('tc-') && rawId.length > 3) {
+                          displayVal = `Placeholder (${rawId.substring(3)})`;
+                        } else {
+                          displayVal = `Placeholder (${rawId.substring(0, 8)}...)`;
+                        }
+                      } else if (['price', 'discount_price', 'total_amount', 'amount', 'subtotal', 'delivery_fee'].includes(k) && v !== null && v !== undefined) {
                         displayVal = `₹${parseFloat(v).toLocaleString()}`;
                       } else if ((k === 'id_proof' || k === 'aadhar_no') && displayVal.length === 12 && /^\d+$/.test(displayVal)) {
                         const parts = [];
@@ -1178,7 +1141,7 @@ const AdminPanel = ({ onLogout, location }) => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
           <div>
             <h1 className="admin-hero-title" style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>Live Community Locator</h1>
-            <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '4px' }}>Real-time OpenStreetMap tracking of Users, Riders, and Merchant Partners across Ahmedabad.</p>
+            <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '4px' }}>Real-time Google Maps tracking of Users, Riders, and Merchant Partners across Ahmedabad.</p>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             <button 
@@ -1273,95 +1236,22 @@ const AdminPanel = ({ onLogout, location }) => {
                   <p style={{ fontWeight: 600 }}>Syncing map coordinates...</p>
                 </div>
               ) : (
-                <MapContainer 
-                  center={[23.0225, 72.5714]} 
-                  zoom={13} 
-                  scrollWheelZoom={true}
+                <GoogleMapWrapper
+                  center={selectedPersonCoords ? [selectedPersonCoords.lat, selectedPersonCoords.lng] : [23.0225, 72.5714]}
+                  zoom={selectedPersonCoords ? 15 : 13}
                   style={{ height: '100%', width: '100%', zIndex: 1 }}
-                  minZoom={5}
-                >
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  
-                  {filteredPeople.map(person => {
-                    let mapIcon = mapBlueIcon;
-                    if (person.iconColor === 'green') mapIcon = mapGreenIcon;
-                    else if (person.iconColor === 'orange') mapIcon = mapOrangeIcon;
-                    else if (person.iconColor === 'red') mapIcon = mapRedIcon;
-                    else if (person.iconColor === 'violet') mapIcon = mapVioletIcon;
-
-                    if (!person.lat || !person.lng || isNaN(person.lat) || isNaN(person.lng)) return null;
-
-                    return (
-                      <Marker 
-                        key={person.id} 
-                        position={[person.lat, person.lng]} 
-                        icon={mapIcon}
-                      >
-                        <Popup>
-                          <div style={{ padding: '8px', minWidth: '180px', fontFamily: 'Inter, sans-serif' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                              <div style={{ 
-                                width: '32px', height: '32px', borderRadius: '50%', 
-                                background: person.iconColor === 'green' ? '#22c55e' : (person.iconColor === 'orange' ? '#f97316' : (person.iconColor === 'red' ? '#ef4444' : '#a855f7')),
-                                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.85rem'
-                              }}>
-                                {person.name.slice(0, 2).toUpperCase()}
-                              </div>
-                              <div>
-                                <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>{person.name}</h4>
-                                <span style={{ 
-                                  fontSize: '0.7rem', 
-                                  background: person.iconColor === 'green' ? '#ecfdf5' : (person.iconColor === 'orange' ? '#fff7ed' : (person.iconColor === 'red' ? '#fef2f2' : '#faf5ff')),
-                                  color: person.iconColor === 'green' ? '#047857' : (person.iconColor === 'orange' ? '#c2410c' : (person.iconColor === 'red' ? '#b91c1c' : '#7e22ce')),
-                                  padding: '1px 6px', borderRadius: '10px', fontWeight: 600
-                                }}>
-                                  {person.role}
-                                </span>
-                              </div>
-                            </div>
-                            
-                            <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px', margin: '8px 0' }}>
-                              <div><strong>Contact:</strong> {person.phone}</div>
-                              {person.role === 'Vendor' && <div><strong>Category:</strong> {person.email}</div>}
-                              {person.role === 'Rider' && (
-                                <>
-                                  <div><strong>Vehicle:</strong> {person.email}</div>
-                                  <div><strong>Rating:</strong> ⭐ {person.meta.rating}</div>
-                                </>
-                              )}
-                              {person.role === 'Buyer' && <div><strong>Email:</strong> {person.email}</div>}
-                              {person.role === 'Provider' && <div><strong>Expertise:</strong> {person.email}</div>}
-                              {person.isSimulated && <div style={{ color: '#0284c7', fontSize: '0.75rem', fontWeight: 600 }}>✨ Live Simulation Bot</div>}
-                            </div>
-
-                            <a 
-                              href={`tel:${person.phone}`}
-                              style={{
-                                display: 'block',
-                                textAlign: 'center',
-                                background: '#0f172a',
-                                color: 'white',
-                                textDecoration: 'none',
-                                padding: '6px',
-                                borderRadius: '6px',
-                                fontSize: '0.8rem',
-                                fontWeight: 600,
-                                marginTop: '4px'
-                              }}
-                            >
-                              Call Service Phone
-                            </a>
-                          </div>
-                        </Popup>
-                      </Marker>
-                    );
-                  })}
-                  
-                  <MapRecenter coords={selectedPersonCoords} />
-                </MapContainer>
+                  markers={filteredPeople
+                    .filter(p => p.lat && p.lng && !isNaN(p.lat) && !isNaN(p.lng))
+                    .map(person => ({
+                      position: [person.lat, person.lng],
+                      svgIcon: getAdminMapMarkerSvg(ADMIN_MARKER_COLORS[person.iconColor] || ADMIN_MARKER_COLORS.blue),
+                      iconSize: [32, 42],
+                      iconAnchor: [16, 42],
+                      title: `${person.name} (${person.role}) — ${person.phone}`,
+                      onClick: () => setSelectedPersonCoords({ lat: person.lat, lng: person.lng })
+                    }))
+                  }
+                />
               )}
             </div>
           </div>
@@ -1795,7 +1685,7 @@ const AdminPanel = ({ onLogout, location }) => {
               <Menu size={24} />
             </button>
             <div className="breadcrumb">
-              <Database size={14} className="mobile-hide" /> <span className="mobile-hide">/ MASTER CONTROL /</span> <strong>{activeAdminTab.toUpperCase()}</strong>
+              <Database size={14} className="mobile-hide" /> <span className="mobile-hide">/ MASTER CONTROL /</span> <strong>{currentTab.label.toUpperCase()}</strong>
             </div>
           </div>
           <div className="admin-profile-pill">
@@ -1814,17 +1704,17 @@ const AdminPanel = ({ onLogout, location }) => {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
             >
-              {activeAdminTab === 'dashboard' ? (
+              {activeAdminTab === 'dashboard_panel' ? (
                 <>
                   <h1 className="admin-hero-title">Platform Intelligence</h1>
                   <p style={{ color: '#64748b', marginBottom: '2rem' }}>Overview of your entire business ecosystem.</p>
                   {renderDashboard()}
                 </>
-              ) : activeAdminTab === 'people_map' ? (
+              ) : activeAdminTab === 'people_map_panel' ? (
                 renderPeopleMap()
-              ) : activeAdminTab === 'reports' ? (
+              ) : activeAdminTab === 'reports_panel' ? (
                 renderReports()
-              ) : activeAdminTab === 'settings' ? (
+              ) : activeAdminTab === 'settings_panel' ? (
                 renderSettings()
               ) : syncStatus === 'missing_table' ? (
                 <div className="missing-table-notice animate-fade-in" style={{ padding: '3rem', background: '#fff1f2', borderRadius: '24px', border: '2px dashed #f43f5e', textAlign: 'center' }}>

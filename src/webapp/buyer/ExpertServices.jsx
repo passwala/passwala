@@ -52,6 +52,7 @@ const ExpertServices = ({ onBack, location, userCoords }) => {
           price, 
           description,
           duration_minutes,
+          image_url,
           service_providers (
             id,
             business_name,
@@ -100,7 +101,7 @@ const ExpertServices = ({ onBack, location, userCoords }) => {
           const category = s.service_categories?.name || 'Service';
 
           // Safe photo check
-          const rawPhoto = user.photo_url || provider.photo_url || '';
+          const rawPhoto = s.image_url || user.photo_url || provider.photo_url || '';
           const isValidPhoto = typeof rawPhoto === 'string' && 
             (rawPhoto.startsWith('http://') || rawPhoto.startsWith('https://') || rawPhoto.startsWith('data:') || rawPhoto.startsWith('/'));
           const expertPhoto = isValidPhoto ? rawPhoto : getCategoryPhoto(category);
@@ -172,15 +173,6 @@ const ExpertServices = ({ onBack, location, userCoords }) => {
       className="expert-services-page"
     >
       <header className="expert-header no-top-row">
-        <div className="search-bar-expert">
-          <Search size={18} className="search-icon-expert" />
-          <input 
-            type="text" 
-            placeholder={t('describe_issue')} 
-            onFocus={() => toast.success('AI: Tell me what happened, I will find the right expert.')}
-          />
-        </div>
-
         <div className="category-tabs-scroll">
           {categories.map((tab) => (
             <button 
@@ -239,10 +231,9 @@ const ExpertServices = ({ onBack, location, userCoords }) => {
                       </div>
                     )}
                   </div>
-                  <span className="expert-type">
+                   <span className="expert-type">
                     {t((expert.category || '').toLowerCase().replace(' & ', '_'))}
                     {expert.experience ? ` • ${expert.experience}` : ''}
-                    {expert.distance && ` • ${t('km_away').replace('{dist}', expert.distance)}`}
                   </span>
                    {expert.description && (
                      <p className="expert-description-snippet">{expert.description}</p>

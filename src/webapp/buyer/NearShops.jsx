@@ -13,109 +13,13 @@ import {
   Package,
   ShoppingBag
 } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
+import GoogleMapWrapper from '../../utils/GoogleMapWrapper';
 import './NearShops.css';
 import { supabase } from '../../supabase';
 import { useCart } from '../../context/CartContext';
 import { getOSRMRoute } from '../../utils/dijkstra';
 import { useTranslation } from '../LanguageContext';
 
-
-// --- Leaflet Icon Fix & Customization ---
-const orangeIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-const blueIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-const greenIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-// Helper component to center map when coords change
-function RecenterMap({ coords }) {
-  const map = useMap();
-  useEffect(() => {
-    // 🛡️ Safety Check: Prevent crash if coordinates are partially undefined
-    if (coords && coords.lat && coords.lng && !isNaN(coords.lat) && !isNaN(coords.lng)) {
-      map.setView([coords.lat, coords.lng], 14);
-    }
-  }, [coords, map]);
-  return null;
-}
-
-function FitBounds({ userCoords, shops }) {
-  const map = useMap();
-  useEffect(() => {
-    const pts = [];
-    if (userCoords?.lat && userCoords?.lng) {
-      pts.push([userCoords.lat, userCoords.lng]);
-    }
-    shops.forEach(s => {
-      const lat = parseFloat(s.lat);
-      const lng = parseFloat(s.lng);
-      if (!isNaN(lat) && !isNaN(lng)) {
-        pts.push([lat, lng]);
-      }
-    });
-
-    if (pts.length > 1) {
-      map.fitBounds(L.latLngBounds(pts), { padding: [48, 48], maxZoom: 15 });
-    } else if (pts.length === 1) {
-      map.setView(pts[0], 14);
-    }
-  }, [userCoords, shops, map]);
-  return null;
-}
-
-function LocateButton({ userCoords }) {
-  const map = useMap();
-  if (!userCoords?.lat || !userCoords?.lng) return null;
-  return (
-    <button 
-      onClick={() => map.setView([userCoords.lat, userCoords.lng], 15)}
-      style={{
-        position: 'absolute',
-        bottom: '16px',
-        right: '16px',
-        zIndex: 1000,
-        background: 'white',
-        border: '1px solid #cbd5e1',
-        borderRadius: '50%',
-        width: '40px',
-        height: '40px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-        color: '#ff7622'
-      }}
-      title="Re-center to my location"
-      type="button"
-    >
-      <Navigation size={18} fill="#ff7622" />
-    </button>
-  );
-}
 
 const NearShops = ({ location, userCoords }) => {
   const { t } = useTranslation();
@@ -125,11 +29,18 @@ const NearShops = ({ location, userCoords }) => {
   const currentArea = location?.split(',')[0] || 'Your Area';
   
   const { cartItems, addToCart, updateQty, setCartOpen, totalItems } = useCart();
+  const [mapCenter, setMapCenter] = useState([userCoords?.lat || 23.0225, userCoords?.lng || 72.5714]);
+
+  useEffect(() => {
+    if (userCoords?.lat && userCoords?.lng) {
+      setMapCenter([userCoords.lat, userCoords.lng]);
+    }
+  }, [userCoords]);
+
+
+
   const [viewType, setViewType] = useState('SHOPS'); // 'SHOPS' or 'SERVICES'
   const [shopCatalog, setShopCatalog] = useState([]);
-
-
-
   const [selectedShop, setSelectedShop] = useState(null);
 
   const handleOpenShop = async (shop) => {
@@ -428,74 +339,91 @@ const NearShops = ({ location, userCoords }) => {
       </header>
 
       <main className="near-shops-content" style={{ paddingBottom: '120px' }}>
+        {/* Responsive split: map left, list right on desktop */}
+        <div className="near-shops-content-split">
+
         {/* Map Section */}
         <div className="map-view-container">
-          <div className="map-wrapper" style={{ height: '350px', position: 'relative' }}>
-             <MapContainer 
-               center={[userCoords?.lat || 23.0225, userCoords?.lng || 72.5714]} 
-               zoom={14} 
-               scrollWheelZoom={false}
-               style={{ height: '100%', width: '100%', zIndex: 1 }}
-               minZoom={5}
-             >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                
-                {/* User Location Marker */}
-                {userCoords && userCoords.lat && userCoords.lng && (
-                  <Marker position={[userCoords.lat, userCoords.lng]} icon={blueIcon}>
-                    <Popup>{t('you_are_here')}</Popup>
-                  </Marker>
-                )}
+          {/* ── Map wrapper: height is controlled by CSS (no inline override) ── */}
+          <div className="map-wrapper" style={{ position: 'relative' }}>
+             {(() => {
+               const googleMarkers = [];
+               if (userCoords?.lat && userCoords?.lng) {
+                 googleMarkers.push({
+                   position: [userCoords.lat, userCoords.lng],
+                   title: t('you_are_here'),
+                   svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="42" viewBox="0 0 30 42"><path d="M15 0C6.7 0 0 6.7 0 15c0 11.2 15 27 15 27s15-15.8 15-27C30 6.7 23.3 0 15 0zm0 21.8c-3.8 0-6.8-3-6.8-6.8s3-6.8 6.8-6.8 6.8 3 6.8 6.8-3 6.8-6.8 6.8z" fill="#3b82f6" stroke="white" stroke-width="2"/></svg>`,
+                   iconSize: [25, 41],
+                   iconAnchor: [12, 41]
+                 });
+               }
+               filteredShops.forEach((item) => {
+                 const lat = parseFloat(item.lat);
+                 const lng = parseFloat(item.lng);
+                 if (isNaN(lat) || isNaN(lng)) return;
+                 const isService = item.type === 'SERVICES';
+                 googleMarkers.push({
+                   position: [lat, lng],
+                   title: item.name,
+                   svgIcon: isService
+                     ? `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="42" viewBox="0 0 30 42"><path d="M15 0C6.7 0 0 6.7 0 15c0 11.2 15 27 15 27s15-15.8 15-27C30 6.7 23.3 0 15 0zm0 21.8c-3.8 0-6.8-3-6.8-6.8s3-6.8 6.8-6.8 6.8 3 6.8 6.8-3 6.8-6.8 6.8z" fill="#10b981" stroke="white" stroke-width="2"/></svg>`
+                     : `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="42" viewBox="0 0 30 42"><path d="M15 0C6.7 0 0 6.7 0 15c0 11.2 15 27 15 27s15-15.8 15-27C30 6.7 23.3 0 15 0zm0 21.8c-3.8 0-6.8-3-6.8-6.8s3-6.8 6.8-6.8 6.8 3 6.8 6.8-3 6.8-6.8 6.8z" fill="#f97316" stroke="white" stroke-width="2"/></svg>`,
+                   iconSize: [25, 41],
+                   iconAnchor: [12, 41],
+                   onClick: () => handleOpenShop(item)
+                 });
+               });
 
-                  {/* Item Markers */}
-                  {filteredShops.map((item) => {
-                    const lat = parseFloat(item.lat);
-                    const lng = parseFloat(item.lng);
-                    if (isNaN(lat) || isNaN(lng)) return null;
-                    
-                    const isService = item.type === 'SERVICES';
+               const fitPoints = [];
+               if (userCoords?.lat && userCoords?.lng) {
+                 fitPoints.push([userCoords.lat, userCoords.lng]);
+               }
+               filteredShops.forEach((item) => {
+                 const lat = parseFloat(item.lat);
+                 const lng = parseFloat(item.lng);
+                 if (!isNaN(lat) && !isNaN(lng)) {
+                   fitPoints.push([lat, lng]);
+                 }
+               });
 
-                      return (
-                       <Marker 
-                         key={item.id} 
-                         position={[lat, lng]} 
-                         icon={isService ? greenIcon : orangeIcon}
-                         eventHandlers={{
-                           click: () => handleOpenShop(item),
-                         }}
-                       >
-                      <Popup>
-                        <div style={{ padding: '4px' }}>
-                          <h4 style={{ margin: '0 0 4px 0', fontSize: '14px' }}>{item.name}</h4>
-                          <p style={{ margin: 0, fontSize: '11px', color: '#666' }}>{item.category}</p>
-                          <button 
-                            onClick={() => handleOpenShop(item)}
-                            style={{ 
-                              marginTop: '8px', 
-                              background: isService ? '#3b82f6' : 'var(--primary)', 
-                              color: 'white', 
-                              border: 'none', 
-                              padding: '4px 8px', 
-                              borderRadius: '4px', 
-                              fontSize: '11px', 
-                              width: '100%',
-                              fontWeight: 'bold'
-                            }}
-                          >
-                            {isService ? t('view_services') : t('view_catalog')}
-                          </button>
-                        </div>
-                      </Popup>
-                      </Marker>
-                    );
-                  })}
-                
-                 <FitBounds userCoords={userCoords} shops={filteredShops} />
-                 <LocateButton userCoords={userCoords} />
-             </MapContainer>
+               return (
+                 <>
+                   <GoogleMapWrapper
+                     center={mapCenter}
+                     zoom={14}
+                     markers={googleMarkers}
+                     fitBoundsPoints={fitPoints}
+                     style={{ height: '100%', width: '100%', zIndex: 1 }}
+                   />
+                   {userCoords?.lat && userCoords?.lng && (
+                     <button
+                       onClick={() => setMapCenter([userCoords.lat, userCoords.lng])}
+                       style={{
+                         position: 'absolute',
+                         bottom: '12px',
+                         right: '12px',
+                         zIndex: 1000,
+                         background: 'white',
+                         border: '1.5px solid #e2e8f0',
+                         borderRadius: '50%',
+                         width: '40px',
+                         height: '40px',
+                         display: 'flex',
+                         alignItems: 'center',
+                         justifyContent: 'center',
+                         cursor: 'pointer',
+                         boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                         color: '#ff7622'
+                       }}
+                       title="Re-center to my location"
+                       type="button"
+                     >
+                       <Navigation size={18} fill="#ff7622" />
+                     </button>
+                   )}
+                 </>
+               );
+             })()}
              
              {/* Pulse overlay */}
              {loading && (
@@ -511,6 +439,7 @@ const NearShops = ({ location, userCoords }) => {
         </div>
 
         {/* Shops List */}
+        <div className="shops-list-panel">
         <div className="shops-list" style={{ paddingBottom: '120px' }}>
            <AnimatePresence mode='popLayout'>
            {filteredShops.length > 0 ? (
@@ -569,7 +498,10 @@ const NearShops = ({ location, userCoords }) => {
              </Motion.div>
            )}
            </AnimatePresence>
-        </div>
+        </div>{/* /shops-list */}
+        </div>{/* /shops-list-panel */}
+        </div>{/* /near-shops-content-split */}
+
       </main>
 
       {/* Shop Digital Catalog Modal */}

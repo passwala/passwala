@@ -51,6 +51,19 @@ async function getActiveVehicles() {
       vehiclesMap[v.driver_id] = v;
     });
 
+    // Fetch all vehicle IDs that currently have an active/pending booking
+    const allVehicleIds = (existingVehicles || []).map(v => v.id);
+    let busyVehicleIds = new Set();
+    if (allVehicleIds.length > 0) {
+      const { data: activeBookings } = await supabase
+        .from('ticket_bookings')
+        .select('vehicle_id')
+        .in('vehicle_id', allVehicleIds)
+        .eq('status', 'CONFIRMED')
+        .not('vehicle_id', 'is', null);
+      (activeBookings || []).forEach(b => busyVehicleIds.add(b.vehicle_id));
+    }
+
     for (const rider of activeRiders) {
       if (!existingDriverIds.includes(rider.user_id)) {
         // Create a vehicle entry
@@ -72,16 +85,31 @@ async function getActiveVehicles() {
         }
       } else {
         // Ensure existing vehicle is active and is a Bike with 1 seat
+        // BUT do NOT reset available_seats if vehicle is currently busy with a booking
         const vehicle = vehiclesMap[rider.user_id];
-        if (!vehicle.is_active || vehicle.vehicle_type !== 'Bike' || vehicle.total_seats !== 1 || vehicle.available_seats !== 1) {
+        const isBusy = busyVehicleIds.has(vehicle.id);
+        if (!vehicle.is_active || vehicle.vehicle_type !== 'Bike' || vehicle.total_seats !== 1) {
+          // Only reset available_seats to 1 if the vehicle is NOT currently busy
+          const newAvailableSeats = isBusy ? 0 : 1;
           const { data: updatedVehicle } = await supabase
             .from('city_vehicles')
             .update({ 
               is_active: true,
               vehicle_type: 'Bike',
               total_seats: 1,
-              available_seats: 1
+              available_seats: newAvailableSeats
             })
+            .eq('id', vehicle.id)
+            .select()
+            .single();
+          if (updatedVehicle) {
+            vehiclesMap[rider.user_id] = updatedVehicle;
+          }
+        } else if (!isBusy && vehicle.available_seats === 0) {
+          // Vehicle is not busy but seats are 0 - reset to 1 (stale state)
+          const { data: updatedVehicle } = await supabase
+            .from('city_vehicles')
+            .update({ available_seats: 1 })
             .eq('id', vehicle.id)
             .select()
             .single();
@@ -187,6 +215,7 @@ router.get('/search', async (req, res) => {
       distanceKm = R * c;
     }
 
+
     // Minimum ride fare is ₹15, plus dynamic rate per km (default ₹8)
     let ratePerKm = 8;
     try {
@@ -271,7 +300,6 @@ router.post('/book', async (req, res) => {
       }
     }
 
-    let targetVehicleId = vehicleId;
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vehicleId);
     if (!isUuid) {
       const { data: activeVehicles } = await supabase
@@ -280,48 +308,16 @@ router.post('/book', async (req, res) => {
         .eq('is_active', true)
         .limit(1);
       
-      if (activeVehicles && activeVehicles.length > 0) {
-        targetVehicleId = activeVehicles[0].id;
-      } else {
+      if (!(activeVehicles && activeVehicles.length > 0)) {
         const { data: anyVehicles } = await supabase
           .from('city_vehicles')
           .select('id')
           .limit(1);
-        if (anyVehicles && anyVehicles.length > 0) {
-          targetVehicleId = anyVehicles[0].id;
-        } else {
+        if (!(anyVehicles && anyVehicles.length > 0)) {
           return res.status(400).json({ error: 'No active vehicles are available in the city.' });
         }
       }
     }
-
-    // Atomic decrement of vehicle seats (simulated using Supabase RPC if available, or direct check)
-    const { data: vehicle, error: fetchErr } = await supabase
-      .from('city_vehicles')
-      .select('available_seats, total_seats')
-      .eq('id', targetVehicleId)
-      .single();
-
-    if (fetchErr) throw fetchErr;
-
-    if (vehicle.available_seats < seatCount) {
-      // Auto-reset available seats to accommodate the booking during testing/reuse
-      const resetSeats = Math.max(1, seatCount);
-      await supabase
-        .from('city_vehicles')
-        .update({ available_seats: resetSeats })
-        .eq('id', targetVehicleId);
-      vehicle.available_seats = resetSeats;
-    }
-
-    // Decrement seats
-    const newSeats = vehicle.available_seats - seatCount;
-    const { error: updateErr } = await supabase
-      .from('city_vehicles')
-      .update({ available_seats: newSeats })
-      .eq('id', targetVehicleId);
-      
-    if (updateErr) throw updateErr;
 
     // Generate QR Code hash
     const qrHash = `PW-RIDE-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
@@ -331,7 +327,7 @@ router.post('/book', async (req, res) => {
       .from('ticket_bookings')
       .insert([{
         user_id: targetUserId,
-        vehicle_id: targetVehicleId,
+        vehicle_id: null,
         pickup_lat: pickupLat,
         pickup_lng: pickupLng,
         drop_lat: dropLat,
@@ -342,16 +338,16 @@ router.post('/book', async (req, res) => {
         seat_count: seatCount,
         qr_code_hash: qrHash,
         status: 'CONFIRMED',
-        seat_numbers: { luggage_weight: luggageWeight || 0, luggage_price: luggagePrice || 0 }
+        seat_numbers: { 
+          luggage_weight: luggageWeight || 0, 
+          luggage_price: luggagePrice || 0,
+          ride_stage: 'PENDING'
+        }
       }])
       .select()
       .single();
 
-    if (insertErr) {
-      // Revert seats if booking fails
-      await supabase.from('city_vehicles').update({ available_seats: vehicle.available_seats }).eq('id', targetVehicleId);
-      throw insertErr;
-    }
+    if (insertErr) throw insertErr;
 
     res.json({ success: true, booking });
 
@@ -366,11 +362,27 @@ router.post('/cancel', async (req, res) => {
   try {
     const { bookingId, userId } = req.body;
 
+    // Resolve non-UUID userId before querying
+    let resolvedUserId = userId;
+    if (userId) {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+      if (!isUuid) {
+        const { data: byUid } = await supabase.from('users').select('id').eq('uid', userId).maybeSingle();
+        if (byUid) {
+          resolvedUserId = byUid.id;
+        } else if (String(userId).startsWith('phone-')) {
+          const cleanPhone = String(userId).replace('phone-', '');
+          const { data: byPhone } = await supabase.from('users').select('id').eq('phone', cleanPhone).maybeSingle();
+          if (byPhone) resolvedUserId = byPhone.id;
+        }
+      }
+    }
+
     const { data: booking, error: fetchErr } = await supabase
       .from('ticket_bookings')
       .select('*')
       .eq('id', bookingId)
-      .eq('user_id', userId)
+      .eq('user_id', resolvedUserId)
       .single();
 
     if (fetchErr || !booking) {
@@ -441,6 +453,29 @@ router.get('/my-bookings', async (req, res) => {
       return res.status(400).json({ error: 'userId is required' });
     }
 
+    // Resolve non-UUID identifiers (phone-XXXXXXXX or Firebase UID) to Supabase UUID
+    let resolvedUserId = userId;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+    if (!isUuid) {
+      // Try by Firebase UID
+      const { data: byUid } = await supabase
+        .from('users').select('id').eq('uid', userId).maybeSingle();
+      if (byUid) {
+        resolvedUserId = byUid.id;
+      } else if (String(userId).startsWith('phone-')) {
+        // phone-XXXXXXXXXX format
+        const cleanPhone = String(userId).replace('phone-', '');
+        const { data: byPhone } = await supabase
+          .from('users').select('id').eq('phone', cleanPhone).maybeSingle();
+        if (byPhone) resolvedUserId = byPhone.id;
+      }
+      // If still not resolved to a UUID, return empty — don't crash Postgres
+      const isNowUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resolvedUserId);
+      if (!isNowUuid) {
+        return res.json({ success: true, bookings: [] });
+      }
+    }
+
     const { data: bookings, error } = await supabase
       .from('ticket_bookings')
       .select(`
@@ -455,7 +490,7 @@ router.get('/my-bookings', async (req, res) => {
           last_location_update
         )
       `)
-      .eq('user_id', userId)
+      .eq('user_id', resolvedUserId)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -669,12 +704,257 @@ router.get('/booking-status', async (req, res) => {
 
     res.json({
       success: true,
-      status: booking.status,
+      status: (booking.status === 'COMPLETED' || booking.status === 'CANCELLED') ? booking.status : (booking.seat_numbers?.ride_stage || booking.status),
       driverLocation
     });
   } catch (err) {
     console.error('Booking status fetch error:', err);
     res.status(500).json({ error: 'Failed to fetch booking status' });
+  }
+});
+
+// 9. Update specific booking status (stored inside seat_numbers JSONB)
+router.post('/update-status', async (req, res) => {
+  try {
+    const { bookingId, status } = req.body;
+    if (!bookingId || !status) {
+      return res.status(400).json({ error: 'bookingId and status are required' });
+    }
+
+    // First fetch current seat_numbers
+    const { data: currentBooking, error: fetchErr } = await supabase
+      .from('ticket_bookings')
+      .select('seat_numbers')
+      .eq('id', bookingId)
+      .single();
+
+    if (fetchErr || !currentBooking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const updatedSeatNumbers = {
+      ...(currentBooking.seat_numbers || {}),
+      ride_stage: status
+    };
+
+    const updatePayload = { seat_numbers: updatedSeatNumbers };
+    if (status === 'COMPLETED' || status === 'CANCELLED') {
+      updatePayload.status = status;
+    }
+
+    const { data: booking, error: updateErr } = await supabase
+      .from('ticket_bookings')
+      .update(updatePayload)
+      .eq('id', bookingId)
+      .select()
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    res.json({ success: true, booking });
+  } catch (err) {
+    console.error('Update Status Error:', err);
+    res.status(500).json({ error: 'Failed to update status' });
+  }
+});
+
+// Get pending unassigned ride bookings
+router.get('/pending-rides', async (req, res) => {
+  try {
+    const yesterday = new Date();
+    yesterday.setHours(yesterday.getHours() - 24);
+
+    const { data: bookings, error } = await supabase
+      .from('ticket_bookings')
+      .select('*, users(full_name, phone)')
+      .eq('status', 'CONFIRMED')
+      .is('vehicle_id', null)
+      .gt('created_at', yesterday.toISOString())
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Extra safety: filter to only those with ride_stage PENDING in the JSONB
+    const pendingBookings = (bookings || []).filter(b => {
+      const stage = b.seat_numbers?.ride_stage;
+      return !stage || stage === 'PENDING';
+    });
+
+    res.json({ success: true, bookings: pendingBookings });
+  } catch (err) {
+    console.error('Fetch Pending Rides Error:', err);
+    res.status(500).json({ error: 'Failed to fetch pending rides' });
+  }
+});
+
+// Claim a ride booking
+router.post('/claim', async (req, res) => {
+  try {
+    const { bookingId, vehicleId } = req.body;
+    if (!bookingId || !vehicleId) {
+      return res.status(400).json({ error: 'bookingId and vehicleId are required' });
+    }
+
+    // First fetch current booking
+    const { data: currentBooking, error: fetchErr } = await supabase
+      .from('ticket_bookings')
+      .select('*')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (fetchErr || !currentBooking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    if (currentBooking.vehicle_id !== null) {
+      return res.status(400).json({ error: 'Ride already claimed by another driver' });
+    }
+
+    // Update vehicle_id and ride_stage to CONFIRMED
+    const updatedSeatNumbers = {
+      ...(currentBooking.seat_numbers || {}),
+      ride_stage: 'CONFIRMED'
+    };
+
+    const { data: booking, error: updateErr } = await supabase
+      .from('ticket_bookings')
+      .update({
+        vehicle_id: vehicleId,
+        seat_numbers: updatedSeatNumbers
+      })
+      .eq('id', bookingId)
+      .select()
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    res.json({ success: true, booking });
+  } catch (err) {
+    console.error('Claim Booking Error:', err);
+    res.status(500).json({ error: 'Failed to claim booking' });
+  }
+});
+
+// Release/Reject a claimed ride booking
+router.post('/release', async (req, res) => {
+  try {
+    const { bookingId } = req.body;
+    if (!bookingId) {
+      return res.status(400).json({ error: 'bookingId is required' });
+    }
+
+    // First fetch current booking
+    const { data: currentBooking, error: fetchErr } = await supabase
+      .from('ticket_bookings')
+      .select('*')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (fetchErr || !currentBooking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const updatedSeatNumbers = {
+      ...(currentBooking.seat_numbers || {}),
+      ride_stage: 'PENDING'
+    };
+
+    const { data: booking, error: updateErr } = await supabase
+      .from('ticket_bookings')
+      .update({
+        vehicle_id: null,
+        seat_numbers: updatedSeatNumbers
+      })
+      .eq('id', bookingId)
+      .select()
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    res.json({ success: true, booking });
+  } catch (err) {
+    console.error('Release Booking Error:', err);
+    res.status(500).json({ error: 'Failed to release booking' });
+  }
+});
+
+// Get ALL ride bookings for a driver (rider-side history view — bypasses RLS)
+router.get('/driver-bookings', async (req, res) => {
+  try {
+    const { driverId } = req.query;
+    if (!driverId) {
+      return res.status(400).json({ error: 'driverId is required' });
+    }
+
+    // Resolve to Supabase users.id UUID if necessary
+    let resolvedUserId = driverId;
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(driverId);
+    if (!isUUID) {
+      const { data: usr } = await supabase
+        .from('users')
+        .select('id')
+        .eq('uid', driverId)
+        .maybeSingle();
+      if (usr) resolvedUserId = usr.id;
+    }
+
+    // Get vehicle IDs for this driver
+    const { data: vehicles } = await supabase
+      .from('city_vehicles')
+      .select('id')
+      .eq('driver_id', resolvedUserId);
+
+    if (!vehicles || vehicles.length === 0) {
+      return res.json({ success: true, bookings: [] });
+    }
+
+    const vehicleIds = vehicles.map(v => v.id);
+
+    // Fetch all ticket_bookings for these vehicles (service-role bypasses RLS)
+    const { data: bookings, error } = await supabase
+      .from('ticket_bookings')
+      .select('*')
+      .in('vehicle_id', vehicleIds)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.json({ success: true, bookings: bookings || [] });
+  } catch (err) {
+    console.error('Driver Bookings Fetch Error:', err);
+    res.status(500).json({ error: 'Failed to fetch driver bookings' });
+  }
+});
+
+// Driver update booking status (complete/cancel) — bypasses RLS
+router.post('/driver-update-status', async (req, res) => {
+  try {
+    const { bookingId, status } = req.body;
+    if (!bookingId || !status) {
+      return res.status(400).json({ error: 'bookingId and status are required' });
+    }
+
+    const { data: booking, error } = await supabase
+      .from('ticket_bookings')
+      .update({ status })
+      .eq('id', bookingId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // If completed, free up the vehicle seat
+    if (status === 'COMPLETED' && booking?.vehicle_id) {
+      await supabase
+        .from('city_vehicles')
+        .update({ available_seats: 1 })
+        .eq('id', booking.vehicle_id);
+    }
+
+    res.json({ success: true, booking });
+  } catch (err) {
+    console.error('Driver Update Status Error:', err);
+    res.status(500).json({ error: 'Failed to update booking status' });
   }
 });
 

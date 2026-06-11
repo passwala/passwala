@@ -348,6 +348,7 @@ const AppContent = ({
   }, [effectiveUser, fcmToken]);
 
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const [showComingSoon, setShowComingSoon] = useState(false);
   const { addToCart } = useCart();
 
   useEffect(() => {
@@ -587,13 +588,88 @@ const AppContent = ({
 
             {/* 4. Global Footers/Navs */}
             {isWebappMode && effectiveUser && isProfileComplete && (
-              <BottomNav activeTab={currentView} onTabChange={(v) => {
-                if (v === 'NEIGHBORS') {
-                  toast.success("Coming soon!", { icon: '✨' });
-                } else {
-                  navigate(v === 'DASHBOARD' ? '/' : v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'TRACKING' ? '/track-orders' : v === 'PROFILE' ? '/profile' : '/');
-                }
+              <BottomNav activeTab={currentView} user={effectiveUser} onTabChange={(v) => {
+                if (v === 'NEIGHBORS') { setShowComingSoon(true); return; }
+                const routeMap = {
+                  'DASHBOARD':       '/',
+                  'NEAR_SHOPS':      '/near-shops',
+                  'EXPERT_SERVICES': '/expert-services',
+                  'TRACKING':        '/track-orders',
+                  'PROFILE':         '/profile',
+                };
+                if (routeMap[v]) navigate(routeMap[v]);
               }} />
+            )}
+
+            {/* ── Coming Soon Modal ── */}
+            {showComingSoon && (
+              <div
+                onClick={() => setShowComingSoon(false)}
+                style={{
+                  position: 'fixed', inset: 0, zIndex: 9999,
+                  background: 'rgba(0,0,0,0.45)',
+                  backdropFilter: 'blur(6px)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '1.5rem'
+                }}
+              >
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    background: 'linear-gradient(135deg,#fff 0%,#fff7f2 100%)',
+                    borderRadius: '24px',
+                    padding: '2.5rem 2rem 2rem',
+                    maxWidth: '340px', width: '100%',
+                    textAlign: 'center',
+                    boxShadow: '0 24px 60px rgba(0,0,0,0.18)',
+                    border: '1.5px solid rgba(255,118,34,0.18)',
+                    animation: 'cs-pop 0.35s cubic-bezier(0.175,0.885,0.32,1.275)'
+                  }}
+                >
+                  <style>{`
+                    @keyframes cs-pop {
+                      from { opacity:0; transform:scale(0.75) translateY(30px); }
+                      to   { opacity:1; transform:scale(1) translateY(0); }
+                    }
+                    @keyframes cs-rocket {
+                      0%,100% { transform:translateY(0) rotate(-10deg); }
+                      50%     { transform:translateY(-10px) rotate(-10deg); }
+                    }
+                  `}</style>
+
+                  {/* Icon */}
+                  <div style={{ fontSize:'3.5rem', lineHeight:1, marginBottom:'0.75rem', display:'inline-block', animation:'cs-rocket 1.6s ease-in-out infinite' }}>🚀</div>
+
+                  {/* Badge */}
+                  <div style={{
+                    display:'inline-block', background:'linear-gradient(135deg,#ff7622,#ff9f4a)',
+                    color:'white', fontSize:'0.65rem', fontWeight:900, letterSpacing:'0.12em',
+                    padding:'4px 12px', borderRadius:'100px', marginBottom:'1rem',
+                    textTransform:'uppercase'
+                  }}>Coming Soon</div>
+
+                  <h2 style={{ fontSize:'1.35rem', fontWeight:800, color:'#0f172a', margin:'0 0 0.5rem' }}>Community Hub 🏘️</h2>
+                  <p style={{ fontSize:'0.9rem', color:'#64748b', lineHeight:1.6, margin:'0 0 1.75rem' }}>
+                    Connect with your neighbors, join local groups, share updates &amp; discover what&apos;s happening around you — <strong style={{color:'#ff7622'}}>launching very soon!</strong>
+                  </p>
+
+                  <button
+                    onClick={() => setShowComingSoon(false)}
+                    style={{
+                      width:'100%', padding:'0.85rem',
+                      background:'linear-gradient(135deg,#ff7622,#ff9f4a)',
+                      color:'white', border:'none', borderRadius:'14px',
+                      fontWeight:800, fontSize:'0.95rem', cursor:'pointer',
+                      boxShadow:'0 6px 20px rgba(255,118,34,0.35)',
+                      transition:'transform 0.15s'
+                    }}
+                    onMouseDown={e=>e.currentTarget.style.transform='scale(0.97)'}
+                    onMouseUp={e=>e.currentTarget.style.transform='scale(1)'}
+                  >
+                    Got it! ✨
+                  </button>
+                </div>
+              </div>
             )}
 
             {isWebMode && <Footer />}

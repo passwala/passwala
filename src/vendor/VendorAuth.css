@@ -1,0 +1,261 @@
+/* VendorAuth.css — Scoped, no global resets */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap');
+
+/* ═══════════════════════════════
+   PAGE — mobile: block flow, no flex stretch
+═══════════════════════════════ */
+.va-page {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  font-family: 'Outfit', sans-serif;
+  background: #ffffff; /* Page background matches form card background so there is no mismatch at the bottom! */
+}
+
+/* ═══════════════════════════════
+   MOBILE HEADER BANNER
+═══════════════════════════════ */
+.va-mob-header {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(145deg, #0d0d1e 0%, #111128 55%, #0f172a 100%);
+  padding: 2.5rem 1.5rem 2.5rem;
+}
+.va-mob-glow1,.va-mob-glow2 {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  pointer-events: none;
+}
+.va-mob-glow1 { top:-60px; right:-40px; width:220px; height:220px; background: radial-gradient(circle,rgba(249,115,22,.32) 0%,transparent 70%); }
+.va-mob-glow2 { bottom:-50px; left:-30px; width:180px; height:180px; background: radial-gradient(circle,rgba(249,115,22,.2) 0%,transparent 70%); }
+
+.va-mob-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 1.5rem;
+  position: relative;
+  z-index: 2;
+}
+.va-mob-logo {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  background: rgba(249,115,22,.18);
+  border: 1px solid rgba(249,115,22,.3);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.va-mob-bname { font-weight: 900; font-size: .95rem; color: #fff; }
+
+.va-mob-headline { position: relative; z-index: 2; }
+.va-mob-tagline {
+  font-size: .65rem; font-weight: 700; color: #f97316;
+  letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: .45rem;
+}
+.va-mob-title {
+  font-size: 1.65rem; font-weight: 900; color: #fff;
+  line-height: 1.2; letter-spacing: -.3px;
+}
+.va-mob-orange { color: #f97316; }
+
+/* ═══════════════════════════════
+   FORM CARD — slides up over header
+═══════════════════════════════ */
+.va-form-card {
+  position: relative;
+  background: #ffffff;
+  border-radius: 24px 24px 0 0;
+  margin-top: -20px;
+  z-index: 2;
+  padding: 2.25rem 1.75rem 4rem; /* Added generous padding-bottom (4rem) and side padding */
+}
+
+/* desktop heading — hidden on mobile */
+.va-desk-head { display: none; }
+.va-desk-logo {
+  width: 52px; height: 52px;
+  border-radius: 15px; margin: 0 auto 1rem;
+  background: rgba(249,115,22,.1); border: 1.5px solid rgba(249,115,22,.2);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(249,115,22,.12);
+}
+.va-desk-title { font-size: 1.5rem; font-weight: 900; color: #0f172a; letter-spacing: -.3px; margin-bottom: 5px; }
+.va-desk-sub   { font-size: .85rem; color: #64748b; font-weight: 500; margin-bottom: 1.75rem; }
+
+/* mobile form heading */
+.va-mob-form-title { font-size: 1.35rem; font-weight: 900; color: #0f172a; margin-bottom: 4px; letter-spacing: -.2px; }
+.va-mob-form-sub   { font-size: .82rem; color: #64748b; font-weight: 500; margin-bottom: 1.4rem; }
+
+/* label */
+.va-label { display: block; font-size: .76rem; font-weight: 700; color: #475569; margin-bottom: .45rem; letter-spacing: .3px; }
+
+/* input */
+.va-field {
+  display: flex; align-items: center; gap: 6px;
+  background: #f8fafc; border: 1.5px solid #e2e8f0;
+  border-radius: 13px; padding: 0 14px; margin-bottom: .85rem;
+  transition: border-color .2s, box-shadow .2s, background .2s;
+}
+.va-f  { border-color: #f97316 !important; box-shadow: 0 0 0 3.5px rgba(249,115,22,.11); background: #fff !important; }
+.va-ok { border-color: #10b981 !important; box-shadow: 0 0 0 3.5px rgba(16,185,129,.09); background: #fff !important; }
+
+.va-flag { font-size: 1rem; flex-shrink: 0; }
+.va-code {
+  font-size: .95rem; font-weight: 800; color: #334155;
+  padding-right: 10px; border-right: 1.5px solid #e2e8f0;
+  line-height: 52px; flex-shrink: 0;
+}
+.va-inp {
+  flex: 1; min-width: 0; border: none; outline: none; background: transparent;
+  height: 52px; font-size: 1rem; font-weight: 700; color: #0f172a;
+  letter-spacing: 1.5px; font-family: 'Outfit', sans-serif;
+}
+.va-inp::placeholder { color: #c4cdd9; font-weight: 500; letter-spacing: 0; }
+.va-tick { font-size: 1rem; color: #10b981; font-weight: 900; flex-shrink: 0; }
+
+/* button */
+.va-btn {
+  width: 100%; height: 52px; border-radius: 13px; border: none;
+  font-size: 1rem; font-weight: 800; font-family: 'Outfit', sans-serif;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  cursor: not-allowed; background: #e9eef5; color: #b0bec5;
+  transition: all .25s cubic-bezier(.4,0,.2,1); letter-spacing: .2px;
+  margin-bottom: 1.5rem;
+}
+.va-btn-on {
+  background: linear-gradient(135deg,#f97316,#fb923c);
+  color: #fff; cursor: pointer;
+  box-shadow: 0 8px 22px -4px rgba(249,115,22,.38);
+}
+.va-btn-on:hover { transform: translateY(-1px); box-shadow: 0 12px 28px -4px rgba(249,115,22,.44); }
+.va-btn-on:active { transform: none; }
+.va-arr { display: inline-block; font-size: 1.1rem; transition: transform .2s; }
+.va-btn-on:hover .va-arr { transform: translateX(3px); }
+
+/* features */
+.va-feats {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: .45rem; margin-bottom: 1.25rem;
+}
+.va-feat {
+  display: flex; align-items: center; gap: 7px;
+  background: #f8fafc; border: 1px solid #f0f3f8;
+  border-radius: 10px; padding: 9px 11px;
+}
+.va-feat-t { font-size: .73rem; font-weight: 700; color: #475569; }
+
+/* terms */
+.va-terms { text-align: center; font-size: .7rem; color: #94a3b8; line-height: 1.6; }
+.va-lnk { color: #f97316; font-weight: 700; cursor: pointer; }
+.va-lnk:hover { text-decoration: underline; }
+
+/* ═══════════════════════════════
+   DESKTOP LEFT ASIDE
+═══════════════════════════════ */
+.va-aside {
+  display: none;
+}
+
+/* ═══════════════════════════════
+   RESPONSIVE
+═══════════════════════════════ */
+
+/* ── MEDIUM 641–1023px ── */
+@media (min-width: 641px) and (max-width: 1023px) {
+  .va-mob-header { padding: 3rem 2.5rem 3rem; }
+  .va-mob-title  { font-size: 2rem; }
+  .va-form-card  { padding: 2.5rem 3rem 3rem; max-width: 560px; margin-left: auto; margin-right: auto; }
+}
+
+/* ── LARGE ≥1024px — full split layout ── */
+@media (min-width: 1024px) {
+  .va-page {
+    display: flex;
+    flex-direction: row;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    background: #ffffff;
+  }
+
+  /* show left aside */
+  .va-aside {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex: 0 0 50%;
+    width: 50%;
+    height: 100%;
+    padding: 2.75rem 3rem;
+    background: linear-gradient(155deg,#0c0c1d 0%,#0f1023 45%,#0f172a 100%);
+    position: relative;
+    overflow: hidden;
+  }
+  .va-aside-glow1, .va-aside-glow2 {
+    position: absolute; border-radius: 50%; filter: blur(80px); pointer-events: none;
+  }
+  .va-aside-glow1 { top:-120px; left:-90px; width:380px; height:380px; background: radial-gradient(circle,rgba(249,115,22,.26) 0%,transparent 70%); }
+  .va-aside-glow2 { bottom:-70px; right:-50px; width:280px; height:280px; background: radial-gradient(circle,rgba(249,115,22,.18) 0%,transparent 70%); }
+  .va-aside-dots  { position: absolute; inset:0; pointer-events:none; background-image: radial-gradient(rgba(255,255,255,.04) 1px,transparent 1px); background-size: 26px 26px; }
+
+  .va-aside-brand { display: flex; align-items: center; gap: 10px; position: relative; z-index: 2; }
+  .va-aside-logo  { width:40px; height:40px; border-radius:11px; flex-shrink:0; background:rgba(249,115,22,.15); border:1px solid rgba(249,115,22,.3); display:flex; align-items:center; justify-content:center; }
+  .va-aside-bname { font-weight:900; font-size:.97rem; color:#fff; }
+  .va-aside-btag  { font-size:.58rem; font-weight:700; color:#f97316; letter-spacing:2px; text-transform:uppercase; }
+
+  .va-aside-hero  { position: relative; z-index: 2; }
+  .va-aside-chip  { display:inline-block; margin-bottom:1.1rem; background:rgba(249,115,22,.12); border:1px solid rgba(249,115,22,.25); border-radius:20px; padding:4px 13px; font-size:.67rem; font-weight:700; color:#f97316; letter-spacing:.8px; text-transform:uppercase; }
+  .va-aside-h1    { font-size: clamp(1.85rem,3vw,2.75rem); font-weight:900; color:#fff; line-height:1.18; letter-spacing:-.5px; margin-bottom:.9rem; }
+  .va-aside-orange{ color:#f97316; }
+  .va-aside-desc  { font-size:.88rem; color:rgba(255,255,255,.45); line-height:1.7; max-width:320px; }
+
+  .va-aside-pills { position: relative; z-index: 2; display: flex; flex-direction: column; gap: .55rem; }
+  .va-aside-pill  { display:flex; align-items:center; gap:10px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07); border-radius:11px; padding:10px 13px; font-size:.8rem; font-weight:600; color:rgba(255,255,255,.72); max-width:310px; }
+  .va-aside-copy  { font-size:.66rem; color:rgba(255,255,255,.2); margin-top:.5rem; }
+
+  /* hide mobile elements */
+  .va-mob-header       { display: none; }
+  .va-mob-form-title,
+  .va-mob-form-sub     { display: none; }
+
+  /* form area fills right half */
+  .va-form-card {
+    flex: 1;
+    height: 100vh;
+    border-radius: 0;
+    margin-top: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 2rem;
+    overflow-y: auto;
+  }
+
+  /* show desktop heading */
+  .va-desk-head { display: block; text-align: center; margin-bottom: 1.75rem; }
+
+  .va-form-card > form,
+  .va-form-card > .va-label,
+  .va-form-card > .va-feats,
+  .va-form-card > .va-terms { max-width: 380px; width: 100%; }
+}
+
+/* ── SMALL ≤640px ── */
+@media (max-width: 640px) {
+  .va-mob-header { padding: 2rem 1.25rem 2.25rem; }
+  .va-mob-title  { font-size: 1.5rem; }
+  .va-form-card  { padding: 1.75rem 1.25rem 3.5rem; }
+  .va-inp  { height: 48px; }
+  .va-code { line-height: 48px; }
+  .va-btn  { height: 48px; }
+}
+
+/* ── VERY SMALL ≤380px ── */
+@media (max-width: 380px) {
+  .va-mob-title { font-size: 1.3rem; }
+  .va-feats { grid-template-columns: 1fr; }
+  .va-form-card { padding: 1.5rem 1rem 3rem; }
+}

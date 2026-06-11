@@ -13,6 +13,22 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
   return R * c;
 };
 
+const AHMEDABAD_BOUNDS = {
+  minLat: 22.9,
+  maxLat: 23.25,
+  minLng: 72.4,
+  maxLng: 72.7
+};
+
+const isWithinAhmedabad = (lat, lng) => {
+  return (
+    lat >= AHMEDABAD_BOUNDS.minLat &&
+    lat <= AHMEDABAD_BOUNDS.maxLat &&
+    lng >= AHMEDABAD_BOUNDS.minLng &&
+    lng <= AHMEDABAD_BOUNDS.maxLng
+  );
+};
+
 export const useSecureLocation = () => {
   const [locationState, setLocationState] = useState({
     lat: null,
@@ -63,6 +79,24 @@ export const useSecureLocation = () => {
     if (accuracy > 500) {
       console.warn(`[SecureGeo] Rejected: Low accuracy (${accuracy}m)`);
       setLocationState(prev => ({ ...prev, error: 'GPS signal too weak. Please go outside.', errorCode: 'LOW_ACCURACY', loading: false }));
+      return;
+    }
+
+    // 1.5 Ahmedabad Bounds Check
+    if (!isWithinAhmedabad(latitude, longitude)) {
+      console.warn(`[SecureGeo] Coordinates (${latitude}, ${longitude}) outside Ahmedabad. Fallback to Ahmedabad default.`);
+      setLocationState({
+        lat: 23.0225,
+        lng: 72.5714,
+        accuracy,
+        speed: 0,
+        address: 'Ahmedabad, Gujarat',
+        rawAddressObj: null,
+        loading: false,
+        error: null,
+        errorCode: null,
+        isMock: false
+      });
       return;
     }
 

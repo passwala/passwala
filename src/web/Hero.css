@@ -1,7 +1,8 @@
 .hero {
-  padding: 6rem 0;
+  padding-top: 6rem;
+  padding-bottom: 0.5rem;
   background: var(--bg-primary);
-  min-height: 90vh;
+  min-height: auto;
   display: flex;
   align-items: center;
   position: relative;
@@ -20,7 +21,7 @@
 }
 
 .hero-split-container {
-  max-width: 1400px;
+  max-width: 1050px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -43,7 +44,7 @@
   flex: 1;
   background: var(--bg-secondary);
   border-radius: 24px;
-  padding: 3rem;
+  padding: 2.2rem;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   display: flex;
@@ -134,10 +135,10 @@
 }
 
 .hero-title {
-  font-size: 2.5rem;
+  font-size: 1.65rem;
   font-weight: 800;
-  line-height: 1.2;
-  margin-bottom: 1.5rem;
+  line-height: 1.25;
+  margin-bottom: 1.2rem;
   color: var(--text-primary);
 }
 
@@ -150,17 +151,18 @@
 }
 
 .hero-desc {
-  font-size: 1.125rem;
+  font-size: 0.98rem;
   color: var(--text-secondary);
-  margin-bottom: 2rem;
-  line-height: 1.6;
+  margin-bottom: 1.5rem;
+  line-height: 1.55;
+  min-height: 4.6rem;
 }
 
 .feature-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
-  margin-bottom: 2.5rem;
+  margin-bottom: 2rem;
 }
 
 .feature-item {
@@ -182,10 +184,10 @@
 .btn-buyer {
   background: var(--primary);
   color: white;
-  padding: 1rem 2rem;
+  padding: 0.8rem 1.6rem;
   border-radius: 12px;
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1rem;
   border: none;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -201,10 +203,10 @@
 .btn-rider {
   background: white;
   color: var(--primary);
-  padding: 1rem 2rem;
+  padding: 0.8rem 1.6rem;
   border-radius: 12px;
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1rem;
   border: 2px solid var(--primary);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -227,7 +229,7 @@
   }
 
   .hero-title {
-    font-size: 2rem;
+    font-size: 1.5rem;
   }
 
   .feature-grid {

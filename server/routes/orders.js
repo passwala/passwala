@@ -228,6 +228,30 @@ router.post('/payment/verify', userAuth, async (req, res) => {
       return res.status(500).json({ error: 'Database update failed' });
     }
 
+    if (finalOrderStatus === 'PLACED') {
+      try {
+        for (const id of orderIds) {
+          const { data: existing } = await supabase
+            .from('delivery_tracking')
+            .select('id')
+            .eq('order_id', id)
+            .maybeSingle();
+
+          if (!existing) {
+            await supabase
+              .from('delivery_tracking')
+              .insert([{
+                order_id: id,
+                status: 'PENDING',
+                updated_at: new Date().toISOString()
+              }]);
+          }
+        }
+      } catch (trackErr) {
+        console.warn("⚠️ Failed to auto-create delivery tracking records:", trackErr.message || trackErr);
+      }
+    }
+
     // 2. Also update associated service_bookings if any
     try {
       const { data: updatedOrders } = await supabase
@@ -287,6 +311,26 @@ router.post('/notify-new-order', async (req, res) => {
 
   try {
     console.log(`[Notification Engine] Processing notifications for Order #${orderId.substring(0,8)}`);
+
+    try {
+      const { data: existing } = await supabase
+        .from('delivery_tracking')
+        .select('id')
+        .eq('order_id', orderId)
+        .maybeSingle();
+
+      if (!existing) {
+        await supabase
+          .from('delivery_tracking')
+          .insert([{
+            order_id: orderId,
+            status: 'PENDING',
+            updated_at: new Date().toISOString()
+          }]);
+      }
+    } catch (trackErr) {
+      console.warn("⚠️ Failed to auto-create tracking in notify-new-order:", trackErr.message || trackErr);
+    }
 
     // 1. Notify Vendor / Service Provider
     const { data: store, error: storeErr } = await supabase

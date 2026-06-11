@@ -69,7 +69,6 @@ const EventCheckout = () => {
   return (
     <div style={{ background: 'var(--bg-surface)', minHeight: '100vh', paddingBottom: '100px' }}>
       <div style={{ background: 'white', padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: 'var(--shadow-sm)' }}>
-        <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><ArrowLeft /></button>
         <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>Confirm Booking</h2>
       </div>
 

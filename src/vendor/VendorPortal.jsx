@@ -33,6 +33,7 @@ import {
   Layers
 } from 'lucide-react';
 import { supabase } from '../supabase';
+import { auth } from '../firebase';
 import './VendorPortal.css';
 import { 
   VendorInventory, 
@@ -55,6 +56,19 @@ const formatAadhar = (val) => {
 };
 
 const VendorPortal = ({ user, onLogout }) => {
+  const getAuthToken = async () => {
+    try {
+      const currentUser = auth?.currentUser;
+      if (currentUser) {
+        return await currentUser.getIdToken();
+      }
+    } catch (e) {
+      console.warn("Failed to get Firebase ID token:", e);
+    }
+    const uid = user?.uid || user?.id || 'mock_user_123';
+    return `mock_session_token_${uid}`;
+  };
+
   const [appStatus, setAppStatus] = useState('loading'); // loading, onboarding, dashboard, pending
   const [vendorData, setVendorData] = useState(null);
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('vendorActiveTab') || 'dashboard'); 
@@ -335,6 +349,21 @@ const VendorPortal = ({ user, onLogout }) => {
         if (data) {
           setVendorData(data);
           setBusinessType(detectedType);
+          if (data.user_id) {
+            try {
+              const { data: userData } = await supabase
+                .from('users')
+                .select('photo_url')
+                .eq('id', data.user_id)
+                .maybeSingle();
+              if (userData?.photo_url) {
+                setProfileImage(userData.photo_url);
+                localStorage.setItem('vProfileImage', userData.photo_url);
+              }
+            } catch (pErr) {
+              console.warn("Error fetching user photo:", pErr);
+            }
+          }
           if (data.profile_completed || isLocallyCompleted) {
             setAppStatus('dashboard');
           } else {
@@ -786,10 +815,38 @@ const VendorPortal = ({ user, onLogout }) => {
           return;
         }
         const reader = new FileReader();
-        reader.onloadend = () => {
-          setProfileImage(reader.result);
-          localStorage.setItem('vProfileImage', reader.result);
-          toast.success("Profile photo updated successfully!");
+        const uploadToastId = toast.loading("Uploading photo...");
+        reader.onloadend = async () => {
+          const base64Data = reader.result;
+          setProfileImage(base64Data);
+          localStorage.setItem('vProfileImage', base64Data);
+          
+          try {
+            const id = user?.id || user?.phoneNumber || user?.email || user?.uid || resolvedVendor.user_id;
+            if (id) {
+              const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+              const token = await getAuthToken();
+              const res = await fetch(`${apiBase}/api/users/${encodeURIComponent(id)}/photo`, {
+                method: 'PUT',
+                headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ photoURL: base64Data })
+              });
+              if (res.ok) {
+                const resJson = await res.json();
+                if (resJson?.photoURL) {
+                  setProfileImage(resJson.photoURL);
+                  localStorage.setItem('vProfileImage', resJson.photoURL);
+                }
+              }
+            }
+            toast.success("Profile photo updated successfully!", { id: uploadToastId });
+          } catch (err) {
+            console.warn("Failed to sync profile photo to database via API:", err.message);
+            toast.success("Profile photo updated locally, but failed to sync to database.", { id: uploadToastId });
+          }
         };
         reader.readAsDataURL(file);
       }
@@ -949,6 +1006,10 @@ const VendorPortal = ({ user, onLogout }) => {
                   <button 
                     type="button" 
                     onClick={() => {
+                      if (!window.isSecureContext) {
+                        toast.error(`GPS needs HTTPS. Use: https://${window.location.hostname}:3002`, { duration: 5000 });
+                        return;
+                      }
                       if (navigator.geolocation) {
                         navigator.geolocation.getCurrentPosition((pos) => {
                           setEditFormData({
@@ -1036,8 +1097,29 @@ const VendorPortal = ({ user, onLogout }) => {
     <div className="onboarding-screen animate-fade-in">
       {onboardingSubStep === 1 && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="onboarding-content" style={{ position: 'relative' }}>
-          <button className="back-btn-ghost" style={{ position: 'absolute', left: '-10px', top: '-10px', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '8px', borderRadius: '50%' }} onClick={() => { if (onLogout) onLogout(true); else window.location.href = '/'; }}>
-            <ArrowLeft size={24} />
+          <button 
+            className="back-btn-premium" 
+            style={{ 
+              position: 'absolute', 
+              left: '12px', 
+              top: '12px', 
+              width: '44px', 
+              height: '44px', 
+              borderRadius: '50%', 
+              background: '#f8fafc', 
+              border: '1px solid #e2e8f0', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              cursor: 'pointer', 
+              color: '#0f172a', 
+              boxShadow: '0 4px 12px rgba(0,0,0,0.05)', 
+              transition: 'all 0.2s ease',
+              zIndex: 10
+            }} 
+            onClick={() => { if (onLogout) onLogout(true); else window.location.href = '/'; }}
+          >
+            <ArrowLeft size={20} />
           </button>
           
           <div className="onboarding-header">
@@ -1090,8 +1172,29 @@ const VendorPortal = ({ user, onLogout }) => {
 
       {onboardingSubStep === 2 && (
         <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="onboarding-content" style={{ position: 'relative' }}>
-          <button className="back-btn-ghost" style={{ position: 'absolute', left: '-10px', top: '-10px', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }} onClick={() => setOnboardingSubStep(1)}>
-            <ArrowLeft size={24} />
+          <button 
+            className="back-btn-premium" 
+            style={{ 
+              position: 'absolute', 
+              left: '12px', 
+              top: '12px', 
+              width: '44px', 
+              height: '44px', 
+              borderRadius: '50%', 
+              background: '#f8fafc', 
+              border: '1px solid #e2e8f0', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              cursor: 'pointer', 
+              color: '#0f172a', 
+              boxShadow: '0 4px 12px rgba(0,0,0,0.05)', 
+              transition: 'all 0.2s ease',
+              zIndex: 10
+            }} 
+            onClick={() => setOnboardingSubStep(1)}
+          >
+            <ArrowLeft size={20} />
           </button>
           
           <div className="onboarding-header" style={{ marginBottom: '2.5rem', textAlign: 'center' }}>
@@ -1190,6 +1293,10 @@ const VendorPortal = ({ user, onLogout }) => {
                 <button 
                   type="button" 
                   onClick={() => {
+                    if (!window.isSecureContext) {
+                      toast.error(`GPS needs HTTPS. Use: https://${window.location.hostname}:3002`, { duration: 5000 });
+                      return;
+                    }
                     if (navigator.geolocation) {
                       navigator.geolocation.getCurrentPosition((pos) => {
                         setFormData({
@@ -1320,17 +1427,27 @@ const VendorPortal = ({ user, onLogout }) => {
                     const { data: existingUser } = await supabase.from('users').select('id').eq('phone', currentPhone).maybeSingle();
                     if (existingUser) {
                       userId = existingUser.id;
-                      // Update existing user role to VENDOR or SERVICE_PROVIDER
-                      await supabase.from('users').update({
+                      // Update existing user role to VENDOR or SERVICE_PROVIDER and set photo_url
+                      const userUpdatePayload = {
                         role: businessType === 'shop' ? 'VENDOR' : 'SERVICE_PROVIDER'
-                      }).eq('id', existingUser.id);
+                      };
+                      const localPhoto = localStorage.getItem('vProfileImage');
+                      if (localPhoto) {
+                        userUpdatePayload.photo_url = localPhoto;
+                      }
+                      await supabase.from('users').update(userUpdatePayload).eq('id', existingUser.id);
                     } else {
                       // Create user in the users table
-                      const { data: newUser, error: newUserErr } = await supabase.from('users').insert([{
+                      const userInsertPayload = {
                         phone: currentPhone,
                         full_name: formData.name,
                         role: businessType === 'shop' ? 'VENDOR' : 'SERVICE_PROVIDER'
-                      }]).select().single();
+                      };
+                      const localPhoto = localStorage.getItem('vProfileImage');
+                      if (localPhoto) {
+                        userInsertPayload.photo_url = localPhoto;
+                      }
+                      const { data: newUser, error: newUserErr } = await supabase.from('users').insert([userInsertPayload]).select().single();
                       if (!newUserErr && newUser) {
                         userId = newUser.id;
                       }

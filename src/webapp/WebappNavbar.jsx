@@ -69,12 +69,31 @@ const WebappNavbar = ({ user, onOpenProfile, onBack, title, location }) => {
           </div>
           
           {(title !== 'Profile' && !window.location.pathname.includes('/profile')) && (
-            <button className="nav-profile-trigger" onClick={onOpenProfile}>
+            <button 
+              className="nav-profile-trigger" 
+              onClick={onOpenProfile}
+              title="My Profile"
+              aria-label="My Profile"
+            >
                {user?.photoURL ? (
-                 <img src={user.photoURL} alt="P" />
+                 <img 
+                   src={user.photoURL} 
+                   alt="Profile" 
+                   style={{ 
+                     width: '36px', 
+                     height: '36px', 
+                     borderRadius: '50%', 
+                     objectFit: 'cover',
+                     display: 'block'
+                   }} 
+                 />
                ) : (
                  <div className="nav-avatar-circle-v2">
-                    {user?.displayName?.charAt(0).toUpperCase() || (user?.phoneNumber ? '#' : 'U')}
+                   {user?.displayName
+                     ? user.displayName.trim().charAt(0).toUpperCase()
+                     : user?.phoneNumber
+                       ? user.phoneNumber.slice(-2)
+                       : '👤'}
                  </div>
                )}
             </button>

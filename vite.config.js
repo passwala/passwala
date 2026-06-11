@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import mkcert from 'vite-plugin-mkcert'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
@@ -65,11 +66,15 @@ messaging.onBackgroundMessage((payload) => {
   }
 
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+      mkcert() // 🔒 Trusted HTTPS for local network — enables GPS on phone (navigator.geolocation requires secure context)
+    ],
     cacheDir: `node_modules/.vite/${mode || 'default'}`,
     server: {
       port,
-      host: '0.0.0.0',
+      host: '0.0.0.0',  // accessible on all interfaces — laptop & phone on same WiFi
+      https: true,      // 🔒 Required for GPS on phone — install rootCA on phone (see Desktop/passwala-rootCA.crt)
       cors: true,
       strictPort: true,
       allowedHosts: true,
@@ -77,9 +82,22 @@ messaging.onBackgroundMessage((payload) => {
       proxy: {
         '/api': {
           target: 'http://localhost:3004',
-          changeOrigin: true
+          changeOrigin: true,
+          secure: false
         }
       }
+    },
+    optimizeDeps: {
+      include: [
+        'react',
+        'react-dom',
+        'react-router-dom',
+        'react-qr-code',
+        'react-leaflet',
+        'leaflet',
+        'lucide-react',
+        'react-hot-toast'
+      ]
     },
     build: {
       outDir,

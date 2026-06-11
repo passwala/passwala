@@ -4,8 +4,7 @@ import { supabase } from '../supabase';
 import { toast } from 'react-hot-toast';
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { getOSRMRoute } from '../utils/dijkstra';
 import { AHMEDABAD_AREA_COORDS } from '../utils/constants';
 
@@ -611,261 +610,155 @@ export const VendorInventory = ({ businessType, storeId }) => {
   );
 };
 
-// Premium High-Fidelity Custom Leaflet Map Component with OSRM Turn-by-Turn Road Routing
+// Google Maps Order Tracking for Vendor Dashboard
 function VendorOrderTrackingMap({ order, riderCoords, businessType }) {
   const mapRef = React.useRef(null);
-  const leafletMapRef = React.useRef(null);
-  const markerGroupRef = React.useRef(null);
-const boundsFitted = React.useRef(false);
+  const googleMapInstance = React.useRef(null);
+  const activeMarkers = React.useRef([]);
+  const activePolylines = React.useRef([]);
+  const isGoogleLoaded = useGoogleMaps();
   const [osrmRoutePoints, setOsrmRoutePoints] = React.useState([]);
-
-  // Coordinate Resolution State
   const [storeLatLng, setStoreLatLng] = React.useState(null);
   const [customerLatLng, setCustomerLatLng] = React.useState(null);
 
-  // Dynamic Geocoding resolver helper
+  // Geocode helper
   const geocodeAddress = async (address) => {
     if (!address) return null;
-    
-    // Check AHMEDABAD_AREA_COORDS first using shared constants
     const lower = address.toLowerCase().replace(/[.,]/g, '');
     for (const [key, coords] of Object.entries(AHMEDABAD_AREA_COORDS)) {
       if (lower.includes(key)) return coords;
     }
-  
     try {
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ', Ahmedabad, Gujarat, India')}&limit=1`;
-      const res = await fetch(url, { headers: { 'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)' } });
+      const res = await fetch(url, { headers: { 'User-Agent': 'Passwalaa-App/1.0' } });
       if (res.ok) {
         const data = await res.json();
-        if (data && data.length > 0) {
-          return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-        }
+        if (data?.length > 0) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
       }
-    } catch (err) {
-      console.warn('Geocoding error:', err);
-    }
+    } catch (err) { console.warn('Geocoding error:', err); }
     return null;
   };
 
+  // Resolve store and customer positions
   React.useEffect(() => {
     let active = true;
-    const resolvePositions = async () => {
-      // Resolve Store
-      let storePos = null;
-      if (order.stores?.lat && order.stores?.lng) {
-        storePos = [parseFloat(order.stores.lat), parseFloat(order.stores.lng)];
-      } else {
-        const addr = order.stores?.address || 'Ahmedabad';
-        storePos = await geocodeAddress(addr);
-        if (!storePos) storePos = [23.0305, 72.5075];
-      }
-
-      // Resolve Customer
-      let custPos = null;
-      if (order.addresses?.lat && order.addresses?.lng) {
-        custPos = [parseFloat(order.addresses.lat), parseFloat(order.addresses.lng)];
-      } else {
-        const addr = order.addresses?.address_line_1 || 'Ahmedabad';
-        custPos = await geocodeAddress(addr);
-        if (!custPos) custPos = [23.0393, 72.5244];
-      }
-
-      if (active) {
-        setStoreLatLng(storePos);
-        setCustomerLatLng(custPos);
-      }
+    const resolve = async () => {
+      let storePos = order.stores?.lat && order.stores?.lng
+        ? [parseFloat(order.stores.lat), parseFloat(order.stores.lng)]
+        : (await geocodeAddress(order.stores?.address || 'Ahmedabad') || [23.0305, 72.5075]);
+      let custPos = order.addresses?.lat && order.addresses?.lng
+        ? [parseFloat(order.addresses.lat), parseFloat(order.addresses.lng)]
+        : (await geocodeAddress(order.addresses?.address_line_1 || 'Ahmedabad') || [23.0393, 72.5244]);
+      if (active) { setStoreLatLng(storePos); setCustomerLatLng(custPos); }
     };
-    resolvePositions();
+    resolve();
     return () => { active = false; };
   }, [order.stores, order.addresses]);
 
-  // Initialize Map
-  React.useEffect(() => {
-    if (!mapRef.current) return;
-
-    const defaultCenter = [23.0225, 72.5714]; // Ahmedabad center
-    leafletMapRef.current = L.map(mapRef.current, {
-      zoomControl: false,
-      attributionControl: false
-    }).setView(defaultCenter, 14);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      className: 'map-tiles'
-    }).addTo(leafletMapRef.current);
-
-    L.control.zoom({ position: 'topright' }).addTo(leafletMapRef.current);
-    markerGroupRef.current = L.featureGroup().addTo(leafletMapRef.current);
-
-    return () => {
-      if (leafletMapRef.current) {
-        leafletMapRef.current.remove();
-        leafletMapRef.current = null;
-        markerGroupRef.current = null;
-      }
-    };
-  }, []);
-
-  // Force size invalidation to resolve Leaflet dynamic layout rendering bugs
-  React.useEffect(() => {
-    if (leafletMapRef.current) {
-      const timer = setTimeout(() => {
-        if (leafletMapRef.current) {
-          leafletMapRef.current.invalidateSize();
-        }
-      }, 350);
-      return () => clearTimeout(timer);
-    }
-  }, []);
-
-  // Fetch real-time OSRM turn-by-turn road paths dynamically
+  // Fetch OSRM route
   React.useEffect(() => {
     if (!storeLatLng || !customerLatLng) return;
-
-    const riderLatLng = (riderCoords && riderCoords.lat && riderCoords.lng)
-      ? [parseFloat(riderCoords.lat), parseFloat(riderCoords.lng)]
-      : null;
-
-    const fetchOSRMRoute = async () => {
-      // Direct route segment selection based on current delivery status
-      const start = riderLatLng || storeLatLng;
-      const end = (order.status === 'ACCEPTED' || order.status === 'PREPARING') ? storeLatLng : customerLatLng;
-
-      if (!start[0] || !start[1] || !end[0] || !end[1] || (start[0] === end[0] && start[1] === end[1])) {
-        setTimeout(() => {
-          setOsrmRoutePoints(prev => prev.length > 0 ? [] : prev);
-        }, 0);
-        return;
-      }
-
-      try {
-        const routeData = await getOSRMRoute(start[0], start[1], end[0], end[1]);
-        if (routeData.success && routeData.polyline.length > 0) {
-          setOsrmRoutePoints(routeData.polyline);
-        } else {
-          setOsrmRoutePoints([]);
-        }
-      } catch (err) {
-        console.warn("OSRM routing fetch failed for vendor map, falling back to direct line:", err);
-        setOsrmRoutePoints([]);
-      }
-    };
-
-    fetchOSRMRoute();
+    const riderLatLng = riderCoords?.lat && riderCoords?.lng
+      ? [parseFloat(riderCoords.lat), parseFloat(riderCoords.lng)] : null;
+    const start = riderLatLng || storeLatLng;
+    const end = (order.status === 'ACCEPTED' || order.status === 'PREPARING') ? storeLatLng : customerLatLng;
+    if (!start[0] || !end[0] || (start[0] === end[0] && start[1] === end[1])) return;
+    getOSRMRoute(start[0], start[1], end[0], end[1])
+      .then(r => setOsrmRoutePoints(r.success && r.polyline.length > 0 ? r.polyline : []))
+      .catch(() => setOsrmRoutePoints([]));
   }, [order.status, riderCoords, storeLatLng, customerLatLng]);
 
-  // Plot and synchronize markers + dynamic route lines on changes
+  // Initialize Google Map
   React.useEffect(() => {
-    if (!leafletMapRef.current || !markerGroupRef.current || !storeLatLng || !customerLatLng) return;
+    if (!isGoogleLoaded || !mapRef.current || googleMapInstance.current) return;
+    googleMapInstance.current = new window.google.maps.Map(mapRef.current, {
+      center: { lat: 23.0225, lng: 72.5714 },
+      zoom: 14,
+      mapTypeControl: false, streetViewControl: false, fullscreenControl: false, zoomControl: true,
+      zoomControlOptions: { position: window.google.maps.ControlPosition.RIGHT_TOP },
+      styles: [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }]
+    });
+    return () => {
+      activeMarkers.current.forEach(m => m.setMap(null));
+      activePolylines.current.forEach(p => p.setMap(null));
+      activeMarkers.current = []; activePolylines.current = [];
+      googleMapInstance.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGoogleLoaded]);
 
-    markerGroupRef.current.clearLayers();
+  // Draw markers and routes
+  React.useEffect(() => {
+    if (!googleMapInstance.current || !storeLatLng || !customerLatLng) return;
+    activeMarkers.current.forEach(m => m.setMap(null));
+    activePolylines.current.forEach(p => p.setMap(null));
+    activeMarkers.current = []; activePolylines.current = [];
 
-    // Premium vectorized DivIcon markers matching the platform branding
-    const createRiderIcon = () => L.divIcon({
-      className: 'custom-leaflet-marker rider-marker',
-      html: `<div class="marker-container" style="background: #10b981; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative;">
-               <span class="pulse-ring" style="position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 3px solid #10b981; animation: marker-pulse 1.8s infinite; opacity: 0.6;"></span>
-               ${businessType === 'service'
-                 ? `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`
-                 : `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(45deg);"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>`
-               }
-             </div>`,
-      iconSize: [42, 42],
-      iconAnchor: [21, 21]
+    const map = googleMapInstance.current;
+    const svgIcon = (color, svgPath, rounded = false) => ({
+      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42"><rect x="0" y="0" width="42" height="42" rx="${rounded ? 12 : 21}" fill="${color}" stroke="white" stroke-width="3"/><g transform="translate(9,9)">${svgPath}</g></svg>`
+      ),
+      scaledSize: new window.google.maps.Size(42, 42),
+      anchor: new window.google.maps.Point(21, 21)
     });
 
-    const createStoreIcon = () => L.divIcon({
-      className: 'custom-leaflet-marker store-marker',
-      html: `<div class="marker-container" style="background: #f97316; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; position: relative;">
-               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 17H2"/></svg>
-             </div>`,
-      iconSize: [42, 42],
-      iconAnchor: [21, 21]
-    });
+    const drawPoly = (pts, color, weight = 6, dashed = false) => {
+      if (!pts || pts.length < 2) return;
+      const path = pts.map(p => Array.isArray(p) ? { lat: p[0], lng: p[1] } : p);
+      const opts = { path, geodesic: true, strokeColor: color, strokeOpacity: dashed ? 0.0 : 0.9, strokeWeight: weight, map };
+      if (dashed) opts.icons = [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.8, strokeColor: color, scale: 3 }, offset: '0', repeat: '15px' }];
+      activePolylines.current.push(new window.google.maps.Polyline(opts));
+    };
 
-    const createCustomerIcon = () => L.divIcon({
-      className: 'custom-leaflet-marker customer-marker',
-      html: `<div class="marker-container" style="background: #3b82f6; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative;">
-               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-             </div>`,
-      iconSize: [42, 42],
-      iconAnchor: [21, 21]
-    });
+    const storePt = { lat: storeLatLng[0], lng: storeLatLng[1] };
+    const custPt = { lat: customerLatLng[0], lng: customerLatLng[1] };
+    const riderPt = riderCoords?.lat && riderCoords?.lng
+      ? { lat: parseFloat(riderCoords.lat), lng: parseFloat(riderCoords.lng) } : null;
 
-    let riderLatLng = (riderCoords && riderCoords.lat && riderCoords.lng)
-      ? [parseFloat(riderCoords.lat), parseFloat(riderCoords.lng)]
-      : null;
+    // Store marker (orange)
+    activeMarkers.current.push(new window.google.maps.Marker({
+      position: storePt, map, title: businessType === 'service' ? 'Your Service Hub' : 'Your Store',
+      icon: svgIcon('#f97316', '<path d="m1 4 3-3h14l3 3v2H1V4z" fill="none" stroke="white" stroke-width="1.8"/><rect x="1" y="6" width="22" height="14" rx="1" fill="none" stroke="white" stroke-width="1.8"/><path d="M9 20v-4h6v4" fill="none" stroke="white" stroke-width="1.8"/>', true)
+    }));
 
-    // Do not simulate rider movement. Only show if real coordinates exist.
-    // Plot Markers
-    L.marker(storeLatLng, { icon: createStoreIcon() })
-      .bindPopup(`<b>${businessType === 'service' ? 'Your Service Hub' : 'Your Store Hub'}</b>`)
-      .addTo(markerGroupRef.current);
+    // Customer marker (blue)
+    activeMarkers.current.push(new window.google.maps.Marker({
+      position: custPt, map, title: `Customer: ${order.addresses?.society || 'Delivery Location'}`,
+      icon: svgIcon('#3b82f6', '<path d="m1 6 11-5 11 5v13a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6z" fill="none" stroke="white" stroke-width="1.8"/><polyline points="6 24 6 12 12 12 12 24" stroke="white" stroke-width="1.8" fill="none"/>')
+    }));
 
-    L.marker(customerLatLng, { icon: createCustomerIcon() })
-      .bindPopup(`<b>Customer Destination</b><br/>${order.addresses?.society || 'Delivery Location'}`)
-      .addTo(markerGroupRef.current);
-
-    if (riderLatLng) {
-      L.marker(riderLatLng, { icon: createRiderIcon() })
-        .bindPopup(`<b>${businessType === 'service' ? 'Assigned Expert' : 'Assigned Rider'}</b>`)
-        .addTo(markerGroupRef.current);
+    // Rider marker (green)
+    if (riderPt) {
+      activeMarkers.current.push(new window.google.maps.Marker({
+        position: riderPt, map, title: businessType === 'service' ? 'Assigned Expert' : 'Assigned Rider',
+        icon: svgIcon('#10b981', businessType === 'service'
+          ? '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" fill="none" stroke="white" stroke-width="1.8"/>'
+          : '<polygon points="3 9 20 2 13 19 11 11 3 9" fill="none" stroke="white" stroke-width="1.8"/>'
+        )
+      }));
     }
 
-    // Connect them with smart routing polylines
-    const leg1Color = '#f97316'; // store path
-    const leg2Color = '#3b82f6'; // customer path
-
+    // Route polylines
+    const leg1Color = '#f97316', leg2Color = '#3b82f6';
     if (order.status === 'ACCEPTED' || order.status === 'PREPARING') {
-      if (osrmRoutePoints && osrmRoutePoints.length > 0) {
-        L.polyline(osrmRoutePoints, { color: leg1Color, weight: 6, opacity: 0.95, lineJoin: 'round' }).addTo(markerGroupRef.current);
-      } else if (riderLatLng) {
-        L.polyline([riderLatLng, storeLatLng], { color: leg1Color, weight: 6, opacity: 0.9, lineJoin: 'round' }).addTo(markerGroupRef.current);
-      }
-      L.polyline([storeLatLng, customerLatLng], { color: leg2Color, weight: 4, opacity: 0.5, dashArray: '8, 8', lineJoin: 'round' }).addTo(markerGroupRef.current);
+      if (osrmRoutePoints.length > 0) drawPoly(osrmRoutePoints, leg1Color);
+      else if (riderPt) drawPoly([riderPt, storePt], leg1Color);
+      drawPoly([storePt, custPt], leg2Color, 5, true);
     } else {
-      if (riderLatLng) {
-        L.polyline([storeLatLng, riderLatLng], { color: '#94a3b8', weight: 3, opacity: 0.4, dashArray: '4, 4', lineJoin: 'round' }).addTo(markerGroupRef.current);
-      }
-      if (osrmRoutePoints && osrmRoutePoints.length > 0) {
-        L.polyline(osrmRoutePoints, { color: leg2Color, weight: 6, opacity: 0.95, lineJoin: 'round' }).addTo(markerGroupRef.current);
-      } else if (riderLatLng) {
-        L.polyline([riderLatLng, customerLatLng], { color: leg2Color, weight: 6, opacity: 0.9, lineJoin: 'round' }).addTo(markerGroupRef.current);
-      } else {
-        L.polyline([storeLatLng, customerLatLng], { color: leg2Color, weight: 6, opacity: 0.9, lineJoin: 'round' }).addTo(markerGroupRef.current);
-      }
+      if (riderPt) drawPoly([storePt, riderPt], '#94a3b8', 3, true);
+      if (osrmRoutePoints.length > 0) drawPoly(osrmRoutePoints, leg2Color);
+      else drawPoly([riderPt || storePt, custPt], leg2Color);
     }
 
-    // Auto-fit bounds (smart handling to prevent fighting manual user zoom)
+    // Fit bounds
     try {
-      const validPoints = [storeLatLng, customerLatLng];
-      if (riderLatLng && !isNaN(riderLatLng[0]) && !isNaN(riderLatLng[1])) {
-        validPoints.push(riderLatLng);
-      }
-      if (osrmRoutePoints && osrmRoutePoints.length > 0) {
-        osrmRoutePoints.forEach(pt => validPoints.push(pt));
-      }
-      const bounds = L.latLngBounds(validPoints);
-      
-      // ONLY fit bounds if we haven't done it fully yet
-      if (!boundsFitted.current || (osrmRoutePoints.length > 0 && boundsFitted.current === 'initial')) {
-        leafletMapRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
-
-        // Layout shift resolution: Refit after DOM expansion
-        setTimeout(() => {
-          if (leafletMapRef.current) {
-            leafletMapRef.current.invalidateSize();
-            leafletMapRef.current.fitBounds(bounds, { padding: [80, 80], maxZoom: 16 });
-          }
-        }, 400);
-
-        boundsFitted.current = osrmRoutePoints.length > 0 ? true : 'initial';
-      }
-    } catch (e) {
-      console.warn('Map boundary fit failed:', e);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      const bounds = new window.google.maps.LatLngBounds();
+      [storePt, custPt, ...(riderPt ? [riderPt] : []), ...osrmRoutePoints.map(p => ({ lat: p[0], lng: p[1] }))]
+        .filter(p => !isNaN(p.lat || p[0])).forEach(p => bounds.extend(p.lat != null ? p : { lat: p[0], lng: p[1] }));
+      if (!bounds.isEmpty()) setTimeout(() => { if (googleMapInstance.current) googleMapInstance.current.fitBounds(bounds); }, 150);
+    } catch (e) { console.warn('Map bounds error:', e); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.status, riderCoords, osrmRoutePoints, storeLatLng, customerLatLng, businessType]);
 
   return (
@@ -873,38 +766,10 @@ const boundsFitted = React.useRef(false);
   );
 }
 
-// Map Wrapper Component to Manage isolated Supabase state per active order
+// Map Wrapper Component to manage isolated Supabase state per active order
 function VendorOrderMapWrapper({ order, businessType }) {
   const [riderCoords, setRiderCoords] = React.useState(null);
 
-  React.useEffect(() => {
-    // Inject custom animation styles for Leaflet pulse effects if not already present
-    const styleId = 'leaflet-custom-pulse-styles';
-    if (!document.getElementById(styleId)) {
-      const style = document.createElement('style');
-      style.id = styleId;
-      style.textContent = `
-        @keyframes marker-pulse {
-          0% {
-            transform: scale(0.95);
-            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-          }
-          70% {
-            transform: scale(1);
-            box-shadow: 0 0 0 12px rgba(16, 185, 129, 0);
-          }
-          100% {
-            transform: scale(0.95);
-            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-          }
-        }
-        .map-tiles {
-          filter: grayscale(1) invert(0.05) sepia(0.05) brightness(0.95) contrast(1.05);
-        }
-      `;
-      document.head.appendChild(style);
-    }
-  }, []);
 
   React.useEffect(() => {
     if (!order) {

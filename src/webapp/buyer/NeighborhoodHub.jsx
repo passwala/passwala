@@ -15,6 +15,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
   const { addToCart, setCartOpen } = useCart();
 
   const [activeRideBooking, setActiveRideBooking] = useState(null);
+  const [showComingSoon, setShowComingSoon] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -94,7 +95,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
     {
       title: t('city_rides'),
       subtitle: t('city_rides_sub'),
-      image: "https://cdn-icons-png.flaticon.com/512/3202/3202926.png",
+      image: "/city_rides.png",
       type: "peach",
       view: 'CITY_RIDES',
       tag: t('book_ticket')
@@ -102,7 +103,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
     {
       title: t('event_tickets'),
       subtitle: t('event_tickets_sub'),
-      image: "https://cdn-icons-png.flaticon.com/512/825/825590.png",
+      image: "/event_tickets.png",
       type: "purple",
       view: 'EVENTS',
       tag: t('book_now_caps')
@@ -271,7 +272,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
         {activeRideBooking && (
           <div className="completion-banner" style={{ borderStyle: 'solid', background: 'linear-gradient(135deg, rgba(234, 88, 12, 0.1) 0%, var(--bg-surface) 100%)', borderColor: '#ea580c' }}>
             <div className="banner-icon-box" style={{ background: '#ea580c', color: 'white' }}>
-              <span style={{ fontSize: '1.25rem' }}>🚕</span>
+              <span style={{ fontSize: '1.25rem' }}>🛵</span>
             </div>
             <div className="banner-text-content">
               <h4>Active City Ride Booked</h4>
@@ -328,7 +329,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
               key={i} 
               onClick={() => {
                 if (card.view === 'NEIGHBORS') {
-                  toast.success("Coming soon!", { icon: '✨' });
+                  setShowComingSoon(true);
                 } else {
                   onNavigate(card.view);
                 }
@@ -535,6 +536,55 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* ── Coming Soon Popup (Community card) ── */}
+      {showComingSoon && (
+        <div
+          onClick={() => setShowComingSoon(false)}
+          style={{
+            position:'fixed', inset:0, zIndex:9999,
+            background:'rgba(0,0,0,0.45)',
+            backdropFilter:'blur(6px)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            padding:'1.5rem'
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background:'linear-gradient(135deg,#fff 0%,#fff7f2 100%)',
+              borderRadius:'24px', padding:'2.5rem 2rem 2rem',
+              maxWidth:'340px', width:'100%', textAlign:'center',
+              boxShadow:'0 24px 60px rgba(0,0,0,0.18)',
+              border:'1.5px solid rgba(255,118,34,0.18)',
+              animation:'cs-pop 0.35s cubic-bezier(0.175,0.885,0.32,1.275)'
+            }}
+          >
+            <style>{`
+              @keyframes cs-pop{
+                from{opacity:0;transform:scale(0.75) translateY(30px)}
+                to{opacity:1;transform:scale(1) translateY(0)}
+              }
+              @keyframes cs-rocket{
+                0%,100%{transform:translateY(0) rotate(-10deg)}
+                50%{transform:translateY(-10px) rotate(-10deg)}
+              }
+            `}</style>
+            <div style={{fontSize:'3.5rem',lineHeight:1,marginBottom:'0.75rem',display:'inline-block',animation:'cs-rocket 1.6s ease-in-out infinite'}}>🚀</div>
+            <div style={{display:'inline-block',background:'linear-gradient(135deg,#ff7622,#ff9f4a)',color:'white',fontSize:'0.65rem',fontWeight:900,letterSpacing:'0.12em',padding:'4px 12px',borderRadius:'100px',marginBottom:'1rem',textTransform:'uppercase'}}>Coming Soon</div>
+            <h2 style={{fontSize:'1.35rem',fontWeight:800,color:'#0f172a',margin:'0.5rem 0'}}>Community Hub 🏘️</h2>
+            <p style={{fontSize:'0.9rem',color:'#64748b',lineHeight:1.6,margin:'0 0 1.75rem'}}>
+              Connect with your neighbors, join local groups &amp; discover what&apos;s happening nearby — <strong style={{color:'#ff7622'}}>launching very soon!</strong>
+            </p>
+            <button
+              onClick={() => setShowComingSoon(false)}
+              style={{width:'100%',padding:'0.85rem',background:'linear-gradient(135deg,#ff7622,#ff9f4a)',color:'white',border:'none',borderRadius:'14px',fontWeight:800,fontSize:'0.95rem',cursor:'pointer',boxShadow:'0 6px 20px rgba(255,118,34,0.35)'}}
+            >
+              Got it! ✨
+            </button>
+          </div>
+        </div>
+      )}
     </motion.section>
   );
 };

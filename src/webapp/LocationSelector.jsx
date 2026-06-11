@@ -1,35 +1,20 @@
 /* eslint-disable no-unused-vars */
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, MapPin, Navigation, ChevronLeft, CheckCircle2 } from 'lucide-react';
+import { Search, MapPin, Navigation, ChevronLeft, CheckCircle2, Loader } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { useSecureLocation } from '../hooks/useSecureLocation';
 import { AHMEDABAD_AREAS as ahmedabadAreas } from '../utils/constants';
 import './LocationSelector.css';
 
-const AHMEDABAD_BOUNDS = {
-  minLat: 22.9,
-  maxLat: 23.25,
-  minLng: 72.4,
-  maxLng: 72.7
-};
-
-function isWithinAhmedabad(lat, lng) {
-  return (
-    lat >= AHMEDABAD_BOUNDS.minLat &&
-    lat <= AHMEDABAD_BOUNDS.maxLat &&
-    lng >= AHMEDABAD_BOUNDS.minLng &&
-    lng <= AHMEDABAD_BOUNDS.maxLng
-  );
-}
-
 const LocationSelector = ({ currentLocation, onLocationChange }) => {
   const navigate = useNavigate();
+  const [gpsLoading, setGpsLoading] = useState(false);
 
   const handleSelect = (areaObj) => {
     onLocationChange(areaObj.name, { lat: areaObj.lat, lng: areaObj.lng });
     toast.success(`Location set to ${areaObj.name.split(',')[0]}`);
+    navigate(-1); // return to previous screen immediately after selection
   };
 
   const handleBack = () => {
@@ -59,9 +44,8 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
     setSearching(true);
     searchDebounceRef.current = setTimeout(async () => {
       try {
-        const suffix = val.toLowerCase().includes('ahmedabad') ? '' : ', Ahmedabad, Gujarat';
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val + suffix)}&countrycodes=in&limit=20`,
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}&countrycodes=in&limit=20`,
           {
             headers: {
               'Accept-Language': 'en',
@@ -71,9 +55,7 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
         );
         const data = await res.json();
         if (Array.isArray(data)) {
-          const filtered = data.filter(place => 
-            isWithinAhmedabad(parseFloat(place.lat), parseFloat(place.lon))
-          ).map(place => ({
+          const filtered = data.map(place => ({
             name: place.display_name,
             lat: parseFloat(place.lat),
             lng: parseFloat(place.lon)
@@ -88,62 +70,90 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
     }, 500);
   };
 
-  
-  const { lat, lng, error, errorCode, isMock, address, loading, startTracking, stopTracking } = useSecureLocation();
-
+  // ── IP fallback (used when GPS fails) ──────────────────────────────────────
   const fallbackToIP = React.useCallback(async () => {
     try {
       const baseUrl = import.meta.env.VITE_API_URL || '';
       const res = await fetch(`${baseUrl}/api/ip-location`);
-      if (!res.ok) throw new Error('Proxied IP Location failed');
+      if (!res.ok) throw new Error('IP Location failed');
       const data = await res.json();
+
+      // 🔒 On local network, private IPs can't be geolocated.
+      // Server returns isLocal:true — prompt user to enable GPS or select manually.
+      if (data.isLocal) {
+        toast('Enable GPS above for precise location, or tap an area below 📍', {
+          icon: '📍',
+          id: 'geo',
+          duration: 5000
+        });
+        return;
+      }
+
       if (data && data.cityName && data.regionName) {
         const full = `${data.cityName}, ${data.regionName}`;
-        onLocationChange(full, { lat: parseFloat(data.latitude), lng: parseFloat(data.longitude) });
+        onLocationChange(full, {
+          lat: parseFloat(data.latitude) || 23.0225,
+          lng: parseFloat(data.longitude) || 72.5714
+        });
         toast.success(`Approximated: ${full}`, { id: 'geo', duration: 3000 });
       } else {
-        throw new Error('IP failed');
+        throw new Error('IP returned no city');
       }
     } catch (err) {
       toast.error('Automatic detection unavailable. Please select your area manually.', { id: 'geo' });
     }
   }, [onLocationChange]);
 
-  React.useEffect(() => {
-    if (lat && lng && address) {
-      onLocationChange(address, { lat, lng });
-      toast.success(`Securely Located: ${address}`, { id: 'geo' });
-      stopTracking();
-    }
-  }, [lat, lng, address, onLocationChange, stopTracking]);
+  // ── Standard GPS detect (works reliably on all real mobile devices) ────────
+  const detectLocation = () => {
+    if (gpsLoading) return;
 
-  React.useEffect(() => {
-    if (error) {
-      if (errorCode === 'MOCK_DETECTED') {
-        toast.error('❌ Fake GPS App Detected! Please disable mock locations.', { id: 'geo', duration: 5000 });
-      } else {
-        toast.error(`Error: ${error}`, { id: 'geo' });
+    if (!navigator.geolocation) {
+      toast.error('GPS not supported on this device. Please select manually.');
+      return;
+    }
+    setGpsLoading(true);
+    toast.loading('Detecting your location...', { id: 'geo' });
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18`,
+            { headers: { 'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)' } }
+          );
+          const data = await res.json();
+          const area  = data.address?.suburb || data.address?.neighbourhood || data.address?.residential || data.address?.village || '';
+          const city  = data.address?.city || data.address?.town || data.address?.state_district || '';
+          const label = area && city ? `${area}, ${city}` : city || 'Your Location';
+          onLocationChange(label, { lat: latitude, lng: longitude });
+          toast.success(`Located: ${label.split(',')[0]}`, { id: 'geo' });
+          navigate(-1);
+        } catch (err) {
+          console.warn('Reverse geocode failed, falling to IP', err);
+          await fallbackToIP();
+        } finally {
+          setGpsLoading(false);
+        }
+      },
+      (err) => {
+        console.warn('GPS error:', err.code, err.message);
+        setGpsLoading(false);
+        fallbackToIP();
+      },
+      {
+        timeout: 10000,         // ⏱️ Give up after 10 sec on mobile
+        maximumAge: 60000,      // ♻️ Accept cached fix up to 1 min old
+        enableHighAccuracy: false // 🔋 Network-level is enough; saves battery
       }
-      stopTracking();
-      fallbackToIP();
-    }
-  }, [error, errorCode, stopTracking, fallbackToIP]);
-
-  React.useEffect(() => {
-    return () => stopTracking();
-  }, [stopTracking]);
+    );
+  };
 
   const filteredAreas = ahmedabadAreas.filter(area => {
     const q = searchTerm.toLowerCase();
-    return area.name.toLowerCase().includes(q) || 
+    return area.name.toLowerCase().includes(q) ||
       (area.aliases || []).some(alias => alias.toLowerCase().includes(q));
   });
-
-  const detectLocation = () => {
-    if (loading) return;
-    toast.loading('Initializing secure GPS tracker...', { id: 'geo' });
-    startTracking();
-  };
 
   return (
     <motion.div 
@@ -175,14 +185,20 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
       </div>
 
       <div className="location-scroll-content">
-        <div className="auto-detect-card" onClick={detectLocation}>
+        <div className="auto-detect-card" onClick={detectLocation} style={{ opacity: gpsLoading ? 0.75 : 1 }}>
           <div className="detect-visual">
-             <div className="pulse-ripple"></div>
-             <Navigation size={24} color="#ff7622" />
+             {gpsLoading ? (
+               <Loader size={24} color="#ff7622" style={{ animation: 'spin 1s linear infinite' }} />
+             ) : (
+               <>
+                 <div className="pulse-ripple"></div>
+                 <Navigation size={24} color="#ff7622" />
+               </>
+             )}
           </div>
           <div className="detect-info">
-             <strong>{loading ? 'Locating...' : 'Detect My Exact Neighborhood'}</strong>
-             <span>Enable GPS for high accuracy</span>
+             <strong>{gpsLoading ? 'Locating you...' : 'Detect My Exact Neighborhood'}</strong>
+             <span>{gpsLoading ? 'Please wait, acquiring GPS signal...' : 'Enable GPS for high accuracy'}</span>
           </div>
         </div>
 

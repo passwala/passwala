@@ -3,8 +3,7 @@ import { ShoppingBag, Ticket, Car, Navigation, IndianRupee, Clock, ShieldCheck, 
 import './Hero.css';
 
 const Hero = () => {
-  const buyerAppUrl = `http://${window.location.hostname}:3001`;
-  const riderAppUrl = `http://${window.location.hostname}:3003`;
+
 
   return (
     <section className="hero">
@@ -34,12 +33,7 @@ const Hero = () => {
               <div className="feature-item"><ShieldCheck size={20}/> <span>Verified Pros</span></div>
             </div>
 
-            <button 
-              className="btn btn-buyer" 
-              onClick={() => window.open(buyerAppUrl, '_self')}
-            >
-              Open Buyer App
-            </button>
+
           </div>
         </div>
 
@@ -74,12 +68,7 @@ const Hero = () => {
               <div className="feature-item"><Navigation size={20}/> <span>Smart GPS</span></div>
             </div>
 
-            <button 
-              className="btn btn-rider" 
-              onClick={() => window.open(riderAppUrl, '_self')}
-            >
-              Open Rider App
-            </button>
+
           </div>
         </div>
 

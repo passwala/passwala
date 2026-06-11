@@ -221,255 +221,334 @@ const OrderHistory = () => {
 
   const handleDownloadInvoice = (order) => {
     const doc = new jsPDF();
-    
-    const storeName = order.stores?.name || order.items?.[0]?.store || 'Passwala Partner';
-    const storeAddress = order.stores?.address || 'Thaltej, Ahmedabad, Gujarat 380054';
-    const isMahadev = storeName.toLowerCase().includes('mahadev');
-    const storeGSTIN = order.stores?.gstin || (isMahadev ? '24AAAMH4812K1Z9' : '24AAACP1234Q1Z5');
-    const customerName = order.addresses?.name || 'Customer';
-    const customerAddress = `${order.addresses?.society || ''}, ${order.addresses?.address_line_1 || ''}`;
-    const orderId = order.id ? String(order.id).substring(0, 8).toUpperCase() : 'N/A';
-    const invoiceDate = new Date(order.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    
-    // Default styles
+    const user = JSON.parse(localStorage.getItem('passwala_user') || '{}');
+
+    // ── Seller / Store info
+    const storeName    = order.stores?.name || 'Passwala Partner Store';
+    const storeAddress = order.stores?.address || 'Ahmedabad, Gujarat';
+    // GSTIN: stores table doesn't have this column yet — show placeholder or Mahadev GSTIN
+    const isMahadev    = storeName.toLowerCase().includes('mahadev');
+    const isShiv       = storeName.toLowerCase().includes('shiv');
+    const storeGSTIN   = order.stores?.gstin || 
+                         (isMahadev ? '24AAAMH4812K1Z9' : 
+                          (isShiv ? '24BCBR78R78UF1Z' : 'Not Registered'));
+    const storePhone   = order.stores?.phone || '';
+
+    // ── Buyer / Customer info (name from users join, address from addresses)
+    const customerName    = order.users?.full_name ||
+                            order.addresses?.name ||
+                            user?.displayName ||
+                            user?.full_name || 'Customer';
+    const customerPhone   = order.users?.phone || user?.phone || '';
+    const addrLine1       = order.addresses?.address_line_1 || '';
+    const addrLine2       = order.addresses?.address_line_2 || '';
+    const addrCity        = order.addresses?.city || 'Ahmedabad';
+    const addrState       = order.addresses?.state || 'Gujarat';
+    const addrPincode     = order.addresses?.pincode || '380001';
+    // Build clean address (no duplicates)
+    const customerAddress = [addrLine1, addrLine2, addrCity]
+      .filter(Boolean)
+      .filter((v, i, arr) => arr.indexOf(v) === i)  // deduplicate
+      .join(', ');
+
+    const orderId     = order.id ? String(order.id).substring(0, 8).toUpperCase() : 'N/A';
+    const invoiceNo   = `PW-${orderId}-INV`;
+    const invoiceDate = new Date(order.created_at).toLocaleDateString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric'
+    });
+    const deliveredDate = order.updated_at
+      ? new Date(order.updated_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+      : invoiceDate;
+
+    // ── PDF setup
     doc.setTextColor(0, 0, 0);
-    doc.setDrawColor(150, 150, 150);
+    doc.setDrawColor(180, 180, 180);
     doc.setLineWidth(0.1);
 
-    // Header Logo & Title
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
-    doc.setTextColor(255, 118, 34); // Passwala orange
-    doc.text(storeName.toUpperCase(), 14, 20);
-    
-    doc.setFontSize(12);
+    // ── HEADER BAND
+    doc.setFillColor(15, 23, 42);
+    doc.rect(0, 0, 210, 28, 'F');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor(255, 255, 255);
+    doc.text(storeName.toUpperCase(), 14, 13);
+
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    doc.text('Powered by Passwala • Tax Invoice', 14, 20);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('ORIGINAL FOR BUYER', 196, 16, { align: 'right' });
+
     doc.setTextColor(0, 0, 0);
-    doc.text("Tax Invoice", 196, 20, { align: "right" });
-    
-    // --- TOP GRID ---
-    let startY = 25;
-    let gridHeight = 60;
-    
-    // Outer Border for Top Grid
-    doc.rect(14, startY, 182, gridHeight);
-    
-    // Horizontal divider
-    doc.line(14, startY + 30, 196, startY + 30);
-    // Vertical divider
-    doc.line(125, startY, 125, startY + gridHeight);
 
-    // SELLER INFO (Top Left)
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    doc.text("Sold By : Seller", 16, startY + 5);
-    doc.text(storeName.toUpperCase(), 16, startY + 9);
-    doc.setFont("helvetica", "normal");
-    doc.text(storeAddress, 16, startY + 13, { maxWidth: 105 });
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("FSSAI License Number:", 16, startY + 23);
-    doc.setFont("helvetica", "normal");
-    doc.text("10722999000123", 45, startY + 23);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("GSTIN:", 16, startY + 27);
-    doc.setFont("helvetica", "normal");
-    doc.text(storeGSTIN, 28, startY + 27);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("PAN:", 65, startY + 27);
-    doc.setFont("helvetica", "normal");
-    doc.text(storeGSTIN.substring(2, 12), 75, startY + 27);
+    // ── TOP INFO GRID (4 panels in 2 rows)
+    const G = { x: 14, y: 32, w: 182, rowH: 52 };
+    doc.setDrawColor(180, 180, 180);
+    doc.rect(G.x, G.y, G.w, G.rowH * 2);
+    // Row divider
+    doc.line(G.x, G.y + G.rowH, G.x + G.w, G.y + G.rowH);
+    // Col divider
+    doc.line(G.x + 111, G.y, G.x + 111, G.y + G.rowH * 2);
 
-    // INVOICE NUMBER (Top Right)
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    doc.text("Invoice Number:", 127, startY + 15);
-    doc.setFont("helvetica", "normal");
-    doc.text(`${orderId}-INV`, 155, startY + 15);
+    // ─ Panel A: Seller Info (top-left)
+    const pA = { x: G.x + 2, y: G.y + 4 };
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SOLD BY:', pA.x, pA.y);
+    doc.setFontSize(8.5);
+    doc.text(storeName, pA.x, pA.y + 5);
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'normal');
+    const addrLines = doc.splitTextToSize(storeAddress, 105);
+    doc.text(addrLines, pA.x, pA.y + 11);
+    if (storePhone) doc.text(`Ph: ${storePhone}`, pA.x, pA.y + 11 + addrLines.length * 4);
 
-    // BUYER INFO (Bottom Left)
-    let bottomY = startY + 30;
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    doc.text("Invoice To:", 16, bottomY + 5);
-    doc.setFont("helvetica", "normal");
-    doc.text(customerName, 40, bottomY + 5);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("Address:", 16, bottomY + 9);
-    doc.setFont("helvetica", "normal");
-    doc.text(customerAddress, 40, bottomY + 9, { maxWidth: 80 });
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("Pin code:", 16, bottomY + 20);
-    doc.setFont("helvetica", "normal");
-    doc.text("380054", 40, bottomY + 20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('GSTIN:', pA.x, pA.y + 38);
+    doc.setFont('helvetica', 'normal');
+    doc.text(storeGSTIN, pA.x + 12, pA.y + 38);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PAN:', pA.x + 45, pA.y + 38);
+    doc.setFont('helvetica', 'normal');
+    doc.text(storeGSTIN !== 'Not Registered' ? storeGSTIN.substring(2, 12) : 'N/A', pA.x + 55, pA.y + 38);
+    doc.setFont('helvetica', 'bold');
+    doc.text('State:', pA.x, pA.y + 43);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Gujarat (24)', pA.x + 11, pA.y + 43);
 
-    doc.setFont("helvetica", "bold");
-    doc.text("State:", 16, bottomY + 24);
-    doc.setFont("helvetica", "normal");
-    doc.text("Gujarat", 40, bottomY + 24);
+    // ─ Panel B: Invoice details (top-right)
+    const pB = { x: G.x + 113, y: G.y + 4 };
+    const addRow = (label, value, yOff) => {
+      doc.setFontSize(6.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text(label, pB.x, pB.y + yOff);
+      doc.setFont('helvetica', 'normal');
+      doc.text(String(value), pB.x + 28, pB.y + yOff);
+    };
+    addRow('Invoice No.:', invoiceNo, 0);
+    addRow('Invoice Date:', invoiceDate, 6);
+    addRow('Delivery Date:', deliveredDate, 12);
+    addRow('Place of Supply:', 'Gujarat (24)', 18);
+    addRow('Order ID:', orderId, 24);
+    addRow('Payment Mode:', order.payment_method || 'Online', 30);
+    addRow('Payment Status:', order.payment_status || 'PAID', 36);
 
-    // ORDER INFO (Bottom Right)
-    doc.setFont("helvetica", "bold");
-    doc.text("Order Id:", 127, bottomY + 5);
-    doc.setFont("helvetica", "normal");
-    doc.text(orderId, 155, bottomY + 5);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("Invoice Date:", 127, bottomY + 9);
-    doc.setFont("helvetica", "normal");
-    doc.text(invoiceDate, 155, bottomY + 9);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("Place of Supply:", 127, bottomY + 15);
-    doc.setFont("helvetica", "normal");
-    doc.text("Gujarat", 155, bottomY + 15);
+    // ─ Panel C: Bill-to (bottom-left)
+    const pC = { x: G.x + 2, y: G.y + G.rowH + 4 };
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text('BILL TO:', pC.x, pC.y);
+    doc.setFontSize(8);
+    doc.text(customerName, pC.x, pC.y + 5);
+    if (customerPhone) {
+      doc.setFontSize(6.5);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Ph: ${customerPhone}`, pC.x, pC.y + 10);
+    }
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'normal');
+    const custAddrLines = doc.splitTextToSize(customerAddress, 105);
+    doc.text(custAddrLines, pC.x, pC.y + 15);
+    doc.setFont('helvetica', 'bold');
+    doc.text('State:', pC.x, pC.y + 15 + custAddrLines.length * 4 + 2);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${addrState} (24)`, pC.x + 11, pC.y + 15 + custAddrLines.length * 4 + 2);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Pincode:', pC.x + 50, pC.y + 15 + custAddrLines.length * 4 + 2);
+    doc.setFont('helvetica', 'normal');
+    doc.text(addrPincode, pC.x + 65, pC.y + 15 + custAddrLines.length * 4 + 2);
 
-    // --- TABLE ---
-    const tableColumn = ["Sr no", "Item Description", "MRP", "Disc.", "Qty", "Taxable Value", "CGST (%)", "CGST (Amt)", "SGST (%)", "SGST (Amt)", "Total"];
+    // ─ Panel D: GSTIN of buyer (bottom-right)
+    const pD = { x: G.x + 113, y: G.y + G.rowH + 4 };
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text('BUYER GSTIN:', pD.x, pD.y);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Unregistered Consumer', pD.x, pD.y + 5);
+
+    // ── ITEM TABLE
+    const tableStartY = G.y + G.rowH * 2 + 3;
+    const tableColumns = [
+      'Sr', 'HSN', 'Item Description', 'MRP', 'Disc.', 'Qty',
+      'Taxable Val.', 'CGST%', 'CGST Rs.', 'SGST%', 'SGST Rs.', 'Total'
+    ];
     const tableRows = [];
-    
-    let subtotal = 0;
-    
-    (order.items || []).forEach((item, index) => {
-      const itemPrice = parseFloat(item.price || item.price_at_purchase || 0);
-      const itemQty = parseInt(item.qty || item.quantity || 1);
-      const baseValue = itemPrice * itemQty;
-      const cgstAmt = baseValue * 0.025;
-      const sgstAmt = baseValue * 0.025;
-      const itemTotal = baseValue + cgstAmt + sgstAmt;
-      
-      subtotal += itemTotal;
-      
+    let subtotal       = 0;
+    let totalCGST      = 0;
+    let totalSGST      = 0;
+    let totalTaxable   = 0;
+    const GST_RATE     = 5;   // 5% GST (CGST 2.5% + SGST 2.5%) — standard for grocery/food
+    const CGST_RATE    = GST_RATE / 2;
+    const SGST_RATE    = GST_RATE / 2;
+    const HSN_DEFAULT  = '0401'; // Generic food HSN
+
+    (order.items || []).forEach((item, idx) => {
+      const mrp      = parseFloat(item.price || item.price_at_purchase || 0);
+      const qty      = parseInt(item.qty || item.quantity || 1);
+      const taxable  = mrp * qty;
+      const cgst     = taxable * CGST_RATE / 100;
+      const sgst     = taxable * SGST_RATE / 100;
+      const lineTotal = taxable + cgst + sgst;
+
+      subtotal     += lineTotal;
+      totalCGST    += cgst;
+      totalSGST    += sgst;
+      totalTaxable += taxable;
+
       tableRows.push([
-        index + 1,
+        idx + 1,
+        HSN_DEFAULT,
         item.name || item.products?.name || 'Item',
-        itemPrice.toFixed(2),
-        "0.00",
-        itemQty,
-        baseValue.toFixed(2),
-        "2.5%",
-        cgstAmt.toFixed(2),
-        "2.5%",
-        sgstAmt.toFixed(2),
-        itemTotal.toFixed(2)
+        mrp.toFixed(2),
+        '0.00',
+        qty,
+        taxable.toFixed(2),
+        `${CGST_RATE}%`,
+        cgst.toFixed(2),
+        `${SGST_RATE}%`,
+        sgst.toFixed(2),
+        lineTotal.toFixed(2),
       ]);
     });
-    
-    if (order.delivery_fee && parseFloat(order.delivery_fee) > 0) {
-       const fee = parseFloat(order.delivery_fee);
-       subtotal += fee;
-       tableRows.push([
-         tableRows.length + 1,
-         "Delivery charges",
-         fee.toFixed(2),
-         "0.00",
-         1,
-         fee.toFixed(2),
-         "0%",
-         "0.00",
-         "0%",
-         "0.00",
-         fee.toFixed(2)
-       ]);
+
+    // Delivery fee row
+    const deliveryFee = parseFloat(order.delivery_fee || 0);
+    if (deliveryFee > 0) {
+      subtotal += deliveryFee;
+      tableRows.push([
+        tableRows.length + 1, '9965', 'Delivery Charges',
+        deliveryFee.toFixed(2), '0.00', 1,
+        deliveryFee.toFixed(2), '0%', '0.00', '0%', '0.00', deliveryFee.toFixed(2),
+      ]);
     }
-    
+
     autoTable(doc, {
-      startY: startY + gridHeight + 2,
-      head: [tableColumn],
+      startY: tableStartY,
+      head: [tableColumns],
       body: tableRows,
       theme: 'grid',
-      styles: { fontSize: 6, cellPadding: 2, textColor: [0,0,0], lineColor: [150,150,150], lineWidth: 0.1 },
-      headStyles: { fillColor: [250, 250, 250], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center' },
+      styles: { fontSize: 6, cellPadding: 2, textColor: [0, 0, 0], lineColor: [180, 180, 180], lineWidth: 0.1 },
+      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center', fontSize: 5.5 },
       columnStyles: {
-        0: { halign: 'center' },
-        2: { halign: 'right' },
-        3: { halign: 'right' },
-        4: { halign: 'center' },
-        5: { halign: 'right' },
-        6: { halign: 'center' },
-        7: { halign: 'right' },
-        8: { halign: 'center' },
-        9: { halign: 'right' },
-        10: { halign: 'right' }
+        0:  { halign: 'center', cellWidth: 8 },
+        1:  { halign: 'center', cellWidth: 14 },
+        2:  { cellWidth: 40 },
+        3:  { halign: 'right', cellWidth: 14 },
+        4:  { halign: 'right', cellWidth: 12 },
+        5:  { halign: 'center', cellWidth: 8 },
+        6:  { halign: 'right', cellWidth: 18 },
+        7:  { halign: 'center', cellWidth: 12 },
+        8:  { halign: 'right', cellWidth: 14 },
+        9:  { halign: 'center', cellWidth: 12 },
+        10: { halign: 'right', cellWidth: 14 },
+        11: { halign: 'right', cellWidth: 14 },
       },
-      margin: { left: 14, right: 14 }
+      margin: { left: 14, right: 14 },
     });
-    
-    let finalY = doc.lastAutoTable.finalY;
-    
-    // --- TOTAL ROW ---
-    doc.rect(14, finalY, 182, 6);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
-    doc.text("Total", 16, finalY + 4);
-    doc.text(subtotal.toFixed(2), 194, finalY + 4, { align: 'right' });
-    finalY += 6;
-    
-    // --- AMOUNT IN WORDS ---
-    const amountInWords = `Rupees ${subtotal.toFixed(2)} Only`;
-    doc.rect(14, finalY, 182, 6);
-    doc.setFont("helvetica", "bold");
-    doc.text("Amount in Words:", 16, finalY + 4);
-    doc.setFont("helvetica", "normal");
-    doc.text(amountInWords, 45, finalY + 4);
-    finalY += 6;
 
-    // --- COMPANY FOOTER BOX ---
-    let footerHeight = 22;
-    doc.rect(14, finalY, 182, footerHeight);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("Passwala Logistics & Delivery Partner Services", 16, finalY + 5);
-    
-    doc.text("GSTIN:", 16, finalY + 9);
-    doc.setFont("helvetica", "normal");
-    doc.text("24AAACP1234Q1Z5", 35, finalY + 9);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("CIN:", 16, finalY + 13);
-    doc.setFont("helvetica", "normal");
-    doc.text("U74999GJ2026PTC000000", 35, finalY + 13);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("FSSAI License Number:", 80, finalY + 9);
-    doc.setFont("helvetica", "normal");
-    doc.text("10722999000123", 110, finalY + 9);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("PAN:", 80, finalY + 13);
-    doc.setFont("helvetica", "normal");
-    doc.text("AAACP1234Q", 110, finalY + 13);
-    
-    // Signature
-    doc.setFontSize(6);
-    doc.text("Authorized Signatory", 170, finalY + 18, { align: 'center' });
-    doc.line(155, finalY + 15, 185, finalY + 15); // Signature line
-    finalY += footerHeight;
-    
-    // --- REVERSE CHARGE ---
-    doc.rect(14, finalY, 182, 6);
-    doc.setFont("helvetica", "bold");
-    doc.text("Whether the tax is payable on reverse charge: No", 16, finalY + 4);
-    finalY += 6;
+    let finalY = doc.lastAutoTable.finalY + 2;
 
-    // --- TERMS & CONDITIONS ---
-    doc.rect(14, finalY, 182, 28);
+    // ── TAX SUMMARY TABLE (right-aligned block)
+    const totalGST = totalCGST + totalSGST;
+    const summaryRows = [
+      ['Taxable Amount', `Rs. ${totalTaxable.toFixed(2)}`],
+      [`CGST @ ${CGST_RATE}%`, `Rs. ${totalCGST.toFixed(2)}`],
+      [`SGST @ ${SGST_RATE}%`, `Rs. ${totalSGST.toFixed(2)}`],
+    ];
+    if (deliveryFee > 0) {
+      summaryRows.push(['Delivery Charges', `Rs. ${deliveryFee.toFixed(2)}`]);
+    }
+    summaryRows.push(['Total Tax (GST)', `Rs. ${totalGST.toFixed(2)}`]);
+    summaryRows.push(['GRAND TOTAL', `Rs. ${subtotal.toFixed(2)}`]);
+
+    autoTable(doc, {
+      startY: finalY,
+      head: [['Description', 'Amount']],
+      body: summaryRows,
+      theme: 'grid',
+      styles: { fontSize: 7, cellPadding: 2, textColor: [0, 0, 0], lineColor: [180, 180, 180], lineWidth: 0.1 },
+      headStyles: { fillColor: [248, 250, 252], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center' },
+      bodyStyles: { halign: 'right' },
+      columnStyles: { 0: { halign: 'left', fontStyle: 'bold', cellWidth: 50 }, 1: { cellWidth: 30 } },
+      margin: { left: 196 - 80, right: 14 },
+      didParseCell: (data) => {
+        if (data.row.index === summaryRows.length - 1) {
+          data.cell.styles.fillColor = [15, 23, 42];
+          data.cell.styles.textColor = [255, 255, 255];
+          data.cell.styles.fontStyle = 'bold';
+        }
+      },
+    });
+
+    finalY = doc.lastAutoTable.finalY + 2;
+
+    // ── AMOUNT IN WORDS
+    const toWords = (n) => {
+      const ones = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
+        'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+      const tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+      if (n === 0) return 'Zero';
+      if (n < 20) return ones[n];
+      if (n < 100) return tens[Math.floor(n/10)] + (n%10 ? ' ' + ones[n%10] : '');
+      if (n < 1000) return ones[Math.floor(n/100)] + ' Hundred' + (n%100 ? ' ' + toWords(n%100) : '');
+      if (n < 100000) return toWords(Math.floor(n/1000)) + ' Thousand' + (n%1000 ? ' ' + toWords(n%1000) : '');
+      return toWords(Math.floor(n/100000)) + ' Lakh' + (n%100000 ? ' ' + toWords(n%100000) : '');
+    };
+
+    const rupees = Math.floor(subtotal);
+    const paise  = Math.round((subtotal - rupees) * 100);
+    const amtWords = `Indian Rupee ${toWords(rupees)}${paise > 0 ? ' and ' + toWords(paise) + ' Paise' : ''} Only`;
+
+    doc.setFillColor(248, 250, 252);
+    doc.rect(14, finalY, 182, 8, 'F');
+    doc.setDrawColor(180, 180, 180);
+    doc.rect(14, finalY, 182, 8);
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text('Amount in Words:', 16, finalY + 5);
+    doc.setFont('helvetica', 'normal');
+    doc.text(amtWords, 50, finalY + 5);
+    finalY += 10;
+
+    // ── TERMS
+    doc.setFontSize(5.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Terms & Conditions:', 14, finalY + 4);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(80, 80, 80);
+    doc.text('1. For issues/queries contact support@passwala.in or use in-app chat.', 14, finalY + 9);
+    doc.text('2. Never share bank/UPI details with anyone. Passwala will never ask for them.', 14, finalY + 13);
+    doc.text('3. MRP is as printed on package. Final amount may vary due to offers or revised GST rates.', 14, finalY + 17);
+    finalY += 22;
+
+    // ── FOOTER BAND
+    doc.setFillColor(15, 23, 42);
+    doc.rect(0, finalY, 210, 22, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    doc.text("Terms & Conditions:", 16, finalY + 5);
-    doc.setFont("helvetica", "normal");
+    doc.text('Platform / Facilitator: Passwala', 14, finalY + 6);
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(6);
-    doc.text("1. If you have any issues or queries in respect of your order, please contact customer chat support through Passwala platform or drop in email at", 16, finalY + 9);
-    doc.text("support@passwala.in.", 16, finalY + 12);
-    doc.text("2. Please note that we never ask for bank account details such as CVV, account number, UPI Pin etc. across our support channels. For your safety please do", 16, finalY + 16);
-    doc.text("not share these details with anyone over any medium.", 16, finalY + 19);
-    doc.text("3. MRP displayed on the platform is as printed on the product package. Actual MRP and amount payable may be a function of offers, discounts and/or the", 16, finalY + 23);
-    doc.text("revised GST rates made effective by Govt. From time to time.", 16, finalY + 26);
-    
-    doc.save(`Invoice_${orderId}.pdf`);
+    doc.text('CIN: U74999GJ2026PTC000000', 14, finalY + 11);
+    doc.text('Email: support@passwala.in  |  Website: www.passwala.in', 14, finalY + 16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Authorised Signatory', 194, finalY + 16, { align: 'right' });
+    doc.setDrawColor(150, 150, 150);
+    doc.line(160, finalY + 12, 194, finalY + 12);
+
+    // Reverse charge
+    doc.setTextColor(100, 116, 139);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(5.5);
+    doc.text('Whether tax is payable on reverse charge basis: No', 14, finalY + 25);
+
+    doc.save(`Invoice_${storeName.replace(/\s+/g, '_')}_${orderId}.pdf`);
   };
 
   return (

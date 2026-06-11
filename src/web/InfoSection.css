@@ -1,5 +1,5 @@
 .info-section {
-  padding: 5rem 0;
+  padding: 0 0 1.5rem 0;
   background: var(--bg-primary);
 }
 
@@ -9,7 +9,7 @@
   padding: 0 1rem;
   display: flex;
   flex-direction: column;
-  gap: 5rem;
+  gap: 2.5rem;
 }
 
 .info-block {

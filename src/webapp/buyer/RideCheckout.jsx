@@ -11,7 +11,7 @@ const RideCheckout = () => {
   const { t } = useTranslation();
   const { pickup, dropoff, rideData, user } = location.state || {};
   const seatCount = 1;
-  const [luggageWeight, setLuggageWeight] = useState(0); // default weight in kg
+  const [luggageWeight] = useState(0); // default weight in kg
   const [bookingLoading, setBookingLoading] = useState(false);
 
   if (!pickup || !dropoff || !rideData) {
@@ -169,53 +169,7 @@ const RideCheckout = () => {
 
 
 
-        {/* Luggage Details Card */}
-        <div className="rc-card">
-          <h4 className="rc-section-title">
-            <Package size={18} color="var(--primary)" /> {t('luggage_options')}
-          </h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.5rem 0' }}>
-            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              Luggage Rate: <strong style={{ color: 'var(--primary)' }}>₹11 per kg per km</strong>
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '0.25rem' }}>
-              <label style={{ fontSize: '0.9rem', fontWeight: 600 }}>Weight:</label>
-              <input 
-                type="number" 
-                min="0" 
-                max="50" 
-                step="0.1"
-                value={luggageWeight} 
-                onChange={(e) => setLuggageWeight(Math.max(0, parseFloat(e.target.value) || 0))}
-                style={{ 
-                  width: '80px', 
-                  padding: '6px 10px', 
-                  borderRadius: '8px', 
-                  border: '1px solid var(--border-light, #e2e8f0)', 
-                  fontWeight: 700,
-                  fontSize: '1rem',
-                  textAlign: 'center'
-                }} 
-              />
-              <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)' }}>kg</span>
-              <input 
-                type="range" 
-                min="0" 
-                max="50" 
-                step="0.1"
-                value={luggageWeight} 
-                onChange={(e) => setLuggageWeight(parseFloat(e.target.value) || 0)}
-                style={{ flex: 1, accentColor: 'var(--primary, #ff7622)', height: '6px', cursor: 'pointer' }}
-              />
-            </div>
-            {luggageWeight > 0 && (
-              <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: 'var(--primary)', fontWeight: 700 }}>
-                Luggage price is calculated using exact Latitude & Longitude coordinate distance ({displayDistance} km):<br/>
-                ₹11 × {luggageWeight} kg × {displayDistance} km = ₹{luggagePrice.toFixed(2)}
-              </p>
-            )}
-          </div>
-        </div>
+
 
         {/* Fare Summary Card */}
         <div className="rc-card">

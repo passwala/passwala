@@ -648,12 +648,57 @@ router.post('/upsert', async (req, res) => {
     }
 });
 
-// DELETE /api/admin/delete — Securely delete any record (DISABLED)
+// DELETE /api/admin/delete — Securely delete any record
 router.delete('/delete', async (req, res) => {
-    return res.status(403).json({
-        success: false,
-        error: 'Database deletion is disabled on this platform to protect data safety.'
-    });
+    const { table, id } = req.body;
+    if (!table || !id) {
+        return res.status(400).json({ success: false, error: 'Table name and id are required' });
+    }
+
+    if (!ALLOWED_ADMIN_TABLES.includes(table)) {
+        return res.status(400).json({ success: false, error: `Invalid table: ${table} is not whitelisted` });
+    }
+
+    try {
+        // Pre-delete related references to avoid foreign key constraint errors
+        if (table === 'users') {
+            await supabase.from('riders').delete().eq('id', id);
+            await supabase.from('vendors').delete().eq('id', id);
+            await supabase.from('service_providers').delete().eq('id', id);
+            await supabase.from('addresses').delete().eq('id', id);
+            await supabase.from('service_bookings').delete().eq('user_id', id);
+            
+            const { data: userOrders } = await supabase.from('orders').select('id').eq('user_id', id);
+            if (userOrders && userOrders.length > 0) {
+                const orderIds = userOrders.map(o => o.id);
+                await supabase.from('order_items').delete().in('order_id', orderIds);
+                await supabase.from('orders').delete().in('id', orderIds);
+            }
+        } else if (table === 'stores') {
+            await supabase.from('products').delete().eq('store_id', id);
+            await supabase.from('deals').delete().eq('store_id', id);
+        } else if (table === 'services') {
+            await supabase.from('service_bookings').delete().eq('service_id', id);
+        } else if (table === 'orders') {
+            await supabase.from('order_items').delete().eq('order_id', id);
+        } else if (table === 'vendors') {
+            const { data: vendorStores } = await supabase.from('stores').select('id').eq('vendor_id', id);
+            if (vendorStores && vendorStores.length > 0) {
+                const storeIds = vendorStores.map(s => s.id);
+                await supabase.from('products').delete().in('store_id', storeIds);
+                await supabase.from('deals').delete().in('store_id', storeIds);
+                await supabase.from('stores').delete().in('id', storeIds);
+            }
+        }
+
+        const { data, error } = await supabase.from(table).delete().eq('id', id).select();
+        if (error) throw error;
+
+        res.status(200).json({ success: true, data });
+    } catch (error) {
+        console.error(`❌ Admin Delete Error [${table}]:`, error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
 // Helper to get platform settings path regardless of process.cwd()

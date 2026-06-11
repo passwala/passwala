@@ -28,9 +28,9 @@ const Navbar = ({ isAuthenticated, user, _onOpenProfile, onJoin }) => {
           {/* Center: Links (Hidden on Mobile) */}
           <div className="nav-center-v2 mobile-hide">
              <div className="nav-links-v2">
-               <a href={`http://${window.location.hostname}:3001`} className="nav-pill-link">Buyer App</a>
-               <a href={`http://${window.location.hostname}:3002`} className="nav-pill-link">Vendor</a>
-               <a href={`http://${window.location.hostname}:3003`} className="nav-pill-link">Rider</a>
+               <a href={`${window.location.protocol}//${window.location.hostname}:3001`} className="nav-pill-link">Buyer App</a>
+               <a href={`${window.location.protocol}//${window.location.hostname}:3002`} className="nav-pill-link">Vendor</a>
+               <a href={`${window.location.protocol}//${window.location.hostname}:3003`} className="nav-pill-link">Rider</a>
                <a href="#about" className="nav-pill-link">About Us</a>
              </div>
           </div>
@@ -56,9 +56,9 @@ const Navbar = ({ isAuthenticated, user, _onOpenProfile, onJoin }) => {
       {/* Mobile Menu Overlay */}
       <div className={`mobile-menu-overlay ${isMobileMenuOpen ? 'active' : ''}`}>
         <div className="mobile-menu-content">
-          <a href={`http://${window.location.hostname}:3001`} onClick={() => setIsMobileMenuOpen(false)}>Buyer App</a>
-          <a href={`http://${window.location.hostname}:3002`} onClick={() => setIsMobileMenuOpen(false)}>Vendor Portal</a>
-          <a href={`http://${window.location.hostname}:3003`} onClick={() => setIsMobileMenuOpen(false)}>Rider Portal</a>
+          <a href={`${window.location.protocol}//${window.location.hostname}:3001`} onClick={() => setIsMobileMenuOpen(false)}>Buyer App</a>
+          <a href={`${window.location.protocol}//${window.location.hostname}:3002`} onClick={() => setIsMobileMenuOpen(false)}>Vendor Portal</a>
+          <a href={`${window.location.protocol}//${window.location.hostname}:3003`} onClick={() => setIsMobileMenuOpen(false)}>Rider Portal</a>
           <hr style={{border: 'none', borderTop: '1px solid #eee'}} />
           {isAuthenticated ? (
             <span style={{fontWeight: '600', color: 'var(--text-secondary)', padding: '10px 0', display: 'block', textAlign: 'center'}}>Hi, {user?.displayName?.split(' ')[0] || 'User'}</span>

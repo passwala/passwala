@@ -1,78 +1,408 @@
+/* ============================================================
+   BottomNav.css — Passwalaa Buyer App Navigation
+   Phone:   bottom bar (full width)
+   Tablet:  left sidebar 64px (icons only)
+   Desktop: left sidebar 240px (icons + labels)
+   ============================================================ */
+
+/* ── Base: Mobile bottom bar ── */
 .bottom-nav-container {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   width: 100%;
-  padding: 0.8rem 1.5rem 1.2rem;
+  padding: 0.6rem 1rem calc(0.6rem + env(safe-area-inset-bottom));
   background: var(--bg-card);
   z-index: 1000;
-  border-top: 1px solid var(--glass-border);
-  transition: all 0.4s ease;
+  border-top: 1px solid var(--border-light);
   backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.04);
+}
+
+body:not(.dark-mode) .bottom-nav-container {
+  background: rgba(255, 255, 255, 0.95);
 }
 
 .bottom-nav-inner {
   display: flex;
-  justify-content: space-between;
+  flex-direction: row;
+  justify-content: space-around;
   align-items: center;
-  max-width: 500px;
+  max-width: 520px;
   margin: 0 auto;
 }
 
+/* Nav item: base (phone) */
 .nav-item {
   background: transparent;
   border: none;
   cursor: pointer;
-  padding: 0.5rem;
+  padding: 0.4rem 0.6rem;
   color: var(--text-secondary);
-  transition: all 0.3s;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 3px;
+  border-radius: 12px;
+  position: relative;
+  min-width: 52px;
+  min-height: 44px;
+  justify-content: center;
+}
+
+.nav-item:hover {
+  color: var(--primary);
+  background: var(--primary-light);
 }
 
 .nav-item.active {
   color: var(--primary);
+  background: var(--primary-light);
 }
 
+/* Icon wrapper */
 .icon-wrapper {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 28px;
+  height: 28px;
 }
 
+/* Label: visible on phone and desktop, hidden tablet */
 .nav-label {
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   font-weight: 700;
-  margin-top: 4px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.8;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  opacity: 0.75;
+  transition: opacity 0.2s;
 }
 
 .nav-item.active .nav-label {
   opacity: 1;
+  color: var(--primary);
 }
 
+/* Active indicator dot */
 .active-indicator {
   position: absolute;
-  top: -8px;
-  width: 4px;
-  height: 4px;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
   background: var(--primary);
   border-radius: 50%;
-  box-shadow: 0 0 10px rgba(255, 118, 34, 0.8);
+  box-shadow: 0 0 8px rgba(255, 118, 34, 0.7);
 }
 
-@media (min-width: 1024px) {
+/* Brand section: hidden on mobile/tablet — shown only in desktop sidebar */
+.nav-brand-section {
+  display: none;
+}
+
+/* ── Tablet: 64px icon-only left sidebar ── */
+@media (min-width: 768px) {
   .bottom-nav-container {
+    /* Move from bottom to left edge */
+    bottom: auto;
+    top: 60px; /* below navbar height */
+    left: 0;
+    right: auto;
+    width: 64px;
+    height: calc(100vh - 60px);
+    padding: 1rem 0;
+
+    /* Vertical layout */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    border-top: none;
+    border-right: 1px solid var(--border-light);
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.03);
+  }
+
+  body:not(.dark-mode) .bottom-nav-container {
+    background: rgba(255, 255, 255, 0.97);
+  }
+
+  .bottom-nav-inner {
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    max-width: none;
+    width: 100%;
+    gap: 4px;
+    padding: 0.5rem 0;
+    margin: 0;
+  }
+
+  /* Icon-only on tablet — hide labels */
+  .nav-label {
     display: none;
+  }
+
+  /* Active indicator: left bar instead of top dot */
+  .active-indicator {
+    top: 50%;
+    left: -1px;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 24px;
+    border-radius: 0 3px 3px 0;
+  }
+
+  .nav-item {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    padding: 0;
+    min-width: unset;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .nav-item:hover {
+    transform: none; /* no Y translation on desktop sidebar */
+    background: var(--primary-light);
+  }
+
+  /* Tooltip for tablet icons */
+  .nav-item::after {
+    content: attr(title);
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--bg-soft);
+    color: var(--text-primary);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.35rem 0.65rem;
+    border-radius: 8px;
+    white-space: nowrap;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--border-light);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.18s ease;
+    z-index: 3000;
+  }
+
+  .nav-item:hover::after {
+    opacity: 1;
   }
 }
 
-/* --- LIGHT MODE SPECIFIC --- */
-body:not(.dark-mode) .bottom-nav-container {
-  background: white;
+/* ── Desktop/Laptop: 220px labeled sidebar ── */
+@media (min-width: 1024px) {
+
+  /* Sidebar container — starts at top:0 so brand fills top-left alongside navbar */
+  .bottom-nav-container {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 220px;
+    padding: 0;
+    align-items: flex-start;
+    border-right: 1px solid var(--border-light);
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.03);
+    background: var(--bg-card) !important;
+    top: 0;                        /* fills top-left corner, brand aligns with navbar */
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  body:not(.dark-mode) .bottom-nav-container {
+    background: #ffffff !important;
+  }
+
+  /* Brand section — exactly 64px to align with the navbar height */
+  .nav-brand-section {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0 1rem;
+    height: 64px;                              /* matches navbar height */
+    min-height: 64px;
+    border-bottom: 1px solid var(--border-light);
+    width: 100%;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    background: var(--bg-card);
+  }
+
+  .nav-brand-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+
+  .nav-brand-name {
+    font-size: 1.15rem;
+    font-weight: 900;
+    color: var(--primary);
+    letter-spacing: -0.5px;
+    white-space: nowrap;
+  }
+
+  /* Nav item list */
+  .bottom-nav-inner {
+    display: flex !important;
+    flex-direction: column !important;       /* stack items vertically */
+    justify-content: flex-start !important;  /* top-align, no stretching */
+    align-items: flex-start !important;
+    width: 100% !important;
+    gap: 2px !important;
+    padding: 0.75rem 0.75rem !important;
+    margin: 0 !important;
+    max-width: none !important;
+    box-sizing: border-box;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  /* Show labels on desktop */
+  .nav-label {
+    display: block !important;
+    font-size: 0.88rem;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+    opacity: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 145px;
+    line-height: 1;
+  }
+
+  /* Full-width row: icon LEFT + label RIGHT */
+  .nav-item {
+    display: flex !important;
+    width: 100% !important;
+    height: 42px !important;
+    flex-direction: row !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    padding: 0 0.8rem !important;
+    gap: 0.7rem !important;
+    border-radius: 10px !important;
+    min-width: unset !important;
+    min-height: unset !important;
+    max-height: 42px !important;
+    border-left: 3px solid transparent;
+    transition: background 0.15s ease, color 0.15s ease !important;
+    box-sizing: border-box;
+    flex-shrink: 0;
+  }
+
+  /* Active: orange left border + soft orange fill */
+  .nav-item.active {
+    background: var(--primary-light) !important;
+    color: var(--primary) !important;
+    border-left-color: var(--primary) !important;
+    padding-left: calc(0.8rem - 3px) !important;
+    font-weight: 700;
+  }
+
+  .nav-item.active .nav-label {
+    font-weight: 700;
+    color: var(--primary);
+  }
+
+  .nav-item:hover:not(.active) {
+    background: rgba(0, 0, 0, 0.04) !important;
+    color: var(--text-primary) !important;
+  }
+
+  /* No tooltip on desktop (labels visible) */
+  .nav-item::after {
+    display: none !important;
+  }
+
+  /* Hide old absolute pill indicator — use border-left instead */
+  .active-indicator {
+    display: none !important;
+  }
+
+  /* Icon on desktop */
+  .icon-wrapper {
+    width: 20px !important;
+    height: 20px !important;
+    flex-shrink: 0;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  /* ── Sidebar Profile Card (desktop only) ── */
+  .nav-sidebar-profile {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    width: 100%;
+    padding: 0.85rem 1rem;
+    border-top: 1px solid var(--border-light);
+    cursor: pointer;
+    transition: background 0.15s ease;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    background: var(--bg-card);
+  }
+
+  .nav-sidebar-profile:hover {
+    background: var(--primary-light);
+  }
+
+  .nav-sidebar-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ff7622, #ff9a5c);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    border: 2px solid rgba(255,118,34,0.2);
+  }
+
+  .nav-sidebar-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+  }
+
+  .nav-sidebar-name {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 130px;
+  }
+
+  .nav-sidebar-link {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--primary);
+    white-space: nowrap;
+  }
+}
+
+/* ── Sidebar profile card: hidden on mobile/tablet ── */
+.nav-sidebar-profile {
+  display: none;
 }

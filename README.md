@@ -198,6 +198,11 @@ The platform has recently undergone a major round of stabilization and feature e
 ### 🗺️ Interactive Map & Location Tracking Fixes
 - **Unconstrained Map Centering**: Removed `maxBounds` and `maxBoundsViscosity` restriction constraints from `<MapContainer>` components across `NearShops.jsx` and `AdminPanel.jsx`, resolving view lockups and allowing centering to work perfectly for all coordinates.
 - **Dynamic Recenter Binding**: Connected the `<RecenterMap>` custom Leaflet component to safely center the map dynamically when geolocation coords resolve post-mount.
+- **Marker Color Differentiation**: Differentiated the map marker colors on the buyer-side "Near Shops / Local Experts" map (`NearShops.jsx`). The buyer's location remains **blue**, shop locations are **orange**, and Local Experts/Services locations are now **green**.
+
+### 🔧 Stability, ESLint & Vercel Fixes
+- **Firebase Vercel Crash Avoidance**: Handled missing Firebase environment variables gracefully during startup by injecting placeholder values in `firebase.js`, preventing the React application from hard-crashing (blank white page) on initial script load.
+- **Clean ESLint Audits**: Cleared all outstanding `react-hooks/exhaustive-deps` warnings inside `ExpertServices.jsx`, `RideTicket.jsx`, and `RiderDashboard.jsx` by wrapping async fetch tasks in `useCallback` and declaring proper hooks dependencies.
 
 ### 🎨 Premium Orange & White UI Refinements
 - **Unified Glassmorphism**: Standardized dark and light modal backdrops with smooth translucent gradients and premium orange accent lines.

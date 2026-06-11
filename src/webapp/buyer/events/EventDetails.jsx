@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, MapPin, Share2, Clock, Map as MapIcon } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import GoogleMapWrapper from '../../../utils/GoogleMapWrapper';
 import { toast } from 'react-hot-toast';
 import './EventDetails.css';
+import { AHMEDABAD_AREAS } from '../../../utils/constants';
 
 const EventDetails = ({ user }) => {
   const { id } = useParams();
@@ -60,15 +61,26 @@ const EventDetails = ({ user }) => {
     if (event?.venue_lat && event?.venue_lng && !isNaN(parseFloat(event.venue_lat)) && !isNaN(parseFloat(event.venue_lng))) {
       setVenueCoords({ lat: parseFloat(event.venue_lat), lng: parseFloat(event.venue_lng) });
     } else if (event?.venue_name) {
-      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(event.venue_name + ', Ahmedabad')}&limit=1`,
-        { headers: { 'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)' } })
-      .then(r => r.json())
-      .then(d => {
-        if (d && d[0]) {
-          setVenueCoords({ lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) });
-        }
-      })
-      .catch(err => console.warn('Event venue geocoding error:', err));
+      const lowerVenue = event.venue_name.toLowerCase();
+      const matchedArea = AHMEDABAD_AREAS.find(area => {
+        const nameMatch = area.name.toLowerCase() === lowerVenue || lowerVenue.includes(area.name.toLowerCase());
+        const aliasMatch = area.aliases?.some(alias => alias.toLowerCase() === lowerVenue || lowerVenue.includes(alias.toLowerCase()));
+        return nameMatch || aliasMatch;
+      });
+
+      if (matchedArea) {
+        setVenueCoords({ lat: matchedArea.lat, lng: matchedArea.lng });
+      } else {
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(event.venue_name + ', Ahmedabad')}&limit=1`,
+          { headers: { 'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)' } })
+        .then(r => r.json())
+        .then(d => {
+          if (d && d[0]) {
+            setVenueCoords({ lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) });
+          }
+        })
+        .catch(err => console.warn('Event venue geocoding error:', err));
+      }
     }
   }, [event]);
 
@@ -82,13 +94,32 @@ const EventDetails = ({ user }) => {
 
   if (!event) return null;
 
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: event.title,
+          url: window.location.href
+        });
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          toast.error('Sharing failed');
+        }
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success('Event link copied to clipboard!');
+      } catch (err) {
+        toast.error('Failed to copy event link to clipboard');
+      }
+    }
+  };
+
   return (
     <div className="ed-container">
       <div className="ed-hero">
-        <button className="ed-back-btn" onClick={() => navigate(-1)}>
-          <ArrowLeft size={24} />
-        </button>
-        <button className="ed-share-btn">
+        <button className="ed-share-btn" onClick={handleShare}>
           <Share2 size={20} />
         </button>
         <img src={event.banner_url || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200&q=80'} alt={event.title} className="ed-hero-img" />
@@ -159,18 +190,15 @@ const EventDetails = ({ user }) => {
           <h3><MapIcon size={18} className="inline mr-2" /> Venue Map</h3>
           <div className="ed-map-container">
             {venueCoords ? (
-              <MapContainer 
-                center={[venueCoords.lat, venueCoords.lng]} 
-                zoom={15} 
+              <GoogleMapWrapper
+                center={[venueCoords.lat, venueCoords.lng]}
+                zoom={15}
+                markers={[{
+                  position: [venueCoords.lat, venueCoords.lng],
+                  title: event.venue_name
+                }]}
                 style={{ height: '100%', width: '100%', borderRadius: '16px' }}
-                dragging={false}
-                zoomControl={false}
-              >
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                <Marker position={[venueCoords.lat, venueCoords.lng]}>
-                  <Popup>{event.venue_name}</Popup>
-                </Marker>
-              </MapContainer>
+              />
             ) : (
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', borderRadius: '16px', color: '#64748b' }}>
                 <MapPin size={32} style={{ marginBottom: '8px', opacity: 0.4 }} />

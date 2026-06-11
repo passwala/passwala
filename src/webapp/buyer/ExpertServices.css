@@ -540,3 +540,79 @@ body:not(.dark-mode) .rating-pill {
   border: 1px solid var(--glass-border);
 }
 
+/* ── Tablet (768px – 1023px): 2-col expert cards ── */
+@media (min-width: 768px) {
+  .expert-services-page {
+    max-width: 100%;
+    padding: 1.5rem 2rem;
+  }
+
+  .expert-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+  }
+
+  .expert-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .expert-footer {
+    margin-top: auto;
+  }
+
+  .category-tabs-scroll {
+    flex-wrap: wrap;
+    overflow: visible;
+    gap: 8px;
+  }
+}
+
+/* ── Desktop (1024px+): wider, 3 columns ── */
+@media (min-width: 1024px) {
+  .expert-services-page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  .expert-list {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+
+  .expert-card {
+    border-radius: 24px;
+    padding: 1.75rem;
+  }
+
+  .expert-avatar-container,
+  .expert-avatar { width: 80px; height: 80px; }
+
+  .name-row h3 { font-size: 1.3rem; }
+
+  .hire-btn {
+    height: 46px;
+    font-size: 1rem;
+  }
+
+  .category-tabs-scroll {
+    gap: 10px;
+    margin-bottom: 2.5rem;
+  }
+
+  .sub-category-scroll {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+}
+
+/* ── Large Desktop (1280px+) ── */
+@media (min-width: 1280px) {
+  .expert-services-page {
+    max-width: 1200px;
+  }
+}
+

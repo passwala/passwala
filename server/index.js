@@ -27,14 +27,19 @@ const allowedOrigins = [
   'http://127.0.0.1:5173',
   'http://localhost:3000',
   'http://127.0.0.1:3000',
+  'https://localhost:3000',
   'http://localhost:3001',
   'http://127.0.0.1:3001',
+  'https://localhost:3001',
   'http://localhost:3002',
   'http://127.0.0.1:3002',
+  'https://localhost:3002',
   'http://localhost:3003',
   'http://127.0.0.1:3003',
+  'https://localhost:3003',
   'http://localhost:3005',
   'http://127.0.0.1:3005',
+  'https://localhost:3005',
   'https://passwala.vercel.app',
   'https://passwala.onrender.com'
 ];
@@ -44,8 +49,11 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps, curl, or Postman during dev)
     if (!origin) return callback(null, true);
     
-    // Allow exact matches or any Vercel preview deployments
-    const isAllowed = allowedOrigins.includes(origin) || origin.endsWith('.vercel.app');
+    // Check if origin matches localhost, 127.0.0.1, or local network IP on any dev port
+    const isLocalhostOrIP = /https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+):(3000|3001|3002|3003|3004|3005)/.test(origin);
+    
+    // Allow exact matches, local environments, or any Vercel/localtunnel preview deployments
+    const isAllowed = isLocalhostOrIP || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app') || origin.endsWith('.loca.lt') || origin.endsWith('.ngrok.io') || origin.endsWith('.ngrok-free.app');
                       
     if (isAllowed) {
       callback(null, true);
@@ -155,9 +163,27 @@ app.get('/api/ip-location', async (req, res) => {
         clientIp = clientIp.substring(7);
       }
     }
-    const isLocal = !clientIp || clientIp === '127.0.0.1' || clientIp === '::1' || clientIp.startsWith('10.') || clientIp.startsWith('192.168.') || clientIp.startsWith('172.16.');
-    const url = isLocal ? 'https://freeipapi.com/api/json' : `https://freeipapi.com/api/json/${clientIp}`;
-    const response = await fetch(url);
+    const isLocal = !clientIp || clientIp === '127.0.0.1' || clientIp === '::1' ||
+      clientIp.startsWith('10.') || clientIp.startsWith('192.168.') || clientIp.startsWith('172.16.') ||
+      clientIp.startsWith('fd') || clientIp.startsWith('fe80');
+
+    // 🔒 Private/local IPs cannot be geolocated by any IP API.
+    // Calling freeipapi without an IP returns the SERVER's city — completely wrong for the user.
+    // Return a flag so the frontend knows to ask the user to enable GPS or select manually.
+    if (isLocal) {
+      return res.json({
+        isLocal: true,
+        cityName: 'Ahmedabad',
+        regionName: 'Gujarat',
+        countryCode: 'IN',
+        latitude: '23.0225',
+        longitude: '72.5714',
+        message: 'Local network detected — GPS or manual selection recommended for accurate location'
+      });
+    }
+
+    const url = `https://freeipapi.com/api/json/${clientIp}`;
+    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
     if (!response.ok) throw new Error('FreeIPAPI failed');
     const data = await response.json();
     res.json(data);

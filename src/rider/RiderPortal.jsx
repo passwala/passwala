@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Wallet, UserCircle, IndianRupee, Bike } from 'lucide-react';
+import { LayoutDashboard, Wallet, UserCircle, IndianRupee, Bike, Bell } from 'lucide-react';
 import RiderDashboard from './RiderDashboard';
 import RiderEarnings from './RiderEarnings';
 import RiderWallet from './RiderWallet';
 import RiderProfile from './RiderProfile';
+import RiderRideBookings from './RiderRideBookings';
 import './RiderPortal.css'; // Import custom styles
 import { supabase } from '../supabase';
 
@@ -16,6 +17,12 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
   const mainScrollRef = useRef(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [currentCoords, setCurrentCoords] = useState(null);
+
+  // 🔔 Global notification state — works on ANY tab
+  const [globalNotif, setGlobalNotif] = useState(null); // { type: 'ride'|'order', label, sub, count }
+  const [notifCount, setNotifCount] = useState(0);
+  const lastNotifIdRef = useRef(null);
+  const notifTimerRef = useRef(null);
 
   useEffect(() => {
     const resetScroll = () => {
@@ -155,6 +162,103 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
     };
   }, [user, riderId]);
 
+  // 🔔 Global background poller — detects new rides/orders on ANY tab
+  useEffect(() => {
+    if (!isOnline) {
+      setGlobalNotif(null);
+      setNotifCount(0);
+      return;
+    }
+
+    const playPing = () => {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        gain.gain.setValueAtTime(0.4, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.5);
+      } catch(e) {
+        console.warn("AudioContext play error:", e);
+      }
+    };
+
+    const checkForNew = async () => {
+      let uid = user?.id || user?.uid || user?.user_id;
+      if (!uid) return;
+
+      try {
+        // Poll for pending unassigned ride requests
+        const baseUrl = import.meta.env.VITE_API_URL || '';
+        const res = await fetch(`${baseUrl}/api/city-rides/pending-rides`);
+        const json = await res.json();
+        const pending = json.bookings || [];
+
+        if (pending.length > 0) {
+          const newest = pending[0];
+          if (lastNotifIdRef.current !== newest.id) {
+            lastNotifIdRef.current = newest.id;
+            setNotifCount(pending.length);
+            setGlobalNotif({
+              type: 'ride',
+              label: `🛵 New Ride Request!`,
+              sub: `${newest.pickup_area} → ${newest.drop_area}  •  ₹${newest.total_price?.toFixed(0)}`,
+              count: pending.length
+            });
+            playPing();
+            // Auto-dismiss after 15s if rider doesn't tap
+            clearTimeout(notifTimerRef.current);
+            notifTimerRef.current = setTimeout(() => setGlobalNotif(null), 15000);
+          }
+          return;
+        }
+
+        // Also check for active-ride (someone already booked this rider)
+        if (riderId) {
+          const { data: tracking } = await supabase
+            .from('delivery_tracking')
+            .select('order_id, status')
+            .eq('rider_id', riderId)
+            .eq('status', 'ASSIGNED')
+            .limit(1)
+            .maybeSingle();
+
+          if (tracking?.order_id) {
+            const key = `order-${tracking.order_id}`;
+            if (lastNotifIdRef.current !== key) {
+              lastNotifIdRef.current = key;
+              setNotifCount(1);
+              setGlobalNotif({
+                type: 'order',
+                label: `📦 New Delivery Order!`,
+                sub: `Order assigned to you — tap to view`,
+                count: 1
+              });
+              playPing();
+              clearTimeout(notifTimerRef.current);
+              notifTimerRef.current = setTimeout(() => setGlobalNotif(null), 15000);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Global notif poll error:', e);
+      }
+    };
+
+    checkForNew();
+    const interval = setInterval(checkForNew, 5000);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(notifTimerRef.current);
+    };
+  }, [isOnline, riderId, user]);
+
+
   useEffect(() => {
     // Check initial active status from DB
     const checkStatus = async () => {
@@ -184,13 +288,26 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
     return saved ? parseInt(saved) : null;
   });
 
+  const [gpsBlocked, setGpsBlocked] = useState(false);
+
   // 🛰️ Real-time Location Tracking Sync (watchPosition for Uber/Zepto-style tracking)
   useEffect(() => {
     let watchId = null;
 
     const startTracking = () => {
-      if (!navigator.geolocation) return;
+      if (!navigator.geolocation) {
+        console.warn('Geolocation API not available on this device.');
+        return;
+      }
 
+      // GPS requires HTTPS (or localhost) — check secure context first
+      if (!window.isSecureContext) {
+        console.warn('⚠️ GPS blocked: app is running over HTTP. Use HTTPS for live location tracking.');
+        setGpsBlocked(true);
+        return;
+      }
+
+      setGpsBlocked(false);
       watchId = navigator.geolocation.watchPosition(
         async (position) => {
           const { latitude, longitude } = position.coords;
@@ -223,6 +340,7 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
        // Delete location row when rider goes off
        supabase.from('rider_locations').delete().eq('rider_id', riderId);
        setCurrentCoords(null);
+       setGpsBlocked(false);
     }
 
     return () => {
@@ -231,6 +349,7 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
       }
     };
   }, [isOnline, riderId]);
+
 
   useEffect(() => {
     if (isOnline) {
@@ -254,11 +373,20 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
     switch (activeTab) {
       case 'DASHBOARD': return <RiderDashboard {...commonProps} setIsOnline={setIsOnline} riderLocation={location} setRiderLocation={setLocation} isDetecting={isDetecting} setIsDetecting={setIsDetecting} userCoords={currentCoords || userCoords} />;
       case 'EARNINGS': return <RiderEarnings {...commonProps} />;
+      case 'RIDES': return <RiderRideBookings {...commonProps} />;
       case 'WALLET': return <RiderWallet {...commonProps} />;
       case 'PROFILE': return <RiderProfile {...commonProps} onLogout={onLogout} />;
       default: return <RiderDashboard {...commonProps} setIsOnline={setIsOnline} riderLocation={location} setRiderLocation={setLocation} isDetecting={isDetecting} setIsDetecting={setIsDetecting} userCoords={currentCoords || userCoords} />;
     }
   };
+
+  const handleNotifTap = () => {
+    setGlobalNotif(null);
+    setNotifCount(0);
+    lastNotifIdRef.current = null;
+    setActiveTab('DASHBOARD');
+  };
+
 
   return (
     <div className="rider-app">
@@ -309,36 +437,161 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
         </div>
       </header>
 
+      {/* GPS Blocked Warning Banner */}
+      {gpsBlocked && isOnline && (
+        <div style={{
+          background: 'linear-gradient(135deg, #fef3c7, #fde68a)',
+          borderBottom: '2px solid #f59e0b',
+          padding: '10px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          fontSize: '0.78rem',
+          color: '#92400e',
+          fontWeight: 600,
+          zIndex: 100,
+          position: 'relative'
+        }}>
+          <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+          <div>
+            <div style={{ fontWeight: 800 }}>GPS Tracking Blocked</div>
+            <div style={{ fontWeight: 500 }}>Use HTTPS to enable live location:{' '}
+              <a href={`https://${window.location.hostname}:3003`}
+                style={{ color: '#92400e', textDecoration: 'underline', fontWeight: 700 }}>
+                https://{window.location.hostname}:3003
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content Area */}
       <main ref={mainScrollRef} className="rider-main-scroll">
         {renderContent()}
       </main>
 
-      {/* Bottom Navigation */}
+
+      {/* 🔔 Global Floating Notification Banner — shows on ANY tab */}
+      {globalNotif && activeTab !== 'DASHBOARD' && (
+        <div
+          onClick={handleNotifTap}
+          style={{
+            position: 'fixed',
+            bottom: 'calc(env(safe-area-inset-bottom) + 80px)',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 99999,
+            background: 'linear-gradient(135deg, #1a1a2e, #16213e)',
+            color: 'white',
+            borderRadius: 20,
+            padding: '14px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.35), 0 0 0 2px rgba(255,118,34,0.5)',
+            cursor: 'pointer',
+            maxWidth: 'calc(100vw - 3rem)',
+            minWidth: 260,
+            animation: 'slideUpBounce 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            border: '1.5px solid rgba(255,118,34,0.4)',
+          }}
+        >
+          {/* Pulse ring */}
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #ff7622, #ef4444)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '1.3rem'
+            }}>
+              {globalNotif.type === 'ride' ? '🛵' : '📦'}
+            </div>
+            <span style={{
+              position: 'absolute', top: -4, right: -4,
+              background: '#ef4444', color: 'white',
+              fontSize: '0.6rem', fontWeight: 900,
+              width: 18, height: 18, borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: '2px solid #1a1a2e',
+              animation: 'pulse 1s infinite'
+            }}>{globalNotif.count}</span>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ margin: 0, fontWeight: 800, fontSize: '0.875rem', color: '#ff7622', letterSpacing: '0.01em' }}>{globalNotif.label}</p>
+            <p style={{ margin: 0, fontSize: '0.72rem', color: 'rgba(255,255,255,0.75)', fontWeight: 500, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{globalNotif.sub}</p>
+          </div>
+          <div style={{ background: '#ff7622', color: 'white', borderRadius: 10, padding: '6px 12px', fontSize: '0.72rem', fontWeight: 800, flexShrink: 0 }}>View →</div>
+        </div>
+      )}
+
+      {/* Bottom Navigation / Desktop Sidebar */}
       <nav className="rider-bottom-nav">
-          <NavItem 
-            icon={<LayoutDashboard size={24} />} 
-            label="Orders" 
-            isActive={activeTab === 'DASHBOARD'} 
-            onClick={() => setActiveTab('DASHBOARD')} 
+
+          {/* Profile identity — visible inside sidebar on desktop */}
+          <div className="rider-sidebar-profile">
+            <div className="rider-sidebar-avatar">
+              <img
+                src={user?.photoURL || user?.photo || '/logo.png'}
+                alt="Rider"
+                style={{
+                  width: (user?.photoURL || user?.photo) ? '100%' : '26px',
+                  height: (user?.photoURL || user?.photo) ? '100%' : '26px',
+                  objectFit: (user?.photoURL || user?.photo) ? 'cover' : 'contain'
+                }}
+              />
+            </div>
+            <div className="rider-sidebar-identity">
+              <span className="rider-sidebar-name">Passwala Rider</span>
+              <span className={`rider-sidebar-status ${isOnline ? 'online' : 'offline'}`}>
+                <span className="status-dot" />
+                {isOnline ? 'Online' : 'Offline'}
+              </span>
+            </div>
+          </div>
+
+          <NavItem
+            icon={
+              <div style={{ position: 'relative' }}>
+                <LayoutDashboard size={22} />
+                {notifCount > 0 && activeTab !== 'DASHBOARD' && (
+                  <span style={{
+                    position: 'absolute', top: -6, right: -6,
+                    background: '#ef4444', color: 'white',
+                    fontSize: '0.55rem', fontWeight: 900,
+                    width: 15, height: 15, borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    animation: 'pulse 1s infinite'
+                  }}>{notifCount}</span>
+                )}
+              </div>
+            }
+            label="Orders"
+            isActive={activeTab === 'DASHBOARD'}
+            onClick={() => { setActiveTab('DASHBOARD'); setGlobalNotif(null); setNotifCount(0); }}
           />
-          <NavItem 
-            icon={<IndianRupee size={24} />} 
-            label="Earnings" 
-            isActive={activeTab === 'EARNINGS'} 
-            onClick={() => setActiveTab('EARNINGS')} 
+          <NavItem
+            icon={<IndianRupee size={22} />}
+            label="Earnings"
+            isActive={activeTab === 'EARNINGS'}
+            onClick={() => setActiveTab('EARNINGS')}
           />
-          <NavItem 
-            icon={<Wallet size={24} />} 
-            label="Wallet" 
-            isActive={activeTab === 'WALLET'} 
-            onClick={() => setActiveTab('WALLET')} 
+          <NavItem
+            icon={<Bike size={22} />}
+            label="Rides"
+            isActive={activeTab === 'RIDES'}
+            onClick={() => setActiveTab('RIDES')}
           />
-          <NavItem 
-            icon={<UserCircle size={24} />} 
-            label="Profile" 
-            isActive={activeTab === 'PROFILE'} 
-            onClick={() => setActiveTab('PROFILE')} 
+          <NavItem
+            icon={<Wallet size={22} />}
+            label="Wallet"
+            isActive={activeTab === 'WALLET'}
+            onClick={() => setActiveTab('WALLET')}
+          />
+          <NavItem
+            icon={<UserCircle size={22} />}
+            label="Profile"
+            isActive={activeTab === 'PROFILE'}
+            onClick={() => setActiveTab('PROFILE')}
           />
       </nav>
 

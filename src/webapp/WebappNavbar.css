@@ -113,8 +113,7 @@
   flex-shrink: 0;
 }
 
-.nav-action-btn-v2,
-.nav-profile-trigger {
+.nav-action-btn-v2 {
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -130,11 +129,32 @@
   flex-shrink: 0;
 }
 
-.nav-action-btn-v2:hover,
-.nav-profile-trigger:hover {
+/* Profile avatar button — clean circular avatar, no border */
+.nav-profile-trigger {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.nav-action-btn-v2:hover {
   background: var(--primary-light);
   color: var(--primary);
   transform: scale(1.05);
+}
+
+.nav-profile-trigger:hover {
+  transform: scale(1.08);
+  opacity: 0.9;
 }
 
 .nav-action-btn-v2:active,
@@ -201,23 +221,25 @@
 }
 
 .nav-profile-trigger img {
-  width: 28px;
-  height: 28px;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   object-fit: cover;
 }
 
 .nav-avatar-circle-v2 {
-  width: 28px;
-  height: 28px;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
-  background: var(--primary-light);
-  color: var(--primary);
+  background: linear-gradient(135deg, var(--primary), #ff9a3c); /* orange gradient */
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
+  letter-spacing: -0.5px;
+  box-shadow: 0 2px 8px rgba(255, 118, 34, 0.3);
 }
 
 /* Responsiveness */
@@ -245,7 +267,7 @@
   }
 
   .brand-tagline-location {
-    max-width: 140px;
+    max-width: 160px; /* enough for 'Navrangpura, Ahmedabad' */
   }
 
   .navbar-right-actions {
@@ -255,7 +277,7 @@
 
 @media (max-width: 380px) {
   .brand-tagline-location {
-    max-width: 100px;
+    max-width: 160px; /* was 100px — city name was being cut off on small phones */
   }
 }
 
@@ -284,8 +306,158 @@
 
 .clickable-location {
   cursor: pointer;
+  touch-action: manipulation; /* instant tap response on mobile — no 300ms delay */
+  -webkit-tap-highlight-color: transparent;
 }
 
 .clickable-location:active {
   opacity: 0.7;
+}
+
+/* ── Tablet: navbar starts after 64px sidebar ── */
+@media (min-width: 768px) {
+  .webapp-navbar {
+    left: 64px;
+    height: 60px;
+    padding: 0 1.5rem;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .navbar-logo-v3 {
+    width: 32px;
+    height: 32px;
+  }
+
+  .nav-action-btn-v2,
+  .nav-profile-trigger {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* ── Desktop: navbar starts after 220px sidebar ── */
+@media (min-width: 1024px) {
+  .webapp-navbar {
+    left: 220px;
+    padding: 0 2rem;
+    height: 64px;
+    background: #ffffff;             /* solid white — matches sidebar */
+    border-bottom: 1px solid var(--border-light);
+    border-left: 1px solid var(--border-light);  /* separator at sidebar edge */
+    box-shadow: none;
+    z-index: 2000;
+  }
+
+  .navbar-top-main {
+    max-width: 1200px;
+  }
+
+  /* Hide the duplicate brand logo on desktop — sidebar handles brand identity */
+  .navbar-logo-v3 {
+    display: none !important;
+  }
+
+  /* Hide the duplicate brand text on desktop — sidebar shows 'Passwala' */
+  .brand-name-navy {
+    display: none !important;
+  }
+
+  /* Location takes full left slot on desktop */
+  .brand-tagline-location {
+    font-size: 0.9rem;
+    font-weight: 600;
+    gap: 5px;
+  }
+
+  .brand-tagline-location strong {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  /* Action buttons: subtle bordered squares (cart, bell) */
+  .nav-action-btn-v2 {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border-light);
+    transition: all 0.18s ease;
+  }
+
+  .nav-action-btn-v2:hover {
+    background: var(--primary-light);
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 118, 34, 0.12);
+  }
+
+  /* Profile avatar: clean circle — NO border, NO background */
+  .nav-profile-trigger {
+    width: 38px;
+    height: 38px;
+    border-radius: 50% !important;
+    border: 2.5px solid transparent !important;
+    background: transparent !important;
+    padding: 0 !important;
+    cursor: pointer;
+    transition: border-color 0.2s ease, transform 0.18s ease, box-shadow 0.2s ease;
+    box-shadow: 0 0 0 0 rgba(255,118,34,0);
+  }
+
+  .nav-profile-trigger:hover {
+    transform: scale(1.06);
+    border-color: #ff7622 !important;
+    box-shadow: 0 0 0 3px rgba(255,118,34,0.15) !important;
+    background: transparent !important;
+  }
+
+  .nav-profile-trigger img,
+  .nav-profile-trigger .nav-avatar-circle-v2 {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 50% !important;
+  }
+
+  .nav-avatar-circle-v2 {
+    font-size: 1rem;
+  }
+
+  .navbar-right-actions {
+    gap: 0.5rem;
+  }
+}
+
+/* Base styles for avatar circle (mobile-first) */
+.nav-avatar-circle-v2 {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff7622, #ff9a5c);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: white;
+}
+
+/* Profile trigger base (mobile) */
+.nav-profile-trigger {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s ease;
+}
+
+.nav-profile-trigger:hover {
+  border-color: #ff7622;
 }

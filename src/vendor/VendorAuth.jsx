@@ -1,96 +1,118 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
-import './VendorPortal.css';
-
-const _ = motion;
+import './VendorAuth.css';
 
 const VendorAuth = ({ onLogin }) => {
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
+  const [focused, setFocused] = useState(false);
 
-  const handleSendOTP = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const cleanPhone = phoneNumber.replace(/\D/g, '');
-    
-    if (cleanPhone.length !== 10) {
-      toast.error('Enter a valid 10-digit number');
-      return;
-    }
-
+    const clean = phone.replace(/\D/g, '');
+    if (clean.length !== 10) { toast.error('Enter a valid 10-digit number'); return; }
     setLoading(true);
-    toast.success('Login Successful!');
-    onLogin(cleanPhone, { name: 'Vendor Partner' });
+    toast.success('Welcome to Passwala Partner!');
+    onLogin(clean, { name: 'Vendor Partner' });
   };
 
-  return (
-    <div className="vendor-auth-container">
-      <div className="vendor-auth-card glass slide-up">
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ width: '100%' }}>
-          <div className="auth-header">
-            <div className="auth-logo-wrapper">
-              <img src="/logo.png" alt="Passwala Logo" className="auth-logo" />
-            </div>
-            <h2 className="auth-title">Passwala Partner</h2>
-            <p className="auth-subtitle">Professional portal for vendors & experts</p>
-          </div>
+  const isValid = phone.length === 10;
 
-          <form onSubmit={handleSendOTP} className="auth-form mt-4">
-            <div 
-              style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                background: '#f8fafc', 
-                border: '2px solid #e2e8f0', 
-                borderRadius: '16px', 
-                padding: '6px 14px', 
-                marginBottom: '1.5rem',
-                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)',
-                transition: 'all 0.2s' 
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', paddingRight: '10px', borderRight: '2px solid #cbd5e1' }}>
-                <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#334155' }}>+91</span>
-              </div>
-              <input
-                type="tel"
-                placeholder="Mobile number"
-                maxLength={10}
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
-                style={{ 
-                  outline: 'none', 
-                  border: 'none', 
-                  boxShadow: 'none', 
-                  background: 'transparent', 
-                  width: '100%', 
-                  padding: '10px 0 10px 10px', 
-                  fontSize: '1.05rem', 
-                  fontWeight: 700, 
-                  color: '#0f172a',
-                  letterSpacing: '0.5px'
-                }}
-                autoFocus
-              />
-            </div>
-            
-            <button 
-              type="submit" 
-              className="auth-submit-btn" 
-              disabled={loading || phoneNumber.length !== 10}
-              style={{
-                width: '100%',
-                padding: '16px',
-                borderRadius: '16px',
-                fontSize: '1.05rem',
-                fontWeight: 800,
-                boxShadow: '0 10px 20px -5px rgba(249, 115, 22, 0.4)'
-              }}
-            >
-              {loading ? <span className="loader-ring"></span> : 'Continue'}
-            </button>
-          </form>
-        </motion.div>
+  return (
+    <div className="va-page">
+
+      {/* ── DESKTOP LEFT ASIDE ── */}
+      <aside className="va-aside">
+        <div className="va-aside-glow1" />
+        <div className="va-aside-glow2" />
+        <div className="va-aside-dots" />
+
+        <div className="va-aside-brand">
+          <div className="va-aside-logo">
+            <img src="/logo.png" alt="" width={22} height={22} style={{objectFit:'contain'}} />
+          </div>
+          <div>
+            <p className="va-aside-bname">Passwala</p>
+            <p className="va-aside-btag">Partner Portal</p>
+          </div>
+        </div>
+
+        <div className="va-aside-hero">
+          <div className="va-aside-chip">● For Vendors &amp; Experts</div>
+          <h1 className="va-aside-h1">
+            Run your store.<br/>
+            <span className="va-aside-orange">Grow faster.</span>
+          </h1>
+          <p className="va-aside-desc">Manage products, track orders, receive instant payouts and reach thousands of nearby customers.</p>
+        </div>
+
+        <div className="va-aside-pills">
+          {['📦 Inventory management','📊 Sales analytics','💸 Instant payouts','🛵 Live delivery tracking'].map(t => (
+            <div key={t} className="va-aside-pill">{t}</div>
+          ))}
+          <p className="va-aside-copy">© 2026 Passwala Technologies</p>
+        </div>
+      </aside>
+
+      {/* ── MOBILE DARK HEADER ── */}
+      <div className="va-mob-header">
+        <div className="va-mob-glow1" /><div className="va-mob-glow2" />
+        <div className="va-mob-brand">
+          <div className="va-mob-logo">
+            <img src="/logo.png" alt="" width={24} height={24} style={{objectFit:'contain'}} />
+          </div>
+          <span className="va-mob-bname">Passwala Partner</span>
+        </div>
+        <div className="va-mob-headline">
+          <p className="va-mob-tagline">For Vendors &amp; Experts</p>
+          <h2 className="va-mob-title">Run your store. <span className="va-mob-orange">Grow faster.</span></h2>
+        </div>
+      </div>
+
+      {/* ── FORM CARD ── */}
+      <div className="va-form-card">
+
+        {/* Desktop heading only */}
+        <div className="va-desk-head">
+          <div className="va-desk-logo">
+            <img src="/logo.png" alt="" width={28} height={28} style={{objectFit:'contain'}} />
+          </div>
+          <h2 className="va-desk-title">Sign in to Partner Portal</h2>
+          <p className="va-desk-sub">Enter your mobile number to continue</p>
+        </div>
+
+        {/* Mobile heading */}
+        <h3 className="va-mob-form-title">Sign in</h3>
+        <p className="va-mob-form-sub">Enter your 10-digit mobile number</p>
+
+        <label className="va-label">Mobile Number</label>
+        <form onSubmit={handleSubmit} className="va-form">
+          <div className={`va-field${focused?' va-f':''}${isValid?' va-ok':''}`}>
+            <span className="va-flag">🇮🇳</span>
+            <span className="va-code">+91</span>
+            <input
+              className="va-inp"
+              type="tel" placeholder="Enter 10-digit number"
+              maxLength={10} value={phone}
+              onChange={e => setPhone(e.target.value.replace(/\D/g,''))}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              autoFocus
+            />
+            {isValid && <span className="va-tick">✓</span>}
+          </div>
+          <button className={`va-btn${isValid?' va-btn-on':''}`} type="submit" disabled={!isValid||loading}>
+            {loading ? <><span className="loader-ring"/>Signing in…</> : <>Continue <span className="va-arr">→</span></>}
+          </button>
+        </form>
+
+        <div className="va-feats">
+          {[['📦','Products'],['📊','Analytics'],['💸','Payouts'],['🛵','Delivery']].map(([i,t])=>(
+            <div key={t} className="va-feat"><span>{i}</span><span className="va-feat-t">{t}</span></div>
+          ))}
+        </div>
+
+        <p className="va-terms">By continuing you agree to our <span className="va-lnk">Terms</span> &amp; <span className="va-lnk">Privacy Policy</span></p>
       </div>
     </div>
   );

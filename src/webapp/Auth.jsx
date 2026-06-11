@@ -17,14 +17,14 @@ import passwalaLogistics from '../assets/passwala_logistics.png';
 
 const popularAreas = [
   { name: 'Satellite, Ahmedabad', lat: 23.0305, lng: 72.5075 },
-  { name: 'Bandra, Mumbai', lat: 19.0596, lng: 72.8295 },
-  { name: 'Connaught Place, Delhi', lat: 28.6304, lng: 77.2177 },
-  { name: 'Koramangala, Bengaluru', lat: 12.9352, lng: 77.6245 },
-  { name: 'Viman Nagar, Pune', lat: 18.5679, lng: 73.9143 },
   { name: 'Bopal, Ahmedabad', lat: 23.0350, lng: 72.4397 },
-  { name: 'Gachibowli, Hyderabad', lat: 17.4401, lng: 78.3489 },
-  { name: 'Salt Lake, Kolkata', lat: 22.5865, lng: 88.4146 },
-  { name: 'Navrangpura, Ahmedabad', lat: 23.0333, lng: 72.5621 }
+  { name: 'Navrangpura, Ahmedabad', lat: 23.0333, lng: 72.5621 },
+  { name: 'Ghatlodiya, Ahmedabad', lat: 23.0725, lng: 72.5414 },
+  { name: 'Vastrapur, Ahmedabad', lat: 23.0372, lng: 72.5273 },
+  { name: 'Prahlad Nagar, Ahmedabad', lat: 23.0135, lng: 72.5072 },
+  { name: 'Gota, Ahmedabad', lat: 23.0975, lng: 72.5350 },
+  { name: 'Chandkheda, Ahmedabad', lat: 23.1114, lng: 72.5815 },
+  { name: 'Maninagar, Ahmedabad', lat: 22.9986, lng: 72.6025 }
 ];
 
 const Auth = ({ onLogin }) => {
@@ -55,11 +55,17 @@ const Auth = ({ onLogin }) => {
 
   useEffect(() => {
     const saved = localStorage.getItem('local_user_profile');
+    const savedUser = localStorage.getItem('passwala_user');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         setSyncedUser(parsed);
         if (step === 'WARM_UP') onLogin(parsed);
+      } catch (e) { /* Ignore */ }
+    } else if (savedUser && step === 'WARM_UP') {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        onLogin(parsedUser);
       } catch (e) { /* Ignore */ }
     }
   }, [step, onLogin]);
@@ -273,13 +279,31 @@ const Auth = ({ onLogin }) => {
 
   const fallbackToIP = async () => {
     try {
-      const res = await fetch('https://ipapi.co/json/');
+      const baseUrl = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      const res = await fetch(`${baseUrl}/api/ip-location`);
+      if (!res.ok) throw new Error('Proxied IP Location failed');
       const data = await res.json();
-      const detectedCity = data.city || 'Ahmedabad';
-      const fullAddress = `${detectedCity}, ${data.region || 'Gujarat'}`;
 
-      toast.success(`Approximate location detected: ${fullAddress}`);
-      finalizeLocation(fullAddress, { lat: parseFloat(data.latitude) || 23.0225, lng: parseFloat(data.longitude) || 72.5714 });
+      // 🔒 Local network: IP geo cannot work on private IPs.
+      // Server returns isLocal:true — ask user to select manually.
+      if (data.isLocal) {
+        console.warn('⚠️ Local network detected. Prompting manual location selection.');
+        setShowSearch(true);
+        toast('Enable GPS for accurate location, or select your area below 📍', {
+          icon: '📍',
+          duration: 5000,
+          id: 'local-network-prompt'
+        });
+        return;
+      }
+
+      if (data && data.cityName && data.regionName) {
+        const fullAddress = `${data.cityName}, ${data.regionName}`;
+        toast.success(`Approximate location detected: ${fullAddress}`);
+        finalizeLocation(fullAddress, { lat: parseFloat(data.latitude) || 23.0225, lng: parseFloat(data.longitude) || 72.5714 });
+      } else {
+        throw new Error('IP failed');
+      }
     } catch (e) {
       setShowSearch(true);
       toast.info("Please select your area manually.");

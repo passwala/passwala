@@ -42,10 +42,10 @@ const Footer = () => {
           <div className="footer-col">
             <h4>Our Apps</h4>
             <ul className="footer-links-list">
-              <li><a href={`http://${window.location.hostname}:3001`}>Buyer App</a></li>
-              <li><a href={`http://${window.location.hostname}:3003`}>Rider App</a></li>
-              <li><a href={`http://${window.location.hostname}:3002`}>Vendor Portal</a></li>
-              <li><a href={`http://${window.location.hostname}:3005`}>Admin Portal</a></li>
+              <li><a href={`${window.location.protocol}//${window.location.hostname}:3001`}>Buyer App</a></li>
+              <li><a href={`${window.location.protocol}//${window.location.hostname}:3003`}>Rider App</a></li>
+              <li><a href={`${window.location.protocol}//${window.location.hostname}:3002`}>Vendor Portal</a></li>
+              <li><a href={`${window.location.protocol}//${window.location.hostname}:3005`}>Admin Portal</a></li>
             </ul>
           </div>
 

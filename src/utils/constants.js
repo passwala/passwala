@@ -1,5 +1,5 @@
-export const DEFAULT_LOCATION = import.meta.env.VITE_DEFAULT_LOCATION || 'India';
-export const DEFAULT_COORDS = { lat: 20.5937, lng: 78.9629 }; // Geographic center of India
+export const DEFAULT_LOCATION = import.meta.env.VITE_DEFAULT_LOCATION || 'Ahmedabad, Gujarat';
+export const DEFAULT_COORDS = { lat: 23.0225, lng: 72.5714 }; // Ahmedabad Center
 
 // Extended precision map for all major Ahmedabad areas
 // Used to resolve order delivery/service addresses to accurate lat/lng

@@ -1,50 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
+import GoogleMapWrapper from '../../utils/GoogleMapWrapper';
 import { MapPin, Search, Navigation, ArrowRight, Map, LocateFixed, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { AHMEDABAD_AREAS as ahmedabadAreas } from '../../utils/constants';
 import { useTranslation } from '../LanguageContext';
 import './CityTicketBooking.css';
-
-
-// Custom colored markers
-const createColoredMarker = (color) =>
-  new L.DivIcon({
-    className: '',
-    html: `<div style="
-      width:22px; height:22px;
-      background:${color};
-      border:3px solid white;
-      border-radius:50% 50% 50% 0;
-      transform:rotate(-45deg);
-      box-shadow:0 3px 10px rgba(0,0,0,0.3);
-    "></div>`,
-    iconSize: [22, 22],
-    iconAnchor: [11, 22],
-    popupAnchor: [0, -22],
-  });
-
-const pickupIcon = createColoredMarker('#22c55e');
-const dropoffIcon = createColoredMarker('#ef4444');
-
-const vehicleIcon = new L.DivIcon({
-  className: '',
-  html: `<div style="
-    width:38px; height:38px;
-    background:#ff6b00;
-    border:3px solid white;
-    border-radius:50%;
-    box-shadow:0 4px 10px rgba(0,0,0,0.3);
-    display:flex; align-items:center; justify-content:center;
-  ">
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(45deg);"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-  </div>`,
-  iconSize: [38, 38],
-  iconAnchor: [19, 19],
-  popupAnchor: [0, -19]
-});
 
 const POPULAR_ROUTES = [
   { name: 'CG Road', lat: 23.0375, lng: 72.5567 },
@@ -139,35 +100,7 @@ async function fetchRoadRoute(pickup, dropoff) {
   return null;
 }
 
-// Component to handle map clicks
-function MapClickHandler({ onMapClick }) {
-  useMapEvents({
-    click: async (e) => {
-      const { lat, lng } = e.latlng;
-      onMapClick(lat, lng);
-    },
-  });
-  return null;
-}
 
-// Auto-fit map bounds
-function FitBounds({ pickup, dropoff }) {
-  const map = useMap();
-  useEffect(() => {
-    if (pickup && dropoff) {
-      const bounds = L.latLngBounds(
-        [pickup.lat, pickup.lng],
-        [dropoff.lat, dropoff.lng]
-      );
-      map.fitBounds(bounds, { padding: [60, 60] });
-    } else if (pickup) {
-      map.setView([pickup.lat, pickup.lng], 15);
-    } else if (dropoff) {
-      map.setView([dropoff.lat, dropoff.lng], 15);
-    }
-  }, [pickup, dropoff, map]);
-  return null;
-}
 
 const CityTicketBooking = ({ user, userCoords }) => {
   const navigate = useNavigate();
@@ -324,7 +257,7 @@ const CityTicketBooking = ({ user, userCoords }) => {
     setSearchResults([]);
   };
 
-  const center = [23.0225, 72.5714];
+  const [mapCenter, setMapCenter] = useState([23.0225, 72.5714]);
 
   // Fetch admin routes
   useEffect(() => {
@@ -347,45 +280,57 @@ const CityTicketBooking = ({ user, userCoords }) => {
   // Automatically fetch current location on mount as pickup location
   useEffect(() => {
     const resolveInitialLocation = async () => {
-      if (userCoords && userCoords.lat && userCoords.lng) {
+      // If app-level coords already resolved (from useLocation hook), use them directly
+      if (userCoords && userCoords.lat && userCoords.lng &&
+          (userCoords.lat !== 23.0225 || userCoords.lng !== 72.5714)) {
         const name = await reverseGeocode(userCoords.lat, userCoords.lng);
         setPickup({ lat: userCoords.lat, lng: userCoords.lng, name });
         setPickupSearchQuery(name);
+        setMapCenter([userCoords.lat, userCoords.lng]);
         setActiveInput('dropoff');
-      } else if (navigator.geolocation) {
+        return;
+      }
+
+      // Try GPS directly (only works on HTTPS or localhost)
+      if (navigator.geolocation && window.isSecureContext) {
         navigator.geolocation.getCurrentPosition(
           async (pos) => {
             const { latitude, longitude } = pos.coords;
             const name = await reverseGeocode(latitude, longitude);
             setPickup({ lat: latitude, lng: longitude, name });
             setPickupSearchQuery(name);
+            setMapCenter([latitude, longitude]);
             setActiveInput('dropoff');
           },
           (error) => {
-            console.log('Auto-geolocation error or permission denied:', error);
-            // Fallback to Ahmedabad default center
-            const defaultLat = 23.0225;
-            const defaultLng = 72.5714;
-            reverseGeocode(defaultLat, defaultLng).then((name) => {
-              setPickup({ lat: defaultLat, lng: defaultLng, name });
-              setPickupSearchQuery(name);
-              setActiveInput('dropoff');
-            });
+            console.log('GPS unavailable:', error.code, error.message);
+            if (error.code === 1) {
+              // Permission denied — user said no
+              toast('📍 GPS denied. Tap the map or search to set pickup.', { duration: 4000 });
+            } else {
+              // Timeout or unavailable — show gentle prompt
+              toast('📍 Could not get GPS. Tap the map to set pickup location.', { duration: 3000 });
+            }
           },
-          { enableHighAccuracy: true }
+          { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
         );
+      } else if (!window.isSecureContext) {
+        // HTTP context — GPS blocked by browser, prompt user to use map
+        toast('📍 Tap the map to set your pickup location.', { duration: 3000 });
       }
     };
     resolveInitialLocation();
   }, [userCoords]);
 
+
   // Fetch real road route whenever both points are set
   useEffect(() => {
     if (pickup && dropoff) {
       fetchRoadRoute(pickup, dropoff).then((result) => {
+        let finalDist = null;
         if (result) {
           setRoutePath(result.coords);
-          setDistanceKm(result.distanceKm);
+          finalDist = result.distanceKm;
         } else {
           // Straight-line fallback
           setRoutePath([[pickup.lat, pickup.lng], [dropoff.lat, dropoff.lng]]);
@@ -397,8 +342,10 @@ const CityTicketBooking = ({ user, userCoords }) => {
             Math.cos((pickup.lat * Math.PI) / 180) *
               Math.cos((dropoff.lat * Math.PI) / 180) *
               Math.sin(dLng / 2) ** 2;
-          setDistanceKm((R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(1));
+          finalDist = (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(1);
         }
+
+        setDistanceKm(finalDist);
       });
     } else {
       setRoutePath(null);
@@ -555,70 +502,73 @@ const CityTicketBooking = ({ user, userCoords }) => {
         <h2>Book City Ride</h2>
       </div>
 
-      {/* Map hint banner */}
-      <div className="cr-map-hint">
-        <MapPin size={13} />
-        {activeInput === 'pickup'
-          ? 'Tap on the map to set your Pickup Location'
-          : 'Tap on the map to set your Drop-off Location'}
-      </div>
-
       <div className="cr-map-area" style={{ cursor: 'crosshair' }}>
-        <MapContainer
-          center={center}
-          zoom={13}
-          scrollWheelZoom={true}
-          style={{ height: '100%', width: '100%' }}
-          zoomControl={true}
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            maxZoom={19}
-          />
-          <MapClickHandler onMapClick={handleMapClick} />
-          <FitBounds pickup={pickup} dropoff={dropoff} />
+        {/* Map hint banner */}
+        <div className="cr-map-hint">
+          <MapPin size={13} />
+          {activeInput === 'pickup'
+            ? 'Tap on the map to set your Pickup Location'
+            : 'Tap on the map to set your Drop-off Location'}
+        </div>
 
-          {pickup && (
-            <Marker position={[pickup.lat, pickup.lng]} icon={pickupIcon}>
-              <Popup>
-                <strong>🟢 Pickup</strong><br />{pickup.name}
-              </Popup>
-            </Marker>
-          )}
-          {dropoff && (
-            <Marker position={[dropoff.lat, dropoff.lng]} icon={dropoffIcon}>
-              <Popup>
-                <strong>🔴 Drop-off</strong><br />{dropoff.name}
-              </Popup>
-            </Marker>
-          )}
-          {routePath && routePath.length > 1 && (
-            <Polyline
-              positions={routePath}
-              color="#ff6b00"
-              weight={5}
-              opacity={0.85}
-              dashArray={null}
-            />
-          )}
-          {dbVehicles && dbVehicles.map(vehicle => {
+        {(() => {
+          const googleMarkers = [];
+          if (pickup) {
+            googleMarkers.push({
+              position: [pickup.lat, pickup.lng],
+              title: `🟢 Pickup: ${pickup.name}`,
+              svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="9" fill="#22c55e" stroke="white" stroke-width="2.5" /></svg>`,
+              iconSize: [22, 22],
+              iconAnchor: [11, 11]
+            });
+          }
+          if (dropoff) {
+            googleMarkers.push({
+              position: [dropoff.lat, dropoff.lng],
+              title: `🔴 Drop-off: ${dropoff.name}`,
+              svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="9" fill="#ef4444" stroke="white" stroke-width="2.5" /></svg>`,
+              iconSize: [22, 22],
+              iconAnchor: [11, 11]
+            });
+          }
+          dbVehicles.forEach(vehicle => {
             const lat = parseFloat(vehicle.current_lat || vehicle.lat);
             const lng = parseFloat(vehicle.current_lng || vehicle.lng);
-            if (isNaN(lat) || isNaN(lng) || lat === 0) return null;
-            return (
-              <Marker key={vehicle.id} position={[lat, lng]} icon={vehicleIcon}>
-                <Popup>
-                  <div style={{ fontFamily: 'inherit', fontSize: '0.82rem', lineHeight: '1.4' }}>
-                    <strong style={{ color: '#ff6b00' }}>🚌 {t('available_vehicle')}</strong><br />
-                    <span>Type: {vehicle.vehicle_type || 'Bike'}</span><br />
-                    <span>Plate: {vehicle.license_plate || 'GJ01-PW-0000'}</span>
-                  </div>
-                </Popup>
-              </Marker>
-            );
-          })}
-        </MapContainer>
+            if (isNaN(lat) || isNaN(lng) || lat === 0) return;
+            googleMarkers.push({
+              position: [lat, lng],
+              title: `Available Vehicle (${vehicle.vehicle_type || 'Bike'})`,
+              svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 38 38"><circle cx="19" cy="19" r="17" fill="#ff6b00" stroke="white" stroke-width="3" /><g transform="translate(9, 9)"><polygon points="3,11 22,2 13,21 11,13" fill="none" stroke="white" stroke-width="2" style="transform: rotate(45deg); transform-origin: 11px 11px;"/></g></svg>`,
+              iconSize: [38, 38],
+              iconAnchor: [19, 19]
+            });
+          });
+
+          const googlePolylines = [];
+          if (routePath && routePath.length > 1) {
+            googlePolylines.push({
+              path: routePath,
+              color: '#ff6b00',
+              weight: 5
+            });
+          }
+
+          const fitPoints = [];
+          if (pickup) fitPoints.push([pickup.lat, pickup.lng]);
+          if (dropoff) fitPoints.push([dropoff.lat, dropoff.lng]);
+
+          return (
+            <GoogleMapWrapper
+              center={mapCenter}
+              zoom={13}
+              markers={googleMarkers}
+              polylines={googlePolylines}
+              fitBoundsPoints={fitPoints}
+              onClick={({ lat, lng }) => handleMapClick(lat, lng)}
+              style={{ height: '100%', width: '100%' }}
+            />
+          );
+        })()}
 
         {/* Distance badge on map */}
         {distanceKm && (
