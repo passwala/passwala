@@ -675,7 +675,7 @@ function VendorOrderTrackingMap({ order, riderCoords, businessType }) {
       center: { lat: 23.0225, lng: 72.5714 },
       zoom: 14,
       mapTypeControl: false, streetViewControl: false, fullscreenControl: false, zoomControl: true,
-      zoomControlOptions: { position: window.google.maps.ControlPosition.RIGHT_TOP },
+      zoomControlOptions: { position: window.google?.maps?.ControlPosition?.RIGHT_TOP },
       styles: [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }]
     });
     return () => {
@@ -690,23 +690,19 @@ function VendorOrderTrackingMap({ order, riderCoords, businessType }) {
   // Draw markers and routes
   React.useEffect(() => {
     if (!googleMapInstance.current || !storeLatLng || !customerLatLng) return;
-    activeMarkers.current.forEach(m => { if (m.setMap) m.setMap(null); else if (m.map !== undefined) m.map = null; });
+    activeMarkers.current.forEach(m => m.setMap(null));
     activePolylines.current.forEach(p => p.setMap(null));
     activeMarkers.current = []; activePolylines.current = [];
 
     const map = googleMapInstance.current;
-    // Helper: prefer AdvancedMarkerElement over deprecated Marker
-    const AdvancedMarker = window.google?.maps?.marker?.AdvancedMarkerElement;
-    const createMarker = (pos, title, svgStr) => {
-      if (AdvancedMarker) {
-        const pin = document.createElement('div');
-        pin.innerHTML = svgStr ? `<img src="data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgStr)}" width="42" height="42">` : '';
-        return new AdvancedMarker({ position: pos, map, title: title || '', content: pin });
-      }
-      return new window.google.maps.Marker({ position: pos, map, title: title || '', icon: svgStr ? { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgStr), scaledSize: new window.google.maps.Size(42,42), anchor: new window.google.maps.Point(21,21) } : undefined });
-    };
-    const svgIcon = (color, svgPath, rounded = false) =>
-      `<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42"><rect x="0" y="0" width="42" height="42" rx="${rounded ? 12 : 21}" fill="${color}" stroke="white" stroke-width="3"/><g transform="translate(9,9)">${svgPath}</g></svg>`;
+    const svgIcon = (color, svgPath, rounded = false) => ({
+      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42"><rect x="0" y="0" width="42" height="42" rx="${rounded ? 12 : 21}" fill="${color}" stroke="white" stroke-width="3"/><g transform="translate(9,9)">${svgPath}</g></svg>`
+      ),
+      scaledSize: new window.google.maps.Size(42, 42),
+      anchor: new window.google.maps.Point(21, 21)
+    });
+    const createMarker = (pos, title, iconObj) => new window.google.maps.Marker({ position: pos, map, title: title || '', icon: iconObj });
 
     const drawPoly = (pts, color, weight = 6, dashed = false) => {
       if (!pts || pts.length < 2) return;

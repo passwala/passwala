@@ -23,7 +23,6 @@ const GoogleMapWrapper = ({
     const mapOptions = {
       center: { lat: center[0], lng: center[1] },
       zoom: zoom,
-      mapId: 'passwala_map',
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: false,
@@ -69,70 +68,44 @@ const GoogleMapWrapper = ({
     if (!googleMapInstance.current || !isLoaded) return;
 
     // Clean up existing markers
-    activeMarkers.current.forEach(m => {
-      if (m.setMap) m.setMap(null);
-      else if (m.map !== undefined) m.map = null;
-    });
+    activeMarkers.current.forEach(m => m.setMap(null));
     activeMarkers.current = [];
-
-    const AdvancedMarkerElement = window.google?.maps?.marker?.AdvancedMarkerElement;
-    const LegacyMarker = window.google?.maps?.Marker;
 
     // Create new markers
     markers.forEach(markerInfo => {
       if (!markerInfo.position || isNaN(markerInfo.position[0]) || isNaN(markerInfo.position[1])) return;
 
-      const position = { lat: markerInfo.position[0], lng: markerInfo.position[1] };
+      const markerOptions = {
+        position: { lat: markerInfo.position[0], lng: markerInfo.position[1] },
+        map: googleMapInstance.current,
+        title: markerInfo.title || '',
+      };
 
-      let marker;
-
-      if (AdvancedMarkerElement) {
-        // Use modern AdvancedMarkerElement
-        const pin = document.createElement('div');
-        if (markerInfo.svgIcon) {
-          pin.innerHTML = markerInfo.svgIcon;
-          pin.style.cursor = 'pointer';
-        } else {
-          pin.style.cssText = 'width:12px;height:12px;border-radius:50%;background:#ff6b00;border:2px solid white;';
-        }
-        marker = new AdvancedMarkerElement({
-          position,
-          map: googleMapInstance.current,
-          title: markerInfo.title || '',
-          content: pin,
-        });
-
-        if (markerInfo.title) {
-          const infoWindow = new window.google.maps.InfoWindow({
-            content: `<div style="color:#0f172a;font-family:sans-serif;font-size:13px;font-weight:600;padding:4px 8px;">${markerInfo.title}</div>`
-          });
-          pin.addEventListener('click', () => {
-            infoWindow.open(googleMapInstance.current, marker);
-          });
-        }
-
-        if (markerInfo.onClick) {
-          pin.addEventListener('click', markerInfo.onClick);
-        }
-      } else if (LegacyMarker) {
-        // Fallback to legacy Marker
-        const markerOptions = {
-          position,
-          map: googleMapInstance.current,
-          title: markerInfo.title || '',
+      // Custom SVG icon support
+      if (markerInfo.svgIcon) {
+        markerOptions.icon = {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerInfo.svgIcon),
+          scaledSize: new window.google.maps.Size(markerInfo.iconSize?.[0] || 32, markerInfo.iconSize?.[1] || 32),
+          anchor: markerInfo.iconAnchor ? new window.google.maps.Point(markerInfo.iconAnchor[0], markerInfo.iconAnchor[1]) : undefined
         };
-        if (markerInfo.svgIcon) {
-          markerOptions.icon = {
-            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerInfo.svgIcon),
-            scaledSize: new window.google.maps.Size(markerInfo.iconSize?.[0] || 32, markerInfo.iconSize?.[1] || 32),
-            anchor: markerInfo.iconAnchor ? new window.google.maps.Point(markerInfo.iconAnchor[0], markerInfo.iconAnchor[1]) : undefined
-          };
-        }
-        marker = new LegacyMarker(markerOptions);
-        if (markerInfo.onClick) marker.addListener('click', markerInfo.onClick);
       }
 
-      if (marker) activeMarkers.current.push(marker);
+      const marker = new window.google.maps.Marker(markerOptions);
+
+      if (markerInfo.title) {
+        const infoWindow = new window.google.maps.InfoWindow({
+          content: `<div style="color:#0f172a;font-family:sans-serif;font-size:13px;font-weight:600;padding:4px 8px;">${markerInfo.title}</div>`
+        });
+        marker.addListener('click', () => {
+          infoWindow.open(googleMapInstance.current, marker);
+        });
+      }
+
+      if (markerInfo.onClick) {
+        marker.addListener('click', markerInfo.onClick);
+      }
+
+      activeMarkers.current.push(marker);
     });
   }, [markers, isLoaded]);
 

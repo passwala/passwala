@@ -162,17 +162,16 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
     googleMapInstance.current = new window.google.maps.Map(googleMapRef.current, {
       center: center,
       zoom: 14,
-      mapId: 'passwala_map',
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: false,
       zoomControl: true,
-      zoomControlOptions: { position: window.google.maps.ControlPosition.RIGHT_TOP },
+      zoomControlOptions: { position: window.google?.maps?.ControlPosition?.RIGHT_TOP },
       styles: [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }]
     });
     isMapReady.current = true;
     return () => {
-      activeMarkers.current.forEach(m => { if (m.setMap) m.setMap(null); else if (m.map !== undefined) m.map = null; });
+      activeMarkers.current.forEach(m => m.setMap(null));
       activePolylines.current.forEach(p => p.setMap(null));
       activeMarkers.current = [];
       activePolylines.current = [];
@@ -204,15 +203,16 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
     activeMarkers.current = [];
     activePolylines.current = [];
 
-    // Helper: create marker using AdvancedMarkerElement if available
-    const AdvancedMarker = window.google?.maps?.marker?.AdvancedMarkerElement;
+    // Helper: create marker using google.maps.Marker
     const createMarker = (position, title, svgIconStr) => {
-      if (AdvancedMarker) {
-        const pin = document.createElement('div');
-        pin.innerHTML = svgIconStr ? `<img src="data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgIconStr)}" width="42" height="42">` : '';
-        return new AdvancedMarker({ position, map, title: title || '', content: pin });
-      }
-      return new window.google.maps.Marker({ position, map, title: title || '', icon: svgIconStr ? { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgIconStr), scaledSize: new window.google.maps.Size(42,42), anchor: new window.google.maps.Point(21,21) } : undefined });
+      return new window.google.maps.Marker({
+        position, map, title: title || '',
+        icon: svgIconStr ? {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgIconStr),
+          scaledSize: new window.google.maps.Size(42, 42),
+          anchor: new window.google.maps.Point(21, 21)
+        } : undefined
+      });
     };
 
     const map = googleMapInstance.current;

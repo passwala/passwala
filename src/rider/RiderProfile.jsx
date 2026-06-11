@@ -268,7 +268,7 @@ function MyBookingsSubpage({ user, riderId, onBack }) {
             .from('delivery_tracking')
             .select('*, orders(id, total_amount, status, created_at, stores(name))')
             .eq('rider_id', riderId)
-            .order('created_at', { ascending: false })
+            .order('updated_at', { ascending: false })
             .limit(50);
           setOrders(data || []);
         }

@@ -23,7 +23,7 @@ export function useGoogleMaps() {
       isScriptLoading = true;
       const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry,marker&loading=async`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
       script.async = true;
       script.defer = true;
       script.onload = () => {
