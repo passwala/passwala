@@ -91,33 +91,21 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
 
           // Fetch delivery tracking to calculate acceptance and cancellation rates in two steps
           let trackingData = [];
-          const { data: tracking, error: trackingError } = await supabase
+          const { data: tracking } = await supabase
             .from('delivery_tracking')
             .select('order_id, status')
             .eq('rider_id', rid);
 
-          if (trackingError) throw trackingError;
-
-          if (tracking) {
+          if (tracking?.length) {
             trackingData = tracking;
-            const orderIds = trackingData.map(t => t.order_id).filter(Boolean);
-            if (orderIds.length > 0) {
-              const { data: ordersData } = await supabase
-                .from('orders')
-                .select('id, status')
-                .in('id', orderIds);
-              
-              if (ordersData) {
-                const ordersMap = {};
-                ordersData.forEach(o => {
-                  ordersMap[o.id] = o;
-                });
-                trackingData = trackingData.map(t => ({
-                  ...t,
-                  orders: ordersMap[t.order_id] || null
-                }));
-              }
-            }
+            const ids = tracking.map(t => t.order_id).filter(Boolean);
+            const { data: ords } = await supabase
+              .from('orders')
+              .select('id, status')
+              .in('id', ids);
+            
+            const map = Object.fromEntries((ords || []).map(o => [o.id, o]));
+            trackingData = tracking.map(t => ({ ...t, orders: map[t.order_id] }));
           }
 
           let rejectedOrderIds = [];

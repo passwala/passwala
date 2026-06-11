@@ -264,38 +264,22 @@ function MyBookingsSubpage({ user, riderId, onBack }) {
       // Fetch delivery orders via supabase in two steps to bypass cache relationship error
       try {
         if (riderId) {
-          const { data: trackingData, error: trackingErr } = await supabase
+          const { data: tracking } = await supabase
             .from('delivery_tracking')
             .select('*')
             .eq('rider_id', riderId)
             .order('updated_at', { ascending: false })
             .limit(50);
 
-          if (trackingErr) throw trackingErr;
+          if (tracking?.length) {
+            const ids = tracking.map(d => d.order_id).filter(Boolean);
+            const { data: ords } = await supabase
+              .from('orders')
+              .select('id, total_amount, status, created_at, stores(name)')
+              .in('id', ids);
 
-          if (trackingData && trackingData.length > 0) {
-            const orderIds = trackingData.map(d => d.order_id).filter(Boolean);
-            if (orderIds.length > 0) {
-              const { data: ordersData, error: ordersErr } = await supabase
-                .from('orders')
-                .select('id, total_amount, status, created_at, stores(name)')
-                .in('id', orderIds);
-
-              if (ordersErr) throw ordersErr;
-
-              const ordersMap = {};
-              (ordersData || []).forEach(o => {
-                ordersMap[o.id] = o;
-              });
-
-              const merged = trackingData.map(d => ({
-                ...d,
-                orders: ordersMap[d.order_id] || null
-              }));
-              setOrders(merged);
-            } else {
-              setOrders(trackingData);
-            }
+            const map = Object.fromEntries((ords || []).map(o => [o.id, o]));
+            setOrders(tracking.map(d => ({ ...d, orders: map[d.order_id] })));
           } else {
             setOrders([]);
           }
