@@ -261,16 +261,44 @@ function MyBookingsSubpage({ user, riderId, onBack }) {
         }
       } catch (e) { console.warn('Rides fetch:', e); }
 
-      // Fetch delivery orders via supabase
+      // Fetch delivery orders via supabase in two steps to bypass cache relationship error
       try {
         if (riderId) {
-          const { data } = await supabase
+          const { data: trackingData, error: trackingErr } = await supabase
             .from('delivery_tracking')
-            .select('*, orders(id, total_amount, status, created_at, stores(name))')
+            .select('*')
             .eq('rider_id', riderId)
             .order('updated_at', { ascending: false })
             .limit(50);
-          setOrders(data || []);
+
+          if (trackingErr) throw trackingErr;
+
+          if (trackingData && trackingData.length > 0) {
+            const orderIds = trackingData.map(d => d.order_id).filter(Boolean);
+            if (orderIds.length > 0) {
+              const { data: ordersData, error: ordersErr } = await supabase
+                .from('orders')
+                .select('id, total_amount, status, created_at, stores(name)')
+                .in('id', orderIds);
+
+              if (ordersErr) throw ordersErr;
+
+              const ordersMap = {};
+              (ordersData || []).forEach(o => {
+                ordersMap[o.id] = o;
+              });
+
+              const merged = trackingData.map(d => ({
+                ...d,
+                orders: ordersMap[d.order_id] || null
+              }));
+              setOrders(merged);
+            } else {
+              setOrders(trackingData);
+            }
+          } else {
+            setOrders([]);
+          }
         }
       } catch (e) { console.warn('Orders fetch:', e); }
 

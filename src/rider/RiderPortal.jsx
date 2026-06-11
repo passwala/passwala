@@ -89,11 +89,36 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
           
           if (earningsError) throw earningsError;
 
-          // Fetch delivery tracking to calculate acceptance and cancellation rates
-          const { data: trackingData } = await supabase
+          // Fetch delivery tracking to calculate acceptance and cancellation rates in two steps
+          let trackingData = [];
+          const { data: tracking, error: trackingError } = await supabase
             .from('delivery_tracking')
-            .select('order_id, status, orders(status)')
+            .select('order_id, status')
             .eq('rider_id', rid);
+
+          if (trackingError) throw trackingError;
+
+          if (tracking) {
+            trackingData = tracking;
+            const orderIds = trackingData.map(t => t.order_id).filter(Boolean);
+            if (orderIds.length > 0) {
+              const { data: ordersData } = await supabase
+                .from('orders')
+                .select('id, status')
+                .in('id', orderIds);
+              
+              if (ordersData) {
+                const ordersMap = {};
+                ordersData.forEach(o => {
+                  ordersMap[o.id] = o;
+                });
+                trackingData = trackingData.map(t => ({
+                  ...t,
+                  orders: ordersMap[t.order_id] || null
+                }));
+              }
+            }
+          }
 
           let rejectedOrderIds = [];
           try {
