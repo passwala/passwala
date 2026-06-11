@@ -162,6 +162,7 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
     googleMapInstance.current = new window.google.maps.Map(googleMapRef.current, {
       center: center,
       zoom: 14,
+      mapId: 'passwala_map',
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: false,
@@ -171,7 +172,7 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
     });
     isMapReady.current = true;
     return () => {
-      activeMarkers.current.forEach(m => m.setMap(null));
+      activeMarkers.current.forEach(m => { if (m.setMap) m.setMap(null); else if (m.map !== undefined) m.map = null; });
       activePolylines.current.forEach(p => p.setMap(null));
       activeMarkers.current = [];
       activePolylines.current = [];
@@ -198,10 +199,21 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
     if (!isMapReady.current || !googleMapInstance.current || !storeLatLng || !customerLatLng) return;
 
     // Clear previous overlays
-    activeMarkers.current.forEach(m => m.setMap(null));
+    activeMarkers.current.forEach(m => { if (m.setMap) m.setMap(null); else if (m.map !== undefined) m.map = null; });
     activePolylines.current.forEach(p => p.setMap(null));
     activeMarkers.current = [];
     activePolylines.current = [];
+
+    // Helper: create marker using AdvancedMarkerElement if available
+    const AdvancedMarker = window.google?.maps?.marker?.AdvancedMarkerElement;
+    const createMarker = (position, title, svgIconStr) => {
+      if (AdvancedMarker) {
+        const pin = document.createElement('div');
+        pin.innerHTML = svgIconStr ? `<img src="data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgIconStr)}" width="42" height="42">` : '';
+        return new AdvancedMarker({ position, map, title: title || '', content: pin });
+      }
+      return new window.google.maps.Marker({ position, map, title: title || '', icon: svgIconStr ? { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgIconStr), scaledSize: new window.google.maps.Size(42,42), anchor: new window.google.maps.Point(21,21) } : undefined });
+    };
 
     const map = googleMapInstance.current;
     const riderPos = riderCoords?.lat && riderCoords?.lng
@@ -214,31 +226,19 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
     const custPt  = { lat: customerLatLng[0], lng: customerLatLng[1] };
 
     // Store marker
-    const storeMarker = new window.google.maps.Marker({
-      position: storePt, map,
-      title: isService && providerDetails ? (providerDetails.business_name || providerDetails.name) : (order.stores?.name || 'Partner Store'),
-      icon: makeSvgIcon('#f97316', '<rect x="1" y="5" width="20" height="16" rx="2" fill="none" stroke="white" stroke-width="2"/><path d="M5 5V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2" stroke="white" stroke-width="2" fill="none"/>', 'rounded')
-    });
+    const storeSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42"><rect x="0" y="0" width="42" height="42" rx="12" fill="#f97316" stroke="white" stroke-width="3"/><g transform="translate(10,10)"><rect x="1" y="5" width="20" height="16" rx="2" fill="none" stroke="white" stroke-width="2"/><path d="M5 5V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2" stroke="white" stroke-width="2" fill="none"/></g></svg>`;
+    const storeMarker = createMarker(storePt, isService && providerDetails ? (providerDetails.business_name || providerDetails.name) : (order.stores?.name || 'Partner Store'), storeSvg);
     activeMarkers.current.push(storeMarker);
 
     // Customer marker
-    const custMarker = new window.google.maps.Marker({
-      position: custPt, map,
-      title: order.addresses?.address_line_1 || 'Delivery Location',
-      icon: makeSvgIcon('#3b82f6', '<path d="m1 7 9-7 9 7v9a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2z" fill="none" stroke="white" stroke-width="2"/><polyline points="7 22 7 12 11 12 11 22" stroke="white" stroke-width="2" fill="none"/>')
-    });
+    const custSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42"><rect x="0" y="0" width="42" height="42" rx="21" fill="#3b82f6" stroke="white" stroke-width="3"/><g transform="translate(10,10)"><path d="m1 7 9-7 9 7v9a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2z" fill="none" stroke="white" stroke-width="2"/><polyline points="7 22 7 12 11 12 11 22" stroke="white" stroke-width="2" fill="none"/></g></svg>`;
+    const custMarker = createMarker(custPt, order.addresses?.address_line_1 || 'Delivery Location', custSvg);
     activeMarkers.current.push(custMarker);
 
     // Rider/Provider marker
     if (riderPos) {
-      const riderMarker = new window.google.maps.Marker({
-        position: riderPos, map,
-        title: isService ? 'Service Expert' : `Rider: ${order.delivery_agent_name || 'Verified Partner'}`,
-        icon: makeSvgIcon('#10b981', isService
-          ? '<path d="M12 2c0 .6-.1 1.2-.4 1.7L7 12H4a1 1 0 0 0-1 1v1h18v-1a1 1 0 0 0-1-1h-3L12.4 3.7A3.5 3.5 0 0 0 12 2z" fill="white" fill-opacity="0.8"/>'
-          : '<polygon points="3 9 20 2 13 19 11 11 3 9" fill="none" stroke="white" stroke-width="2"/>'
-        )
-      });
+      const riderSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42"><rect x="0" y="0" width="42" height="42" rx="21" fill="#10b981" stroke="white" stroke-width="3"/><g transform="translate(10,10)">${isService ? '<path d="M12 2c0 .6-.1 1.2-.4 1.7L7 12H4a1 1 0 0 0-1 1v1h18v-1a1 1 0 0 0-1-1h-3L12.4 3.7A3.5 3.5 0 0 0 12 2z" fill="white" fill-opacity="0.8"/>' : '<polygon points="3 9 20 2 13 19 11 11 3 9" fill="none" stroke="white" stroke-width="2"/>'}</g></svg>`;
+      const riderMarker = createMarker(riderPos, isService ? 'Service Expert' : `Rider: ${order.delivery_agent_name || 'Verified Partner'}`, riderSvg);
       activeMarkers.current.push(riderMarker);
     }
 

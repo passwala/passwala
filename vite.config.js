@@ -93,8 +93,6 @@ messaging.onBackgroundMessage((payload) => {
         'react-dom',
         'react-router-dom',
         'react-qr-code',
-        'react-leaflet',
-        'leaflet',
         'lucide-react',
         'react-hot-toast'
       ]
@@ -107,9 +105,6 @@ messaging.onBackgroundMessage((payload) => {
           manualChunks(id) {
             if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
               return 'react-vendor';
-            }
-            if (id.includes('node_modules/leaflet') || id.includes('node_modules/react-leaflet')) {
-              return 'maps-vendor';
             }
             if (id.includes('node_modules/framer-motion') || id.includes('node_modules/lucide-react')) {
               return 'ui-vendor';

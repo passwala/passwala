@@ -690,18 +690,23 @@ function VendorOrderTrackingMap({ order, riderCoords, businessType }) {
   // Draw markers and routes
   React.useEffect(() => {
     if (!googleMapInstance.current || !storeLatLng || !customerLatLng) return;
-    activeMarkers.current.forEach(m => m.setMap(null));
+    activeMarkers.current.forEach(m => { if (m.setMap) m.setMap(null); else if (m.map !== undefined) m.map = null; });
     activePolylines.current.forEach(p => p.setMap(null));
     activeMarkers.current = []; activePolylines.current = [];
 
     const map = googleMapInstance.current;
-    const svgIcon = (color, svgPath, rounded = false) => ({
-      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
-        `<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42"><rect x="0" y="0" width="42" height="42" rx="${rounded ? 12 : 21}" fill="${color}" stroke="white" stroke-width="3"/><g transform="translate(9,9)">${svgPath}</g></svg>`
-      ),
-      scaledSize: new window.google.maps.Size(42, 42),
-      anchor: new window.google.maps.Point(21, 21)
-    });
+    // Helper: prefer AdvancedMarkerElement over deprecated Marker
+    const AdvancedMarker = window.google?.maps?.marker?.AdvancedMarkerElement;
+    const createMarker = (pos, title, svgStr) => {
+      if (AdvancedMarker) {
+        const pin = document.createElement('div');
+        pin.innerHTML = svgStr ? `<img src="data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgStr)}" width="42" height="42">` : '';
+        return new AdvancedMarker({ position: pos, map, title: title || '', content: pin });
+      }
+      return new window.google.maps.Marker({ position: pos, map, title: title || '', icon: svgStr ? { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgStr), scaledSize: new window.google.maps.Size(42,42), anchor: new window.google.maps.Point(21,21) } : undefined });
+    };
+    const svgIcon = (color, svgPath, rounded = false) =>
+      `<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42"><rect x="0" y="0" width="42" height="42" rx="${rounded ? 12 : 21}" fill="${color}" stroke="white" stroke-width="3"/><g transform="translate(9,9)">${svgPath}</g></svg>`;
 
     const drawPoly = (pts, color, weight = 6, dashed = false) => {
       if (!pts || pts.length < 2) return;
@@ -717,26 +722,23 @@ function VendorOrderTrackingMap({ order, riderCoords, businessType }) {
       ? { lat: parseFloat(riderCoords.lat), lng: parseFloat(riderCoords.lng) } : null;
 
     // Store marker (orange)
-    activeMarkers.current.push(new window.google.maps.Marker({
-      position: storePt, map, title: businessType === 'service' ? 'Your Service Hub' : 'Your Store',
-      icon: svgIcon('#f97316', '<path d="m1 4 3-3h14l3 3v2H1V4z" fill="none" stroke="white" stroke-width="1.8"/><rect x="1" y="6" width="22" height="14" rx="1" fill="none" stroke="white" stroke-width="1.8"/><path d="M9 20v-4h6v4" fill="none" stroke="white" stroke-width="1.8"/>', true)
-    }));
+    activeMarkers.current.push(createMarker(storePt, businessType === 'service' ? 'Your Service Hub' : 'Your Store',
+      svgIcon('#f97316', '<path d="m1 4 3-3h14l3 3v2H1V4z" fill="none" stroke="white" stroke-width="1.8"/><rect x="1" y="6" width="22" height="14" rx="1" fill="none" stroke="white" stroke-width="1.8"/><path d="M9 20v-4h6v4" fill="none" stroke="white" stroke-width="1.8"/>', true)
+    ));
 
     // Customer marker (blue)
-    activeMarkers.current.push(new window.google.maps.Marker({
-      position: custPt, map, title: `Customer: ${order.addresses?.society || 'Delivery Location'}`,
-      icon: svgIcon('#3b82f6', '<path d="m1 6 11-5 11 5v13a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6z" fill="none" stroke="white" stroke-width="1.8"/><polyline points="6 24 6 12 12 12 12 24" stroke="white" stroke-width="1.8" fill="none"/>')
-    }));
+    activeMarkers.current.push(createMarker(custPt, `Customer: ${order.addresses?.society || 'Delivery Location'}`,
+      svgIcon('#3b82f6', '<path d="m1 6 11-5 11 5v13a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6z" fill="none" stroke="white" stroke-width="1.8"/><polyline points="6 24 6 12 12 12 12 24" stroke="white" stroke-width="1.8" fill="none"/>')
+    ));
 
     // Rider marker (green)
     if (riderPt) {
-      activeMarkers.current.push(new window.google.maps.Marker({
-        position: riderPt, map, title: businessType === 'service' ? 'Assigned Expert' : 'Assigned Rider',
-        icon: svgIcon('#10b981', businessType === 'service'
+      activeMarkers.current.push(createMarker(riderPt, businessType === 'service' ? 'Assigned Expert' : 'Assigned Rider',
+        svgIcon('#10b981', businessType === 'service'
           ? '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" fill="none" stroke="white" stroke-width="1.8"/>'
           : '<polygon points="3 9 20 2 13 19 11 11 3 9" fill="none" stroke="white" stroke-width="1.8"/>'
         )
-      }));
+      ));
     }
 
     // Route polylines

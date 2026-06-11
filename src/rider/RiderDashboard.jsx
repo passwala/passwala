@@ -1132,6 +1132,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     googleMapInstance.current = new window.google.maps.Map(mapRef.current, {
       center: { lat: mapCoords.lat || 23.0225, lng: mapCoords.lng || 72.5714 },
       zoom: 14,
+      mapId: 'passwala_map',
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: false,
@@ -1140,7 +1141,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       styles: [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }]
     });
     return () => {
-      activeMarkers.current.forEach(m => m.setMap(null));
+      activeMarkers.current.forEach(m => { if (m.setMap) m.setMap(null); else if (m.map !== undefined) m.map = null; });
       activePolylines.current.forEach(p => p.setMap(null));
       activeMarkers.current = []; activePolylines.current = [];
       googleMapInstance.current = null;
@@ -1153,9 +1154,20 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     if (!googleMapInstance.current) return;
 
     // Clear previous overlays
-    activeMarkers.current.forEach(m => m.setMap(null));
+    activeMarkers.current.forEach(m => { if (m.setMap) m.setMap(null); else if (m.map !== undefined) m.map = null; });
     activePolylines.current.forEach(p => p.setMap(null));
     activeMarkers.current = []; activePolylines.current = [];
+
+    // Helper: prefer AdvancedMarkerElement over deprecated Marker
+    const AdvancedMarker = window.google?.maps?.marker?.AdvancedMarkerElement;
+    const createMarker = (pos, title, svgStr) => {
+      if (AdvancedMarker) {
+        const pin = document.createElement('div');
+        pin.innerHTML = svgStr ? `<img src="data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgStr)}" width="42" height="42">` : '';
+        return new AdvancedMarker({ position: pos, map, title: title || '', content: pin });
+      }
+      return new window.google.maps.Marker({ position: pos, map, title: title || '', icon: svgStr ? { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgStr), scaledSize: new window.google.maps.Size(42,42), anchor: new window.google.maps.Point(21,21) } : undefined });
+    };
 
     const map = googleMapInstance.current;
 
@@ -1193,11 +1205,8 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
 
     // 1. Rider marker (green bike icon)
     if (riderPos) {
-      activeMarkers.current.push(new window.google.maps.Marker({
-        position: riderPos, map,
-        title: `You (Rider) — ${isOnline ? 'Online' : 'Offline'}`,
-        icon: svgIcon('#10b981', '<circle cx="9" cy="12.5" r="2.5" fill="none" stroke="white" stroke-width="1.8"/><circle cx="15" cy="12.5" r="2.5" fill="none" stroke="white" stroke-width="1.8"/><circle cx="12" cy="3" r="1" fill="white"/><path d="M8 12.5l2.5-4.5h3l2.5 4.5" fill="none" stroke="white" stroke-width="1.8"/>')
-      }));
+      const riderSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42"><rect x="0" y="0" width="42" height="42" rx="21" fill="#10b981" stroke="white" stroke-width="3"/><g transform="translate(9,9)"><circle cx="9" cy="12.5" r="2.5" fill="none" stroke="white" stroke-width="1.8"/><circle cx="15" cy="12.5" r="2.5" fill="none" stroke="white" stroke-width="1.8"/><circle cx="12" cy="3" r="1" fill="white"/><path d="M8 12.5l2.5-4.5h3l2.5 4.5" fill="none" stroke="white" stroke-width="1.8"/></g></svg>`;
+      activeMarkers.current.push(createMarker(riderPos, `You (Rider) — ${isOnline ? 'Online' : 'Offline'}`, riderSvg));
     }
 
     const orderToDraw = activeOrder || (incomingOrder && !incomingOrder.isRide ? incomingOrder : null);
@@ -1209,16 +1218,12 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       const custPt = { lat: customerCoords.lat, lng: customerCoords.lng };
 
       // Store marker (orange)
-      activeMarkers.current.push(new window.google.maps.Marker({
-        position: storePt, map, title: `Store: ${orderToDraw.store}`,
-        icon: svgIcon('#f97316', '<path d="m1 4 3-3h14l3 3v2H1V4z" fill="none" stroke="white" stroke-width="1.8"/><rect x="1" y="6" width="22" height="14" rx="1" fill="none" stroke="white" stroke-width="1.8"/><path d="M9 20v-4h6v4" fill="none" stroke="white" stroke-width="1.8"/>', true)
-      }));
+      const storeSvg2 = `<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42"><rect x="0" y="0" width="42" height="42" rx="12" fill="#f97316" stroke="white" stroke-width="3"/><g transform="translate(9,9)"><path d="m1 4 3-3h14l3 3v2H1V4z" fill="none" stroke="white" stroke-width="1.8"/><rect x="1" y="6" width="22" height="14" rx="1" fill="none" stroke="white" stroke-width="1.8"/><path d="M9 20v-4h6v4" fill="none" stroke="white" stroke-width="1.8"/></g></svg>`;
+      activeMarkers.current.push(createMarker(storePt, `Store: ${orderToDraw.store}`, storeSvg2));
 
       // Customer marker (blue)
-      activeMarkers.current.push(new window.google.maps.Marker({
-        position: custPt, map, title: `Customer: ${orderToDraw.customerName}`,
-        icon: svgIcon('#3b82f6', '<path d="m1 6 11-5 11 5v13a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6z" fill="none" stroke="white" stroke-width="1.8"/><polyline points="6 24 6 12 12 12 12 24" stroke="white" stroke-width="1.8" fill="none"/>')
-      }));
+      const custSvg2 = `<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42"><rect x="0" y="0" width="42" height="42" rx="21" fill="#3b82f6" stroke="white" stroke-width="3"/><g transform="translate(9,9)"><path d="m1 6 11-5 11 5v13a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6z" fill="none" stroke="white" stroke-width="1.8"/><polyline points="6 24 6 12 12 12 12 24" stroke="white" stroke-width="1.8" fill="none"/></g></svg>`;
+      activeMarkers.current.push(createMarker(custPt, `Customer: ${orderToDraw.customerName}`, custSvg2));
 
       const leg1Color = '#f97316', leg2Color = '#3b82f6';
       if (deliveryStep < 2) {
@@ -1247,18 +1252,12 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         const pickupPt = { lat: pLat, lng: pLng }, dropoffPt = { lat: dLat, lng: dLng };
 
         // Pickup marker (green)
-        activeMarkers.current.push(new window.google.maps.Marker({
-          position: pickupPt, map,
-          title: `Pickup: ${activeRide?.pickup || incomingOrder?.pickupAddress || 'Pickup Point'}`,
-          icon: svgIcon('#22c55e', '<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="white" transform="translate(-0.5,-1) scale(1)" stroke="none"/>')
-        }));
+        const pickupSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42"><rect x="0" y="0" width="42" height="42" rx="21" fill="#22c55e" stroke="white" stroke-width="3"/><g transform="translate(9,9)"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="white" transform="translate(-0.5,-1) scale(1)" stroke="none"/></g></svg>`;
+        activeMarkers.current.push(createMarker(pickupPt, `Pickup: ${activeRide?.pickup || incomingOrder?.pickupAddress || 'Pickup Point'}`, pickupSvg));
 
         // Dropoff marker (red)
-        activeMarkers.current.push(new window.google.maps.Marker({
-          position: dropoffPt, map,
-          title: `Drop: ${activeRide?.dropoff || incomingOrder?.dropAddress || 'Drop Point'}`,
-          icon: svgIcon('#ef4444', '<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="white" transform="translate(-0.5,-1) scale(1)" stroke="none"/>')
-        }));
+        const dropoffSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42"><rect x="0" y="0" width="42" height="42" rx="21" fill="#ef4444" stroke="white" stroke-width="3"/><g transform="translate(9,9)"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="white" transform="translate(-0.5,-1) scale(1)" stroke="none"/></g></svg>`;
+        activeMarkers.current.push(createMarker(dropoffPt, `Drop: ${activeRide?.dropoff || incomingOrder?.dropAddress || 'Drop Point'}`, dropoffSvg));
 
         const rideRouteColor = activeRide ? '#10b981' : '#f97316';
         const isDashed = !activeRide;
