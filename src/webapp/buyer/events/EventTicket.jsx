@@ -11,9 +11,25 @@ const BASE_URL = import.meta.env.VITE_API_URL || (window.location.protocol === '
 const EventTicket = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { booking, event: initialEvent, tier } = location.state || {};
+  const { booking, event: initialEvent, tier, isFromCheckout = false } = location.state || {};
   const [event, setEvent] = useState(initialEvent || {});
   const [ticketStatus] = useState(booking?.status || 'CONFIRMED');
+  const [countdown, setCountdown] = useState(6);
+
+  useEffect(() => {
+    if (!isFromCheckout) return;
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          navigate('/events');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isFromCheckout, navigate]);
 
   useEffect(() => {
     if (!initialEvent?.id) return;

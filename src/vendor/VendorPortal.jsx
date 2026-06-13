@@ -373,7 +373,23 @@ const VendorPortal = ({ user, onLogout }) => {
           .eq('phone', phone)
           .maybeSingle();
 
-        let detectedType = userData?.role === 'EVENT_ORGANIZER' ? 'event' : 'service';
+        const EVENT_CATEGORIES = [
+          "Music & Concerts",
+          "Comedy & Theatre",
+          "Workshops & Classes",
+          "Parties & Nightlife",
+          "Festivals & Fairs",
+          "Sports & Fitness",
+          "Corporate & Business",
+          "Other Events"
+        ];
+
+        let detectedType = (userData?.role === 'EVENT_ORGANIZER' || (data && EVENT_CATEGORIES.includes(data.category))) ? 'event' : 'service';
+
+        // Auto-heal/sync user role if there's a mismatch
+        if (data && EVENT_CATEGORIES.includes(data.category) && userData && userData.role !== 'EVENT_ORGANIZER') {
+          await supabase.from('users').update({ role: 'EVENT_ORGANIZER' }).eq('phone', phone);
+        }
 
         // If not found in service_providers, check vendors
         if (!data && !error) {
@@ -397,7 +413,7 @@ const VendorPortal = ({ user, onLogout }) => {
           }
           error = vError;
         } else if (data) {
-          detectedType = userData?.role === 'EVENT_ORGANIZER' ? 'event' : 'service';
+          detectedType = (userData?.role === 'EVENT_ORGANIZER' || EVENT_CATEGORIES.includes(data.category)) ? 'event' : 'service';
         }
 
         if (error && !isLocallyCompleted) throw error;

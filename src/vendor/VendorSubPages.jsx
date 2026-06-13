@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { Package, FileText, IndianRupee, Wallet, Star, Bell, HelpCircle, CheckCircle, Clock, MapPin, Download, ArrowUpRight, ArrowDownRight, Tag, Trash2, PackagePlus, Camera, Wrench, AlertTriangle, X, Calendar, ScanLine, Zap, QrCode } from 'lucide-react';
+import { Package, FileText, IndianRupee, Wallet, Star, Bell, HelpCircle, CheckCircle, Clock, MapPin, Download, ArrowUpRight, ArrowDownRight, Tag, Trash2, PackagePlus, Camera, Wrench, AlertTriangle, X, Calendar, ScanLine, Zap, QrCode, Layers } from 'lucide-react';
 import { supabase } from '../supabase';
 import { toast } from 'react-hot-toast';
 // eslint-disable-next-line no-unused-vars
@@ -368,6 +368,15 @@ export const ConfirmModal = ({ isOpen, title, message, confirmText, cancelText, 
 export const VendorInventory = ({ vendorData, businessType, storeId }) => {
   const [items, setItems] = React.useState([]);
   const [showForm, setShowForm] = React.useState(false);
+  const [eventWizardStep, setEventWizardStep] = React.useState(1);
+  const wizardScrollRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (wizardScrollRef.current) {
+      wizardScrollRef.current.scrollTop = 0;
+    }
+  }, [eventWizardStep, showForm]);
+  const [isSaving, setIsSaving] = React.useState(false);
   const [editingId, setEditingId] = React.useState(null);
   const [newItem, setNewItem] = React.useState({ 
     name: '', 
@@ -383,6 +392,10 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
     event_date: '',
     booking_start: '',
     booking_end: '',
+    show_type: 'single',
+    schedule_slots: [
+      { id: Date.now(), date: '', starts: '19:00', ends: '22:00', venue_name: '' }
+    ],
     ticket_tiers: [
       { tier_name: 'General Admission', price: '299', total_seats: '100', booking_open: '', booking_close: '' }
     ]
@@ -528,6 +541,8 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
 
   const handleAdd = async (e) => {
     e.preventDefault();
+    setIsSaving(true);
+    try {
 
     if (businessType === 'event') {
       const validTiers = (newItem.ticket_tiers || []).filter(t => t.price);
@@ -711,6 +726,64 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
     if ((storeId || vendorData?.user_id) && (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(storeId) || businessType === 'event')) {
       try {
         const targetTable = businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : 'services';
+        
+        if (businessType === 'event' && (newItem.show_type === 'multiple' || newItem.show_type === 'festival') && newItem.schedule_slots && newItem.schedule_slots.length > 0) {
+          let lastInsertedEvent = null;
+          for (const slot of newItem.schedule_slots) {
+            const payload = {
+              title: newProductObj.name,
+              description: newProductObj.detail || 'Added Manually',
+              category: newItem.category || 'Music & Concerts',
+              venue_name: slot.venue_name || 'Ahmedabad Venue',
+              venue_lat: 23.0225,
+              venue_lng: 72.5714,
+              event_date: slot.date ? new Date(`${slot.date}T${slot.starts || '19:00'}:00`).toISOString() : new Date().toISOString(),
+              ends_at: slot.date ? new Date(`${slot.date}T${slot.ends || '22:00'}:00`).toISOString() : new Date().toISOString(),
+              banner_url: newProductObj.image || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=400&q=80',
+              status: 'PENDING_APPROVAL',
+              created_by: vendorData?.user_id || null,
+              booking_start: newItem.booking_start ? new Date(newItem.booking_start).toISOString() : null,
+              booking_end: newItem.booking_end ? new Date(newItem.booking_end).toISOString() : null,
+              show_type: newItem.show_type,
+              visibility: newItem.visibility || 'public',
+              is_online: !!newItem.is_online
+            };
+
+            const { data, error } = await supabase.from(targetTable).insert([payload]).select();
+            if (error) {
+              console.error('Supabase insert error:', error);
+              toast.error(`Failed to publish listing: ${error.message}`);
+              return;
+            }
+
+            if (data && data[0]) {
+              lastInsertedEvent = data[0];
+              const tiersPayload = (newItem.ticket_tiers && newItem.ticket_tiers.length > 0)
+                ? newItem.ticket_tiers.map(t => ({
+                    event_id: data[0].id,
+                    tier_name: t.tier_name || 'General Admission',
+                    price: parseFloat(t.price) || 299,
+                    total_seats: parseInt(t.total_seats) || 100,
+                    available_seats: parseInt(t.total_seats) || 100,
+                    booking_open:  t.booking_open  ? new Date(t.booking_open).toISOString()  : null,
+                    booking_close: t.booking_close ? new Date(t.booking_close).toISOString() : null
+                  }))
+                : [{
+                    event_id: data[0].id,
+                    tier_name: 'General Admission',
+                    price: parseFloat(newProductObj.price) || 299,
+                    total_seats: 200,
+                    available_seats: 200
+                  }];
+              await supabase.from('event_ticket_tiers').insert(tiersPayload);
+            }
+          }
+          toast.success(`Published ${newItem.schedule_slots.length} shows successfully!`);
+          setNewItem({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: null, category: 'Music & Concerts', venue_name: '', event_date: '', booking_start: '', booking_end: '', ticket_tiers: [{ tier_name: 'General Admission', price: '299', total_seats: '100' }] });
+          setShowForm(false);
+          return;
+        }
+
         let payload = {};
         if (businessType === 'shop') {
           payload = {
@@ -734,11 +807,15 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
             venue_lat: 23.0225,
             venue_lng: 72.5714,
             event_date: newItem.event_date ? new Date(newItem.event_date).toISOString() : new Date().toISOString(),
+            ends_at: newItem.ends_at ? new Date(newItem.ends_at).toISOString() : null,
             banner_url: newProductObj.image || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=400&q=80',
             status: 'PENDING_APPROVAL',
             created_by: vendorData?.user_id || null,
             booking_start: newItem.booking_start ? new Date(newItem.booking_start).toISOString() : null,
-            booking_end: newItem.booking_end ? new Date(newItem.booking_end).toISOString() : null
+            booking_end: newItem.booking_end ? new Date(newItem.booking_end).toISOString() : null,
+            show_type: newItem.show_type || 'single',
+            visibility: newItem.visibility || 'public',
+            is_online: !!newItem.is_online
           };
         } else {
           payload = {
@@ -759,7 +836,6 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
         }
 
         if (data && data[0]) {
-          // If event, insert default ticket tier
           if (businessType === 'event') {
             const tiersPayload = (newItem.ticket_tiers && newItem.ticket_tiers.length > 0)
               ? newItem.ticket_tiers.map(t => ({
@@ -817,6 +893,9 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
     toast.success('Listing published successfully!');
     setNewItem({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: businessType === 'shop' ? '44444444-4444-4444-4444-444444444444' : '77777777-7777-7777-7777-777777777777', category: 'Music & Concerts', venue_name: '', event_date: '', booking_start: '', booking_end: '', ticket_tiers: [{ tier_name: 'General Admission', price: '299', total_seats: '100' }] });
     setShowForm(false);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleEditClick = async (item) => {
@@ -870,6 +949,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
       booking_end: toLocal(item.booking_end),
       ticket_tiers: tiers
     });
+    setEventWizardStep(2);
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -918,7 +998,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => { setEditingId(null); setNewItem({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: null, category: 'Music & Concerts', venue_name: '', event_date: '', booking_start: '', booking_end: '', ticket_tiers: [{ tier_name: 'General Admission', price: '299', total_seats: '100' }] }); setShowForm(true); }}
+          onClick={() => { setEditingId(null); setNewItem({ name: '', detail: '', price: '299', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: null, category: 'Music & Concerts', venue_name: '', event_date: '', booking_start: '', booking_end: '', show_type: 'single', schedule_slots: [{ id: Date.now(), date: '', starts: '19:00', ends: '22:00', venue_name: '' }], ticket_tiers: [{ tier_name: 'General Admission', price: '299', total_seats: '100' }] }); setEventWizardStep(1); setShowForm(true); }}
           className="v-btn-primary"
         >
           <PackagePlus size={20} />
@@ -952,7 +1032,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               style={{
                 width: '100%',
-                maxWidth: '650px',
+                maxWidth: businessType === 'event' ? '850px' : '650px',
                 maxHeight: '90vh',
                 boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
                 margin: 'auto',
@@ -984,312 +1064,1386 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                   <button type="button" onClick={() => setShowForm(false)} className="v-action-btn delete" style={{ background: '#f1f5f9', color: '#64748b' }}><X size={20} /></button>
                 </div>
 
-                <div 
-                  style={{ 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    gap: '2rem',
-                    overflowY: 'auto',
-                    flex: 1,
-                    padding: '2.5rem 3rem'
-                  }}
-                >
-                  <div className="v-form-row-2col">
-                    <div className="v-form-group" style={businessType === 'event' ? { gridColumn: '1 / -1' } : {}}>
-                      <label>Title of the {businessType === 'shop' ? 'Product' : businessType === 'event' ? 'Event' : 'Service'}</label>
-                      <input required type="text" className="v-input" placeholder={businessType === 'event' ? "E.g. Live Music Night" : "E.g. Full Home Sanitize"} value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} />
-                    </div>
-                    {businessType !== 'event' && (
-                      <div className="v-form-group">
-                        <label>Base Price (₹)</label>
-                        <div style={{ position: 'relative' }}>
-                          <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', fontWeight: 900, color: '#94a3b8' }}>₹</span>
-                          <input 
-                            required 
-                            type="number" 
-                            className="v-input" 
-                            style={{ paddingLeft: '36px' }} 
-                            placeholder="0.00" 
-                            value={newItem.price} 
-                            onChange={e => setNewItem({ ...newItem, price: e.target.value })} 
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {businessType === 'event' && (
-                    <>
-                      <div className="v-form-row-2col">
-                        <div className="v-form-group">
-                          <label>Event Category</label>
-                          <select required className="v-input" value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value })}>
-                            <option value="Music & Concerts">Music & Concerts</option>
-                            <option value="Comedy & Theatre">Comedy & Theatre</option>
-                            <option value="Workshops & Classes">Workshops & Classes</option>
-                            <option value="Parties & Nightlife">Parties & Nightlife</option>
-                            <option value="Festivals & Fairs">Festivals & Fairs</option>
-                            <option value="Sports & Fitness">Sports & Fitness</option>
-                            <option value="Corporate & Business">Corporate & Business</option>
-                            <option value="Other Events">Other Events</option>
-                          </select>
-                        </div>
-                        <div className="v-form-group">
-                          <label>Event Date & Time</label>
-                          <input 
-                            required 
-                            type="datetime-local" 
-                            className="v-input" 
-                            min={nowMin}
-                            value={newItem.event_date} 
-                            onChange={e => setNewItem({ ...newItem, event_date: e.target.value })} 
-                          />
-                        </div>
-                      </div>
-
-                      <div className="v-form-group">
-                        <label>Venue Name</label>
-                        <input required type="text" className="v-input" placeholder="E.g. Town Hall, Satellite" value={newItem.venue_name} onChange={e => setNewItem({ ...newItem, venue_name: e.target.value })} />
-                      </div>
-
-                      <div className="v-form-group" style={{ marginTop: '1rem', background: '#f8fafc', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                          <span style={{ fontWeight: 800, color: '#334155', fontSize: '0.95rem', letterSpacing: '0.5px', textTransform: 'uppercase' }}>Ticket Categories & Pricing</span>
-                          <button 
-                            type="button" 
-                            className="v-btn-secondary" 
-                            style={{ padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 700 }}
-                            onClick={() => {
-                              const currentTiers = newItem.ticket_tiers || [];
-                              setNewItem({
-                                ...newItem,
-                                ticket_tiers: [...currentTiers, { tier_name: '', price: '', total_seats: '100', booking_open: '', booking_close: '' }]
-                              });
-                            }}
+                {businessType === 'event' ? (
+                  // EVENT ORGANIZER WIZARD
+                  <div ref={wizardScrollRef} style={{ display: 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, padding: '1.5rem 3rem' }}>
+                    {eventWizardStep === 1 ? (
+                      // Step 1: Event Type Selection
+                      <div className="event-type-selection-container">
+                        <p className="event-type-subtitle">Choose the type of setup for your upcoming event. You can customize details later.</p>
+                        <div className="event-type-cards">
+                          {/* Single Show Card */}
+                          <div 
+                            className={`event-type-card ${newItem.show_type === 'single' || !newItem.show_type ? 'selected' : ''}`}
+                            onClick={() => setNewItem({ ...newItem, show_type: 'single' })}
                           >
-                            + Add Category
-                          </button>
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                          {(newItem.ticket_tiers || []).map((tier, idx) => (
-                            <div key={idx} style={{ background: 'white', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '1rem 1.25rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-                              {/* Row 1: Name | Price | Seats | Delete */}
-                              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '0.75rem', alignItems: 'end' }}>
-                                <div>
-                                  <label style={{ fontSize: '0.73rem', fontWeight: 700, color: '#64748b', marginBottom: '4px', display: 'block' }}>Category Name</label>
-                                  <input
-                                    required
-                                    type="text"
-                                    className="v-input"
-                                    placeholder="E.g. VIP, Premium, Couple"
-                                    value={tier.tier_name}
-                                    onChange={e => {
-                                      const updated = [...newItem.ticket_tiers];
-                                      updated[idx].tier_name = e.target.value;
-                                      setNewItem({ ...newItem, ticket_tiers: updated });
-                                    }}
-                                  />
-                                </div>
-                                <div>
-                                  <label style={{ fontSize: '0.73rem', fontWeight: 700, color: '#64748b', marginBottom: '4px', display: 'block' }}>Price (₹)</label>
-                                  <input
-                                    required
-                                    type="number"
-                                    className="v-input"
-                                    placeholder="299"
-                                    value={tier.price}
-                                    onChange={e => {
-                                      const updated = [...newItem.ticket_tiers];
-                                      updated[idx].price = e.target.value;
-                                      let minPrice = e.target.value;
-                                      updated.forEach(t => {
-                                        if (t.price && parseFloat(t.price) < parseFloat(minPrice)) minPrice = t.price;
-                                      });
-                                      setNewItem({ ...newItem, ticket_tiers: updated, price: minPrice });
-                                    }}
-                                  />
-                                </div>
-                                <div>
-                                  <label style={{ fontSize: '0.73rem', fontWeight: 700, color: '#64748b', marginBottom: '4px', display: 'block' }}>Total Seats</label>
-                                  <input
-                                    required
-                                    type="number"
-                                    min="1"
-                                    step="1"
-                                    className="v-input"
-                                    placeholder="100"
-                                    value={tier.total_seats}
-                                    onChange={e => {
-                                      const val = Math.max(1, parseInt(e.target.value) || 1);
-                                      const updated = [...newItem.ticket_tiers];
-                                      updated[idx].total_seats = String(val);
-                                      setNewItem({ ...newItem, ticket_tiers: updated });
-                                    }}
-                                  />
-                                </div>
-                                <div>
-                                  <button
-                                    type="button"
-                                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '8px' }}
-                                    disabled={(newItem.ticket_tiers || []).length <= 1}
-                                    onClick={() => {
-                                      const updated = (newItem.ticket_tiers || []).filter((_, i) => i !== idx);
-                                      let minPrice = updated[0]?.price || '299';
-                                      updated.forEach(t => {
-                                        if (t.price && parseFloat(t.price) < parseFloat(minPrice)) minPrice = t.price;
-                                      });
-                                      setNewItem({ ...newItem, ticket_tiers: updated, price: minPrice });
-                                    }}
-                                  >
-                                    <Trash2 size={17} />
-                                  </button>
-                                </div>
+                            <div className="card-top-row">
+                              <div className="card-icon-box orange-tint">
+                                <Clock size={20} color="var(--v-primary)" />
                               </div>
-
-                              {/* Row 2: Booking Open | Booking Close */}
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed #e2e8f0' }}>
-                                <div>
-                                  <label style={{ fontSize: '0.73rem', fontWeight: 700, color: '#16a34a', marginBottom: '4px', display: 'block' }}>✅ Book Open Time</label>
-                                  <input
-                                    type="datetime-local"
-                                    className="v-input"
-                                    min={nowMin}
-                                    value={tier.booking_open || ''}
-                                    onChange={e => {
-                                      const updated = [...newItem.ticket_tiers];
-                                      updated[idx].booking_open = e.target.value;
-                                      if (updated[idx].booking_close && updated[idx].booking_close < e.target.value) {
-                                        updated[idx].booking_close = '';
-                                      }
-                                      setNewItem({ ...newItem, ticket_tiers: updated });
-                                    }}
-                                  />
-                                </div>
-                                <div>
-                                  <label style={{ fontSize: '0.73rem', fontWeight: 700, color: '#dc2626', marginBottom: '4px', display: 'block' }}>🔒 Book Close Time</label>
-                                  <input
-                                    type="datetime-local"
-                                    className="v-input"
-                                    min={tier.booking_open || nowMin}
-                                    value={tier.booking_close || ''}
-                                    onChange={e => {
-                                      const updated = [...newItem.ticket_tiers];
-                                      updated[idx].booking_close = e.target.value;
-                                      setNewItem({ ...newItem, ticket_tiers: updated });
-                                    }}
-                                  />
+                              <div className="card-badge-container">
+                                <span className="card-badge-most-common">Most common</span>
+                                <div className={`card-check-circle ${(newItem.show_type === 'single' || !newItem.show_type) ? 'checked' : ''}`}>
+                                  {(newItem.show_type === 'single' || !newItem.show_type) && (
+                                    <div className="card-checkmark-fill">✓</div>
+                                  )}
                                 </div>
                               </div>
                             </div>
-                          ))}
+                            <h4 className="card-title">Single show</h4>
+                            <p className="card-desc">One date, one venue and one show time. Perfect for concerts, comedy nights and workshops.</p>
+                            <span className="card-duration-info">Takes about 2 minutes.</span>
+                          </div>
+
+                          {/* Multiple Shows Card */}
+                          <div 
+                            className={`event-type-card ${newItem.show_type === 'multiple' ? 'selected' : ''}`}
+                            onClick={() => setNewItem({ ...newItem, show_type: 'multiple' })}
+                          >
+                            <div className="card-top-row">
+                              <div className="card-icon-box orange-tint">
+                                <Layers size={20} color="var(--v-primary)" />
+                              </div>
+                              <div className="card-badge-container">
+                                <div className={`card-check-circle ${newItem.show_type === 'multiple' ? 'checked' : ''}`}>
+                                  {newItem.show_type === 'multiple' && (
+                                    <div className="card-checkmark-fill">✓</div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <h4 className="card-title">Multiple shows</h4>
+                            <p className="card-desc">One event across several dates or times, such as a theatre run or weekly comedy night.</p>
+                            <span className="card-duration-info">Manage every show from a simple schedule.</span>
+                          </div>
+
+                          {/* Festival or Tour Card */}
+                          <div 
+                            className={`event-type-card ${newItem.show_type === 'festival' ? 'selected' : ''}`}
+                            onClick={() => setNewItem({ ...newItem, show_type: 'festival' })}
+                          >
+                            <div className="card-top-row">
+                              <div className="card-icon-box orange-tint">
+                                <MapPin size={20} color="var(--v-primary)" />
+                              </div>
+                              <div className="card-badge-container">
+                                <span className="card-badge-advanced">Advanced</span>
+                                <div className={`card-check-circle ${newItem.show_type === 'festival' ? 'checked' : ''}`}>
+                                  {newItem.show_type === 'festival' && (
+                                    <div className="card-checkmark-fill">✓</div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <h4 className="card-title">Festival or tour</h4>
+                            <p className="card-desc">Multiple venues, multi-day festivals, tours, custom passes or complex per-slot setup.</p>
+                            <span className="card-duration-info">Opens the complete step-by-step advanced setup.</span>
+                          </div>
+                        </div>
+
+                        <div className="event-type-footer">
+                          <span className="event-type-selected-text">
+                            Selected: <strong>{newItem.show_type === 'festival' ? 'Festival or tour' : newItem.show_type === 'multiple' ? 'Multiple shows' : 'Single show'}</strong>
+                          </span>
+                          <button 
+                            type="button" 
+                            className="event-type-continue-btn"
+                            onClick={() => setEventWizardStep(2)}
+                          >
+                            Continue
+                          </button>
                         </div>
                       </div>
-                    </>
-                  )}
-
-                  {businessType === 'service' && (
-                    <div className="v-form-group">
-                      <label>Service Category</label>
-                      <select required className="v-input" value={newItem.category_id || '77777777-7777-7777-7777-777777777777'} onChange={e => setNewItem({ ...newItem, category_id: e.target.value })}>
-                        <option value="77777777-7777-7777-7777-555555555555">Cleaning</option>
-                        <option value="77777777-7777-7777-7777-111111111111">Electrical</option>
-                        <option value="77777777-7777-7777-7777-222222222222">AC & Appliance</option>
-                        <option value="77777777-7777-7777-7777-333333333333">Carpentry</option>
-                        <option value="77777777-7777-7777-7777-444444444444">Painting</option>
-                        <option value="77777777-7777-7777-7777-777777777777">Plumbing</option>
-                      </select>
-                    </div>
-                  )}
-
-                  {businessType === 'shop' && (
-                    <>
-                      <div className="v-form-row-2col">
-                      <div className="v-form-group">
-                        <label>Barcode Type</label>
-                        <select className="v-input" value={newItem.barcode_type} onChange={e => setNewItem({ ...newItem, barcode_type: e.target.value })}>
-                          <option value="EAN-13">EAN-13</option>
-                          <option value="UPCA-2">UPCA-2</option>
-                          <option value="UPC-A">UPC-A</option>
-                          <option value="EAN-8">EAN-8</option>
-                        </select>
-                      </div>
-                      <div className="v-form-group">
-                        <label>Barcode Number</label>
-                        <input type="text" maxLength={20} className="v-input" placeholder="E.g. 8901234567890" value={newItem.barcode} onChange={e => setNewItem({ ...newItem, barcode: e.target.value.replace(/\D/g, '') })} />
-                      </div>
-                    </div>
-                    <div className="v-form-row-2col" style={{ marginTop: '-1rem' }}>
-                      <div className="v-form-group">
-                        <label>Stock Quantity</label>
-                        <input required type="number" className="v-input" placeholder="E.g. 50" value={newItem.stock_quantity} onChange={e => setNewItem({ ...newItem, stock_quantity: e.target.value })} />
-                      </div>
-                    </div>
-                  </>
-                  )}
-
-                  <div className="v-form-group">
-                    <label>Description & Unique Selling Points</label>
-                    <textarea className="v-input" style={{ minHeight: '120px', resize: 'vertical' }} placeholder="What makes this special? List features, warranty, or delivery times..." value={newItem.detail} onChange={e => setNewItem({ ...newItem, detail: e.target.value })} />
-                  </div>
-
-                  {(businessType === 'shop' || businessType === 'event') && (
-                    <div className="v-form-group">
-                      <label>Visual Presentation</label>
-                      <div
-                        className="v-input v-upload-zone"
-                        onClick={(e) => {
-                          if (e.target.id !== 'inventory-upload') {
-                            document.getElementById('inventory-upload').click();
-                          }
-                        }}
-                      >
-                        <input id="inventory-upload" type="file" hidden accept="image/*" onClick={(e) => e.stopPropagation()} onChange={(e) => {
-                          const file = e.target.files[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                              setNewItem(prev => ({ ...prev, image: reader.result }));
-                              e.target.value = '';
-                            };
-                            reader.readAsDataURL(file);
-                          } else {
-                            e.target.value = '';
-                          }
-                        }} />
-                        {newItem.image ? (
-                          <div style={{ position: 'relative', width: '220px', height: '150px', margin: '0 auto' }}>
-                            <img src={newItem.image} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '16px' }} />
-                            <div style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setNewItem(prev => ({ ...prev, image: null })); }}><Trash2 size={16} color="#ef4444" /></div>
+                    ) : newItem.show_type === 'multiple' ? (
+                      // MULTIPLE SHOWS WIZARD STEPS
+                      newItem.show_type === 'multiple' && (
+                        eventWizardStep === 2 ? (
+                          // Step 2: Basics
+                          <div className="single-event-wizard-step animate-fade-in">
+                            <div className="wizard-stepper-bar">
+                              <div className="step-item active"><span className="step-number">1</span><span className="step-label">Basics</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">2</span><span className="step-label">Schedule</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">3</span><span className="step-label">Tickets</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">4</span><span className="step-label">Photos & details</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">5</span><span className="step-label">Review</span></div>
+                            </div>
+                            <div className="wizard-step-header">
+                              <div className="wizard-back-indicator">
+                                <span className="current-selection-badge">Multiple shows</span>
+                                <button type="button" className="change-selection-btn" onClick={() => setEventWizardStep(1)}>Change</button>
+                              </div>
+                              <h2 className="wizard-title">Create multiple shows</h2>
+                              <p className="wizard-subtitle">Build a multi-date or multi-time event without using the advanced setup.</p>
+                            </div>
+                            <div className="wizard-section-card">
+                              <div className="section-card-header">
+                                <h4>Basics</h4>
+                                <span className="required-badge">Required</span>
+                              </div>
+                              <div className="wizard-fields-stack">
+                                <div className="v-form-group">
+                                  <label>Event name *</label>
+                                  <input type="text" className="v-input" placeholder="e.g. Friday night comedy run" required value={newItem.name || ''} onChange={(e) => setNewItem({ ...newItem, name: e.target.value })} />
+                                </div>
+                                <div className="v-form-group">
+                                  <label>Event visibility *</label>
+                                  <div className="visibility-cards-row">
+                                    <div className={`visibility-card ${(newItem.visibility === 'public' || !newItem.visibility) ? 'selected' : ''}`} onClick={() => setNewItem({ ...newItem, visibility: 'public' })}>
+                                      <div className="visibility-circle">{(newItem.visibility === 'public' || !newItem.visibility) && <div className="checkmark" />}</div>
+                                      <div className="visibility-info"><strong>Public</strong><span>Visible on Showmates listings.</span></div>
+                                    </div>
+                                    <div className={`visibility-card ${newItem.visibility === 'private' ? 'selected' : ''}`} onClick={() => setNewItem({ ...newItem, visibility: 'private' })}>
+                                      <div className="visibility-circle">{newItem.visibility === 'private' && <div className="checkmark" />}</div>
+                                      <div className="visibility-info"><strong>Private</strong><span>Accessible only by private access links.</span></div>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="online-checkbox-card">
+                                  <input type="checkbox" id="is_online_evt_mult" checked={!!newItem.is_online} onChange={(e) => setNewItem({ ...newItem, is_online: e.target.checked })} />
+                                  <label htmlFor="is_online_evt_mult"><strong>Online event</strong><span>Online events use listing cities for each show instead of physical venues.</span></label>
+                                </div>
+                                <div className="v-form-group">
+                                  <label>Category *</label>
+                                  <select required className="v-input" value={newItem.category || ''} onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}>
+                                    <option value="">Search group or category</option>
+                                    <option value="Music & Concerts">Music & Concerts</option>
+                                    <option value="Comedy & Theatre">Comedy & Theatre</option>
+                                    <option value="Workshops & Classes">Workshops & Classes</option>
+                                    <option value="Parties & Nightlife">Parties & Nightlife</option>
+                                    <option value="Festivals & Fairs">Festivals & Fairs</option>
+                                    <option value="Sports & Fitness">Sports & Fitness</option>
+                                    <option value="Corporate & Business">Corporate & Business</option>
+                                    <option value="Other Events">Other Events</option>
+                                  </select>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.5rem' }}>
+                                  <div className="v-form-group">
+                                    <label>Booking Opens *</label>
+                                    <input 
+                                      type="datetime-local" 
+                                      required 
+                                      className="v-input" 
+                                      value={newItem.booking_start ? new Date(newItem.booking_start).toISOString().slice(0, 16) : ''} 
+                                      onChange={(e) => setNewItem({ ...newItem, booking_start: e.target.value ? new Date(e.target.value).toISOString() : '' })} 
+                                    />
+                                  </div>
+                                  <div className="v-form-group">
+                                    <label>Booking Closes *</label>
+                                    <input 
+                                      type="datetime-local" 
+                                      required 
+                                      className="v-input" 
+                                      value={newItem.booking_end ? new Date(newItem.booking_end).toISOString().slice(0, 16) : ''} 
+                                      onChange={(e) => setNewItem({ ...newItem, booking_end: e.target.value ? new Date(e.target.value).toISOString() : '' })} 
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="wizard-navigation-footer">
+                              <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(1)}>← Back</button>
+                              <button type="button" className="wizard-next-btn" onClick={() => {
+                                if (!newItem.name || !newItem.category) {
+                                  toast.error("Please fill in required fields!");
+                                  return;
+                                }
+                                setEventWizardStep(3);
+                              }}>Next: Schedule</button>
+                            </div>
+                          </div>
+                        ) : eventWizardStep === 3 ? (
+                          // Step 3: Schedule
+                          <div className="single-event-wizard-step animate-fade-in">
+                            <div className="wizard-stepper-bar">
+                              <div className="step-item active-past"><span className="step-number">1</span><span className="step-label">Basics</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active"><span className="step-number">2</span><span className="step-label">Schedule</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">3</span><span className="step-label">Tickets</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">4</span><span className="step-label">Photos & details</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">5</span><span className="step-label">Review</span></div>
+                            </div>
+                            <div className="wizard-step-header">
+                              <h2 className="wizard-title">Event Schedule</h2>
+                              <p className="wizard-subtitle">Add each date and time slot for your shows.</p>
+                            </div>
+                            <div className="wizard-section-card">
+                              <div className="section-card-header">
+                                <h4>Schedules ({(newItem.schedule_slots || []).length})</h4>
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                {(newItem.schedule_slots || []).map((slot, index) => (
+                                  <div key={slot.id || index} style={{ border: '1px solid #e2e8f0', borderRadius: '16px', padding: '1.25rem', background: '#f8fafc' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', fontWeight: 'bold', fontSize: '0.85rem', color: '#ea580c' }}>
+                                      <span>Show #{index + 1}</span>
+                                      {newItem.schedule_slots.length > 1 && (
+                                        <button type="button" style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer' }} onClick={() => {
+                                          setNewItem({ ...newItem, schedule_slots: newItem.schedule_slots.filter(s => s.id !== slot.id) });
+                                        }}><Trash2 size={16} /></button>
+                                      )}
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
+                                      <div className="v-form-group">
+                                        <label>Date *</label>
+                                        <input type="date" className="v-input" required value={slot.date || ''} onChange={(e) => {
+                                          const slots = [...newItem.schedule_slots];
+                                          slots[index] = { ...slot, date: e.target.value };
+                                          setNewItem({ ...newItem, schedule_slots: slots });
+                                        }} />
+                                      </div>
+                                      <div className="v-form-group">
+                                        <label>Starts *</label>
+                                        <input type="time" className="v-input" required value={slot.starts || '19:00'} onChange={(e) => {
+                                          const slots = [...newItem.schedule_slots];
+                                          slots[index] = { ...slot, starts: e.target.value };
+                                          setNewItem({ ...newItem, schedule_slots: slots });
+                                        }} />
+                                      </div>
+                                      <div className="v-form-group">
+                                        <label>Ends *</label>
+                                        <input type="time" className="v-input" required value={slot.ends || '22:00'} onChange={(e) => {
+                                          const slots = [...newItem.schedule_slots];
+                                          slots[index] = { ...slot, ends: e.target.value };
+                                          setNewItem({ ...newItem, schedule_slots: slots });
+                                        }} />
+                                      </div>
+                                      <div className="v-form-group">
+                                        <label>Venue *</label>
+                                        <input type="text" className="v-input" required placeholder="Venue details..." value={slot.venue_name || ''} onChange={(e) => {
+                                          const slots = [...newItem.schedule_slots];
+                                          slots[index] = { ...slot, venue_name: e.target.value };
+                                          setNewItem({ ...newItem, schedule_slots: slots });
+                                        }} />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              <button type="button" className="add-tier-dashed-btn" onClick={() => {
+                                const slots = [...(newItem.schedule_slots || [])];
+                                slots.push({ id: Date.now(), date: '', starts: '19:00', ends: '22:00', venue_name: '' });
+                                setNewItem({ ...newItem, schedule_slots: slots });
+                              }}>+ Add another show date/time</button>
+                            </div>
+                            <div className="wizard-navigation-footer">
+                              <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(2)}>← Back</button>
+                              <button type="button" className="wizard-next-btn" onClick={() => {
+                                const invalid = newItem.schedule_slots?.some(s => !s.date || !s.venue_name);
+                                if (invalid || !newItem.schedule_slots?.length) {
+                                  toast.error("Please fill in date and venue for all scheduled shows!");
+                                  return;
+                                }
+                                setEventWizardStep(4);
+                              }}>Next: Tickets</button>
+                            </div>
+                          </div>
+                        ) : eventWizardStep === 4 ? (
+                          // Step 4: Tickets
+                          <div className="single-event-wizard-step animate-fade-in">
+                            <div className="wizard-stepper-bar">
+                              <div className="step-item active-past"><span className="step-number">1</span><span className="step-label">Basics</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active-past"><span className="step-number">2</span><span className="step-label">Schedule</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active"><span className="step-number">3</span><span className="step-label">Tickets</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">4</span><span className="step-label">Photos & details</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">5</span><span className="step-label">Review</span></div>
+                            </div>
+                            <div className="wizard-step-header">
+                              <h2 className="wizard-title">Tickets</h2>
+                              <p className="wizard-subtitle">Define the pricing tiers for your multiple shows.</p>
+                            </div>
+                            <div className="wizard-section-card">
+                              <div className="section-card-header">
+                                <h4>Tickets</h4>
+                                <span className="sell-badge">Tiers: {newItem.ticket_tiers?.length || 0}</span>
+                              </div>
+                              <div className="ticket-tiers-list">
+                                {(newItem.ticket_tiers || []).map((tier, index) => (
+                                  <div className="ticket-tier-row-card" key={tier.id || index}>
+                                    <div className="tier-row-header">
+                                      <span className="tier-index-number">{index + 1}</span>
+                                      <span className="tier-badge-type">{parseFloat(tier.price) === 0 ? 'Free' : 'Paid'}</span>
+                                      {newItem.ticket_tiers.length > 1 && (
+                                        <button type="button" className="delete-tier-btn" onClick={() => {
+                                          setNewItem({ ...newItem, ticket_tiers: newItem.ticket_tiers.filter((_, idx) => idx !== index) });
+                                        }}><Trash2 size={16} /></button>
+                                      )}
+                                    </div>
+                                    <div className="tier-inputs-grid">
+                                      <div className="v-form-group">
+                                        <label>Name *</label>
+                                        <input type="text" className="v-input" placeholder="General Admission" required value={tier.tier_name || ''} onChange={(e) => {
+                                          const nextTiers = [...newItem.ticket_tiers];
+                                          nextTiers[index] = { ...tier, tier_name: e.target.value };
+                                          setNewItem({ ...newItem, ticket_tiers: nextTiers });
+                                        }} />
+                                      </div>
+                                      <div className="v-form-group">
+                                        <label>Price *</label>
+                                        <input type="number" className="v-input" placeholder="₹ 0" required value={tier.price === 0 ? '' : tier.price} onChange={(e) => {
+                                          const nextTiers = [...newItem.ticket_tiers];
+                                          nextTiers[index] = { ...tier, price: parseFloat(e.target.value) || 0 };
+                                          setNewItem({ ...newItem, ticket_tiers: nextTiers });
+                                        }} />
+                                      </div>
+                                      <div className="v-form-group">
+                                        <label>Quantity *</label>
+                                        <input type="number" className="v-input" placeholder="100" required value={tier.total_seats || ''} onChange={(e) => {
+                                          const nextTiers = [...newItem.ticket_tiers];
+                                          nextTiers[index] = { ...tier, total_seats: parseInt(e.target.value) || 0, available_seats: parseInt(e.target.value) || 0 };
+                                          setNewItem({ ...newItem, ticket_tiers: nextTiers });
+                                        }} />
+                                      </div>
+                                      <div className="v-form-group">
+                                        <label>Entries per ticket *</label>
+                                        <input type="number" className="v-input" defaultValue={1} required />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              <button type="button" className="add-tier-dashed-btn" onClick={() => {
+                                const nextTiers = [...(newItem.ticket_tiers || [])];
+                                nextTiers.push({ id: 'temp_' + Date.now(), tier_name: '', price: 0, total_seats: 100, available_seats: 100 });
+                                setNewItem({ ...newItem, ticket_tiers: nextTiers });
+                              }}>+ Add another ticket type</button>
+                            </div>
+                            <div className="wizard-navigation-footer">
+                              <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(3)}>← Back</button>
+                              <button type="button" className="wizard-next-btn" onClick={() => {
+                                if (!newItem.ticket_tiers?.length || newItem.ticket_tiers.some(t => !t.tier_name)) {
+                                  toast.error("Please add at least one complete ticket tier!");
+                                  return;
+                                }
+                                setEventWizardStep(5);
+                              }}>Next: Photos & details</button>
+                            </div>
+                          </div>
+                        ) : eventWizardStep === 5 ? (
+                          // Step 5: Photos & details
+                          <div className="single-event-wizard-step animate-fade-in">
+                            <div className="wizard-stepper-bar">
+                              <div className="step-item active-past"><span className="step-number">1</span><span className="step-label">Basics</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active-past"><span className="step-number">2</span><span className="step-label">Schedule</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active-past"><span className="step-number">3</span><span className="step-label">Tickets</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active"><span className="step-number">4</span><span className="step-label">Photos & details</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">5</span><span className="step-label">Review</span></div>
+                            </div>
+                            <div className="wizard-step-header">
+                              <h2 className="wizard-title">Event Banner & Description</h2>
+                              <p className="wizard-subtitle">Upload assets to publish your multiple shows listing.</p>
+                            </div>
+                            <div className="wizard-section-card">
+                              <div className="section-card-header">
+                                <h4>Visual Cover Photo</h4>
+                              </div>
+                              <div className="v-form-group">
+                                <div
+                                  className="v-input v-upload-zone"
+                                  onClick={(e) => {
+                                    if (e.target.id !== 'inventory-upload-wizard') {
+                                      document.getElementById('inventory-upload-wizard').click();
+                                    }
+                                  }}
+                                >
+                                  <input id="inventory-upload-wizard" type="file" hidden accept="image/*" onClick={(e) => e.stopPropagation()} onChange={(e) => {
+                                    const file = e.target.files[0];
+                                    if (file) {
+                                      const reader = new FileReader();
+                                      reader.onloadend = () => {
+                                        setNewItem(prev => ({ ...prev, image: reader.result }));
+                                        e.target.value = '';
+                                      };
+                                      reader.readAsDataURL(file);
+                                    } else {
+                                      e.target.value = '';
+                                    }
+                                  }} />
+                                  {newItem.image ? (
+                                    <div style={{ position: 'relative', width: '220px', height: '150px', margin: '0 auto' }}>
+                                      <img src={newItem.image} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '16px' }} />
+                                      <div style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setNewItem(prev => ({ ...prev, image: null })); }}><Trash2 size={16} color="#ef4444" /></div>
+                                    </div>
+                                  ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                      <Camera size={40} color="#cbd5e1" style={{ marginBottom: '1rem' }} />
+                                      <p style={{ margin: 0, fontWeight: 800, color: '#1e293b' }}>Click to upload cover photo</p>
+                                      <p style={{ margin: '4px 0 0 0', color: '#94a3b8', fontSize: '0.85rem' }}>High-res photos increase conversion by 40%</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="wizard-section-card">
+                              <div className="section-card-header">
+                                <h4>Event Description</h4>
+                              </div>
+                              <div className="v-form-group">
+                                <label>Description *</label>
+                                <textarea placeholder="Describe your event in detail..." required rows={6} value={newItem.detail || ''} onChange={(e) => setNewItem({ ...newItem, detail: e.target.value })} className="wizard-textarea" />
+                              </div>
+                            </div>
+                            <div className="wizard-navigation-footer">
+                              <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(4)}>← Back</button>
+                              <button type="button" className="wizard-next-btn" onClick={() => {
+                                if (!newItem.image || !newItem.detail) {
+                                  toast.error("Please add cover photo and description!");
+                                  return;
+                                }
+                                setEventWizardStep(6);
+                              }}>Next: Review</button>
+                            </div>
                           </div>
                         ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <Camera size={40} color="#cbd5e1" style={{ marginBottom: '1rem' }} />
-                            <p style={{ margin: 0, fontWeight: 800, color: '#1e293b' }}>Click to upload cover photo</p>
-                            <p style={{ margin: '4px 0 0 0', color: '#94a3b8', fontSize: '0.85rem' }}>High-res photos increase conversion by 40%</p>
+                          // Step 6: Review
+                          <div className="single-event-wizard-step animate-fade-in">
+                            <div className="wizard-stepper-bar">
+                              <div className="step-item active-past"><span className="step-number">1</span><span className="step-label">Basics</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active-past"><span className="step-number">2</span><span className="step-label">Schedule</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active-past"><span className="step-number">3</span><span className="step-label">Tickets</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active-past"><span className="step-number">4</span><span className="step-label">Photos & details</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active"><span className="step-number">5</span><span className="step-label">Review</span></div>
+                            </div>
+                            <div className="wizard-step-header">
+                              <h2 className="wizard-title">Review Event Details</h2>
+                              <p className="wizard-subtitle">Verify the details before publishing multiple shows live.</p>
+                            </div>
+                            <div className="wizard-section-card review-summary-card">
+                              <div className="review-banner">
+                                {newItem.image && <img src={newItem.image} alt="Banner" />}
+                                <span className="review-status-badge">UPCOMING</span>
+                              </div>
+                              <div className="review-content">
+                                <h3 className="review-title">{newItem.name || 'Untitled Event'}</h3>
+                                <div className="review-meta-row">
+                                  <span className="review-category-tag">{newItem.category}</span>
+                                  <span className="review-visibility-tag">{newItem.visibility || 'public'}</span>
+                                </div>
+                                <div style={{ margin: '1.5rem 0' }}>
+                                  <strong>📅 Scheduled Shows ({(newItem.schedule_slots || []).length})</strong>
+                                  <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.5rem' }}>
+                                    {(newItem.schedule_slots || []).map((s, idx) => (
+                                      <div key={s.id || idx} style={{ padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>Show #{idx + 1}: {s.date} ({s.starts} - {s.ends})</span>
+                                        <strong>📍 {s.venue_name}</strong>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="review-tickets-section">
+                                  <strong>Ticket Tiers ({newItem.ticket_tiers?.length || 0})</strong>
+                                  <div className="review-tiers-list">
+                                    {(newItem.ticket_tiers || []).map((t, idx) => (
+                                      <div className="review-tier-item" key={t.id || idx}>
+                                        <div className="tier-left">
+                                          <strong>{t.tier_name}</strong>
+                                          <span>Capacity: {t.total_seats} seats</span>
+                                        </div>
+                                        <span className="tier-price-tag">₹{t.price}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="wizard-navigation-footer">
+                              <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(5)}>← Back</button>
+                              <button type="submit" className="wizard-publish-btn" disabled={isSaving}>
+                                {isSaving ? 'Publishing...' : 'Publish Multiple Shows'}
+                              </button>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                        )
+                      )
+                    ) : newItem.show_type === 'festival' ? (
+                      // FESTIVAL OR TOUR WIZARD STEPS
+                      newItem.show_type === 'festival' && (
+                        eventWizardStep === 2 ? (
+                          // Step 2: Basics
+                          <div className="single-event-wizard-step animate-fade-in">
+                            <div className="wizard-stepper-bar">
+                              <div className="step-item active"><span className="step-number">1</span><span className="step-label">Basic Details</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">2</span><span className="step-label">Venues</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">3</span><span className="step-label">Tickets</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">4</span><span className="step-label">Photos</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">5</span><span className="step-label">Review</span></div>
+                            </div>
+                            <div className="wizard-step-header">
+                              <div className="wizard-back-indicator">
+                                <span className="current-selection-badge">Festival or tour</span>
+                                <button type="button" className="change-selection-btn" onClick={() => setEventWizardStep(1)}>Change</button>
+                              </div>
+                              <h2 className="wizard-title">Create Festival or Tour</h2>
+                              <p className="wizard-subtitle">Use this flow for complex schedules, multiple venues, tours or advanced setup.</p>
+                            </div>
+                            <div className="wizard-section-card">
+                              <div className="section-card-header">
+                                <h4>Basic Details</h4>
+                              </div>
+                              <div className="wizard-fields-stack">
+                                <div className="v-form-group">
+                                  <label>Event Title *</label>
+                                  <input type="text" className="v-input" placeholder="Enter captivating event title" required value={newItem.name || ''} onChange={(e) => setNewItem({ ...newItem, name: e.target.value })} />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                  <div className="v-form-group">
+                                    <label>Event Category *</label>
+                                    <select required className="v-input" value={newItem.category || ''} onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}>
+                                      <option value="">Select category</option>
+                                      <option value="Music & Concerts">Music & Concerts</option>
+                                      <option value="Comedy & Theatre">Comedy & Theatre</option>
+                                      <option value="Workshops & Classes">Workshops & Classes</option>
+                                      <option value="Parties & Nightlife">Parties & Nightlife</option>
+                                      <option value="Festivals & Fairs">Festivals & Fairs</option>
+                                      <option value="Sports & Fitness">Sports & Fitness</option>
+                                    </select>
+                                  </div>
+                                  <div className="v-form-group">
+                                    <label>Visibility *</label>
+                                    <select required className="v-input" value={newItem.visibility || 'public'} onChange={(e) => setNewItem({ ...newItem, visibility: e.target.value })}>
+                                      <option value="public">Public - Visible to anyone</option>
+                                      <option value="private">Private - Invitation only</option>
+                                    </select>
+                                  </div>
+                                </div>
+                                <div className="online-checkbox-card">
+                                  <input type="checkbox" id="is_online_fest" checked={!!newItem.is_online} onChange={(e) => setNewItem({ ...newItem, is_online: e.target.checked })} />
+                                  <label htmlFor="is_online_fest"><strong>This is an online event</strong><span>Virtual events use video conferencing platforms instead of physical venues.</span></label>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.5rem' }}>
+                                  <div className="v-form-group">
+                                    <label>Booking Opens *</label>
+                                    <input 
+                                      type="datetime-local" 
+                                      required 
+                                      className="v-input" 
+                                      value={newItem.booking_start ? new Date(newItem.booking_start).toISOString().slice(0, 16) : ''} 
+                                      onChange={(e) => setNewItem({ ...newItem, booking_start: e.target.value ? new Date(e.target.value).toISOString() : '' })} 
+                                    />
+                                  </div>
+                                  <div className="v-form-group">
+                                    <label>Booking Closes *</label>
+                                    <input 
+                                      type="datetime-local" 
+                                      required 
+                                      className="v-input" 
+                                      value={newItem.booking_end ? new Date(newItem.booking_end).toISOString().slice(0, 16) : ''} 
+                                      onChange={(e) => setNewItem({ ...newItem, booking_end: e.target.value ? new Date(e.target.value).toISOString() : '' })} 
+                                    />
+                                  </div>
+                                </div>
+                                <div className="v-form-group">
+                                  <label>Event Description *</label>
+                                  <textarea className="wizard-textarea" placeholder="Describe your event in detail. What can attendees expect?" required rows={5} value={newItem.detail || ''} onChange={(e) => setNewItem({ ...newItem, detail: e.target.value })} />
+                                </div>
+                              </div>
+                            </div>
+                            <div className="wizard-navigation-footer">
+                              <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(1)}>← Back</button>
+                              <button type="button" className="wizard-next-btn" onClick={() => {
+                                if (!newItem.name || !newItem.category || !newItem.detail) {
+                                  toast.error("Please fill in title, category and description!");
+                                  return;
+                                }
+                                setEventWizardStep(3);
+                              }}>Next: Venues</button>
+                            </div>
+                          </div>
+                        ) : eventWizardStep === 3 ? (
+                          // Step 3: Venues/Stops
+                          <div className="single-event-wizard-step animate-fade-in">
+                            <div className="wizard-stepper-bar">
+                              <div className="step-item active-past"><span className="step-number">1</span><span className="step-label">Basic Details</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active"><span className="step-number">2</span><span className="step-label">Venues</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">3</span><span className="step-label">Tickets</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">4</span><span className="step-label">Photos</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">5</span><span className="step-label">Review</span></div>
+                            </div>
+                            <div className="wizard-step-header">
+                              <h2 className="wizard-title">Tour stops & Venues</h2>
+                              <p className="wizard-subtitle">Define where and when each stop of the tour/festival occurs.</p>
+                            </div>
+                            <div className="wizard-section-card">
+                              <div className="section-card-header">
+                                <h4>Venues ({(newItem.schedule_slots || []).length})</h4>
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                {(newItem.schedule_slots || []).map((slot, index) => (
+                                  <div key={slot.id || index} style={{ border: '1px solid #e2e8f0', borderRadius: '16px', padding: '1.25rem', background: '#f8fafc' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', fontWeight: 'bold', fontSize: '0.85rem', color: '#ea580c' }}>
+                                      <span>Stop #{index + 1}</span>
+                                      {newItem.schedule_slots.length > 1 && (
+                                        <button type="button" style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer' }} onClick={() => {
+                                          setNewItem({ ...newItem, schedule_slots: newItem.schedule_slots.filter(s => s.id !== slot.id) });
+                                        }}><Trash2 size={16} /></button>
+                                      )}
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
+                                      <div className="v-form-group">
+                                        <label>Venue / City *</label>
+                                        <input type="text" className="v-input" required placeholder="Venue name and city" value={slot.venue_name || ''} onChange={(e) => {
+                                          const slots = [...newItem.schedule_slots];
+                                          slots[index] = { ...slot, venue_name: e.target.value };
+                                          setNewItem({ ...newItem, schedule_slots: slots });
+                                        }} />
+                                      </div>
+                                      <div className="v-form-group">
+                                        <label>Date *</label>
+                                        <input type="date" className="v-input" required value={slot.date || ''} onChange={(e) => {
+                                          const slots = [...newItem.schedule_slots];
+                                          slots[index] = { ...slot, date: e.target.value };
+                                          setNewItem({ ...newItem, schedule_slots: slots });
+                                        }} />
+                                      </div>
+                                      <div className="v-form-group">
+                                        <label>Starts *</label>
+                                        <input type="time" className="v-input" required value={slot.starts || '19:00'} onChange={(e) => {
+                                          const slots = [...newItem.schedule_slots];
+                                          slots[index] = { ...slot, starts: e.target.value };
+                                          setNewItem({ ...newItem, schedule_slots: slots });
+                                        }} />
+                                      </div>
+                                      <div className="v-form-group">
+                                        <label>Ends *</label>
+                                        <input type="time" className="v-input" required value={slot.ends || '22:00'} onChange={(e) => {
+                                          const slots = [...newItem.schedule_slots];
+                                          slots[index] = { ...slot, ends: e.target.value };
+                                          setNewItem({ ...newItem, schedule_slots: slots });
+                                        }} />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              <button type="button" className="add-tier-dashed-btn" onClick={() => {
+                                const slots = [...(newItem.schedule_slots || [])];
+                                slots.push({ id: Date.now(), date: '', starts: '19:00', ends: '22:00', venue_name: '' });
+                                setNewItem({ ...newItem, schedule_slots: slots });
+                              }}>+ Add another tour stop</button>
+                            </div>
+                            <div className="wizard-navigation-footer">
+                              <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(2)}>← Back</button>
+                              <button type="button" className="wizard-next-btn" onClick={() => {
+                                if (newItem.schedule_slots?.some(s => !s.date || !s.venue_name)) {
+                                  toast.error("Please fill in date and venue details for all tour stops!");
+                                  return;
+                                }
+                                setEventWizardStep(4);
+                              }}>Next: Tickets</button>
+                            </div>
+                          </div>
+                        ) : eventWizardStep === 4 ? (
+                          // Step 4: Ticket Tiers
+                          <div className="single-event-wizard-step animate-fade-in">
+                            <div className="wizard-stepper-bar">
+                              <div className="step-item active-past"><span className="step-number">1</span><span className="step-label">Basic Details</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active-past"><span className="step-number">2</span><span className="step-label">Venues</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active"><span className="step-number">3</span><span className="step-label">Tickets</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">4</span><span className="step-label">Photos</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">5</span><span className="step-label">Review</span></div>
+                            </div>
+                            <div className="wizard-step-header">
+                              <h2 className="wizard-title">Ticket Tiers</h2>
+                              <p className="wizard-subtitle">Create pricing categories for this tour/festival.</p>
+                            </div>
+                            <div className="wizard-section-card">
+                              <div className="section-card-header">
+                                <h4>Tickets</h4>
+                              </div>
+                              <div className="ticket-tiers-list">
+                                {(newItem.ticket_tiers || []).map((tier, index) => (
+                                  <div className="ticket-tier-row-card" key={tier.id || index}>
+                                    <div className="tier-row-header">
+                                      <span className="tier-index-number">{index + 1}</span>
+                                      <span className="tier-badge-type">{parseFloat(tier.price) === 0 ? 'Free' : 'Paid'}</span>
+                                      {newItem.ticket_tiers.length > 1 && (
+                                        <button type="button" className="delete-tier-btn" onClick={() => {
+                                          setNewItem({ ...newItem, ticket_tiers: newItem.ticket_tiers.filter((_, idx) => idx !== index) });
+                                        }}><Trash2 size={16} /></button>
+                                      )}
+                                    </div>
+                                    <div className="tier-inputs-grid">
+                                      <div className="v-form-group">
+                                        <label>Name *</label>
+                                        <input type="text" className="v-input" placeholder="General Admission" required value={tier.tier_name || ''} onChange={(e) => {
+                                          const nextTiers = [...newItem.ticket_tiers];
+                                          nextTiers[index] = { ...tier, tier_name: e.target.value };
+                                          setNewItem({ ...newItem, ticket_tiers: nextTiers });
+                                        }} />
+                                      </div>
+                                      <div className="v-form-group">
+                                        <label>Price *</label>
+                                        <input type="number" className="v-input" placeholder="₹ 0" required value={tier.price === 0 ? '' : tier.price} onChange={(e) => {
+                                          const nextTiers = [...newItem.ticket_tiers];
+                                          nextTiers[index] = { ...tier, price: parseFloat(e.target.value) || 0 };
+                                          setNewItem({ ...newItem, ticket_tiers: nextTiers });
+                                        }} />
+                                      </div>
+                                      <div className="v-form-group">
+                                        <label>Quantity *</label>
+                                        <input type="number" className="v-input" placeholder="100" required value={tier.total_seats || ''} onChange={(e) => {
+                                          const nextTiers = [...newItem.ticket_tiers];
+                                          nextTiers[index] = { ...tier, total_seats: parseInt(e.target.value) || 0, available_seats: parseInt(e.target.value) || 0 };
+                                          setNewItem({ ...newItem, ticket_tiers: nextTiers });
+                                        }} />
+                                      </div>
+                                      <div className="v-form-group">
+                                        <label>Entries per ticket *</label>
+                                        <input type="number" className="v-input" defaultValue={1} required />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              <button type="button" className="add-tier-dashed-btn" onClick={() => {
+                                const nextTiers = [...(newItem.ticket_tiers || [])];
+                                nextTiers.push({ id: 'temp_' + Date.now(), tier_name: '', price: 0, total_seats: 100, available_seats: 100 });
+                                setNewItem({ ...newItem, ticket_tiers: nextTiers });
+                              }}>+ Add another ticket type</button>
+                            </div>
+                            <div className="wizard-navigation-footer">
+                              <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(3)}>← Back</button>
+                              <button type="button" className="wizard-next-btn" onClick={() => {
+                                if (!newItem.ticket_tiers?.length || newItem.ticket_tiers.some(t => !t.tier_name)) {
+                                  toast.error("Please add at least one complete ticket tier!");
+                                  return;
+                                }
+                                setEventWizardStep(5);
+                              }}>Next: Photos</button>
+                            </div>
+                          </div>
+                        ) : eventWizardStep === 5 ? (
+                          // Step 5: Photos & Cover
+                          <div className="single-event-wizard-step animate-fade-in">
+                            <div className="wizard-stepper-bar">
+                              <div className="step-item active-past"><span className="step-number">1</span><span className="step-label">Basic Details</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active-past"><span className="step-number">2</span><span className="step-label">Venues</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active-past"><span className="step-number">3</span><span className="step-label">Tickets</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active"><span className="step-number">4</span><span className="step-label">Photos</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">5</span><span className="step-label">Review</span></div>
+                            </div>
+                            <div className="wizard-step-header">
+                              <h2 className="wizard-title">Event Banner</h2>
+                              <p className="wizard-subtitle">Add a banner image to attract attendees to your festival/tour stops.</p>
+                            </div>
+                            <div className="wizard-section-card">
+                              <div className="section-card-header">
+                                <h4>Banner Image</h4>
+                              </div>
+                              <div className="v-form-group">
+                                <div
+                                  className="v-input v-upload-zone"
+                                  onClick={(e) => {
+                                    if (e.target.id !== 'inventory-upload-wizard-fest') {
+                                      document.getElementById('inventory-upload-wizard-fest').click();
+                                    }
+                                  }}
+                                >
+                                  <input id="inventory-upload-wizard-fest" type="file" hidden accept="image/*" onClick={(e) => e.stopPropagation()} onChange={(e) => {
+                                    const file = e.target.files[0];
+                                    if (file) {
+                                      const reader = new FileReader();
+                                      reader.onloadend = () => {
+                                        setNewItem(prev => ({ ...prev, image: reader.result }));
+                                        e.target.value = '';
+                                      };
+                                      reader.readAsDataURL(file);
+                                    } else {
+                                      e.target.value = '';
+                                    }
+                                  }} />
+                                  {newItem.image ? (
+                                    <div style={{ position: 'relative', width: '220px', height: '150px', margin: '0 auto' }}>
+                                      <img src={newItem.image} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '16px' }} />
+                                      <div style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setNewItem(prev => ({ ...prev, image: null })); }}><Trash2 size={16} color="#ef4444" /></div>
+                                    </div>
+                                  ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                      <Camera size={40} color="#cbd5e1" style={{ marginBottom: '1rem' }} />
+                                      <p style={{ margin: 0, fontWeight: 800, color: '#1e293b' }}>Click to upload cover photo</p>
+                                      <p style={{ margin: '4px 0 0 0', color: '#94a3b8', fontSize: '0.85rem' }}>High-res photos increase conversion by 40%</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="wizard-navigation-footer">
+                              <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(4)}>← Back</button>
+                              <button type="button" className="wizard-next-btn" onClick={() => {
+                                if (!newItem.image) {
+                                  toast.error("Please upload a banner image!");
+                                  return;
+                                }
+                                setEventWizardStep(6);
+                              }}>Next: Review</button>
+                            </div>
+                          </div>
+                        ) : (
+                          // Step 6: Review
+                          <div className="single-event-wizard-step animate-fade-in">
+                            <div className="wizard-stepper-bar">
+                              <div className="step-item active-past"><span className="step-number">1</span><span className="step-label">Basic Details</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active-past"><span className="step-number">2</span><span className="step-label">Venues</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active-past"><span className="step-number">3</span><span className="step-label">Tickets</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active-past"><span className="step-number">4</span><span className="step-label">Photos</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active"><span className="step-number">5</span><span className="step-label">Review</span></div>
+                            </div>
+                            <div className="wizard-step-header">
+                              <h2 className="wizard-title">Review Tour Details</h2>
+                              <p className="wizard-subtitle">Verify the details before publishing your tour stops live.</p>
+                            </div>
+                            <div className="wizard-section-card review-summary-card">
+                              <div className="review-banner">
+                                {newItem.image && <img src={newItem.image} alt="Banner" />}
+                                <span className="review-status-badge">UPCOMING</span>
+                              </div>
+                              <div className="review-content">
+                                <h3 className="review-title">{newItem.name || 'Untitled Tour/Festival'}</h3>
+                                <div className="review-meta-row">
+                                  <span className="review-category-tag">{newItem.category}</span>
+                                  <span className="review-visibility-tag">{newItem.visibility || 'public'}</span>
+                                </div>
+                                <div style={{ margin: '1.5rem 0' }}>
+                                  <strong>📅 Tour Stops / Venues ({(newItem.schedule_slots || []).length})</strong>
+                                  <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.5rem' }}>
+                                    {(newItem.schedule_slots || []).map((s, idx) => (
+                                      <div key={s.id || idx} style={{ padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>Stop #{idx + 1}: {s.venue_name}</span>
+                                        <strong>📍 {s.date} ({s.starts} - {s.ends})</strong>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="review-tickets-section">
+                                  <strong>Ticket Tiers ({newItem.ticket_tiers?.length || 0})</strong>
+                                  <div className="review-tiers-list">
+                                    {(newItem.ticket_tiers || []).map((t, idx) => (
+                                      <div className="review-tier-item" key={t.id || idx}>
+                                        <div className="tier-left">
+                                          <strong>{t.tier_name}</strong>
+                                          <span>Capacity: {t.total_seats} seats</span>
+                                        </div>
+                                        <span className="tier-price-tag">₹{t.price}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="wizard-navigation-footer">
+                              <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(5)}>← Back</button>
+                              <button type="submit" className="wizard-publish-btn" disabled={isSaving}>
+                                {isSaving ? 'Publishing...' : 'Publish Tour / Festival'}
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      )
+                    ) : (
+                      // SINGLE SHOW WIZARD STEPS
+                      (newItem.show_type === 'single' || !newItem.show_type) && (
+                        eventWizardStep === 2 ? (
+                          // Step 2: Create your show (basics, when/where, tickets)
+                          <div className="single-event-wizard-step animate-fade-in">
+                            <div className="wizard-stepper-bar">
+                              <div className="step-item active"><span className="step-number">1</span><span className="step-label">Create your show</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">2</span><span className="step-label">Photos & details</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">3</span><span className="step-label">Review</span></div>
+                            </div>
+                            <div className="wizard-step-header">
+                              <div className="wizard-back-indicator">
+                                <span className="current-selection-badge">Single show</span>
+                                <button type="button" className="change-selection-btn" onClick={() => setEventWizardStep(1)}>Change</button>
+                              </div>
+                              <h2 className="wizard-title">Create your show</h2>
+                              <p className="wizard-subtitle">Everything needed to start selling, all in one place.</p>
+                            </div>
 
-                <div 
-                  className="v-form-actions" 
-                  style={{ 
-                    padding: '1.5rem 3rem 2.5rem 3rem', 
-                    borderTop: '1px solid #f1f5f9', 
-                    background: 'white',
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    gap: '1rem'
-                  }}
-                >
-                  <button type="button" onClick={() => setShowForm(false)} className="v-btn-outline">Discard</button>
-                  <button type="submit" className="v-btn-primary">
-                    {editingId ? (businessType === 'event' ? 'Update Event' : 'Update Listing') : (businessType === 'shop' ? 'Publish to Store' : businessType === 'event' ? 'Publish Event' : 'Publish Service')}
-                  </button>
-                </div>
+                            {/* Section 1: The basics */}
+                            <div className="wizard-section-card">
+                              <div className="section-card-header">
+                                <h4>The basics</h4>
+                                <span className="required-badge">Required</span>
+                              </div>
+                              <p className="section-card-desc">Name the event and choose the category guests will browse under.</p>
+                              <div className="wizard-fields-stack">
+                                <div className="v-form-group">
+                                  <label>Event name *</label>
+                                  <input type="text" className="v-input" placeholder="e.g. An evening with Prateek Kuhad" required value={newItem.name || ''} onChange={(e) => setNewItem({ ...newItem, name: e.target.value })} />
+                                </div>
+                                <div className="v-form-group">
+                                  <label>Event visibility *</label>
+                                  <div className="visibility-cards-row">
+                                    <div className={`visibility-card ${(newItem.visibility === 'public' || !newItem.visibility) ? 'selected' : ''}`} onClick={() => setNewItem({ ...newItem, visibility: 'public' })}>
+                                      <div className="visibility-circle">{(newItem.visibility === 'public' || !newItem.visibility) && <div className="checkmark" />}</div>
+                                      <div className="visibility-info"><strong>Public</strong><span>Visible on Showmate listings.</span></div>
+                                    </div>
+                                    <div className={`visibility-card ${newItem.visibility === 'private' ? 'selected' : ''}`} onClick={() => setNewItem({ ...newItem, visibility: 'private' })}>
+                                      <div className="visibility-circle">{newItem.visibility === 'private' && <div className="checkmark" />}</div>
+                                      <div className="visibility-info"><strong>Private</strong><span>Accessible only by private access links.</span></div>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="online-checkbox-card">
+                                  <input type="checkbox" id="is_online_evt" checked={!!newItem.is_online} onChange={(e) => setNewItem({ ...newItem, is_online: e.target.checked })} />
+                                  <label htmlFor="is_online_evt"><strong>Online event</strong><span>Virtual events use video conferencing details instead of a physical venue.</span></label>
+                                </div>
+                                <div className="v-form-group">
+                                  <label>Category *</label>
+                                  <select required className="v-input" value={newItem.category || ''} onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}>
+                                    <option value="">Search group or category</option>
+                                    <option value="Music & Concerts">Music & Concerts</option>
+                                    <option value="Comedy & Theatre">Comedy & Theatre</option>
+                                    <option value="Workshops & Classes">Workshops & Classes</option>
+                                    <option value="Parties & Nightlife">Parties & Nightlife</option>
+                                    <option value="Festivals & Fairs">Festivals & Fairs</option>
+                                    <option value="Sports & Fitness">Sports & Fitness</option>
+                                    <option value="Corporate & Business">Corporate & Business</option>
+                                    <option value="Other Events">Other Events</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Section 2: When and where */}
+                            <div className="wizard-section-card">
+                              <div className="section-card-header">
+                                <h4>When and where</h4>
+                              </div>
+                              <p className="section-card-desc">Set the single public show date, time and venue.</p>
+                              <div className="when-where-grid">
+                                <div className="v-form-group">
+                                  <label>Date *</label>
+                                  <input type="date" required className="v-input" value={newItem.event_date ? newItem.event_date.split('T')[0] : ''} onChange={(e) => {
+                                    const timePart = newItem.event_date && newItem.event_date.includes('T') ? newItem.event_date.split('T')[1] : '19:00';
+                                    setNewItem({ ...newItem, event_date: `${e.target.value}T${timePart}` });
+                                  }} />
+                                </div>
+                                <div className="v-form-group">
+                                  <label>Starts *</label>
+                                  <input type="time" required className="v-input" value={newItem.event_date && newItem.event_date.includes('T') ? newItem.event_date.split('T')[1].substring(0, 5) : '19:00'} onChange={(e) => {
+                                    const datePart = newItem.event_date ? newItem.event_date.split('T')[0] : new Date().toISOString().split('T')[0];
+                                    setNewItem({ ...newItem, event_date: `${datePart}T${e.target.value}:00` });
+                                  }} />
+                                </div>
+                                <div className="v-form-group">
+                                  <label>Ends *</label>
+                                  <input type="time" required className="v-input" value={newItem.ends_at && newItem.ends_at.includes('T') ? newItem.ends_at.split('T')[1].substring(0, 5) : '22:00'} onChange={(e) => {
+                                    const datePart = newItem.ends_at ? newItem.ends_at.split('T')[0] : (newItem.event_date ? newItem.event_date.split('T')[0] : new Date().toISOString().split('T')[0]);
+                                    setNewItem({ ...newItem, ends_at: `${datePart}T${e.target.value}:00` });
+                                  }} />
+                                </div>
+                              </div>
+                              <div className="when-where-grid" style={{ marginTop: '1.25rem' }}>
+                                <div className="v-form-group">
+                                  <label>Booking Opens *</label>
+                                  <input 
+                                    type="datetime-local" 
+                                    required 
+                                    className="v-input" 
+                                    value={newItem.booking_start ? new Date(newItem.booking_start).toISOString().slice(0, 16) : ''} 
+                                    onChange={(e) => setNewItem({ ...newItem, booking_start: e.target.value ? new Date(e.target.value).toISOString() : '' })} 
+                                  />
+                                </div>
+                                <div className="v-form-group">
+                                  <label>Booking Closes *</label>
+                                  <input 
+                                    type="datetime-local" 
+                                    required 
+                                    className="v-input" 
+                                    value={newItem.booking_end ? new Date(newItem.booking_end).toISOString().slice(0, 16) : ''} 
+                                    onChange={(e) => setNewItem({ ...newItem, booking_end: e.target.value ? new Date(e.target.value).toISOString() : '' })} 
+                                  />
+                                </div>
+                              </div>
+                              <div className="v-form-group">
+                                <label>Venue *</label>
+                                <input type="text" className="v-input" placeholder="Search venue..." required={!newItem.is_online} disabled={!!newItem.is_online} value={newItem.is_online ? 'Online Virtual Venue' : (newItem.venue_name || '')} onChange={(e) => setNewItem({ ...newItem, venue_name: e.target.value })} />
+                              </div>
+                            </div>
+
+                            {/* Section 3: Tickets */}
+                            <div className="wizard-section-card">
+                              <div className="section-card-header">
+                                <h4>Tickets</h4>
+                                <div className="ticket-capacity-badges">
+                                  <span className="cap-badge">Capacity: {newItem.ticket_tiers?.reduce((sum, t) => sum + (parseInt(t.total_seats) || 0), 0) || 0}</span>
+                                </div>
+                              </div>
+                              <p className="section-card-desc">Each ticket type automatically applies to this one show.</p>
+                              <div className="ticket-tiers-list">
+                                {(newItem.ticket_tiers || []).map((tier, index) => (
+                                  <div className="ticket-tier-row-card" key={tier.id || index}>
+                                    <div className="tier-row-header">
+                                      <span className="tier-index-number">{index + 1}</span>
+                                      <span className="tier-badge-type">{parseFloat(tier.price) === 0 ? 'Free' : 'Paid'}</span>
+                                      {newItem.ticket_tiers.length > 1 && (
+                                        <button type="button" className="delete-tier-btn" onClick={() => {
+                                          setNewItem({ ...newItem, ticket_tiers: newItem.ticket_tiers.filter((_, idx) => idx !== index) });
+                                        }}><Trash2 size={16} /></button>
+                                      )}
+                                    </div>
+                                    <div className="tier-inputs-grid">
+                                      <div className="v-form-group">
+                                        <label>Name *</label>
+                                        <input type="text" className="v-input" placeholder="General Admission" required value={tier.tier_name || ''} onChange={(e) => {
+                                          const nextTiers = [...newItem.ticket_tiers];
+                                          nextTiers[index] = { ...tier, tier_name: e.target.value };
+                                          setNewItem({ ...newItem, ticket_tiers: nextTiers });
+                                        }} />
+                                      </div>
+                                      <div className="v-form-group">
+                                        <label>Price *</label>
+                                        <input type="number" className="v-input" placeholder="₹ 0" required value={tier.price === 0 ? '' : tier.price} onChange={(e) => {
+                                          const nextTiers = [...newItem.ticket_tiers];
+                                          nextTiers[index] = { ...tier, price: parseFloat(e.target.value) || 0 };
+                                          setNewItem({ ...newItem, ticket_tiers: nextTiers });
+                                        }} />
+                                      </div>
+                                      <div className="v-form-group">
+                                        <label>Quantity *</label>
+                                        <input type="number" className="v-input" placeholder="100" required value={tier.total_seats || ''} onChange={(e) => {
+                                          const nextTiers = [...newItem.ticket_tiers];
+                                          nextTiers[index] = { ...tier, total_seats: parseInt(e.target.value) || 0, available_seats: parseInt(e.target.value) || 0 };
+                                          setNewItem({ ...newItem, ticket_tiers: nextTiers });
+                                        }} />
+                                      </div>
+                                      <div className="v-form-group">
+                                        <label>Entries per ticket *</label>
+                                        <input type="number" className="v-input" defaultValue={1} required />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              <button type="button" className="add-tier-dashed-btn" onClick={() => {
+                                const nextTiers = [...(newItem.ticket_tiers || [])];
+                                nextTiers.push({ id: 'temp_' + Date.now(), tier_name: '', price: 0, total_seats: 100, available_seats: 100 });
+                                setNewItem({ ...newItem, ticket_tiers: nextTiers });
+                              }}>+ Add another ticket type</button>
+                            </div>
+
+                            <div className="wizard-navigation-footer">
+                              <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(1)}>← Back</button>
+                              <button type="button" className="wizard-next-btn" onClick={() => {
+                                if (!newItem.name || !newItem.category) {
+                                  toast.error("Please fill in the required basic fields!");
+                                  return;
+                                }
+                                setEventWizardStep(3);
+                              }}>Next: Photos & details</button>
+                            </div>
+                          </div>
+                        ) : eventWizardStep === 3 ? (
+                          // Step 3: Photos & details
+                          <div className="single-event-wizard-step animate-fade-in">
+                            <div className="wizard-stepper-bar">
+                              <div className="step-item active-past"><span className="step-number">1</span><span className="step-label">Create your show</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active"><span className="step-number">2</span><span className="step-label">Photos & details</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item"><span className="step-number">3</span><span className="step-label">Review</span></div>
+                            </div>
+                            <div className="wizard-step-header">
+                              <h2 className="wizard-title">Event Banner & Description</h2>
+                              <p className="wizard-subtitle">Add rich details to attract attendees and make your listing premium.</p>
+                            </div>
+                            <div className="wizard-section-card">
+                              <div className="section-card-header">
+                                <h4>Banner Image</h4>
+                              </div>
+                              <div className="v-form-group">
+                                <div
+                                  className="v-input v-upload-zone"
+                                  onClick={(e) => {
+                                    if (e.target.id !== 'inventory-upload-wizard-single') {
+                                      document.getElementById('inventory-upload-wizard-single').click();
+                                    }
+                                  }}
+                                >
+                                  <input id="inventory-upload-wizard-single" type="file" hidden accept="image/*" onClick={(e) => e.stopPropagation()} onChange={(e) => {
+                                    const file = e.target.files[0];
+                                    if (file) {
+                                      const reader = new FileReader();
+                                      reader.onloadend = () => {
+                                        setNewItem(prev => ({ ...prev, image: reader.result }));
+                                        e.target.value = '';
+                                      };
+                                      reader.readAsDataURL(file);
+                                    } else {
+                                      e.target.value = '';
+                                    }
+                                  }} />
+                                  {newItem.image ? (
+                                    <div style={{ position: 'relative', width: '220px', height: '150px', margin: '0 auto' }}>
+                                      <img src={newItem.image} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '16px' }} />
+                                      <div style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setNewItem(prev => ({ ...prev, image: null })); }}><Trash2 size={16} color="#ef4444" /></div>
+                                    </div>
+                                  ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                      <Camera size={40} color="#cbd5e1" style={{ marginBottom: '1rem' }} />
+                                      <p style={{ margin: 0, fontWeight: 800, color: '#1e293b' }}>Click to upload cover photo</p>
+                                      <p style={{ margin: '4px 0 0 0', color: '#94a3b8', fontSize: '0.85rem' }}>High-res photos increase conversion by 40%</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="wizard-section-card">
+                              <div className="section-card-header">
+                                <h4>Event Description</h4>
+                              </div>
+                              <div className="v-form-group">
+                                <label>Description *</label>
+                                <textarea placeholder="Describe your event in detail..." required rows={6} value={newItem.detail || ''} onChange={(e) => setNewItem({ ...newItem, detail: e.target.value })} className="wizard-textarea" />
+                              </div>
+                            </div>
+                            <div className="wizard-navigation-footer">
+                              <button type="button" className="wizard-back-btn" onClick={() => setNewItem({ ...newItem, eventWizardStep: 2 })}>← Back</button>
+                              <button type="button" className="wizard-next-btn" onClick={() => {
+                                if (!newItem.image || !newItem.detail) {
+                                  toast.error("Please add banner image and description details!");
+                                  return;
+                                }
+                                setEventWizardStep(4);
+                              }}>Next: Review</button>
+                            </div>
+                          </div>
+                        ) : (
+                          // Step 4: Review
+                          <div className="single-event-wizard-step animate-fade-in">
+                            <div className="wizard-stepper-bar">
+                              <div className="step-item active-past"><span className="step-number">1</span><span className="step-label">Create your show</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active-past"><span className="step-number">2</span><span className="step-label">Photos & details</span></div>
+                              <div className="step-divider">›</div>
+                              <div className="step-item active"><span className="step-number">3</span><span className="step-label">Review</span></div>
+                            </div>
+                            <div className="wizard-step-header">
+                              <h2 className="wizard-title">Review event details</h2>
+                              <p className="wizard-subtitle">Verify the details before publishing this event live.</p>
+                            </div>
+                            <div className="wizard-section-card review-summary-card">
+                              <div className="review-banner">
+                                {newItem.image ? <img src={newItem.image} alt={newItem.name} /> : <div className="no-banner-placeholder">No Banner Provided</div>}
+                                <span className="review-status-badge">UPCOMING</span>
+                              </div>
+                              <div className="review-content">
+                                <h3 className="review-title">{newItem.name || 'Untitled Event'}</h3>
+                                <div className="review-meta-row">
+                                  <span className="review-category-tag">{newItem.category || 'Category'}</span>
+                                  <span className="review-visibility-tag">{newItem.visibility || 'public'}</span>
+                                </div>
+                                <div className="review-info-grid">
+                                  <div className="review-info-item">
+                                    <strong>📅 Date & Time</strong>
+                                    <span>{newItem.event_date ? new Date(newItem.event_date).toLocaleString() : 'Not Set'}</span>
+                                  </div>
+                                  <div className="review-info-item">
+                                    <strong>📍 Venue</strong>
+                                    <span>{newItem.is_online ? 'Online Virtual Event' : (newItem.venue_name || 'Not Set')}</span>
+                                  </div>
+                                </div>
+                                <div className="review-description-section">
+                                  <strong>Description</strong>
+                                  <p>{newItem.detail || 'No description provided.'}</p>
+                                </div>
+                                <div className="review-tickets-section">
+                                  <strong>Ticket Tiers ({newItem.ticket_tiers?.length || 0})</strong>
+                                  <div className="review-tiers-list">
+                                    {(newItem.ticket_tiers || []).map((t, idx) => (
+                                      <div className="review-tier-item" key={t.id || idx}>
+                                        <div className="tier-left">
+                                          <strong>{t.tier_name || 'General Admission'}</strong>
+                                          <span>Capacity: {t.total_seats || 100} seats</span>
+                                        </div>
+                                        <span className="tier-price-tag">₹{t.price}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="wizard-navigation-footer">
+                              <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(3)}>← Back</button>
+                              <button type="submit" className="wizard-publish-btn" disabled={isSaving}>
+                                {isSaving ? 'Publishing...' : 'Publish Event'}
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      )
+                    )}
+                  </div>
+                ) : (
+                  // STANDARD PRODUCT/SERVICE FORM FIELDS
+                  <>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', overflowY: 'auto', flex: 1, padding: '2.5rem 3rem' }}>
+                      <div className="v-form-row-2col">
+                        <div className="v-form-group">
+                          <label>Title of the {businessType === 'shop' ? 'Product' : 'Service'}</label>
+                          <input required type="text" className="v-input" placeholder="E.g. Full Home Sanitize" value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} />
+                        </div>
+                        <div className="v-form-group">
+                          <label>Base Price (₹)</label>
+                          <div style={{ position: 'relative' }}>
+                            <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', fontWeight: 900, color: '#94a3b8' }}>₹</span>
+                            <input 
+                              required 
+                              type="number" 
+                              className="v-input" 
+                              style={{ paddingLeft: '36px' }} 
+                              placeholder="0.00" 
+                              value={newItem.price} 
+                              onChange={e => setNewItem({ ...newItem, price: e.target.value })} 
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {businessType === 'service' && (
+                        <div className="v-form-group">
+                          <label>Service Category</label>
+                          <select required className="v-input" value={newItem.category_id || '77777777-7777-7777-7777-777777777777'} onChange={e => setNewItem({ ...newItem, category_id: e.target.value })}>
+                            <option value="77777777-7777-7777-7777-555555555555">Cleaning</option>
+                            <option value="77777777-7777-7777-7777-111111111111">Electrical</option>
+                            <option value="77777777-7777-7777-7777-222222222222">AC & Appliance</option>
+                            <option value="77777777-7777-7777-7777-333333333333">Carpentry</option>
+                            <option value="77777777-7777-7777-7777-444444444444">Painting</option>
+                            <option value="77777777-7777-7777-7777-777777777777">Plumbing</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {businessType === 'shop' && (
+                        <>
+                          <div className="v-form-row-2col">
+                            <div className="v-form-group">
+                              <label>Barcode Type</label>
+                              <select className="v-input" value={newItem.barcode_type} onChange={e => setNewItem({ ...newItem, barcode_type: e.target.value })}>
+                                <option value="EAN-13">EAN-13</option>
+                                <option value="UPCA-2">UPCA-2</option>
+                                <option value="UPC-A">UPC-A</option>
+                                <option value="EAN-8">EAN-8</option>
+                              </select>
+                            </div>
+                            <div className="v-form-group">
+                              <label>Barcode Number</label>
+                              <input type="text" maxLength={20} className="v-input" placeholder="E.g. 8901234567890" value={newItem.barcode} onChange={e => setNewItem({ ...newItem, barcode: e.target.value.replace(/\D/g, '') })} />
+                            </div>
+                          </div>
+                          <div className="v-form-row-2col" style={{ marginTop: '-1rem' }}>
+                            <div className="v-form-group">
+                              <label>Stock Quantity</label>
+                              <input required type="number" className="v-input" placeholder="E.g. 50" value={newItem.stock_quantity} onChange={e => setNewItem({ ...newItem, stock_quantity: e.target.value })} />
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      <div className="v-form-group">
+                        <label>Description & Unique Selling Points</label>
+                        <textarea className="v-input" style={{ minHeight: '120px', resize: 'vertical' }} placeholder="What makes this special? List features, warranty, or delivery times..." value={newItem.detail} onChange={e => setNewItem({ ...newItem, detail: e.target.value })} />
+                      </div>
+
+                      {businessType === 'shop' && (
+                        <div className="v-form-group">
+                          <label>Visual Presentation</label>
+                          <div
+                            className="v-input v-upload-zone"
+                            onClick={(e) => {
+                              if (e.target.id !== 'inventory-upload') {
+                                document.getElementById('inventory-upload').click();
+                              }
+                            }}
+                          >
+                            <input id="inventory-upload" type="file" hidden accept="image/*" onClick={(e) => e.stopPropagation()} onChange={(e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setNewItem(prev => ({ ...prev, image: reader.result }));
+                                  e.target.value = '';
+                                };
+                                reader.readAsDataURL(file);
+                              } else {
+                                e.target.value = '';
+                              }
+                            }} />
+                            {newItem.image ? (
+                              <div style={{ position: 'relative', width: '220px', height: '150px', margin: '0 auto' }}>
+                                <img src={newItem.image} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '16px' }} />
+                                <div style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setNewItem(prev => ({ ...prev, image: null })); }}><Trash2 size={16} color="#ef4444" /></div>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <Camera size={40} color="#cbd5e1" style={{ marginBottom: '1rem' }} />
+                                <p style={{ margin: 0, fontWeight: 800, color: '#1e293b' }}>Click to upload cover photo</p>
+                                <p style={{ margin: '4px 0 0 0', color: '#94a3b8', fontSize: '0.85rem' }}>High-res photos increase conversion by 40%</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div 
+                      className="v-form-actions" 
+                      style={{ 
+                        padding: '1.5rem 3rem 2.5rem 3rem', 
+                        borderTop: '1px solid #f1f5f9', 
+                        background: 'white',
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                        gap: '1rem'
+                      }}
+                    >
+                      <button type="button" onClick={() => setShowForm(false)} className="v-btn-outline">Discard</button>
+                      <button type="submit" className="v-btn-primary">
+                        {editingId ? 'Update Listing' : (businessType === 'shop' ? 'Publish to Store' : 'Publish Service')}
+                      </button>
+                    </div>
+                  </>
+                )}
               </form>
             </motion.div>
           </div>
@@ -1706,6 +2860,49 @@ export const VendorOrders = ({ storeId, businessType, vendorData }) => {
     type: 'danger'
   });
 
+  const downloadVendorSalesReport = () => {
+    if (!orders || orders.length === 0) {
+      toast.error("No sales records found to export.");
+      return;
+    }
+    toast.loading("Generating sales report...");
+
+    try {
+      // Generate CSV
+      const headers = ['Order/Booking ID', 'Date & Time', 'Fulfillment Status', 'Details / Items', 'Booking/Fulfillment Type', 'Amount (INR)'];
+      const csvContent = [
+        headers.join(','),
+        ...orders.map(o => {
+          const itemsStr = o.order_items?.map(item => `${item.products?.name || item.name} (x${item.quantity})`).join('; ') || 'N/A';
+          const typeStr = businessType === 'event' ? 'Event Ticket' : businessType === 'service' ? 'Home Service' : 'Store Order';
+          return [
+            `"${o.id}"`,
+            `"${o.created_at ? new Date(o.created_at).toLocaleString() : 'N/A'}"`,
+            `"${o.status || 'PENDING'}"`,
+            `"${itemsStr.replace(/"/g, '""')}"`,
+            `"${typeStr}"`,
+            o.total_amount || 0
+          ].join(',');
+        })
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `vendor_sales_report_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.dismiss();
+      toast.success("Excel/CSV sales report downloaded!");
+    } catch (e) {
+      toast.dismiss();
+      console.error(e);
+      toast.error(`Failed to export report: ${e.message}`);
+    }
+  };
+
   const fetchOrders = React.useCallback(async (isInitial = false) => {
     if (!storeId) {
       setOrders([]);
@@ -2105,22 +3302,38 @@ export const VendorOrders = ({ storeId, businessType, vendorData }) => {
           <h1 className="v-hero-title">{businessType === 'service' ? 'Live Bookings' : businessType === 'event' ? 'Ticket Bookings' : 'Live Orders'}</h1>
           <p className="v-hero-subtitle">{businessType === 'service' ? 'Real-time tracking and operational control for your services' : businessType === 'event' ? 'Real-time tracking and control of ticket bookings and passes' : 'Real-time tracking and operational control for your store'}</p>
         </div>
-        {businessType === 'event' && (
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {businessType === 'event' && (
+            <button
+              onClick={() => setQrScannerOpen({ open: true, booking: null })}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '14px 24px',
+                background: 'linear-gradient(135deg, #0f172a, #1e293b)',
+                color: 'white', border: 'none', borderRadius: '16px',
+                fontWeight: 800, cursor: 'pointer', fontSize: '0.95rem',
+                boxShadow: '0 4px 20px rgba(15,23,42,0.3)',
+                whiteSpace: 'nowrap', flexShrink: 0
+              }}
+            >
+              <ScanLine size={18} /> Scan QR to Check In
+            </button>
+          )}
           <button
-            onClick={() => setQrScannerOpen({ open: true, booking: null })}
+            onClick={downloadVendorSalesReport}
             style={{
               display: 'flex', alignItems: 'center', gap: '10px',
               padding: '14px 24px',
-              background: 'linear-gradient(135deg, #0f172a, #1e293b)',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
               color: 'white', border: 'none', borderRadius: '16px',
               fontWeight: 800, cursor: 'pointer', fontSize: '0.95rem',
-              boxShadow: '0 4px 20px rgba(15,23,42,0.3)',
+              boxShadow: '0 4px 20px rgba(16,185,129,0.3)',
               whiteSpace: 'nowrap', flexShrink: 0
             }}
           >
-            <ScanLine size={18} /> Scan QR to Check In
+            <Download size={18} /> Download Sales Report (Excel)
           </button>
-        )}
+        </div>
       </div>
 
       <div className="v-tab-group" style={{ marginBottom: '3rem' }}>

@@ -35,7 +35,10 @@ import {
   Calendar,
   MapPin,
   Map,
-  Navigation
+  Navigation,
+  Layers,
+  Clock,
+  Download
 } from 'lucide-react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@supabase/supabase-js';
@@ -143,7 +146,7 @@ const TABLE_SCHEMAS = {
   stores: { vendor_id: '', name: '', description: '', address: '', is_open: true, rating: 0 },
   service_categories: { name: '', icon_url: '' },
   orders: { user_id: '', store_id: '', address_id: '', status: 'PENDING', subtotal: 0, delivery_fee: 0, total_amount: 0, payment_status: 'PENDING' },
-  events: { title: '', category: '', venue_name: '', venue_lat: 23.0225, venue_lng: 72.5714, event_date: '', status: 'UPCOMING', banner_url: '', starting_price: 0 },
+  events: { title: '', category: '', venue_name: '', venue_lat: 23.0225, venue_lng: 72.5714, event_date: '', ends_at: '', status: 'UPCOMING', banner_url: '', starting_price: 0, show_type: 'single', visibility: 'public', is_online: false, booking_start: '', booking_end: '' },
   event_bookings: { user_id: '', event_id: '', tier_id: '', ticket_count: 0, total_amount: 0, status: 'CONFIRMED' },
   city_routes: { start_area: '', end_area: '', distance_km: 0, base_price: 0, is_active: true },
   city_vehicles: { driver_id: '', vehicle_type: '', license_plate: '', total_seats: 0, available_seats: 0, is_active: true },
@@ -165,7 +168,7 @@ const DATABASE_SCHEMAS = {
   admins: ['username', 'role'],
   stores: ['vendor_id', 'name', 'description', 'logo_url', 'banner_url', 'address', 'lat', 'lng', 'is_open', 'rating'],
   orders: ['user_id', 'store_id', 'address_id', 'status', 'subtotal', 'delivery_fee', 'total_amount', 'payment_status'],
-  events: ['title', 'category', 'venue_name', 'venue_lat', 'venue_lng', 'event_date', 'status', 'banner_url', 'starting_price'],
+  events: ['title', 'category', 'venue_name', 'venue_lat', 'venue_lng', 'event_date', 'ends_at', 'status', 'banner_url', 'starting_price', 'show_type', 'visibility', 'is_online', 'booking_start', 'booking_end'],
   event_bookings: ['user_id', 'event_id', 'tier_id', 'ticket_count', 'total_amount', 'status'],
   city_routes: ['start_area', 'end_area', 'distance_km', 'base_price', 'is_active'],
   city_vehicles: ['driver_id', 'vehicle_type', 'license_plate', 'total_seats', 'available_seats', 'is_active'],
@@ -404,6 +407,7 @@ const EventApprovalsPanel = ({ API_URL }) => {
 
 const AdminPanel = ({ onLogout, location }) => {
   const [activeAdminTab, setActiveAdminTab] = useState(() => localStorage.getItem('admin_active_tab') || 'dashboard_panel');
+  const [eventWizardStep, setEventWizardStep] = useState(1);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -457,6 +461,136 @@ const AdminPanel = ({ onLogout, location }) => {
   const [showPurgeConfirm, setShowPurgeConfirm] = useState(false);
   const [isSaving, setSaving] = useState(false);
   const [syncStatus, setSyncStatus] = useState('cloud'); // 'cloud' or 'offline'
+
+  const downloadAdminSalesReport = async () => {
+    if (!adminSupabase) {
+      toast.error("Supabase client not initialized.");
+      return;
+    }
+    const toastId = toast.loading("Generating sales report...");
+
+    try {
+      const reportRows = [];
+
+      // 1. Fetch Store Orders
+      const { data: storeOrders } = await adminSupabase
+        .from('orders')
+        .select('id, created_at, status, total_amount, stores(name)')
+        .order('created_at', { ascending: false });
+      
+      if (storeOrders) {
+        storeOrders.forEach(o => {
+          reportRows.push({
+            id: o.id,
+            date: o.created_at ? new Date(o.created_at).toLocaleString() : 'N/A',
+            type: 'Store Order',
+            details: o.stores?.name ? `Store: ${o.stores.name}` : 'Marketplace Shop Order',
+            status: o.status || 'PENDING',
+            amount: o.total_amount || 0
+          });
+        });
+      }
+
+      // 2. Fetch Service Bookings
+      const { data: serviceBookings } = await adminSupabase
+        .from('service_bookings')
+        .select('id, scheduled_at, status, total_amount, services(title)')
+        .order('scheduled_at', { ascending: false });
+
+      if (serviceBookings) {
+        serviceBookings.forEach(sb => {
+          reportRows.push({
+            id: sb.id,
+            date: sb.scheduled_at ? new Date(sb.scheduled_at).toLocaleString() : 'N/A',
+            type: 'Home Service',
+            details: sb.services?.title ? `Service: ${sb.services.title}` : 'Home Booking',
+            status: sb.status || 'PENDING',
+            amount: sb.total_amount || 0
+          });
+        });
+      }
+
+      // 3. Fetch Ride Bookings
+      const { data: rideBookings } = await adminSupabase
+        .from('ticket_bookings')
+        .select('id, created_at, status, total_price, city_routes(start_area, end_area)')
+        .order('created_at', { ascending: false });
+
+      if (rideBookings) {
+        rideBookings.forEach(rb => {
+          const route = rb.city_routes;
+          const routeStr = route ? `Ride: ${route.start_area} to ${route.end_area}` : 'City Ride Ticket';
+          reportRows.push({
+            id: rb.id,
+            date: rb.created_at ? new Date(rb.created_at).toLocaleString() : 'N/A',
+            type: 'City Ride',
+            details: routeStr,
+            status: rb.status || 'CONFIRMED',
+            amount: rb.total_price || 0
+          });
+        });
+      }
+
+      // 4. Fetch Event Bookings
+      const { data: eventBookings } = await adminSupabase
+        .from('event_bookings')
+        .select('id, created_at, status, total_amount, events(title, show_type)')
+        .order('created_at', { ascending: false });
+
+      if (eventBookings) {
+        eventBookings.forEach(eb => {
+          const ev = eb.events;
+          const evStr = ev ? `Event: ${ev.title} (${ev.show_type || 'single'})` : 'Event Pass Booking';
+          reportRows.push({
+            id: eb.id,
+            date: eb.created_at ? new Date(eb.created_at).toLocaleString() : 'N/A',
+            type: 'Event Ticket',
+            details: evStr,
+            status: eb.status || 'CONFIRMED',
+            amount: eb.total_amount || 0
+          });
+        });
+      }
+
+      toast.dismiss(toastId);
+
+      if (reportRows.length === 0) {
+        toast.error("No sales records found to export.");
+        return;
+      }
+
+      // Sort by Date (newest first)
+      reportRows.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      // Generate CSV
+      const headers = ['Order/Booking ID', 'Date & Time', 'Sales Type', 'Items / Booking Details', 'Fulfillment Status', 'Revenue (INR)'];
+      const csvContent = [
+        headers.join(','),
+        ...reportRows.map(row => [
+          `"${row.id}"`,
+          `"${row.date}"`,
+          `"${row.type}"`,
+          `"${row.details.replace(/"/g, '""')}"`,
+          `"${row.status}"`,
+          row.amount
+        ].join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `passwala_platform_sales_report_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Excel/CSV sales report downloaded!");
+    } catch (e) {
+      toast.dismiss(toastId);
+      console.error(e);
+      toast.error(`Failed to export report: ${e.message}`);
+    }
+  };
 
   // --- Relational Reference States ---
   const [vendorsList, setVendorsList] = useState([]);
@@ -759,6 +893,16 @@ const AdminPanel = ({ onLogout, location }) => {
       if (currentTable === 'products') {
         filteredData = filteredData.filter(p => p.description !== 'Service item auto-registered');
       }
+
+      // Merge local untracked offline records so they show in the table
+      const localKey = `admin_local_${currentTable}`;
+      const localAdded = JSON.parse(localStorage.getItem(localKey) || '[]');
+      if (localAdded.length > 0) {
+        const serverIds = new Set(filteredData.map(item => item.id));
+        const unsyncedLocal = localAdded.filter(item => !serverIds.has(item.id));
+        filteredData = [...unsyncedLocal, ...filteredData];
+      }
+
       setData(filteredData);
       localStorage.setItem(`admin_cache_${currentTable}`, JSON.stringify(filteredData));
       setSyncStatus('cloud');
@@ -929,46 +1073,83 @@ const AdminPanel = ({ onLogout, location }) => {
       }
 
       // 2. Attempt Background Cloud Sync
-      let finalPayload = { ...payload };
-
       try {
         const adminKey = sessionStorage.getItem('admin_token') || '';
-        const response = await fetch(`${API_URL}/api/admin/upsert`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'x-admin-key': adminKey 
-          },
-          body: JSON.stringify({
-            table: currentTab.table,
-            payload: finalPayload
-          })
-        });
-        if (response.status === 401) {
-          toast.error('Session expired. Please login again.');
-          onLogout();
-          return;
-        }
-        const result = await response.json();
-        if (!result.success) {
-          throw new Error(result.error || 'Failed to sync with backend');
-        }
+        
+        if (currentTab.table === 'events' && (payload.show_type === 'multiple' || payload.show_type === 'festival') && payload.schedule_slots && payload.schedule_slots.length > 0) {
+          for (const slot of payload.schedule_slots) {
+            const slotPayload = {
+              ...payload,
+              event_date: slot.date ? `${slot.date}T${slot.starts || '19:00'}:00` : new Date().toISOString(),
+              ends_at: slot.date ? `${slot.date}T${slot.ends || '22:00'}:00` : new Date().toISOString(),
+              venue_name: slot.venue_name || 'Venue TBA'
+            };
+            delete slotPayload.schedule_slots; // clean up client-only field
+            
+            const response = await fetch(`${API_URL}/api/admin/upsert`, {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'x-admin-key': adminKey 
+              },
+              body: JSON.stringify({
+                table: currentTab.table,
+                payload: slotPayload
+              })
+            });
+            if (response.status === 401) {
+              toast.error('Session expired. Please login again.');
+              onLogout();
+              return;
+            }
+            const result = await response.json();
+            if (!result.success) {
+              throw new Error(result.error || 'Failed to sync with backend');
+            }
+          }
+          toast.success(`Published ${payload.schedule_slots.length} shows to Cloud! ☁️`, { id: 'offline-toast' });
+          setSyncStatus('cloud');
+          fetchData();
+        } else {
+          let finalPayload = { ...payload };
+          delete finalPayload.schedule_slots; // clean up client-only field
+          const response = await fetch(`${API_URL}/api/admin/upsert`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-admin-key': adminKey 
+            },
+            body: JSON.stringify({
+              table: currentTab.table,
+              payload: finalPayload
+            })
+          });
+          if (response.status === 401) {
+            toast.error('Session expired. Please login again.');
+            onLogout();
+            return;
+          }
+          const result = await response.json();
+          if (!result.success) {
+            throw new Error(result.error || 'Failed to sync with backend');
+          }
 
-        const returnedItem = result.data;
-        if (returnedItem) {
-          setData(prev => prev.map(item => item.id === payload.id ? returnedItem : item));
-          const localAddedCurrent = JSON.parse(localStorage.getItem(localKey) || '[]');
-          const newLocal = localAddedCurrent.map(item => item.id === payload.id ? returnedItem : item);
-          localStorage.setItem(localKey, JSON.stringify(newLocal));
+          const returnedItem = result.data;
+          if (returnedItem) {
+            setData(prev => prev.map(item => item.id === payload.id ? returnedItem : item));
+            const localAddedCurrent = JSON.parse(localStorage.getItem(localKey) || '[]');
+            const newLocal = localAddedCurrent.map(item => item.id === payload.id ? returnedItem : item);
+            localStorage.setItem(localKey, JSON.stringify(newLocal));
 
-          const cachedListCurrent = JSON.parse(localStorage.getItem(cacheKey) || '[]');
-          const newCached = cachedListCurrent.map(item => item.id === payload.id ? returnedItem : item);
-          localStorage.setItem(cacheKey, JSON.stringify(newCached));
+            const cachedListCurrent = JSON.parse(localStorage.getItem(cacheKey) || '[]');
+            const newCached = cachedListCurrent.map(item => item.id === payload.id ? returnedItem : item);
+            localStorage.setItem(cacheKey, JSON.stringify(newCached));
+          }
+
+          toast.success('Synced with Cloud! ☁️', { id: 'offline-toast' });
+          setSyncStatus('cloud');
+          fetchData(); // Instantly pull latest joined relations
         }
-
-        toast.success('Synced with Cloud! ☁️', { id: 'offline-toast' });
-        setSyncStatus('cloud');
-        fetchData(); // Instantly pull latest joined relations
       } catch (syncErr) {
         console.warn('Sync failed, record kept in Local Storage:', syncErr);
         setSyncStatus('offline');
@@ -1068,6 +1249,7 @@ const AdminPanel = ({ onLogout, location }) => {
   const openModal = (item = null) => {
     fetchReferences(); // Lazy-load fresh lookup relations for select dropdowns
     setEditingItem(item);
+    setEventWizardStep(1);
     const schema = TABLE_SCHEMAS[currentTab.table];
 
     if (item) {
@@ -1080,6 +1262,20 @@ const AdminPanel = ({ onLogout, location }) => {
         // Since phone/full_name may come from joined users, populate them if we have them in item
         if (item.phone) cleanData.phone = item.phone;
         if (item.full_name) cleanData.full_name = item.full_name;
+        
+        if (currentTab.table === 'events') {
+          cleanData.ticket_tiers = [];
+          const adminKey = sessionStorage.getItem('admin_token') || '';
+          fetch(`${API_URL}/api/admin/fetch?table=event_ticket_tiers`, { headers: { 'x-admin-key': adminKey } })
+            .then(res => res.json())
+            .then(json => {
+              if (json.success && json.data) {
+                const eventTiers = json.data.filter(t => t.event_id === item.id);
+                setFormData(prev => ({ ...prev, ticket_tiers: eventTiers.length > 0 ? eventTiers : [{ id: 'temp_' + Date.now(), tier_name: 'General Admission', price: 0, total_seats: 100, available_seats: 100 }] }));
+              }
+            });
+        }
+        
         setFormData(cleanData);
       } else {
         const cleanData = { ...item };
@@ -1092,7 +1288,16 @@ const AdminPanel = ({ onLogout, location }) => {
       }
     } else {
       if (schema) {
-        setFormData({ ...schema });
+        const initialForm = { ...schema };
+        if (currentTab.table === 'events') {
+          initialForm.ticket_tiers = [
+            { id: 'temp_' + Date.now(), tier_name: 'General Admission', price: 0, total_seats: 100, available_seats: 100 }
+          ];
+          initialForm.schedule_slots = [
+            { id: Date.now(), date: '', starts: '19:00', ends: '22:00', venue_name: '' }
+          ];
+        }
+        setFormData(initialForm);
       } else if (data.length > 0) {
         const blankSchema = {};
         Object.keys(data[0]).forEach(key => {
@@ -1226,7 +1431,21 @@ const AdminPanel = ({ onLogout, location }) => {
 
                 return (
                   <tr key={item.id}>
-                    <td className="id-col">#{String(item.id).slice(-4)}</td>
+                    <td className="id-col">
+                      {String(item.id).startsWith('temp_') ? (
+                        <span style={{ 
+                          background: 'rgba(249, 115, 22, 0.1)', 
+                          color: '#f97316', 
+                          border: '1px solid rgba(249, 115, 22, 0.2)', 
+                          padding: '2px 6px', 
+                          borderRadius: '4px', 
+                          fontSize: '0.75rem', 
+                          fontWeight: 700 
+                        }}>Local</span>
+                      ) : (
+                        `#${String(item.id).slice(-4)}`
+                      )}
+                    </td>
                     {keys.map(k => {
                       let v = item[k];
                       
@@ -1622,8 +1841,32 @@ const AdminPanel = ({ onLogout, location }) => {
   const renderReports = () => {
     return (
       <div className="reports-container animate-fade-in" style={{ padding: '1rem 0' }}>
-        <h1 className="admin-hero-title">Business Performance & Analytics</h1>
-        <p style={{ color: '#64748b', marginBottom: '2rem' }}>Comprehensive performance reporting and metric evaluations.</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h1 className="admin-hero-title" style={{ margin: 0 }}>Business Performance & Analytics</h1>
+            <p style={{ color: '#64748b', margin: 0 }}>Comprehensive performance reporting and metric evaluations.</p>
+          </div>
+          <button 
+            onClick={downloadAdminSalesReport}
+            style={{ 
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
+              color: 'white', 
+              border: 'none', 
+              padding: '12px 24px', 
+              borderRadius: '14px', 
+              fontWeight: 800, 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '10px', 
+              cursor: 'pointer',
+              boxShadow: '0 10px 20px rgba(16, 185, 129, 0.15)',
+              fontSize: '0.95rem'
+            }}
+          >
+            <Download size={18} />
+            Download Sales Report (Excel)
+          </button>
+        </div>
 
         <div className="main-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
           <div className="stat-card" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 10px 25px rgba(99, 102, 241, 0.15)' }}>
@@ -1997,147 +2240,1883 @@ CREATE TABLE IF NOT EXISTS service_areas (
       {/* Modal logic remains similar but with better styling in CSS */}
       {showModal && (
         <div className="admin-modal-overlay">
-          <div className="admin-modal">
+          <div className={`admin-modal ${currentTab.table === 'events' ? 'wide-modal' : ''}`}>
             <div className="modal-header">
               <h3>Modify Platform Resource</h3>
               <button className="close-modal-btn" onClick={() => setShowModal(false)}><X size={20} /></button>
             </div>
             <form onSubmit={handleUpsert} className="admin-form">
-              <div className="form-grid">
-                {Object.keys(formData).length > 0 ? Object.keys(formData).map(key => {
-                  const hiddenFields = ['id', 'uid', 'created_at', 'updated_at', 'users'];
-                  if (hiddenFields.includes(key)) return null;
+              {currentTab.table === 'events' ? (
+                eventWizardStep === 1 ? (
+                  <div className="event-type-selection-container">
+                    <p className="event-type-subtitle">We'll tailor the setup based on what you're planning. You can switch later.</p>
+                    <div className="event-type-cards">
+                      {/* Card 1: Single Show */}
+                      <div 
+                        className={`event-type-card ${formData.show_type === 'single' || !formData.show_type ? 'selected' : ''}`}
+                        onClick={() => setFormData({ ...formData, show_type: 'single' })}
+                      >
+                        <div className="card-top-row">
+                          <div className="card-icon-box purple-tint">
+                            <Clock size={20} color="#4f46e5" />
+                          </div>
+                          <div className="card-badge-container">
+                            <span className="card-badge-most-common">Most common</span>
+                            <div className={`card-check-circle ${(formData.show_type === 'single' || !formData.show_type) ? 'checked' : ''}`}>
+                              {(formData.show_type === 'single' || !formData.show_type) && (
+                                <div className="card-checkmark-fill">✓</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <h4 className="card-title">Single show</h4>
+                        <p className="card-desc">One date, one venue and one show time. Perfect for concerts, comedy nights and workshops.</p>
+                        <span className="card-duration-info">Takes about 2 minutes.</span>
+                      </div>
 
-                  const isBoolean = typeof formData[key] === 'boolean';
-                  const isForeignKey = ['user_id', 'vendor_id', 'store_id', 'provider_id', 'category_id', 'service_id', 'address_id'].includes(key);
+                      {/* Card 2: Multiple Shows */}
+                      <div 
+                        className={`event-type-card ${formData.show_type === 'multiple' ? 'selected' : ''}`}
+                        onClick={() => setFormData({ ...formData, show_type: 'multiple' })}
+                      >
+                        <div className="card-top-row">
+                          <div className="card-icon-box blue-tint">
+                            <Layers size={20} color="#3b82f6" />
+                          </div>
+                          <div className="card-badge-container">
+                            <div className={`card-check-circle ${formData.show_type === 'multiple' ? 'checked' : ''}`}>
+                              {formData.show_type === 'multiple' && (
+                                <div className="card-checkmark-fill">✓</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <h4 className="card-title">Multiple shows</h4>
+                        <p className="card-desc">One event across several dates or times, such as a theatre run or weekly comedy night.</p>
+                        <span className="card-duration-info">Manage every show from a simple schedule.</span>
+                      </div>
 
-                  return (
-                    <div className="form-field" key={key} style={isBoolean ? { flexDirection: 'row', alignItems: 'center', gap: '0.5rem' } : {}}>
-                      <label>{key.replace(/_/g, ' ').toUpperCase()}</label>
-                      {isBoolean ? (
-                        <input
-                          type="checkbox"
-                          checked={formData[key]}
-                          onChange={(e) => setFormData({ ...formData, [key]: e.target.checked })}
-                          style={{ width: 'auto', marginBottom: 0 }}
-                        />
-                      ) : isForeignKey ? (
-                        <select
-                          value={formData[key] || ''}
-                          onChange={(e) => {
-                            const val = e.target.value || null;
-                            const nextData = { ...formData, [key]: val };
-                            
-                            // Automatically pre-populate price/amount based on selection
-                            if (key === 'service_id' && val && currentTab.table === 'service_bookings') {
-                              const serv = servicesList.find(s => s.id === val);
-                              if (serv) {
-                                if (serv.price) {
-                                  nextData.total_amount = serv.price;
-                                }
-                                if (serv.provider_id) {
-                                  nextData.provider_id = serv.provider_id;
-                                }
-                              }
-                            }
+                      {/* Card 3: Festival or Tour */}
+                      <div 
+                        className={`event-type-card ${formData.show_type === 'festival' ? 'selected' : ''}`}
+                        onClick={() => setFormData({ ...formData, show_type: 'festival' })}
+                      >
+                        <div className="card-top-row">
+                          <div className="card-icon-box orange-tint">
+                            <MapPin size={20} color="#f97316" />
+                          </div>
+                          <div className="card-badge-container">
+                            <span className="card-badge-advanced">Advanced</span>
+                            <div className={`card-check-circle ${formData.show_type === 'festival' ? 'checked' : ''}`}>
+                              {formData.show_type === 'festival' && (
+                                <div className="card-checkmark-fill">✓</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <h4 className="card-title">Festival or tour</h4>
+                        <p className="card-desc">Multiple venues, multi-day festivals, tours, custom passes or complex per-slot setup.</p>
+                        <span className="card-duration-info">Opens the complete step-by-step advanced setup.</span>
+                      </div>
+                    </div>
+                    
+                    <div className="event-type-footer">
+                      <span className="event-type-selected-text">
+                        Selected: <strong>{formData.show_type === 'festival' ? 'Festival or tour' : formData.show_type === 'multiple' ? 'Multiple shows' : 'Single show'}</strong>
+                      </span>
+                      <button 
+                        type="button" 
+                        className="event-type-continue-btn"
+                        onClick={() => setEventWizardStep(2)}
+                      >
+                        Continue
+                      </button>
+                    </div>
+                  </div>
+                ) : formData.show_type === 'multiple' ? (
+                  eventWizardStep === 2 ? (
+                    // STEP 1 of Multiple Shows: Basics
+                    <div className="single-event-wizard-step animate-fade-in">
+                      {/* Visual Stepper */}
+                      <div className="wizard-stepper-bar">
+                        <div className="step-item active">
+                          <span className="step-number">1</span>
+                          <span className="step-label">Basics</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">2</span>
+                          <span className="step-label">Schedule</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">3</span>
+                          <span className="step-label">Tickets</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">4</span>
+                          <span className="step-label">Photos & details</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">5</span>
+                          <span className="step-label">Review</span>
+                        </div>
+                      </div>
 
-                            // Automatically pre-populate phone and name when linking an existing user
-                            if (key === 'user_id' && val) {
-                              const selectedUser = usersList.find(u => u.id === val);
-                              if (selectedUser) {
-                                if (nextData.phone !== undefined) nextData.phone = selectedUser.phone || '';
-                                if (nextData.full_name !== undefined) nextData.full_name = selectedUser.full_name || '';
-                                if (nextData.name !== undefined) nextData.name = selectedUser.full_name || '';
-                              }
+                      <div className="wizard-step-header">
+                        <div className="wizard-back-indicator">
+                          <span className="current-selection-badge">Multiple shows</span>
+                          <button type="button" className="change-selection-btn" onClick={() => setEventWizardStep(1)}>Change</button>
+                        </div>
+                        <h2 className="wizard-title">Create multiple shows</h2>
+                        <p className="wizard-subtitle">Build a multi-date or multi-time event without using the advanced setup.</p>
+                      </div>
+
+                      <div className="wizard-section-card">
+                        <div className="section-card-header">
+                          <h4>Basics</h4>
+                          <span className="required-badge">Required</span>
+                        </div>
+                        <p className="section-card-desc">Name the event once. Each show gets its own schedule row next.</p>
+
+                        <div className="wizard-fields-stack">
+                          <div className="form-field">
+                            <label>Event name *</label>
+                            <input 
+                              type="text" 
+                              placeholder="e.g. Friday night comedy run" 
+                              required
+                              value={formData.title || ''} 
+                              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                            />
+                          </div>
+
+                          <div className="form-field">
+                            <label>Event visibility *</label>
+                            <div className="visibility-cards-row">
+                              <div 
+                                className={`visibility-card ${(formData.visibility === 'public' || !formData.visibility) ? 'selected' : ''}`}
+                                onClick={() => setFormData({ ...formData, visibility: 'public' })}
+                              >
+                                <div className="visibility-circle">
+                                  {(formData.visibility === 'public' || !formData.visibility) && <div className="checkmark" />}
+                                </div>
+                                <div className="visibility-info">
+                                  <strong>Public</strong>
+                                  <span>Visible on Showmates listings.</span>
+                                </div>
+                              </div>
+                              <div 
+                                className={`visibility-card ${formData.visibility === 'private' ? 'selected' : ''}`}
+                                onClick={() => setFormData({ ...formData, visibility: 'private' })}
+                              >
+                                <div className="visibility-circle">
+                                  {formData.visibility === 'private' && <div className="checkmark" />}
+                                </div>
+                                <div className="visibility-info">
+                                  <strong>Private</strong>
+                                  <span>Accessible only by private access links.</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="online-checkbox-card">
+                            <input 
+                              type="checkbox" 
+                              id="is_online_evt_mult"
+                              checked={!!formData.is_online}
+                              onChange={(e) => setFormData({ ...formData, is_online: e.target.checked })}
+                            />
+                            <label htmlFor="is_online_evt_mult">
+                              <strong>Online event</strong>
+                              <span>Online events use listing cities for each show instead of physical venues.</span>
+                            </label>
+                          </div>
+
+                          <div className="form-field">
+                            <label>Category *</label>
+                            <select 
+                              required 
+                              value={formData.category || ''} 
+                              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                              className="admin-select"
+                            >
+                              <option value="">Search group or category</option>
+                              <option value="Music & Concerts">Music & Concerts</option>
+                              <option value="Comedy & Theatre">Comedy & Theatre</option>
+                              <option value="Workshops & Classes">Workshops & Classes</option>
+                              <option value="Parties & Nightlife">Parties & Nightlife</option>
+                              <option value="Festivals & Fairs">Festivals & Fairs</option>
+                              <option value="Sports & Fitness">Sports & Fitness</option>
+                              <option value="Corporate & Business">Corporate & Business</option>
+                              <option value="Other Events">Other Events</option>
+                            </select>
+                          </div>
+
+                          <div className="booking-window-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.75rem' }}>
+                            <div className="form-field">
+                              <label>Booking Opens *</label>
+                              <input 
+                                type="datetime-local" 
+                                required
+                                value={formData.booking_start ? new Date(formData.booking_start).toISOString().slice(0, 16) : ''}
+                                onChange={(e) => {
+                                  setFormData({ ...formData, booking_start: e.target.value ? new Date(e.target.value).toISOString() : '' });
+                                }}
+                              />
+                            </div>
+                            <div className="form-field">
+                              <label>Booking Closes *</label>
+                              <input 
+                                type="datetime-local" 
+                                required
+                                value={formData.booking_end ? new Date(formData.booking_end).toISOString().slice(0, 16) : ''}
+                                onChange={(e) => {
+                                  setFormData({ ...formData, booking_end: e.target.value ? new Date(e.target.value).toISOString() : '' });
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="organizer-info-box">
+                            <strong>Organizer</strong>
+                            <span>Current organizer: Admin Panel Organizer</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="wizard-navigation-footer">
+                        <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(1)}>← Back</button>
+                        <div className="wizard-right-actions">
+                          <button type="button" className="wizard-next-btn" onClick={() => {
+                            if (!formData.title || !formData.category) {
+                              toast.error("Please fill in required fields!");
+                              return;
                             }
-                            
-                            setFormData(nextData);
-                          }}
-                          className="admin-select"
-                        >
-                          <option value="">-- Select {key.replace(/_/g, ' ').toUpperCase()} --</option>
-                          {key === 'user_id' && usersList.map(u => (
-                            <option key={u.id} value={u.id}>{u.full_name || 'No Name'} ({u.phone})</option>
+                            setEventWizardStep(3);
+                          }}>Next: Schedule</button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : eventWizardStep === 3 ? (
+                    // STEP 2: Schedule
+                    <div className="single-event-wizard-step animate-fade-in">
+                      {/* Visual Stepper */}
+                      <div className="wizard-stepper-bar">
+                        <div className="step-item active-past">
+                          <span className="step-number">1</span>
+                          <span className="step-label">Basics</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active">
+                          <span className="step-number">2</span>
+                          <span className="step-label">Schedule</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">3</span>
+                          <span className="step-label">Tickets</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">4</span>
+                          <span className="step-label">Photos & details</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">5</span>
+                          <span className="step-label">Review</span>
+                        </div>
+                      </div>
+
+                      <div className="wizard-step-header">
+                        <h2 className="wizard-title">Event Schedule</h2>
+                        <p className="wizard-subtitle">Add each date and time slot for your shows.</p>
+                      </div>
+
+                      <div className="wizard-section-card">
+                        <div className="section-card-header">
+                          <h4>Schedules ({(formData.schedule_slots || []).length})</h4>
+                        </div>
+                        
+                        <div className="schedule-slots-list" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                          {(formData.schedule_slots || []).map((slot, index) => (
+                            <div key={slot.id || index} style={{ border: '1px solid #e2e8f0', borderRadius: '16px', padding: '1rem', background: '#f8fafc', position: 'relative' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', fontWeight: 'bold', fontSize: '0.85rem', color: '#ff6b00' }}>
+                                <span>Show #{index + 1}</span>
+                                {formData.schedule_slots.length > 1 && (
+                                  <button type="button" style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer' }} onClick={() => {
+                                    setFormData({ ...formData, schedule_slots: formData.schedule_slots.filter(s => s.id !== slot.id) });
+                                  }}><Trash2 size={16} /></button>
+                                )}
+                              </div>
+                              <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
+                                <div className="form-field">
+                                  <label>Date *</label>
+                                  <input type="date" required value={slot.date || ''} onChange={(e) => {
+                                    const slots = [...formData.schedule_slots];
+                                    slots[index] = { ...slot, date: e.target.value };
+                                    setFormData({ ...formData, schedule_slots: slots });
+                                  }} />
+                                </div>
+                                <div className="form-field">
+                                  <label>Starts *</label>
+                                  <input type="time" required value={slot.starts || '19:00'} onChange={(e) => {
+                                    const slots = [...formData.schedule_slots];
+                                    slots[index] = { ...slot, starts: e.target.value };
+                                    setFormData({ ...formData, schedule_slots: slots });
+                                  }} />
+                                </div>
+                                <div className="form-field">
+                                  <label>Ends *</label>
+                                  <input type="time" required value={slot.ends || '22:00'} onChange={(e) => {
+                                    const slots = [...formData.schedule_slots];
+                                    slots[index] = { ...slot, ends: e.target.value };
+                                    setFormData({ ...formData, schedule_slots: slots });
+                                  }} />
+                                </div>
+                                <div className="form-field">
+                                  <label>Venue *</label>
+                                  <input type="text" required placeholder="Search venue..." value={slot.venue_name || ''} onChange={(e) => {
+                                    const slots = [...formData.schedule_slots];
+                                    slots[index] = { ...slot, venue_name: e.target.value };
+                                    setFormData({ ...formData, schedule_slots: slots });
+                                  }} />
+                                </div>
+                              </div>
+                            </div>
                           ))}
-                          {key === 'vendor_id' && vendorsList.map(v => (
-                            <option key={v.id} value={v.id}>{v.business_name || v.name || 'No Name'}</option>
-                          ))}
-                          {key === 'store_id' && storesList.map(s => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
-                          ))}
-                          {key === 'provider_id' && providersList.map(p => (
-                            <option key={p.id} value={p.id}>{p.business_name || 'No Name'}</option>
-                          ))}
-                          {key === 'service_id' && servicesList.map(sv => (
-                            <option key={sv.id} value={sv.id}>{sv.title}</option>
-                          ))}
-                          {key === 'address_id' && addressesList
-                            .filter(addr => !formData.user_id || addr.user_id === formData.user_id)
-                            .map(addr => {
-                              const uName = usersList.find(u => u.id === addr.user_id)?.full_name || 'Unknown User';
-                              return (
-                                <option key={addr.id} value={addr.id}>
-                                  {addr.address_line_1}{addr.address_line_2 ? `, ${addr.address_line_2}` : ''}, {addr.city || ''} ({uName})
-                                </option>
-                              );
-                            })
-                          }
-                          {key === 'category_id' && (
-                            currentTab.table === 'products'
-                              ? productCategoriesList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)
-                              : serviceCategoriesList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)
-                          )}
-                        </select>
-                      ) : (
-                        <input
-                          type={['scheduled_at', 'valid_until', 'event_date'].includes(key) ? 'datetime-local' : (typeof (TABLE_SCHEMAS[currentTab.table]?.[key]) === 'number' ? 'number' : 'text')}
-                          value={['scheduled_at', 'valid_until', 'event_date'].includes(key) ? formatDateForInput(formData[key]) : (formData[key] !== undefined && formData[key] !== null ? formData[key] : '')}
-                          maxLength={key === 'phone' ? 10 : (key === 'aadhar_no' ? 14 : (key === 'license_no' ? 14 : (key === 'id_proof' ? (formData[key] && /^\d+$/.test(formData[key].replace(/[^A-Z0-9]/g, '')) ? 14 : 10) : undefined)))}
-                          onChange={(e) => {
-                            let val = e.target.value;
-                            if (key === 'phone') {
-                              val = val.replace(/\D/g, '').slice(0, 10);
-                            } else if (key === 'aadhar_no') {
-                              const clean = val.replace(/\D/g, '').slice(0, 12);
-                              const parts = [];
-                              for (let i = 0; i < clean.length; i += 4) {
-                                parts.push(clean.slice(i, i + 4));
-                              }
-                              val = parts.join(' ');
-                            } else if (key === 'license_no') {
-                              // FSSAI / Standard License is 14 numeric digits
-                              val = val.replace(/\D/g, '').slice(0, 14);
-                            } else if (key === 'id_proof') {
-                              val = val.toUpperCase().replace(/[^A-Z0-9]/g, '');
-                              const isNumeric = /^\d+$/.test(val) || val.length === 0;
-                              if (isNumeric) {
-                                const sliced = val.slice(0, 12);
-                                const parts = [];
-                                for (let i = 0; i < sliced.length; i += 4) {
-                                  parts.push(sliced.slice(i, i + 4));
-                                }
-                                val = parts.join(' ');
-                              } else {
-                                val = val.slice(0, 10);
-                              }
+                        </div>
+
+                        <button type="button" className="add-tier-dashed-btn" style={{ marginTop: '1rem' }} onClick={() => {
+                          const slots = [...(formData.schedule_slots || [])];
+                          slots.push({ id: Date.now(), date: '', starts: '19:00', ends: '22:00', venue_name: '' });
+                          setFormData({ ...formData, schedule_slots: slots });
+                        }}>+ Add another show date/time</button>
+                      </div>
+
+                      <div className="wizard-navigation-footer">
+                        <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(2)}>← Back</button>
+                        <div className="wizard-right-actions">
+                          <button type="button" className="wizard-next-btn" onClick={() => {
+                            const invalid = formData.schedule_slots?.some(s => !s.date || !s.venue_name);
+                            if (invalid || !formData.schedule_slots?.length) {
+                              toast.error("Please fill in date and venue for all scheduled shows!");
+                              return;
                             }
-                            
-                            // Strictly parse as number if the schema demands a number, to prevent backend NOT NULL or type errors
-                            if (typeof (TABLE_SCHEMAS[currentTab.table]?.[key]) === 'number') {
-                              val = val === '' ? 0 : Number(val);
+                            setEventWizardStep(4);
+                          }}>Next: Tickets</button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : eventWizardStep === 4 ? (
+                    // STEP 3: Tickets
+                    <div className="single-event-wizard-step animate-fade-in">
+                      {/* Visual Stepper */}
+                      <div className="wizard-stepper-bar">
+                        <div className="step-item active-past">
+                          <span className="step-number">1</span>
+                          <span className="step-label">Basics</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active-past">
+                          <span className="step-number">2</span>
+                          <span className="step-label">Schedule</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active">
+                          <span className="step-number">3</span>
+                          <span className="step-label">Tickets</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">4</span>
+                          <span className="step-label">Photos & details</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">5</span>
+                          <span className="step-label">Review</span>
+                        </div>
+                      </div>
+
+                      <div className="wizard-step-header">
+                        <h2 className="wizard-title">Tickets</h2>
+                        <p className="wizard-subtitle">Define the pricing tiers for your multiple shows.</p>
+                      </div>
+
+                      <div className="wizard-section-card">
+                        <div className="section-card-header">
+                          <h4>Tickets</h4>
+                          <span className="sell-badge">Tiers: {formData.ticket_tiers?.length || 0}</span>
+                        </div>
+
+                        <div className="ticket-tiers-list">
+                          {(formData.ticket_tiers || []).map((tier, index) => (
+                            <div className="ticket-tier-row-card" key={tier.id || index}>
+                              <div className="tier-row-header">
+                                <span className="tier-index-number">{index + 1}</span>
+                                <span className="tier-badge-type">{parseFloat(tier.price) === 0 ? 'Free' : 'Paid'}</span>
+                                {formData.ticket_tiers.length > 1 && (
+                                  <button type="button" className="delete-tier-btn" onClick={() => {
+                                    setFormData({ ...formData, ticket_tiers: formData.ticket_tiers.filter((_, idx) => idx !== index) });
+                                  }}><Trash2 size={16} /></button>
+                                )}
+                              </div>
+                              <div className="tier-inputs-grid">
+                                <div className="form-field">
+                                  <label>Name *</label>
+                                  <input type="text" placeholder="General Admission" required value={tier.tier_name || ''} onChange={(e) => {
+                                    const nextTiers = [...formData.ticket_tiers];
+                                    nextTiers[index] = { ...tier, tier_name: e.target.value };
+                                    setFormData({ ...formData, ticket_tiers: nextTiers });
+                                  }} />
+                                </div>
+                                <div className="form-field">
+                                  <label>Price *</label>
+                                  <input type="number" placeholder="₹ 0" required value={tier.price === 0 ? '' : tier.price} onChange={(e) => {
+                                    const nextTiers = [...formData.ticket_tiers];
+                                    nextTiers[index] = { ...tier, price: parseFloat(e.target.value) || 0 };
+                                    setFormData({ ...formData, ticket_tiers: nextTiers });
+                                  }} />
+                                </div>
+                                <div className="form-field">
+                                  <label>Quantity *</label>
+                                  <input type="number" placeholder="100" required value={tier.total_seats || ''} onChange={(e) => {
+                                    const nextTiers = [...formData.ticket_tiers];
+                                    nextTiers[index] = { ...tier, total_seats: parseInt(e.target.value) || 0, available_seats: parseInt(e.target.value) || 0 };
+                                    setFormData({ ...formData, ticket_tiers: nextTiers });
+                                  }} />
+                                </div>
+                                <div className="form-field">
+                                  <label>Entries per ticket *</label>
+                                  <input type="number" defaultValue={1} required />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <button type="button" className="add-tier-dashed-btn" onClick={() => {
+                          const nextTiers = [...(formData.ticket_tiers || [])];
+                          nextTiers.push({ id: 'temp_' + Date.now(), tier_name: '', price: 0, total_seats: 100, available_seats: 100 });
+                          setFormData({ ...formData, ticket_tiers: nextTiers });
+                        }}>+ Add another ticket type</button>
+                      </div>
+
+                      <div className="wizard-navigation-footer">
+                        <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(3)}>← Back</button>
+                        <div className="wizard-right-actions">
+                          <button type="button" className="wizard-next-btn" onClick={() => {
+                            if (!formData.ticket_tiers?.length || formData.ticket_tiers.some(t => !t.tier_name)) {
+                              toast.error("Please add at least one complete ticket tier!");
+                              return;
                             }
-                            
-                            setFormData({ ...formData, [key]: val });
-                          }}
-                        />
-                      )}
+                            setEventWizardStep(5);
+                          }}>Next: Photos & details</button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : eventWizardStep === 5 ? (
+                    // STEP 4: Photos & details
+                    <div className="single-event-wizard-step animate-fade-in">
+                      {/* Visual Stepper */}
+                      <div className="wizard-stepper-bar">
+                        <div className="step-item active-past">
+                          <span className="step-number">1</span>
+                          <span className="step-label">Basics</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active-past">
+                          <span className="step-number">2</span>
+                          <span className="step-label">Schedule</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active-past">
+                          <span className="step-number">3</span>
+                          <span className="step-label">Tickets</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active">
+                          <span className="step-number">4</span>
+                          <span className="step-label">Photos & details</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">5</span>
+                          <span className="step-label">Review</span>
+                        </div>
+                      </div>
+
+                      <div className="wizard-step-header">
+                        <h2 className="wizard-title">Event Banner & Description</h2>
+                        <p className="wizard-subtitle">Upload assets to publish your multiple shows listing.</p>
+                      </div>
+
+                      <div className="wizard-section-card">
+                        <div className="section-card-header">
+                          <h4>Banner Image</h4>
+                        </div>
+                        <div className="form-field">
+                          <label>Banner URL *</label>
+                          <input type="text" placeholder="https://example.com/banner.jpg" required value={formData.banner_url || ''} onChange={(e) => setFormData({ ...formData, banner_url: e.target.value })} />
+                        </div>
+                        {formData.banner_url && (
+                          <div className="banner-preview-box">
+                            <img src={formData.banner_url} alt="Event Preview" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="wizard-section-card">
+                        <div className="section-card-header">
+                          <h4>Event Description</h4>
+                        </div>
+                        <div className="form-field">
+                          <label>Description *</label>
+                          <textarea placeholder="Describe your event in detail..." required rows={6} value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="wizard-textarea" />
+                        </div>
+                      </div>
+
+                      <div className="wizard-navigation-footer">
+                        <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(4)}>← Back</button>
+                        <div className="wizard-right-actions">
+                          <button type="button" className="wizard-next-btn" onClick={() => {
+                            if (!formData.banner_url || !formData.description) {
+                              toast.error("Please add banner image and description!");
+                              return;
+                            }
+                            setEventWizardStep(6);
+                          }}>Next: Review</button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    // STEP 5: Review
+                    <div className="single-event-wizard-step animate-fade-in">
+                      <div className="wizard-stepper-bar">
+                        <div className="step-item active-past">
+                          <span className="step-number">1</span>
+                          <span className="step-label">Basics</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active-past">
+                          <span className="step-number">2</span>
+                          <span className="step-label">Schedule</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active-past">
+                          <span className="step-number">3</span>
+                          <span className="step-label">Tickets</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active-past">
+                          <span className="step-number">4</span>
+                          <span className="step-label">Photos & details</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active">
+                          <span className="step-number">5</span>
+                          <span className="step-label">Review</span>
+                        </div>
+                      </div>
+
+                      <div className="wizard-step-header">
+                        <h2 className="wizard-title">Review Event Details</h2>
+                        <p className="wizard-subtitle">Verify the details before publishing multiple shows live.</p>
+                      </div>
+
+                      <div className="wizard-section-card review-summary-card">
+                        <div className="review-banner">
+                          {formData.banner_url && <img src={formData.banner_url} alt="Banner" />}
+                          <span className="review-status-badge">UPCOMING</span>
+                        </div>
+                        <div className="review-content">
+                          <h3 className="review-title">{formData.title || 'Untitled Event'}</h3>
+                          <div className="review-meta-row">
+                            <span className="review-category-tag">{formData.category}</span>
+                            <span className="review-visibility-tag">{formData.visibility || 'public'}</span>
+                          </div>
+
+                          <div style={{ margin: '1.5rem 0' }}>
+                            <strong>📅 Scheduled Shows ({(formData.schedule_slots || []).length})</strong>
+                            <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.5rem' }}>
+                              {(formData.schedule_slots || []).map((s, idx) => (
+                                <div key={s.id || idx} style={{ padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between' }}>
+                                  <span>Show #{idx + 1}: {s.date} ({s.starts} - {s.ends})</span>
+                                  <strong>📍 {s.venue_name}</strong>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="review-tickets-section">
+                            <strong>Ticket Tiers ({formData.ticket_tiers?.length || 0})</strong>
+                            <div className="review-tiers-list">
+                              {(formData.ticket_tiers || []).map((t, idx) => (
+                                <div className="review-tier-item" key={t.id || idx}>
+                                  <div className="tier-left">
+                                    <strong>{t.tier_name}</strong>
+                                    <span>Capacity: {t.total_seats} seats</span>
+                                  </div>
+                                  <span className="tier-price-tag">₹{t.price}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="wizard-navigation-footer">
+                        <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(5)}>← Back</button>
+                        <div className="wizard-right-actions">
+                          <button type="submit" className="wizard-publish-btn" disabled={isSaving}>
+                            {isSaving ? 'Publishing...' : 'Publish Multiple Shows'}
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )
-                }) : <p style={{ color: 'var(--text-secondary)' }}>Open a populated table first to configure new data.</p>}
-              </div>
-              <button type="submit" className="submit-form-btn" disabled={isSaving}>
-                {isSaving ? 'Saving...' : 'Save Changes'}
-              </button>
+                ) : formData.show_type === 'festival' ? (
+                  // Festival/Tour Wizard
+                  eventWizardStep === 2 ? (
+                    // STEP 1: Basic Event Details
+                    <div className="single-event-wizard-step animate-fade-in">
+                      <div className="wizard-stepper-bar">
+                        <div className="step-item active">
+                          <span className="step-number">1</span>
+                          <span className="step-label">Basic Details</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">2</span>
+                          <span className="step-label">Venues</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">3</span>
+                          <span className="step-label">Tickets</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">4</span>
+                          <span className="step-label">Photos</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">5</span>
+                          <span className="step-label">Review</span>
+                        </div>
+                      </div>
+
+                      <div className="wizard-step-header">
+                        <div className="wizard-back-indicator">
+                          <span className="current-selection-badge">Festival or tour</span>
+                          <button type="button" className="change-selection-btn" onClick={() => setEventWizardStep(1)}>Change</button>
+                        </div>
+                        <h2 className="wizard-title">Create Festival or Tour</h2>
+                        <p className="wizard-subtitle">Use this flow for complex schedules, multiple venues, tours or advanced setup.</p>
+                      </div>
+
+                      <div className="wizard-section-card">
+                        <div className="section-card-header">
+                          <h4>Basic Event Details</h4>
+                        </div>
+                        <div className="wizard-fields-stack">
+                          <div className="form-field">
+                            <label>Event Title *</label>
+                            <input type="text" placeholder="Enter captivating event title" required value={formData.title || ''} onChange={(e) => setFormData({ ...formData, title: e.target.value })} />
+                          </div>
+
+                          <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                            <div className="form-field">
+                              <label>Event Category *</label>
+                              <select required value={formData.category || ''} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="admin-select">
+                                <option value="">Select event category</option>
+                                <option value="Music & Concerts">Music & Concerts</option>
+                                <option value="Comedy & Theatre">Comedy & Theatre</option>
+                                <option value="Workshops & Classes">Workshops & Classes</option>
+                                <option value="Parties & Nightlife">Parties & Nightlife</option>
+                                <option value="Festivals & Fairs">Festivals & Fairs</option>
+                                <option value="Sports & Fitness">Sports & Fitness</option>
+                              </select>
+                            </div>
+                            <div className="form-field">
+                              <label>Visibility *</label>
+                              <select required value={formData.visibility || 'public'} onChange={(e) => setFormData({ ...formData, visibility: e.target.value })} className="admin-select">
+                                <option value="public">Public - Visible to anyone</option>
+                                <option value="private">Private - Invitation only</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="booking-window-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.75rem' }}>
+                            <div className="form-field">
+                              <label>Booking Opens *</label>
+                              <input 
+                                type="datetime-local" 
+                                required
+                                value={formData.booking_start ? new Date(formData.booking_start).toISOString().slice(0, 16) : ''}
+                                onChange={(e) => {
+                                  setFormData({ ...formData, booking_start: e.target.value ? new Date(e.target.value).toISOString() : '' });
+                                }}
+                              />
+                            </div>
+                            <div className="form-field">
+                              <label>Booking Closes *</label>
+                              <input 
+                                type="datetime-local" 
+                                required
+                                value={formData.booking_end ? new Date(formData.booking_end).toISOString().slice(0, 16) : ''}
+                                onChange={(e) => {
+                                  setFormData({ ...formData, booking_end: e.target.value ? new Date(e.target.value).toISOString() : '' });
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="form-field">
+                            <label>Event Description *</label>
+                            <textarea placeholder="Describe your event in detail. What can attendees expect?" required rows={5} value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="wizard-textarea" />
+                          </div>
+
+                          <div className="online-checkbox-card">
+                            <input type="checkbox" id="is_online_fest" checked={!!formData.is_online} onChange={(e) => setFormData({ ...formData, is_online: e.target.checked })} />
+                            <label htmlFor="is_online_fest">
+                              <strong>This is an online event</strong>
+                              <span>Virtual events use video conferencing platforms instead of physical venues.</span>
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="wizard-navigation-footer">
+                        <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(1)}>← Back</button>
+                        <div className="wizard-right-actions">
+                          <button type="button" className="wizard-next-btn" onClick={() => {
+                            if (!formData.title || !formData.category || !formData.description) {
+                              toast.error("Please fill in title, category and description!");
+                              return;
+                            }
+                            setEventWizardStep(3);
+                          }}>Next: Venues</button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : eventWizardStep === 3 ? (
+                    // STEP 2: Venues (Stops)
+                    <div className="single-event-wizard-step animate-fade-in">
+                      <div className="wizard-stepper-bar">
+                        <div className="step-item active-past">
+                          <span className="step-number">1</span>
+                          <span className="step-label">Basic Details</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active">
+                          <span className="step-number">2</span>
+                          <span className="step-label">Venues</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">3</span>
+                          <span className="step-label">Tickets</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">4</span>
+                          <span className="step-label">Photos</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">5</span>
+                          <span className="step-label">Review</span>
+                        </div>
+                      </div>
+
+                      <div className="wizard-step-header">
+                        <h2 className="wizard-title">Tour stops & Venues</h2>
+                        <p className="wizard-subtitle">Define where and when each stop of the tour/festival occurs.</p>
+                      </div>
+
+                      <div className="wizard-section-card">
+                        <div className="section-card-header">
+                          <h4>Venues ({(formData.schedule_slots || []).length})</h4>
+                        </div>
+                        <div className="schedule-slots-list" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                          {(formData.schedule_slots || []).map((slot, index) => (
+                            <div key={slot.id || index} style={{ border: '1px solid #e2e8f0', borderRadius: '16px', padding: '1rem', background: '#f8fafc' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', fontWeight: 'bold', fontSize: '0.85rem', color: '#ff6b00' }}>
+                                <span>Stop #{index + 1}</span>
+                                {formData.schedule_slots.length > 1 && (
+                                  <button type="button" style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer' }} onClick={() => {
+                                    setFormData({ ...formData, schedule_slots: formData.schedule_slots.filter(s => s.id !== slot.id) });
+                                  }}><Trash2 size={16} /></button>
+                                )}
+                              </div>
+                              <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
+                                <div className="form-field">
+                                  <label>Venue / City *</label>
+                                  <input type="text" required placeholder="Venue name and city" value={slot.venue_name || ''} onChange={(e) => {
+                                    const slots = [...formData.schedule_slots];
+                                    slots[index] = { ...slot, venue_name: e.target.value };
+                                    setFormData({ ...formData, schedule_slots: slots });
+                                  }} />
+                                </div>
+                                <div className="form-field">
+                                  <label>Date *</label>
+                                  <input type="date" required value={slot.date || ''} onChange={(e) => {
+                                    const slots = [...formData.schedule_slots];
+                                    slots[index] = { ...slot, date: e.target.value };
+                                    setFormData({ ...formData, schedule_slots: slots });
+                                  }} />
+                                </div>
+                                <div className="form-field">
+                                  <label>Starts *</label>
+                                  <input type="time" required value={slot.starts || '19:00'} onChange={(e) => {
+                                    const slots = [...formData.schedule_slots];
+                                    slots[index] = { ...slot, starts: e.target.value };
+                                    setFormData({ ...formData, schedule_slots: slots });
+                                  }} />
+                                </div>
+                                <div className="form-field">
+                                  <label>Ends *</label>
+                                  <input type="time" required value={slot.ends || '22:00'} onChange={(e) => {
+                                    const slots = [...formData.schedule_slots];
+                                    slots[index] = { ...slot, ends: e.target.value };
+                                    setFormData({ ...formData, schedule_slots: slots });
+                                  }} />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <button type="button" className="add-tier-dashed-btn" style={{ marginTop: '1rem' }} onClick={() => {
+                          const slots = [...(formData.schedule_slots || [])];
+                          slots.push({ id: Date.now(), date: '', starts: '19:00', ends: '22:00', venue_name: '' });
+                          setFormData({ ...formData, schedule_slots: slots });
+                        }}>+ Add another tour stop</button>
+                      </div>
+
+                      <div className="wizard-navigation-footer">
+                        <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(2)}>← Back</button>
+                        <div className="wizard-right-actions">
+                          <button type="button" className="wizard-next-btn" onClick={() => {
+                            if (formData.schedule_slots?.some(s => !s.date || !s.venue_name)) {
+                              toast.error("Please fill in date and venue details for all tour stops!");
+                              return;
+                            }
+                            setEventWizardStep(4);
+                          }}>Next: Tickets</button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : eventWizardStep === 4 ? (
+                    // STEP 3: Tickets
+                    <div className="single-event-wizard-step animate-fade-in">
+                      <div className="wizard-stepper-bar">
+                        <div className="step-item active-past">
+                          <span className="step-number">1</span>
+                          <span className="step-label">Basic Details</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active-past">
+                          <span className="step-number">2</span>
+                          <span className="step-label">Venues</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active">
+                          <span className="step-number">3</span>
+                          <span className="step-label">Tickets</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">4</span>
+                          <span className="step-label">Photos</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">5</span>
+                          <span className="step-label">Review</span>
+                        </div>
+                      </div>
+
+                      <div className="wizard-step-header">
+                        <h2 className="wizard-title">Ticket Tiers</h2>
+                        <p className="wizard-subtitle">Create pricing categories for this tour/festival.</p>
+                      </div>
+
+                      <div className="wizard-section-card">
+                        <div className="section-card-header">
+                          <h4>Tickets</h4>
+                        </div>
+                        <div className="ticket-tiers-list">
+                          {(formData.ticket_tiers || []).map((tier, index) => (
+                            <div className="ticket-tier-row-card" key={tier.id || index}>
+                              <div className="tier-row-header">
+                                <span className="tier-index-number">{index + 1}</span>
+                                <span className="tier-badge-type">{parseFloat(tier.price) === 0 ? 'Free' : 'Paid'}</span>
+                                {formData.ticket_tiers.length > 1 && (
+                                  <button type="button" className="delete-tier-btn" onClick={() => {
+                                    setFormData({ ...formData, ticket_tiers: formData.ticket_tiers.filter((_, idx) => idx !== index) });
+                                  }}><Trash2 size={16} /></button>
+                                )}
+                              </div>
+                              <div className="tier-inputs-grid">
+                                <div className="form-field">
+                                  <label>Name *</label>
+                                  <input type="text" placeholder="General Admission" required value={tier.tier_name || ''} onChange={(e) => {
+                                    const nextTiers = [...formData.ticket_tiers];
+                                    nextTiers[index] = { ...tier, tier_name: e.target.value };
+                                    setFormData({ ...formData, ticket_tiers: nextTiers });
+                                  }} />
+                                </div>
+                                <div className="form-field">
+                                  <label>Price *</label>
+                                  <input type="number" placeholder="₹ 0" required value={tier.price === 0 ? '' : tier.price} onChange={(e) => {
+                                    const nextTiers = [...formData.ticket_tiers];
+                                    nextTiers[index] = { ...tier, price: parseFloat(e.target.value) || 0 };
+                                    setFormData({ ...formData, ticket_tiers: nextTiers });
+                                  }} />
+                                </div>
+                                <div className="form-field">
+                                  <label>Quantity *</label>
+                                  <input type="number" placeholder="100" required value={tier.total_seats || ''} onChange={(e) => {
+                                    const nextTiers = [...formData.ticket_tiers];
+                                    nextTiers[index] = { ...tier, total_seats: parseInt(e.target.value) || 0, available_seats: parseInt(e.target.value) || 0 };
+                                    setFormData({ ...formData, ticket_tiers: nextTiers });
+                                  }} />
+                                </div>
+                                <div className="form-field">
+                                  <label>Entries per ticket *</label>
+                                  <input type="number" defaultValue={1} required />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <button type="button" className="add-tier-dashed-btn" onClick={() => {
+                          const nextTiers = [...(formData.ticket_tiers || [])];
+                          nextTiers.push({ id: 'temp_' + Date.now(), tier_name: '', price: 0, total_seats: 100, available_seats: 100 });
+                          setFormData({ ...formData, ticket_tiers: nextTiers });
+                        }}>+ Add another ticket type</button>
+                      </div>
+
+                      <div className="wizard-navigation-footer">
+                        <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(3)}>← Back</button>
+                        <div className="wizard-right-actions">
+                          <button type="button" className="wizard-next-btn" onClick={() => {
+                            if (!formData.ticket_tiers?.length || formData.ticket_tiers.some(t => !t.tier_name)) {
+                              toast.error("Please add at least one complete ticket tier!");
+                              return;
+                            }
+                            setEventWizardStep(5);
+                          }}>Next: Photos & details</button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : eventWizardStep === 5 ? (
+                    // STEP 4: Photos
+                    <div className="single-event-wizard-step animate-fade-in">
+                      <div className="wizard-stepper-bar">
+                        <div className="step-item active-past">
+                          <span className="step-number">1</span>
+                          <span className="step-label">Basic Details</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active-past">
+                          <span className="step-number">2</span>
+                          <span className="step-label">Venues</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active-past">
+                          <span className="step-number">3</span>
+                          <span className="step-label">Tickets</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active">
+                          <span className="step-number">4</span>
+                          <span className="step-label">Photos</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">5</span>
+                          <span className="step-label">Review</span>
+                        </div>
+                      </div>
+
+                      <div className="wizard-step-header">
+                        <h2 className="wizard-title">Event Banner</h2>
+                        <p className="wizard-subtitle">Add a banner image to attract attendees to your festival/tour stops.</p>
+                      </div>
+
+                      <div className="wizard-section-card">
+                        <div className="section-card-header">
+                          <h4>Banner Image</h4>
+                        </div>
+                        <div className="form-field">
+                          <label>Banner URL *</label>
+                          <input type="text" placeholder="https://example.com/banner.jpg" required value={formData.banner_url || ''} onChange={(e) => setFormData({ ...formData, banner_url: e.target.value })} />
+                        </div>
+                        {formData.banner_url && (
+                          <div className="banner-preview-box">
+                            <img src={formData.banner_url} alt="Event Preview" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="wizard-navigation-footer">
+                        <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(4)}>← Back</button>
+                        <div className="wizard-right-actions">
+                          <button type="button" className="wizard-next-btn" onClick={() => {
+                            if (!formData.banner_url) {
+                              toast.error("Please add a banner image URL!");
+                              return;
+                            }
+                            setEventWizardStep(6);
+                          }}>Next: Review</button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    // STEP 5: Review
+                    <div className="single-event-wizard-step animate-fade-in">
+                      <div className="wizard-stepper-bar">
+                        <div className="step-item active-past">
+                          <span className="step-number">1</span>
+                          <span className="step-label">Basic Details</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active-past">
+                          <span className="step-number">2</span>
+                          <span className="step-label">Venues</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active-past">
+                          <span className="step-number">3</span>
+                          <span className="step-label">Tickets</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active-past">
+                          <span className="step-number">4</span>
+                          <span className="step-label">Photos</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active">
+                          <span className="step-number">5</span>
+                          <span className="step-label">Review</span>
+                        </div>
+                      </div>
+
+                      <div className="wizard-step-header">
+                        <h2 className="wizard-title">Review Tour Details</h2>
+                        <p className="wizard-subtitle">Verify the details before publishing your tour stops live.</p>
+                      </div>
+
+                      <div className="wizard-section-card review-summary-card">
+                        <div className="review-banner">
+                          {formData.banner_url && <img src={formData.banner_url} alt="Banner" />}
+                          <span className="review-status-badge">UPCOMING</span>
+                        </div>
+                        <div className="review-content">
+                          <h3 className="review-title">{formData.title || 'Untitled Tour/Festival'}</h3>
+                          <div className="review-meta-row">
+                            <span className="review-category-tag">{formData.category}</span>
+                            <span className="review-visibility-tag">{formData.visibility || 'public'}</span>
+                          </div>
+
+                          <div style={{ margin: '1.5rem 0' }}>
+                            <strong>📅 Tour Stops / Venues ({(formData.schedule_slots || []).length})</strong>
+                            <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.5rem' }}>
+                              {(formData.schedule_slots || []).map((s, idx) => (
+                                <div key={s.id || idx} style={{ padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between' }}>
+                                  <span>Stop #{idx + 1}: {s.venue_name}</span>
+                                  <strong>📍 {s.date} ({s.starts} - {s.ends})</strong>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="review-tickets-section">
+                            <strong>Ticket Tiers ({formData.ticket_tiers?.length || 0})</strong>
+                            <div className="review-tiers-list">
+                              {(formData.ticket_tiers || []).map((t, idx) => (
+                                <div className="review-tier-item" key={t.id || idx}>
+                                  <div className="tier-left">
+                                    <strong>{t.tier_name}</strong>
+                                    <span>Capacity: {t.total_seats} seats</span>
+                                  </div>
+                                  <span className="tier-price-tag">₹{t.price}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="wizard-navigation-footer">
+                        <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(5)}>← Back</button>
+                        <div className="wizard-right-actions">
+                          <button type="submit" className="wizard-publish-btn" disabled={isSaving}>
+                            {isSaving ? 'Publishing...' : 'Publish Tour / Festival'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                ) : (formData.show_type === 'single' || !formData.show_type) ? (
+                  eventWizardStep === 2 ? (
+                    // STEP 1 of visual stepper: Create your show (basics, when/where, tickets)
+                    <div className="single-event-wizard-step animate-fade-in">
+                      {/* Visual Stepper */}
+                      <div className="wizard-stepper-bar">
+                        <div className="step-item active">
+                          <span className="step-number">1</span>
+                          <span className="step-label">Create your show</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">2</span>
+                          <span className="step-label">Photos & details</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">3</span>
+                          <span className="step-label">Review</span>
+                        </div>
+                      </div>
+
+                      <div className="wizard-step-header">
+                        <div className="wizard-back-indicator">
+                          <span className="current-selection-badge">Single show</span>
+                          <button type="button" className="change-selection-btn" onClick={() => setEventWizardStep(1)}>Change</button>
+                        </div>
+                        <h2 className="wizard-title">Create your show</h2>
+                        <p className="wizard-subtitle">Everything needed to start selling, all in one place. We'll save your progress as you go.</p>
+                      </div>
+
+                      {/* Section 1: The basics */}
+                      <div className="wizard-section-card">
+                        <div className="section-card-header">
+                          <h4>The basics</h4>
+                          <span className="required-badge">Required</span>
+                        </div>
+                        <p className="section-card-desc">Name the event and choose the category guests will browse under.</p>
+
+                        <div className="wizard-fields-stack">
+                          <div className="form-field">
+                            <label>Event name *</label>
+                            <input 
+                              type="text" 
+                              placeholder="e.g. An evening with Prateek Kuhad" 
+                              required
+                              value={formData.title || ''} 
+                              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                            />
+                          </div>
+
+                          <div className="form-field">
+                            <label>Event visibility *</label>
+                            <div className="visibility-cards-row">
+                              <div 
+                                className={`visibility-card ${(formData.visibility === 'public' || !formData.visibility) ? 'selected' : ''}`}
+                                onClick={() => setFormData({ ...formData, visibility: 'public' })}
+                              >
+                                <div className="visibility-circle">
+                                  {(formData.visibility === 'public' || !formData.visibility) && <div className="checkmark" />}
+                                </div>
+                                <div className="visibility-info">
+                                  <strong>Public</strong>
+                                  <span>Visible on Showmate listings.</span>
+                                </div>
+                              </div>
+                              <div 
+                                className={`visibility-card ${formData.visibility === 'private' ? 'selected' : ''}`}
+                                onClick={() => setFormData({ ...formData, visibility: 'private' })}
+                              >
+                                <div className="visibility-circle">
+                                  {formData.visibility === 'private' && <div className="checkmark" />}
+                                </div>
+                                <div className="visibility-info">
+                                  <strong>Private</strong>
+                                  <span>Accessible only by private access links.</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="online-checkbox-card">
+                            <input 
+                              type="checkbox" 
+                              id="is_online_evt"
+                              checked={!!formData.is_online}
+                              onChange={(e) => setFormData({ ...formData, is_online: e.target.checked })}
+                            />
+                            <label htmlFor="is_online_evt">
+                              <strong>Online event</strong>
+                              <span>Virtual events use video conferencing details instead of a physical venue.</span>
+                            </label>
+                          </div>
+
+                          <div className="form-field">
+                            <label>Category *</label>
+                            <select 
+                              required 
+                              value={formData.category || ''} 
+                              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                              className="admin-select"
+                            >
+                              <option value="">Search group or category</option>
+                              <option value="Music & Concerts">Music & Concerts</option>
+                              <option value="Comedy & Theatre">Comedy & Theatre</option>
+                              <option value="Workshops & Classes">Workshops & Classes</option>
+                              <option value="Parties & Nightlife">Parties & Nightlife</option>
+                              <option value="Festivals & Fairs">Festivals & Fairs</option>
+                              <option value="Sports & Fitness">Sports & Fitness</option>
+                              <option value="Corporate & Business">Corporate & Business</option>
+                              <option value="Other Events">Other Events</option>
+                            </select>
+                          </div>
+
+                          <div className="organizer-info-box">
+                            <strong>Organizer</strong>
+                            <span>Current organizer is set from your signed-in account.</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Section 2: When and where */}
+                      <div className="wizard-section-card">
+                        <div className="section-card-header">
+                          <h4>When and where</h4>
+                        </div>
+                        <p className="section-card-desc">Set the single public show date, time and venue.</p>
+
+                        <div className="when-where-grid">
+                          <div className="form-field">
+                            <label>Date *</label>
+                            <input 
+                              type="date" 
+                              required
+                              value={formData.event_date ? formData.event_date.split('T')[0] : ''}
+                              onChange={(e) => {
+                                const timePart = formData.event_date && formData.event_date.includes('T') ? formData.event_date.split('T')[1] : '19:00';
+                                setFormData({ ...formData, event_date: `${e.target.value}T${timePart}` });
+                              }}
+                            />
+                          </div>
+                          <div className="form-field">
+                            <label>Starts *</label>
+                            <input 
+                              type="time" 
+                              required
+                              value={formData.event_date && formData.event_date.includes('T') ? formData.event_date.split('T')[1].substring(0, 5) : '19:00'}
+                              onChange={(e) => {
+                                const datePart = formData.event_date ? formData.event_date.split('T')[0] : new Date().toISOString().split('T')[0];
+                                setFormData({ ...formData, event_date: `${datePart}T${e.target.value}:00` });
+                              }}
+                            />
+                          </div>
+                          <div className="form-field">
+                            <label>Ends *</label>
+                            <input 
+                              type="time" 
+                              required
+                              value={formData.ends_at && formData.ends_at.includes('T') ? formData.ends_at.split('T')[1].substring(0, 5) : '22:00'}
+                              onChange={(e) => {
+                                const datePart = formData.ends_at ? formData.ends_at.split('T')[0] : (formData.event_date ? formData.event_date.split('T')[0] : new Date().toISOString().split('T')[0]);
+                                setFormData({ ...formData, ends_at: `${datePart}T${e.target.value}:00` });
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="when-where-grid" style={{ marginTop: '1.25rem' }}>
+                          <div className="form-field">
+                            <label>Booking Opens *</label>
+                            <input 
+                              type="datetime-local" 
+                              required
+                              value={formData.booking_start ? new Date(formData.booking_start).toISOString().slice(0, 16) : ''}
+                              onChange={(e) => {
+                                setFormData({ ...formData, booking_start: e.target.value ? new Date(e.target.value).toISOString() : '' });
+                              }}
+                            />
+                          </div>
+                          <div className="form-field">
+                            <label>Booking Closes *</label>
+                            <input 
+                              type="datetime-local" 
+                              required
+                              value={formData.booking_end ? new Date(formData.booking_end).toISOString().slice(0, 16) : ''}
+                              onChange={(e) => {
+                                setFormData({ ...formData, booking_end: e.target.value ? new Date(e.target.value).toISOString() : '' });
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="venue-search-row">
+                          <div className="form-field" style={{ flex: 1 }}>
+                            <label>Venue *</label>
+                            <input 
+                              type="text" 
+                              placeholder="Search venue..." 
+                              required={!formData.is_online}
+                              disabled={!!formData.is_online}
+                              value={formData.is_online ? 'Online Virtual Venue' : (formData.venue_name || '')} 
+                              onChange={(e) => setFormData({ ...formData, venue_name: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Section 3: Tickets */}
+                      <div className="wizard-section-card">
+                        <div className="section-card-header">
+                          <h4>Tickets</h4>
+                          <div className="ticket-capacity-badges">
+                            <span className="cap-badge">Capacity: {formData.ticket_tiers?.reduce((sum, t) => sum + (parseInt(t.total_seats) || 0), 0) || 0}</span>
+                            <span className="sell-badge">Sellout: {formData.ticket_tiers?.reduce((sum, t) => sum + (parseInt(t.total_seats) || 0), 0) || 0}</span>
+                          </div>
+                        </div>
+                        <p className="section-card-desc">Each ticket type automatically applies to this one show.</p>
+
+                        <div className="ticket-tiers-list">
+                          {(formData.ticket_tiers || []).map((tier, index) => (
+                            <div className="ticket-tier-row-card" key={tier.id || index}>
+                              <div className="tier-row-header">
+                                <span className="tier-index-number">{index + 1}</span>
+                                <span className="tier-badge-type">{parseFloat(tier.price) === 0 ? 'Free' : 'Paid'}</span>
+                                {formData.ticket_tiers.length > 1 && (
+                                  <button 
+                                    type="button" 
+                                    className="delete-tier-btn"
+                                    onClick={() => {
+                                      const nextTiers = formData.ticket_tiers.filter((_, idx) => idx !== index);
+                                      setFormData({ ...formData, ticket_tiers: nextTiers });
+                                    }}
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="tier-inputs-grid">
+                                <div className="form-field">
+                                  <label>Name *</label>
+                                  <input 
+                                    type="text" 
+                                    placeholder="General Admission" 
+                                    required
+                                    value={tier.tier_name || ''} 
+                                    onChange={(e) => {
+                                      const nextTiers = [...formData.ticket_tiers];
+                                      nextTiers[index] = { ...tier, tier_name: e.target.value };
+                                      setFormData({ ...formData, ticket_tiers: nextTiers });
+                                    }}
+                                  />
+                                </div>
+                                <div className="form-field">
+                                  <label>Price *</label>
+                                  <input 
+                                    type="number" 
+                                    placeholder="₹ 0" 
+                                    required
+                                    value={tier.price === 0 ? '' : tier.price} 
+                                    onChange={(e) => {
+                                      const nextTiers = [...formData.ticket_tiers];
+                                      nextTiers[index] = { ...tier, price: parseFloat(e.target.value) || 0 };
+                                      setFormData({ ...formData, ticket_tiers: nextTiers });
+                                    }}
+                                  />
+                                </div>
+                                <div className="form-field">
+                                  <label>Quantity *</label>
+                                  <input 
+                                    type="number" 
+                                    placeholder="100" 
+                                    required
+                                    value={tier.total_seats || ''} 
+                                    onChange={(e) => {
+                                      const nextTiers = [...formData.ticket_tiers];
+                                      nextTiers[index] = { ...tier, total_seats: parseInt(e.target.value) || 0, available_seats: parseInt(e.target.value) || 0 };
+                                      setFormData({ ...formData, ticket_tiers: nextTiers });
+                                    }}
+                                  />
+                                </div>
+                                <div className="form-field">
+                                  <label>Entries per ticket *</label>
+                                  <input 
+                                    type="number" 
+                                    placeholder="1" 
+                                    required
+                                    defaultValue={1}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <button 
+                          type="button" 
+                          className="add-tier-dashed-btn"
+                          onClick={() => {
+                            const nextTiers = [...(formData.ticket_tiers || [])];
+                            nextTiers.push({ id: 'temp_' + Date.now(), tier_name: '', price: 0, total_seats: 100, available_seats: 100 });
+                            setFormData({ ...formData, ticket_tiers: nextTiers });
+                          }}
+                        >
+                          + Add another ticket type
+                        </button>
+                      </div>
+
+                      {/* Step Navigation Bar */}
+                      <div className="wizard-navigation-footer">
+                        <button 
+                          type="button" 
+                          className="wizard-back-btn" 
+                          onClick={() => setEventWizardStep(1)}
+                        >
+                          ← Back
+                        </button>
+                        <div className="wizard-right-actions">
+                          <span className="save-status-indicator">Draft is not saved yet</span>
+                          <button 
+                            type="button" 
+                            className="wizard-save-draft-btn"
+                            onClick={() => {
+                              toast.success("Draft state updated locally!");
+                            }}
+                          >
+                            Save draft
+                          </button>
+                          <button 
+                            type="button" 
+                            className="wizard-next-btn"
+                            onClick={() => {
+                              if (!formData.title || !formData.category) {
+                                toast.error("Please fill in the required basic fields!");
+                                return;
+                              }
+                              setEventWizardStep(3);
+                            }}
+                          >
+                            Next: Photos & details
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : eventWizardStep === 3 ? (
+                    // STEP 2: Photos & details
+                    <div className="single-event-wizard-step animate-fade-in">
+                      {/* Visual Stepper */}
+                      <div className="wizard-stepper-bar">
+                        <div className="step-item active-past">
+                          <span className="step-number">1</span>
+                          <span className="step-label">Create your show</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active">
+                          <span className="step-number">2</span>
+                          <span className="step-label">Photos & details</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item">
+                          <span className="step-number">3</span>
+                          <span className="step-label">Review</span>
+                        </div>
+                      </div>
+
+                      <div className="wizard-step-header">
+                        <h2 className="wizard-title">Event Banner & Description</h2>
+                        <p className="wizard-subtitle">Add rich details to attract attendees and make your listing premium.</p>
+                      </div>
+
+                      <div className="wizard-section-card">
+                        <div className="section-card-header">
+                          <h4>Banner Image</h4>
+                        </div>
+                        <div className="form-field">
+                          <label>Banner URL *</label>
+                          <input 
+                            type="text" 
+                            placeholder="https://example.com/banner.jpg" 
+                            required
+                            value={formData.banner_url || ''} 
+                            onChange={(e) => setFormData({ ...formData, banner_url: e.target.value })}
+                          />
+                        </div>
+                        {formData.banner_url && (
+                          <div className="banner-preview-box">
+                            <img src={formData.banner_url} alt="Event Preview" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="wizard-section-card">
+                        <div className="section-card-header">
+                          <h4>Event Description</h4>
+                        </div>
+                        <div className="form-field">
+                          <label>Description *</label>
+                          <textarea 
+                            placeholder="Describe your event in detail..." 
+                            required
+                            rows={6}
+                            value={formData.description || ''} 
+                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                            className="wizard-textarea"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="wizard-section-card">
+                        <div className="section-card-header">
+                          <h4>Status & Custom fields</h4>
+                        </div>
+                        <div className="form-grid">
+                          <div className="form-field">
+                            <label>Status *</label>
+                            <select 
+                              value={formData.status || 'UPCOMING'} 
+                              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                              className="admin-select"
+                            >
+                              <option value="UPCOMING">UPCOMING</option>
+                              <option value="ONGOING">ONGOING</option>
+                              <option value="COMPLETED">COMPLETED</option>
+                              <option value="CANCELLED">CANCELLED</option>
+                              <option value="SOLD_OUT">SOLD_OUT</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="wizard-navigation-footer">
+                        <button 
+                          type="button" 
+                          className="wizard-back-btn" 
+                          onClick={() => setEventWizardStep(2)}
+                        >
+                          ← Back
+                        </button>
+                        <div className="wizard-right-actions">
+                          <button 
+                            type="button" 
+                            className="wizard-next-btn"
+                            onClick={() => {
+                              if (!formData.banner_url || !formData.description) {
+                                toast.error("Please add banner image and description details!");
+                                return;
+                              }
+                              const minPrice = formData.ticket_tiers?.length > 0 
+                                ? Math.min(...formData.ticket_tiers.map(t => parseFloat(t.price) || 0))
+                                : 0;
+                              setFormData(prev => ({ ...prev, starting_price: minPrice }));
+                              setEventWizardStep(4);
+                            }}
+                          >
+                            Next: Review
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    // STEP 3: Review
+                    <div className="single-event-wizard-step animate-fade-in">
+                      {/* Visual Stepper */}
+                      <div className="wizard-stepper-bar">
+                        <div className="step-item active-past">
+                          <span className="step-number">1</span>
+                          <span className="step-label">Create your show</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active-past">
+                          <span className="step-number">2</span>
+                          <span className="step-label">Photos & details</span>
+                        </div>
+                        <div className="step-divider">›</div>
+                        <div className="step-item active">
+                          <span className="step-number">3</span>
+                          <span className="step-label">Review</span>
+                        </div>
+                      </div>
+
+                      <div className="wizard-step-header">
+                        <h2 className="wizard-title">Review event details</h2>
+                        <p className="wizard-subtitle">Verify the details before publishing this event live.</p>
+                      </div>
+
+                      <div className="wizard-section-card review-summary-card">
+                        <div className="review-banner">
+                          {formData.banner_url ? (
+                            <img src={formData.banner_url} alt={formData.title} />
+                          ) : (
+                            <div className="no-banner-placeholder">No Banner URL Provided</div>
+                          )}
+                          <span className="review-status-badge">{formData.status || 'UPCOMING'}</span>
+                        </div>
+
+                        <div className="review-content">
+                          <h3 className="review-title">{formData.title || 'Untitled Event'}</h3>
+                          <div className="review-meta-row">
+                            <span className="review-category-tag">{formData.category || 'Category'}</span>
+                            <span className="review-visibility-tag">{formData.visibility || 'public'}</span>
+                          </div>
+
+                          <div className="review-info-grid">
+                            <div className="review-info-item">
+                              <strong>📅 Date & Time</strong>
+                              <span>{formData.event_date ? new Date(formData.event_date).toLocaleString() : 'Not Set'}</span>
+                            </div>
+                            <div className="review-info-item">
+                              <strong>📍 Venue</strong>
+                              <span>{formData.is_online ? 'Online Virtual Event' : (formData.venue_name || 'Not Set')}</span>
+                            </div>
+                          </div>
+
+                          <div className="review-description-section">
+                            <strong>Description</strong>
+                            <p>{formData.description || 'No description provided.'}</p>
+                          </div>
+
+                          <div className="review-tickets-section">
+                            <strong>Ticket Tiers ({formData.ticket_tiers?.length || 0})</strong>
+                            <div className="review-tiers-list">
+                              {(formData.ticket_tiers || []).map((t, idx) => (
+                                <div className="review-tier-item" key={t.id || idx}>
+                                  <div className="tier-left">
+                                    <strong>{t.tier_name || 'General Admission'}</strong>
+                                    <span>Capacity: {t.total_seats || 100} seats</span>
+                                  </div>
+                                  <span className="tier-price-tag">{parseFloat(t.price) === 0 ? 'Free' : `₹${t.price}`}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="wizard-navigation-footer">
+                        <button 
+                          type="button" 
+                          className="wizard-back-btn" 
+                          onClick={() => setEventWizardStep(3)}
+                        >
+                          ← Back
+                        </button>
+                        <div className="wizard-right-actions">
+                          <button type="submit" className="wizard-publish-btn" disabled={isSaving}>
+                            {isSaving ? 'Publishing...' : 'Publish Event'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                ) : (
+                  <>
+                    <div className="form-grid">
+                      {Object.keys(formData).map(key => {
+                        const hiddenFields = ['id', 'uid', 'created_at', 'updated_at', 'users', 'show_type', 'ticket_tiers'];
+                        if (hiddenFields.includes(key)) return null;
+
+                        const isBoolean = typeof formData[key] === 'boolean';
+                        const isForeignKey = ['user_id', 'vendor_id', 'store_id', 'provider_id', 'category_id', 'service_id', 'address_id'].includes(key);
+
+                        return (
+                          <div className="form-field" key={key} style={isBoolean ? { flexDirection: 'row', alignItems: 'center', gap: '0.5rem' } : {}}>
+                            <label>{key.replace(/_/g, ' ').toUpperCase()}</label>
+                            {isBoolean ? (
+                              <input
+                                type="checkbox"
+                                checked={formData[key]}
+                                onChange={(e) => setFormData({ ...formData, [key]: e.target.checked })}
+                                style={{ width: 'auto', marginBottom: 0 }}
+                              />
+                            ) : isForeignKey ? (
+                              <select
+                                value={formData[key] || ''}
+                                onChange={(e) => setFormData({ ...formData, [key]: e.target.value || null })}
+                                className="admin-select"
+                              >
+                                <option value="">-- Select {key.replace(/_/g, ' ').toUpperCase()} --</option>
+                                {key === 'vendor_id' && vendorsList.map(v => (
+                                  <option key={v.id} value={v.id}>{v.business_name || v.name || 'No Name'}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type={key === 'event_date' || key === 'ends_at' ? 'datetime-local' : (typeof (TABLE_SCHEMAS.events?.[key]) === 'number' ? 'number' : 'text')}
+                                value={key === 'event_date' || key === 'ends_at' ? formatDateForInput(formData[key]) : (formData[key] !== undefined && formData[key] !== null ? formData[key] : '')}
+                                onChange={(e) => {
+                                  let val = e.target.value;
+                                  if (typeof (TABLE_SCHEMAS.events?.[key]) === 'number') {
+                                    val = val === '' ? 0 : Number(val);
+                                  }
+                                  setFormData({ ...formData, [key]: val });
+                                }}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="event-wizard-buttons-row" style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+                      <button 
+                        type="button" 
+                        className="event-type-back-btn" 
+                        onClick={() => setEventWizardStep(1)}
+                        style={{ flex: 1, padding: '14px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontWeight: 'bold', cursor: 'pointer', color: '#64748b' }}
+                      >
+                        Back
+                      </button>
+                      <button type="submit" className="submit-form-btn" style={{ flex: 2, marginTop: 0 }} disabled={isSaving}>
+                        {isSaving ? 'Saving...' : 'Save Changes'}
+                      </button>
+                    </div>
+                  </>
+                )
+              ) : (
+                <>
+                  <div className="form-grid">
+                    {Object.keys(formData).length > 0 ? Object.keys(formData).map(key => {
+                      const hiddenFields = ['id', 'uid', 'created_at', 'updated_at', 'users'];
+                      if (hiddenFields.includes(key)) return null;
+
+                      const isBoolean = typeof formData[key] === 'boolean';
+                      const isForeignKey = ['user_id', 'vendor_id', 'store_id', 'provider_id', 'category_id', 'service_id', 'address_id'].includes(key);
+
+                      return (
+                        <div className="form-field" key={key} style={isBoolean ? { flexDirection: 'row', alignItems: 'center', gap: '0.5rem' } : {}}>
+                          <label>{key.replace(/_/g, ' ').toUpperCase()}</label>
+                          {isBoolean ? (
+                            <input
+                              type="checkbox"
+                              checked={formData[key]}
+                              onChange={(e) => setFormData({ ...formData, [key]: e.target.checked })}
+                              style={{ width: 'auto', marginBottom: 0 }}
+                            />
+                          ) : isForeignKey ? (
+                            <select
+                              value={formData[key] || ''}
+                              onChange={(e) => {
+                                const val = e.target.value || null;
+                                const nextData = { ...formData, [key]: val };
+                                
+                                // Automatically pre-populate price/amount based on selection
+                                if (key === 'service_id' && val && currentTab.table === 'service_bookings') {
+                                  const serv = servicesList.find(s => s.id === val);
+                                  if (serv) {
+                                    if (serv.price) {
+                                      nextData.total_amount = serv.price;
+                                    }
+                                    if (serv.provider_id) {
+                                      nextData.provider_id = serv.provider_id;
+                                    }
+                                  }
+                                }
+
+                                // Automatically pre-populate phone and name when linking an existing user
+                                if (key === 'user_id' && val) {
+                                  const selectedUser = usersList.find(u => u.id === val);
+                                  if (selectedUser) {
+                                    if (nextData.phone !== undefined) nextData.phone = selectedUser.phone || '';
+                                    if (nextData.full_name !== undefined) nextData.full_name = selectedUser.full_name || '';
+                                    if (nextData.name !== undefined) nextData.name = selectedUser.full_name || '';
+                                  }
+                                }
+                                
+                                setFormData(nextData);
+                              }}
+                              className="admin-select"
+                            >
+                              <option value="">-- Select {key.replace(/_/g, ' ').toUpperCase()} --</option>
+                              {key === 'user_id' && usersList.map(u => (
+                                <option key={u.id} value={u.id}>{u.full_name || 'No Name'} ({u.phone})</option>
+                              ))}
+                              {key === 'vendor_id' && vendorsList.map(v => (
+                                <option key={v.id} value={v.id}>{v.business_name || v.name || 'No Name'}</option>
+                              ))}
+                              {key === 'store_id' && storesList.map(s => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                              ))}
+                              {key === 'provider_id' && providersList.map(p => (
+                                <option key={p.id} value={p.id}>{p.business_name || 'No Name'}</option>
+                              ))}
+                              {key === 'service_id' && servicesList.map(sv => (
+                                <option key={sv.id} value={sv.id}>{sv.title}</option>
+                              ))}
+                              {key === 'address_id' && addressesList
+                                .filter(addr => !formData.user_id || addr.user_id === formData.user_id)
+                                .map(addr => {
+                                  const uName = usersList.find(u => u.id === addr.user_id)?.full_name || 'Unknown User';
+                                  return (
+                                    <option key={addr.id} value={addr.id}>
+                                      {addr.address_line_1}{addr.address_line_2 ? `, ${addr.address_line_2}` : ''}, {addr.city || ''} ({uName})
+                                    </option>
+                                  );
+                                })
+                              }
+                              {key === 'category_id' && (
+                                currentTab.table === 'products'
+                                  ? productCategoriesList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)
+                                  : serviceCategoriesList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)
+                              )}
+                            </select>
+                          ) : (
+                            <input
+                              type={['scheduled_at', 'valid_until', 'event_date'].includes(key) ? 'datetime-local' : (typeof (TABLE_SCHEMAS[currentTab.table]?.[key]) === 'number' ? 'number' : 'text')}
+                              value={['scheduled_at', 'valid_until', 'event_date'].includes(key) ? formatDateForInput(formData[key]) : (formData[key] !== undefined && formData[key] !== null ? formData[key] : '')}
+                              maxLength={key === 'phone' ? 10 : (key === 'aadhar_no' ? 14 : (key === 'license_no' ? 14 : (key === 'id_proof' ? (formData[key] && /^\d+$/.test(formData[key].replace(/[^A-Z0-9]/g, '')) ? 14 : 10) : undefined)))}
+                              onChange={(e) => {
+                                let val = e.target.value;
+                                if (key === 'phone') {
+                                  val = val.replace(/\D/g, '').slice(0, 10);
+                                } else if (key === 'aadhar_no') {
+                                  const clean = val.replace(/\D/g, '').slice(0, 12);
+                                  const parts = [];
+                                  for (let i = 0; i < clean.length; i += 4) {
+                                    parts.push(clean.slice(i, i + 4));
+                                  }
+                                  val = parts.join(' ');
+                                } else if (key === 'license_no') {
+                                  val = val.replace(/\D/g, '').slice(0, 14);
+                                } else if (key === 'id_proof') {
+                                  val = val.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                                  const isNumeric = /^\d+$/.test(val) || val.length === 0;
+                                  if (isNumeric) {
+                                    const sliced = val.slice(0, 12);
+                                    const parts = [];
+                                    for (let i = 0; i < sliced.length; i += 4) {
+                                      parts.push(sliced.slice(i, i + 4));
+                                    }
+                                    val = parts.join(' ');
+                                  } else {
+                                    val = val.slice(0, 10);
+                                  }
+                                }
+                                
+                                if (typeof (TABLE_SCHEMAS[currentTab.table]?.[key]) === 'number') {
+                                  val = val === '' ? 0 : Number(val);
+                                }
+                                
+                                setFormData({ ...formData, [key]: val });
+                              }}
+                            />
+                          )}
+                        </div>
+                      );
+                    }) : <p style={{ color: 'var(--text-secondary)' }}>Open a populated table first to configure new data.</p>}
+                  </div>
+                  <button type="submit" className="submit-form-btn" disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </>
+              )}
             </form>
           </div>
         </div>

@@ -124,11 +124,11 @@ router.get('/search', async (req, res) => {
     if (createdByIds.length > 0) {
       const { data: vendors } = await supabase
         .from('vendors')
-        .select('user_id, business_name, owner_name')
+        .select('user_id, business_name, name')
         .in('user_id', createdByIds);
       if (vendors) {
         vendors.forEach(v => {
-          vendorMap[v.user_id] = v.business_name || v.owner_name || null;
+          vendorMap[v.user_id] = v.business_name || v.name || null;
         });
       }
     }
@@ -181,10 +181,10 @@ router.get('/:id', async (req, res) => {
     if (event.created_by) {
       const { data: vendor } = await supabase
         .from('vendors')
-        .select('business_name, owner_name')
+        .select('business_name, name')
         .eq('user_id', event.created_by)
         .maybeSingle();
-      organizer_name = vendor?.business_name || vendor?.owner_name || null;
+      organizer_name = vendor?.business_name || vendor?.name || null;
     }
 
     res.json({ success: true, event: { ...event, organizer_name } });

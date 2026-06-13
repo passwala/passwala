@@ -634,20 +634,62 @@ router.post('/upsert', async (req, res) => {
         }
 
         // Save intercepted starting_price to event_ticket_tiers
-        if (table === 'events' && startingPrice !== null && data && data.id) {
-            const tierPayload = {
-                event_id: data.id,
+        let ticketTiers = null;
+        if (table === 'events' && payload.ticket_tiers) {
+            ticketTiers = payload.ticket_tiers;
+        } else if (table === 'events' && payload.event_ticket_tiers) {
+            ticketTiers = payload.event_ticket_tiers;
+        }
+
+        // Save intercepted starting_price to event_ticket_tiers if no explicit ticket tiers were provided
+        if (table === 'events' && ticketTiers === null && startingPrice !== null && data && data.id) {
+            ticketTiers = [{
                 tier_name: 'General Admission',
                 price: parseFloat(startingPrice) || 0,
                 total_seats: 1000,
                 available_seats: 1000
-            };
-            const { data: existingTier } = await supabase.from('event_ticket_tiers').select('id').eq('event_id', data.id).eq('tier_name', 'General Admission').maybeSingle();
-            
-            if (existingTier) {
-                await supabase.from('event_ticket_tiers').update({ price: tierPayload.price }).eq('id', existingTier.id);
-            } else {
-                await supabase.from('event_ticket_tiers').insert([tierPayload]);
+            }];
+        }
+
+        if (table === 'events' && ticketTiers && data && data.id) {
+            // Get existing tiers for this event
+            const { data: existingTiers } = await supabase.from('event_ticket_tiers').select('id, tier_name').eq('event_id', data.id);
+            const existingTiersMap = {};
+            if (existingTiers) {
+                existingTiers.forEach(t => { existingTiersMap[t.tier_name] = t.id; });
+            }
+
+            const incomingNames = new Set();
+            for (const tier of ticketTiers) {
+                const price = parseFloat(tier.price) || 0;
+                const total_seats = parseInt(tier.total_seats) || 1000;
+                const available_seats = tier.available_seats !== undefined ? parseInt(tier.available_seats) : total_seats;
+                const tier_name = tier.tier_name || 'General Admission';
+                incomingNames.add(tier_name);
+
+                const tierPayload = {
+                    event_id: data.id,
+                    tier_name,
+                    price,
+                    total_seats,
+                    available_seats
+                };
+
+                const existingId = existingTiersMap[tier_name];
+                if (existingId) {
+                    await supabase.from('event_ticket_tiers').update(tierPayload).eq('id', existingId);
+                } else {
+                    await supabase.from('event_ticket_tiers').insert([tierPayload]);
+                }
+            }
+
+            // Clean up old tiers not present in the new set
+            if (existingTiers) {
+                for (const t of existingTiers) {
+                    if (!incomingNames.has(t.tier_name)) {
+                        await supabase.from('event_ticket_tiers').delete().eq('id', t.id);
+                    }
+                }
             }
         }
 
