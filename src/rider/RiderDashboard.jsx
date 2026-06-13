@@ -1174,7 +1174,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     const map = googleMapInstance.current;
 
     // Helper: create SVG icon
-    const svgIcon = (color, svgPath, rounded = false) => ({
+    const _svgIcon = (color, svgPath, rounded = false) => ({
       url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
         `<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42"><rect x="0" y="0" width="42" height="42" rx="${rounded ? 12 : 21}" fill="${color}" stroke="white" stroke-width="3"/><g transform="translate(9,9)">${svgPath}</g></svg>`
       ),
@@ -1307,7 +1307,6 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
         }
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapCoords, activeOrder, incomingOrder, deliveryStep, isOnline, osrmRouteToStore, osrmRouteToCustomer, activeRide, rideStep, routeStats, isGoogleLoaded]);
 
 

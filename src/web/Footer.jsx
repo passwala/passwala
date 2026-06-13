@@ -31,10 +31,10 @@ const Footer = () => {
           <div className="footer-col">
             <h4>Why Passwala</h4>
             <ul className="footer-links-list">
-              <li><a href="#">Values</a></li>
-              <li><a href="#">Safety</a></li>
-              <li><a href="#">Deployment</a></li>
-              <li><a href="#">Trust & Verification</a></li>
+              <li>Values</li>
+              <li>Safety</li>
+              <li>Deployment</li>
+              <li>rust & Verification</li>
             </ul>
           </div>
 
@@ -53,10 +53,10 @@ const Footer = () => {
           <div className="footer-col">
             <h4>Support</h4>
             <ul className="footer-links-list">
-              <li><a href="#">Help Center</a></li>
-              <li><a href="#">Documentation</a></li>
-              <li><a href="#">Pricing</a></li>
-              <li><a href="#">Contact Us</a></li>
+              <li>Help Center</li>
+              <li>Documentation</li>
+              <li>Pricing</li>
+              <li>Contact Us</li>
             </ul>
           </div>
 
@@ -75,8 +75,8 @@ const Footer = () => {
         <div className="footer-bottom-v2">
           <p>&copy; {currentYear} Passwala. Built with ❤️ in Ahmedabad.</p>
           <div style={{ display: 'flex', gap: '24px' }}>
-             <span>English (US)</span>
-             <span>Status</span>
+            <span>English (US)</span>
+            <span>Status</span>
           </div>
         </div>
       </div>

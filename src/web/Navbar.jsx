@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './Navbar.css';
 
-const Navbar = ({ isAuthenticated, user, _onOpenProfile, onJoin }) => {
+const Navbar = ({ isAuthenticated, user, _onOpenProfile, _onJoin }) => {
   const [scrolled, setScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -31,18 +31,20 @@ const Navbar = ({ isAuthenticated, user, _onOpenProfile, onJoin }) => {
                <a href={`${window.location.protocol}//${window.location.hostname}:3001`} className="nav-pill-link">Buyer App</a>
                <a href={`${window.location.protocol}//${window.location.hostname}:3002`} className="nav-pill-link">Vendor</a>
                <a href={`${window.location.protocol}//${window.location.hostname}:3003`} className="nav-pill-link">Rider</a>
-               <a href="#about" className="nav-pill-link">About Us</a>
+               <a href="#about" className="nav-pill-link" onClick={(e) => {
+                 e.preventDefault();
+                 const el = document.querySelector('.info-section');
+                 if (el) el.scrollIntoView({ behavior: 'smooth' });
+               }}>About Us</a>
              </div>
           </div>
 
           {/* Right: Actions (Hidden on Mobile) */}
           <div className="nav-right mobile-hide">
-             {isAuthenticated ? (
+             {isAuthenticated && (
                <div style={{display: 'flex', gap: '15px', alignItems: 'center'}}>
                  <span style={{fontWeight: '600', color: 'var(--text-secondary)'}}>Hi, {user?.displayName?.split(' ')[0] || 'User'}</span>
                </div>
-             ) : (
-               <button onClick={onJoin} className="join-free-btn">Get Started</button>
              )}
           </div>
 
@@ -60,10 +62,8 @@ const Navbar = ({ isAuthenticated, user, _onOpenProfile, onJoin }) => {
           <a href={`${window.location.protocol}//${window.location.hostname}:3002`} onClick={() => setIsMobileMenuOpen(false)}>Vendor Portal</a>
           <a href={`${window.location.protocol}//${window.location.hostname}:3003`} onClick={() => setIsMobileMenuOpen(false)}>Rider Portal</a>
           <hr style={{border: 'none', borderTop: '1px solid #eee'}} />
-          {isAuthenticated ? (
+          {isAuthenticated && (
             <span style={{fontWeight: '600', color: 'var(--text-secondary)', padding: '10px 0', display: 'block', textAlign: 'center'}}>Hi, {user?.displayName?.split(' ')[0] || 'User'}</span>
-          ) : (
-            <button onClick={() => { setIsMobileMenuOpen(false); onJoin(); }} className="mobile-join-btn">Get Started</button>
           )}
         </div>
       </div>

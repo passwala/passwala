@@ -11,7 +11,10 @@ import {
   X,
   Store,
   CreditCard,
-  Download
+  Download,
+  Ticket,
+  Calendar,
+  QrCode
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
@@ -24,12 +27,17 @@ const _ = motion;
 
 const OrderHistory = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'events'
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
+  const [eventBookings, setEventBookings] = useState([]);
+  const [eventLoading, setEventLoading] = useState(false);
+  const [cancelConfirm, setCancelConfirm] = useState(null); // { booking } | null
 
   useEffect(() => {
     fetchOrders();
+    fetchEventBookings();
 
     // ⚡ REAL-TIME: Listen for status updates on orders
     const channel = supabase
@@ -39,10 +47,7 @@ const OrderHistory = () => {
         schema: 'public', 
         table: 'orders' 
       }, (payload) => {
-        // If an order status changed, refresh the list
         fetchOrders();
-        
-        // If the new status is DELIVERED, show a celebratory toast
         if (payload.new && payload.new.status === 'DELIVERED') {
            toast.success("Your order has been delivered! Enjoy!", { icon: '🎁' });
         }
@@ -53,6 +58,79 @@ const OrderHistory = () => {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const fetchEventBookings = async () => {
+    setEventLoading(true);
+    try {
+      const savedUser = JSON.parse(localStorage.getItem('passwala_user') || '{}');
+      let resolvedUserId = savedUser.id || savedUser.uid;
+
+      // Resolve UUID if needed
+      if (resolvedUserId && resolvedUserId.length !== 36) {
+        const phoneNo = savedUser.phoneNumber?.replace('+91','') || savedUser.phone?.replace('+91','');
+        const orFilters = [];
+        if (savedUser.uid) orFilters.push(`uid.eq.${savedUser.uid}`);
+        if (savedUser.email) orFilters.push(`email.eq.${savedUser.email}`);
+        if (phoneNo) { orFilters.push(`phone.eq.${phoneNo}`); orFilters.push(`phone.eq.+91${phoneNo}`); }
+        if (orFilters.length > 0) {
+          const { data: usr } = await supabase.from('users').select('id').or(orFilters.join(',')).maybeSingle();
+          resolvedUserId = usr?.id || null;
+        } else resolvedUserId = null;
+      }
+
+      if (!resolvedUserId || resolvedUserId.length !== 36) return;
+
+      const { data, error } = await supabase
+        .from('event_bookings')
+        .select(`
+          id, ticket_count, total_amount, base_amount, cgst_amount, sgst_amount,
+          status, qr_code_hash, invoice_number, created_at, tier_id,
+          events!event_id(id, title, venue_name, event_date, banner_url, category, created_by),
+          event_ticket_tiers!tier_id(id, tier_name, price)
+        `)
+        .eq('user_id', resolvedUserId)
+        .order('created_at', { ascending: false });
+
+      if (error) console.warn('Event bookings query error:', error.message);
+      if (!error && data) {
+        setEventBookings(data);
+        // Store resolvedUserId for cancel use
+        window._resolvedEventUserId = resolvedUserId;
+      }
+    } catch (err) {
+      console.warn('Failed to fetch event bookings:', err);
+    } finally {
+      setEventLoading(false);
+    }
+  };
+
+  const BASE_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+
+  const handleCancelTicket = (booking) => {
+    // Show custom confirm modal instead of browser dialog
+    setCancelConfirm({ booking });
+  };
+
+  const confirmCancelTicket = async () => {
+    if (!cancelConfirm) return;
+    const { booking } = cancelConfirm;
+    setCancelConfirm(null);
+    const userId = window._resolvedEventUserId;
+    if (!userId) { toast.error('Could not verify your identity. Please refresh and try again.'); return; }
+    try {
+      const res = await fetch(`${BASE_URL}/api/events/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId: booking.id, userId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success('Ticket cancelled. Seats have been released.');
+      fetchEventBookings();
+    } catch (err) {
+      toast.error(err.message || 'Failed to cancel ticket');
+    }
+  };
 
   const fetchOrders = async () => {
     try {
@@ -560,12 +638,50 @@ const OrderHistory = () => {
         className="profile-sub-page"
       >
         <main className="sub-page-content">
-          {loading ? (
-            <div className="discovery-loading">
-              <div className="spinner"></div>
-              <p>Gathering your past orders...</p>
-            </div>
-          ) : (
+          {/* Tabs */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem', background: '#f1f5f9', padding: '5px', borderRadius: '14px' }}>
+            <button
+              onClick={() => setActiveTab('orders')}
+              style={{
+                flex: 1, padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                fontWeight: 700, fontSize: '0.875rem',
+                background: activeTab === 'orders' ? 'white' : 'transparent',
+                color: activeTab === 'orders' ? 'var(--primary, #ff6b00)' : '#64748b',
+                boxShadow: activeTab === 'orders' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all 0.2s'
+              }}
+            >
+              🛍 Orders
+            </button>
+            <button
+              onClick={() => setActiveTab('events')}
+              style={{
+                flex: 1, padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                fontWeight: 700, fontSize: '0.875rem',
+                background: activeTab === 'events' ? 'white' : 'transparent',
+                color: activeTab === 'events' ? 'var(--primary, #ff6b00)' : '#64748b',
+                boxShadow: activeTab === 'events' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all 0.2s',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+              }}
+            >
+              🎟 Event Tickets
+              {eventBookings.length > 0 && (
+                <span style={{ background: 'var(--primary, #ff6b00)', color: 'white', borderRadius: '20px', padding: '1px 8px', fontSize: '0.72rem', fontWeight: 800 }}>
+                  {eventBookings.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* ORDERS TAB */}
+          {activeTab === 'orders' && (
+            loading ? (
+              <div className="discovery-loading">
+                <div className="spinner"></div>
+                <p>Gathering your past orders...</p>
+              </div>
+            ) : (
             <div className="orders-list-profile">
               {orders.length === 0 ? (
                  <div className="empty-state-profile">
@@ -612,6 +728,105 @@ const OrderHistory = () => {
                 ))
               )}
             </div>
+            )
+          )}
+
+          {/* EVENT TICKETS TAB */}
+          {activeTab === 'events' && (
+            eventLoading ? (
+              <div className="discovery-loading">
+                <div className="spinner"></div>
+                <p>Loading your event tickets...</p>
+              </div>
+            ) : eventBookings.length === 0 ? (
+              <div className="empty-state-profile">
+                <Ticket size={48} />
+                <h3>No event tickets yet</h3>
+                <p>When you book event tickets, they'll appear here.</p>
+                <button onClick={() => navigate('/events')} className="shop-now-btn">Browse Events</button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {eventBookings.map((booking, i) => {
+                  const event = booking.events;
+                  const tier = booking.event_ticket_tiers;
+                  const isConfirmed = booking.status === 'CONFIRMED';
+                  return (
+                    <motion.div
+                      key={booking.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      style={{
+                        background: 'white', borderRadius: '20px',
+                        boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
+                        overflow: 'hidden', border: '1px solid #f1f5f9'
+                      }}
+                    >
+                      {/* Banner */}
+                      <div style={{ position: 'relative', height: '100px' }}>
+                        <img
+                          src={event?.banner_url || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&q=80'}
+                          alt={event?.title}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(0,0,0,0.05) 0%,rgba(0,0,0,0.7) 100%)' }} />
+                        <div style={{ position: 'absolute', bottom: 10, left: 14, right: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                          <h4 style={{ margin: 0, color: 'white', fontWeight: 800, fontSize: '1rem' }}>{event?.title}</h4>
+                          <span style={{ 
+                            background: booking.status === 'CONFIRMED' ? '#22c55e' : booking.status === 'COMPLETED' ? '#16a34a' : booking.status === 'CANCELLED' ? '#ef4444' : '#f59e0b', 
+                            color: 'white', padding: '3px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800 
+                          }}>
+                            {booking.status === 'COMPLETED' ? '✅ Attended' : booking.status}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Details */}
+                      <div style={{ padding: '1rem 1.25rem' }}>
+                        <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.75rem' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Calendar size={13} /> {event?.event_date ? new Date(event.event_date).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : '—'}
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <MapPin size={13} /> {event?.venue_name || '—'}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ fontSize: '0.82rem', color: '#475569' }}>
+                            <span style={{ background: '#f1f5f9', padding: '2px 8px', borderRadius: '8px', fontWeight: 600 }}>{tier?.tier_name || 'Standard'}</span>
+                            <span style={{ marginLeft: '8px' }}>{booking.ticket_count} ticket{booking.ticket_count > 1 ? 's' : ''}</span>
+                          </div>
+                          <span style={{ fontWeight: 800, color: 'var(--primary, #ff6b00)', fontSize: '1rem' }}>₹{booking.total_amount || 0}</span>
+                        </div>
+
+                        <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed #e2e8f0', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => navigate('/events/ticket', { state: { booking, event, tier } })}
+                            style={{ flex: 1, minWidth: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'var(--primary, #ff6b00)', color: 'white', border: 'none', padding: '10px', borderRadius: '12px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
+                          >
+                            <QrCode size={15} /> View Ticket
+                          </button>
+                          {/* Cancel button — only if CONFIRMED and event hasn't happened yet */}
+                          {booking.status === 'CONFIRMED' && event?.event_date && new Date(event.event_date) > new Date() && (
+                            <button
+                              onClick={() => handleCancelTicket(booking)}
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', background: '#fef2f2', color: '#ef4444', border: '1.5px solid #fecaca', padding: '10px 14px', borderRadius: '12px', fontWeight: 700, cursor: 'pointer', fontSize: '0.82rem' }}
+                            >
+                              ✕ Cancel
+                            </button>
+                          )}
+                          <span style={{ display: 'flex', alignItems: 'center', fontSize: '0.72rem', color: '#94a3b8' }}>
+                            {new Date(booking.created_at).toLocaleDateString('en-IN')}
+                          </span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )
           )}
         </main>
       </motion.div>
@@ -715,6 +930,122 @@ const OrderHistory = () => {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Custom Cancel Confirm Modal ──────────────────────────────── */}
+      <AnimatePresence>
+        {cancelConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 9999,
+              background: 'rgba(15,23,42,0.55)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '1.5rem'
+            }}
+            onClick={() => setCancelConfirm(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.82, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.88, opacity: 0, y: 20 }}
+              transition={{ type: 'spring', damping: 22, stiffness: 320 }}
+              onClick={e => e.stopPropagation()}
+              style={{
+                background: 'white',
+                borderRadius: '24px',
+                padding: '2rem',
+                maxWidth: '340px',
+                width: '100%',
+                boxShadow: '0 32px 64px rgba(0,0,0,0.22)',
+                textAlign: 'center'
+              }}
+            >
+              {/* Warning Icon */}
+              <div style={{
+                width: '64px', height: '64px',
+                background: 'linear-gradient(135deg, #fff1f2, #ffe4e6)',
+                borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 1.25rem',
+                border: '3px solid rgba(239,68,68,0.15)'
+              }}>
+                <span style={{ fontSize: '1.8rem' }}>🎫</span>
+              </div>
+
+              {/* Title */}
+              <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
+                Cancel Ticket?
+              </h3>
+
+              {/* Event name */}
+              <p style={{ margin: '0 0 0.4rem', fontSize: '0.9rem', color: '#64748b', lineHeight: 1.5 }}>
+                You are cancelling your ticket for
+              </p>
+              <p style={{
+                margin: '0 0 1.5rem',
+                fontSize: '1rem', fontWeight: 700, color: '#ef4444',
+                background: 'rgba(239,68,68,0.07)',
+                borderRadius: '10px', padding: '8px 14px',
+                display: 'inline-block'
+              }}>
+                "{cancelConfirm.booking?.events?.title || 'this event'}"
+              </p>
+
+              {/* Warning note */}
+              <div style={{
+                background: '#fff7ed',
+                border: '1.5px solid rgba(251,146,60,0.3)',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                marginBottom: '1.5rem',
+                display: 'flex', alignItems: 'flex-start', gap: '8px', textAlign: 'left'
+              }}>
+                <span style={{ fontSize: '1rem', flexShrink: 0, marginTop: '1px' }}>⚠️</span>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: '#9a3412', lineHeight: 1.5 }}>
+                  This <strong>cannot be undone</strong>. Your seats will be released back to the pool.
+                </p>
+              </div>
+
+              {/* Buttons */}
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  onClick={() => setCancelConfirm(null)}
+                  style={{
+                    flex: 1, padding: '0.85rem',
+                    background: '#f1f5f9', color: '#475569',
+                    border: 'none', borderRadius: '14px',
+                    fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer',
+                    transition: 'background 0.15s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'}
+                >
+                  Keep Ticket
+                </button>
+                <button
+                  onClick={confirmCancelTicket}
+                  style={{
+                    flex: 1, padding: '0.85rem',
+                    background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                    color: 'white',
+                    border: 'none', borderRadius: '14px',
+                    fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(239,68,68,0.35)',
+                    transition: 'opacity 0.15s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.opacity = '0.88'}
+                  onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                >
+                  Yes, Cancel
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </>

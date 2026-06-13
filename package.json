@@ -23,7 +23,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "server": "nodemon server/index.js",
-    "server:api": "nodemon server/index.js --headless"
+    "server:api": "nodemon server/index.js --headless",
+    "test:admin": "node scratch/test_admin_login.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.100.0",
@@ -36,9 +37,11 @@
     "framer-motion": "^12.38.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
+    "jsqr": "^1.4.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.477.0",
     "morgan": "^1.10.1",
+    "nodemailer": "^8.0.11",
     "razorpay": "^2.9.6",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

@@ -314,10 +314,10 @@
   opacity: 0.7;
 }
 
-/* ── Tablet: navbar starts after 64px sidebar ── */
+/* ── Tablet: navbar starts at left: 0 ── */
 @media (min-width: 768px) {
   .webapp-navbar {
-    left: 64px;
+    left: 0 !important;
     height: 60px;
     padding: 0 1.5rem;
     border-bottom: 1px solid var(--border-light);
@@ -335,15 +335,14 @@
   }
 }
 
-/* ── Desktop: navbar starts after 220px sidebar ── */
+/* ── Desktop: navbar starts at left: 0 ── */
 @media (min-width: 1024px) {
   .webapp-navbar {
-    left: 220px;
+    left: 0 !important;
     padding: 0 2rem;
     height: 64px;
-    background: #ffffff;             /* solid white — matches sidebar */
+    background: #ffffff;
     border-bottom: 1px solid var(--border-light);
-    border-left: 1px solid var(--border-light);  /* separator at sidebar edge */
     box-shadow: none;
     z-index: 2000;
   }
@@ -352,17 +351,16 @@
     max-width: 1200px;
   }
 
-  /* Hide the duplicate brand logo on desktop — sidebar handles brand identity */
+  /* Show the brand logo and name on desktop now that sidebar is gone */
   .navbar-logo-v3 {
-    display: none !important;
+    display: block !important;
   }
 
-  /* Hide the duplicate brand text on desktop — sidebar shows 'Passwala' */
   .brand-name-navy {
-    display: none !important;
+    display: block !important;
   }
 
-  /* Location takes full left slot on desktop */
+  /* Location takes normal slot next to brand */
   .brand-tagline-location {
     font-size: 0.9rem;
     font-weight: 600;

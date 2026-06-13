@@ -25,7 +25,32 @@ export const useLocation = () => {
 
     const autoDetectLocation = async () => {
       const savedLoc = localStorage.getItem('passwala_location');
-      if (savedLoc && savedLoc !== 'Detecting Location...' && savedLoc !== DEFAULT_LOCATION) return;
+      
+      // Check if permission is already granted
+      let hasPermission = false;
+      try {
+        if (navigator.permissions && navigator.permissions.query) {
+          const status = await navigator.permissions.query({ name: 'geolocation' });
+          if (status.state === 'granted') {
+            hasPermission = true;
+          }
+        }
+      } catch (e) {
+        console.warn('Permissions API query failed:', e);
+      }
+
+      // If they have manually chosen a specific non-mock location, and we don't have explicit permission, keep it.
+      // Otherwise, if it's a mock location (Ambawadi, Ahmedabad, etc.) or default, or if we have permission, auto-detect.
+      const isMockOrGeneric = !savedLoc || 
+                              savedLoc === 'Detecting Location...' || 
+                              savedLoc === DEFAULT_LOCATION || 
+                              savedLoc === 'Ahmedabad, Gujarat' || 
+                              savedLoc.includes('Ambawadi') || 
+                              savedLoc === 'India';
+
+      if (!isMockOrGeneric && !hasPermission) {
+        return;
+      }
 
       // Geolocation works on localhost even over HTTP (browsers treat localhost as secure).
       // On non-localhost (phone via local IP), GPS may be blocked by the browser — the
@@ -52,7 +77,7 @@ export const useLocation = () => {
                 if (area && city) {
                   const preUpdateLoc = localStorage.getItem('passwala_location');
                   if (!cancelled) updateLocation(`${area}, ${city}`);
-                  if (!cancelled && (!preUpdateLoc || preUpdateLoc === 'Detecting Location...' || preUpdateLoc === DEFAULT_LOCATION)) {
+                  if (!cancelled && (!preUpdateLoc || preUpdateLoc === 'Detecting Location...' || preUpdateLoc === DEFAULT_LOCATION || isMockOrGeneric)) {
                     toast.success(`Located: ${area}`, { icon: '📍', id: 'auto-geo' });
                   }
                   return;
@@ -84,29 +109,32 @@ export const useLocation = () => {
 
     const fetchIPLocation = async () => {
       try {
-        const baseUrl = import.meta.env.VITE_API_URL || '';
+        // Try fetching public geolocation directly from client browser first for real IP
+        const directRes = await fetch('https://freeipapi.com/api/json/');
+        if (directRes.ok) {
+          const data = await directRes.json();
+          if (data && data.cityName && data.regionName) {
+            const lat = data.latitude ? parseFloat(data.latitude) : 23.0225;
+            const lng = data.longitude ? parseFloat(data.longitude) : 72.5714;
+            if (!cancelled) {
+              updateLocation(`${data.cityName}, ${data.regionName}`);
+              updateCoords({ lat, lng });
+            }
+            return;
+          }
+        }
+      } catch (directErr) {
+        console.warn("Direct IP Geolocation failed, trying backend proxy:", directErr);
+      }
+
+      try {
+        const baseUrl = window.location.protocol === 'https:' ? '' : (import.meta.env.VITE_API_URL || '');
         const res = await fetch(`${baseUrl}/api/ip-location`);
         if (!res.ok) throw new Error('Proxied IP Location failed');
         
         const data = await res.json();
 
-        // 🔒 If server detected a local/private IP, it cannot geolocate us accurately.
-        // The server returns Ahmedabad defaults with isLocal:true.
-        // Only use these defaults — do NOT toast as if we detected real location.
-        if (data.isLocal) {
-          console.warn('⚠️ Local network: IP geo unavailable. Using default Ahmedabad coords.');
-          if (!cancelled) {
-            updateCoords({ lat: 23.0225, lng: 72.5714 });
-            // Only set location if nothing is stored yet
-            const existing = localStorage.getItem('passwala_location');
-            if (!existing || existing === DEFAULT_LOCATION || existing === 'Detecting Location...') {
-              updateLocation('Ahmedabad, Gujarat');
-            }
-          }
-          return;
-        }
-
-        if (data && data.cityName && data.regionName) {
+        if (data && !data.isLocal && data.cityName && data.regionName) {
           const lat = data.latitude ? parseFloat(data.latitude) : 23.0225;
           const lng = data.longitude ? parseFloat(data.longitude) : 72.5714;
 
@@ -114,9 +142,11 @@ export const useLocation = () => {
           if (data.latitude && data.longitude) {
             if (!cancelled) updateCoords({ lat, lng });
           }
+        } else {
+          throw new Error('IP failed or is local');
         }
       } catch (e) {
-        console.warn('Proxied IP Location fallbacks failed, keeping default location');
+        console.warn('IP Location fallbacks failed, keeping default location');
         if (!cancelled) {
           updateCoords({ lat: 23.0225, lng: 72.5714 });
           updateLocation('Ahmedabad, Gujarat');

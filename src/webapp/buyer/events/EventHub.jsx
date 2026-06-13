@@ -1,74 +1,136 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Calendar, MapPin, Tag } from 'lucide-react';
+import { Search, Calendar, History, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { supabase } from '../../../supabase';
 import './EventHub.css';
 
 const CATEGORIES = [
-  'All', 'Music Concerts', 'Comedy Shows', 'College Programs', 
-  'School Functions', 'Business Seminars', 'Workshops', 
-  'Live Shows', 'Sports Events', 'Festival Events'
+  'All',
+  'Music & Concerts',
+  'Comedy & Theatre',
+  'Workshops & Classes',
+  'Parties & Nightlife',
+  'Festivals & Fairs',
+  'Sports & Fitness',
+  'Corporate & Business',
 ];
+
+const PAGE_SIZE = 12;
+const BASE_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+const FALLBACK_IMG = 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=400&q=80';
 
 const EventHub = () => {
   const navigate = useNavigate();
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [allEvents, setAllEvents]     = useState([]);
+  const [loading, setLoading]         = useState(true);
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [timeFilter, setTimeFilter]   = useState('upcoming');
+  const [page, setPage]               = useState(1);
+  const abortRef    = useRef(null);
+  const refreshRef  = useRef(null);
 
-  const fetchEvents = React.useCallback(async () => {
-    setLoading(true);
-    try {
-      const baseUrl = import.meta.env.VITE_API_URL || '';
-      const response = await fetch(`${baseUrl}/api/events/search?category=${activeCategory}&query=${searchQuery}`);
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
-      setEvents(data.events || []);
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to load events');
-    } finally {
-      setLoading(false);
-    }
-  }, [activeCategory, searchQuery]);
-
+  // Debounce search input by 400ms
   useEffect(() => {
-    // Add debounce for search query
-    const delayDebounceFn = setTimeout(() => {
-      fetchEvents();
-    }, 500);
-    return () => clearTimeout(delayDebounceFn);
+    const t = setTimeout(() => setDebouncedQuery(searchQuery), 400);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  // Reset page when filters change
+  useEffect(() => { setPage(1); }, [activeCategory, debouncedQuery, timeFilter]);
+
+  const fetchEvents = useCallback(async (silent = false) => {
+    // Cancel any in-flight request
+    if (abortRef.current) abortRef.current.abort();
+    abortRef.current = new AbortController();
+
+    if (!silent) setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        category: activeCategory,
+        query: debouncedQuery,
+        ...(timeFilter === 'past' ? { filter: 'past' } : {})
+      });
+      const res = await fetch(`${BASE_URL}/api/events/search?${params}`, {
+        signal: abortRef.current.signal
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setAllEvents(data.events || []);
+    } catch (err) {
+      if (err.name === 'AbortError') return; // intentional cancel — ignore
+      console.error(err);
+      if (!silent) toast.error('Failed to load events');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, [activeCategory, debouncedQuery, timeFilter]);
+
+  // Fetch on filter change
+  useEffect(() => { fetchEvents(false); }, [fetchEvents]);
+
+  // Realtime + 60s polling
+  useEffect(() => {
+    const channel = supabase
+      .channel('event-hub-seats')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'event_ticket_tiers' }, () => fetchEvents(true))
+      .subscribe();
+    refreshRef.current = setInterval(() => fetchEvents(true), 60000);
+    return () => { supabase.removeChannel(channel); clearInterval(refreshRef.current); };
   }, [fetchEvents]);
 
-  const formatDate = (dateString) => {
-    const options = { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-    return new Date(dateString).toLocaleDateString('en-IN', options);
-  };
+  const formatShortDate = (d) =>
+    new Date(d).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+
+  // Pagination slice
+  const totalPages  = Math.ceil(allEvents.length / PAGE_SIZE);
+  const visibleEvts = allEvents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
-    <div className="event-hub-container">
-      <div className="eh-header">
-        <h2>Ahmedabad Events</h2>
-      </div>
-
-      <div className="eh-search-container">
-        <div className="eh-search-bar">
-          <Search size={20} className="text-gray-400" />
-          <input 
-            type="text" 
-            placeholder="Search events, concerts, workshops..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+    <div className="eh-root">
+      {/* ── Top Header ── */}
+      <div className="eh-topbar">
+        <h2 className="eh-heading">Events Near You</h2>
+        <div className="eh-time-toggle">
+          <button
+            className={`eh-toggle-btn ${timeFilter === 'upcoming' ? 'active' : ''}`}
+            onClick={() => setTimeFilter('upcoming')}
+          >
+            <Calendar size={14} /> Upcoming
+          </button>
+          <button
+            className={`eh-toggle-btn ${timeFilter === 'past' ? 'active-past' : ''}`}
+            onClick={() => setTimeFilter('past')}
+          >
+            <History size={14} /> Past
+          </button>
         </div>
       </div>
 
-      <div className="eh-categories-scroll">
+      {/* ── Search ── */}
+      <div className="eh-search-wrap">
+        <div className="eh-search-bar">
+          <Search size={18} className="eh-search-icon" />
+          <input
+            type="text"
+            placeholder="Search events, concerts, workshops..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button className="eh-search-clear" onClick={() => setSearchQuery('')}>✕</button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Category Chips ── */}
+      <div className="eh-cats">
         {CATEGORIES.map(cat => (
-          <button 
-            key={cat} 
-            className={`eh-category-chip ${activeCategory === cat ? 'active' : ''}`}
+          <button
+            key={cat}
+            className={`eh-cat-chip ${activeCategory === cat ? 'active' : ''}`}
             onClick={() => setActiveCategory(cat)}
           >
             {cat}
@@ -76,55 +138,122 @@ const EventHub = () => {
         ))}
       </div>
 
-      <div className="eh-events-list">
-        {loading ? (
-          <div className="eh-loading">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary"></div>
-          </div>
-        ) : events.length === 0 ? (
-          <div className="eh-empty-state">
-            <Calendar size={48} className="text-gray-300 mb-4" />
-            <p>No events found for this category or search.</p>
-          </div>
-        ) : (
-          events.map(event => (
-            <div key={event.id} className="eh-event-card" onClick={() => navigate(`/events/${event.id}`)}>
-              <div className="eh-event-banner-container">
-                <img src={event.banner_url || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&q=80'} alt={event.title} className="eh-event-banner" />
-                {event.status === 'SOLD_OUT' && (
-                  <div className="eh-sold-out-badge">SOLD OUT</div>
-                )}
-                <div className="eh-category-badge">{event.category}</div>
-              </div>
-              
-              <div className="eh-event-content">
-                <h3 className="eh-event-title">{event.title}</h3>
-                
-                <div className="eh-event-meta">
-                  <div className="eh-meta-item">
-                    <Calendar size={16} />
-                    <span>{formatDate(event.event_date)}</span>
-                  </div>
-                  <div className="eh-meta-item">
-                    <MapPin size={16} />
-                    <span className="truncate">{event.venue_name}</span>
-                  </div>
-                </div>
+      {/* ── Result count ── */}
+      {!loading && allEvents.length > 0 && (
+        <p className="eh-result-count">
+          {allEvents.length} event{allEvents.length !== 1 ? 's' : ''} found
+          {activeCategory !== 'All' ? ` in "${activeCategory}"` : ''}
+        </p>
+      )}
 
-                <div className="eh-event-footer">
-                  <div className="eh-price-start">
-                    <span className="eh-price-label">Starts from</span>
-                    <span className="eh-price-amount">
-                      ₹{event.event_ticket_tiers?.length ? Math.min(...event.event_ticket_tiers.map(t => t.price)) : 0}
-                    </span>
+      {/* ── Event Grid ── */}
+      {loading ? (
+        <div className="eh-loader">
+          <div className="eh-spinner" />
+          <p>Loading events...</p>
+        </div>
+      ) : allEvents.length === 0 ? (
+        <div className="eh-empty">
+          <Calendar size={52} color="#ffe4cc" />
+          <p>No {timeFilter === 'past' ? 'past' : 'upcoming'} events found{activeCategory !== 'All' ? ` in "${activeCategory}"` : ''}.</p>
+          {activeCategory !== 'All' && (
+            <button className="eh-reset-btn" onClick={() => setActiveCategory('All')}>Show all events</button>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="eh-grid">
+            {visibleEvts.map(event => {
+              const tiers     = event.event_ticket_tiers || [];
+              const minPrice  = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : null;
+              const totalSeats = tiers.reduce((s, t) => s + (t.available_seats || 0), 0);
+              const totalCap   = tiers.reduce((s, t) => s + (t.total_seats || 0), 0);
+              const pct        = totalCap > 0 ? (totalSeats / totalCap) * 100 : 100;
+              const isSoldOut  = event.status === 'SOLD_OUT' || totalSeats === 0;
+              // Filter out "Other Events" category label
+              const categoryLabel = (event.category && event.category !== 'Other Events') ? event.category : null;
+
+              return (
+                <div
+                  key={event.id}
+                  className="eh-card"
+                  onClick={() => navigate(`/events/${event.id}`)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && navigate(`/events/${event.id}`)}
+                >
+                  {/* Poster */}
+                  <div className="eh-card-img-wrap">
+                    <img
+                      src={event.banner_url || FALLBACK_IMG}
+                      alt={event.title}
+                      className="eh-card-img"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = FALLBACK_IMG;
+                      }}
+                    />
+                    <div className="eh-date-badge">{formatShortDate(event.event_date)}</div>
+                    {isSoldOut && <div className="eh-soldout-ribbon">SOLD OUT</div>}
+                    {timeFilter === 'past' && <div className="eh-past-badge"><Clock size={10} /> PAST</div>}
                   </div>
-                  <button className="eh-book-btn">Book Now</button>
+
+                  {/* Info */}
+                  <div className="eh-card-info">
+                    <h3 className="eh-card-title">{event.title}</h3>
+                    <p className="eh-card-venue">
+                      {event.venue_name}{event.city ? `, ${event.city}` : ''}
+                    </p>
+                    {categoryLabel && <p className="eh-card-category">{categoryLabel}</p>}
+                    {minPrice !== null && (
+                      <p className="eh-card-price">₹{minPrice} onwards</p>
+                    )}
+                    {!isSoldOut && totalCap > 0 && (
+                      <div className="eh-avail-bar">
+                        <div
+                          className="eh-avail-fill"
+                          style={{ width: `${pct}%`, background: pct < 20 ? '#f59e0b' : '#22c55e' }}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
+              );
+            })}
+          </div>
+
+          {/* ── Pagination ── */}
+          {totalPages > 1 && (
+            <div className="eh-pagination">
+              <button
+                className="eh-page-btn"
+                disabled={page === 1}
+                onClick={() => { setPage(p => p - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              >
+                <ChevronLeft size={16} /> Prev
+              </button>
+              <div className="eh-page-nums">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+                  <button
+                    key={n}
+                    className={`eh-page-num ${n === page ? 'active' : ''}`}
+                    onClick={() => { setPage(n); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  >
+                    {n}
+                  </button>
+                ))}
               </div>
+              <button
+                className="eh-page-btn"
+                disabled={page === totalPages}
+                onClick={() => { setPage(p => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              >
+                Next <ChevronRight size={16} />
+              </button>
             </div>
-          ))
-        )}
-      </div>
+          )}
+        </>
+      )}
     </div>
   );
 };

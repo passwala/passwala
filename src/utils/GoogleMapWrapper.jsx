@@ -39,7 +39,10 @@ const GoogleMapWrapper = ({
       ]
     };
 
-    const map = new window.google.maps.Map(mapRef.current, mapOptions);
+    const map = new window.google.maps.Map(mapRef.current, {
+      ...mapOptions,
+      mapId: 'default' // required for AdvancedMarkerElement
+    });
     googleMapInstance.current = map;
 
     // Handle map click
@@ -54,6 +57,7 @@ const GoogleMapWrapper = ({
         window.google.maps.event.clearInstanceListeners(map);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded]);
 
   // Center/Zoom Update
@@ -75,22 +79,47 @@ const GoogleMapWrapper = ({
     markers.forEach(markerInfo => {
       if (!markerInfo.position || isNaN(markerInfo.position[0]) || isNaN(markerInfo.position[1])) return;
 
-      const markerOptions = {
-        position: { lat: markerInfo.position[0], lng: markerInfo.position[1] },
-        map: googleMapInstance.current,
-        title: markerInfo.title || '',
-      };
+      const position = { lat: markerInfo.position[0], lng: markerInfo.position[1] };
 
-      // Custom SVG icon support
-      if (markerInfo.svgIcon) {
-        markerOptions.icon = {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerInfo.svgIcon),
-          scaledSize: new window.google.maps.Size(markerInfo.iconSize?.[0] || 32, markerInfo.iconSize?.[1] || 32),
-          anchor: markerInfo.iconAnchor ? new window.google.maps.Point(markerInfo.iconAnchor[0], markerInfo.iconAnchor[1]) : undefined
+      // Use AdvancedMarkerElement if available (modern API), fallback to legacy Marker
+      const AdvancedMarkerElement = window.google?.maps?.marker?.AdvancedMarkerElement;
+
+      let marker;
+      if (AdvancedMarkerElement) {
+        // Build custom pin element for SVG icons
+        let content;
+        if (markerInfo.svgIcon) {
+          const img = document.createElement('img');
+          img.src = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerInfo.svgIcon);
+          img.style.width = (markerInfo.iconSize?.[0] || 32) + 'px';
+          img.style.height = (markerInfo.iconSize?.[1] || 32) + 'px';
+          content = img;
+        }
+        marker = new AdvancedMarkerElement({
+          map: googleMapInstance.current,
+          position,
+          title: markerInfo.title || '',
+          ...(content ? { content } : {})
+        });
+      } else {
+        // Legacy Marker fallback
+        const markerOptions = {
+          position,
+          map: googleMapInstance.current,
+          title: markerInfo.title || '',
         };
+        if (markerInfo.svgIcon) {
+          markerOptions.icon = {
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerInfo.svgIcon),
+            // eslint-disable-next-line no-undef
+            scaledSize: new window.google.maps.Size(markerInfo.iconSize?.[0] || 32, markerInfo.iconSize?.[1] || 32),
+            anchor: markerInfo.iconAnchor
+              ? new window.google.maps.Point(markerInfo.iconAnchor[0], markerInfo.iconAnchor[1])
+              : undefined
+          };
+        }
+        marker = new window.google.maps.Marker(markerOptions); // eslint-disable-line
       }
-
-      const marker = new window.google.maps.Marker(markerOptions);
 
       if (markerInfo.title) {
         const infoWindow = new window.google.maps.InfoWindow({
@@ -179,12 +208,25 @@ const GoogleMapWrapper = ({
     }
   }, [fitBoundsPoints, isLoaded]);
 
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+  const keyMissing = !apiKey || apiKey.includes('YOUR_');
+
+  if (keyMissing) {
+    return (
+      <div style={{ ...style, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', borderRadius: 12, flexDirection: 'column', gap: 8 }}>
+        <span style={{ fontSize: 28 }}>🗺️</span>
+        <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>Map preview unavailable</span>
+        <span style={{ color: '#94a3b8', fontSize: 11 }}>Add VITE_GOOGLE_MAPS_API_KEY to .env</span>
+      </div>
+    );
+  }
+
   if (!isLoaded) {
     return (
       <div style={{ ...style, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', color: '#64748b' }}>
         <div className="flex flex-col items-center gap-2">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#ff6b00]"></div>
-          <span className="text-sm font-semibold">Loading Google Maps...</span>
+          <span className="text-sm font-semibold">Loading map...</span>
         </div>
       </div>
     );

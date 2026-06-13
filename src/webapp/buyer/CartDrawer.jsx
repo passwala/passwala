@@ -124,34 +124,6 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
     let resolvedAddressId = userAddress?.id;
 
     try {
-      // 0. Stock Verification: Verify that all physical products in the cart have enough stock in database
-      const productItems = cartItems.filter(item => item.type !== 'service');
-      if (productItems.length > 0) {
-        const productIds = productItems.map(item => item.id);
-        const { data: dbProducts, error: dbProdError } = await supabase
-          .from('products')
-          .select('id, name, stock_quantity')
-          .in('id', productIds);
-
-        if (!dbProdError && dbProducts) {
-          const productStockMap = {};
-          dbProducts.forEach(p => {
-            productStockMap[p.id] = p.stock_quantity;
-          });
-
-          for (const item of productItems) {
-            const currentStock = productStockMap[item.id];
-            if (currentStock !== undefined && currentStock !== null) {
-              if (currentStock < (item.qty || 1)) {
-                toast.error(`Out of Stock: Only ${currentStock} units of "${item.name}" are available.`);
-                setIsPlacingOrder(false);
-                setShowConfirm(false);
-                return;
-              }
-            }
-          }
-        }
-      }
 
       // 1. Resolve User ID (UUID) from Supabase if not a valid UUID
       if (!resolvedUserId && userObj) {
@@ -577,31 +549,6 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
              console.warn("Order items save error:", itemError);
              throw new Error(`Failed to save items: ${itemError.message || itemError}`);
            }
-
-           // Decrement stock in products table for physical products
-           for (const item of items) {
-             if (item.type !== 'service' && typeof item.id === 'string' && item.id.length === 36) {
-               try {
-                 const { data: prodData } = await supabase
-                   .from('products')
-                   .select('stock_quantity')
-                   .eq('id', item.id)
-                   .maybeSingle();
-                 
-                 if (prodData) {
-                   const newStock = Math.max(0, (prodData.stock_quantity || 0) - (item.qty || 1));
-                   await supabase
-                     .from('products')
-                     .update({ stock_quantity: newStock })
-                     .eq('id', item.id);
-                 }
-               } catch (stockErr) {
-                 console.warn("Could not decrement stock for item:", item.name, stockErr);
-               }
-             }
-           }
-
-
 
           // Insert into service_bookings table for service items
           for (const item of items) {

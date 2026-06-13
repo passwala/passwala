@@ -39,6 +39,7 @@ const ALLOWED_ADMIN_TABLES = [
   'service_areas',
   'events',
   'event_bookings',
+  'event_ticket_tiers',
   'city_routes',
   'city_vehicles',
   'ticket_bookings'
@@ -308,6 +309,13 @@ router.get('/stats', async (req, res) => {
         const { count: vendorCount } = await supabase.from('vendors').select('*', { count: 'exact', head: true });
         const { count: orderCount } = await supabase.from('orders').select('*', { count: 'exact', head: true });
         const { count: productCount } = await supabase.from('products').select('*', { count: 'exact', head: true });
+        const { count: serviceCount } = await supabase.from('services').select('*', { count: 'exact', head: true });
+
+        // Calculate pending approvals (apps) from unverified vendors, riders, and service providers
+        const { count: unverifiedVendors } = await supabase.from('vendors').select('*', { count: 'exact', head: true }).eq('is_verified', false);
+        const { count: unverifiedRiders } = await supabase.from('riders').select('*', { count: 'exact', head: true }).eq('is_verified', false);
+        const { count: unverifiedProviders } = await supabase.from('service_providers').select('*', { count: 'exact', head: true }).eq('is_verified', false);
+        const pendingApprovals = (unverifiedVendors || 0) + (unverifiedRiders || 0) + (unverifiedProviders || 0);
 
         // Calculate real revenue and order stats
         const { data: allOrders } = await supabase
@@ -424,6 +432,8 @@ router.get('/stats', async (req, res) => {
                 vendors: vendorCount || 0,
                 orders: orderCount || 0,
                 activeItems: productCount || 0,
+                services: serviceCount || 0,
+                apps: pendingApprovals || 0,
                 totalRevenue,
                 ordersCompleted,
                 averageOrderValue,
@@ -747,6 +757,70 @@ router.post('/settings', async (req, res) => {
         res.status(200).json({ success: true, settings });
     } catch (error) {
         console.error('❌ Save Settings Error:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+
+// ══════════════════════════════════════════════════════════════════
+// EVENT APPROVAL ROUTES (Admin Only)
+// ══════════════════════════════════════════════════════════════════
+
+// GET /api/admin/events/pending — All events awaiting approval
+router.get('/events/pending', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('events')
+            .select('*, event_ticket_tiers(*)')
+            .eq('status', 'PENDING_APPROVAL')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        res.status(200).json({ success: true, events: data || [] });
+    } catch (error) {
+        console.error('❌ Pending Events Fetch Error:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/admin/events/approve — Approve event → status = UPCOMING
+router.post('/events/approve', async (req, res) => {
+    try {
+        const { id } = req.body;
+        if (!id) return res.status(400).json({ error: 'Event ID is required' });
+
+        const { data, error } = await supabase
+            .from('events')
+            .update({ status: 'UPCOMING' })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.status(200).json({ success: true, event: data });
+    } catch (error) {
+        console.error('❌ Event Approve Error:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/admin/events/reject — Reject event → status = REJECTED
+router.post('/events/reject', async (req, res) => {
+    try {
+        const { id, reason } = req.body;
+        if (!id) return res.status(400).json({ error: 'Event ID is required' });
+
+        const { data, error } = await supabase
+            .from('events')
+            .update({ status: 'REJECTED' })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.status(200).json({ success: true, event: data, reason });
+    } catch (error) {
+        console.error('❌ Event Reject Error:', error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });

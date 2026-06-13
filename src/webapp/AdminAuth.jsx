@@ -3,7 +3,9 @@ import { ShieldCheck, Lock } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import './Auth.css'; // Reusing styles
 
-const API_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+const API_URL = window.location.protocol === 'https:' 
+  ? '' 
+  : (import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3004`);
 
 const AdminAuth = ({ onAdminLogin }) => {
   const [adminCode, setAdminCode] = useState('');

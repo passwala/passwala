@@ -1,11 +1,25 @@
 import express from 'express';
 import supabase from '../supabase.js';
+import { userAuth } from './users.js';
 
 const router = express.Router();
 
-// Register a new rider
-router.post('/register', async (req, res) => {
+// Register a new rider (secured with userAuth)
+router.post('/register', userAuth, async (req, res) => {
   const { user_id, vehicle_no, license_no, id_proof } = req.body;
+
+  // Security check: Ensure users can only register themselves, unless they are admin
+  if (!req.isAdmin) {
+    const { data: dbUser } = await supabase
+      .from('users')
+      .select('uid')
+      .eq('id', user_id)
+      .maybeSingle();
+
+    if (!dbUser || dbUser.uid !== req.user.uid) {
+      return res.status(403).json({ success: false, error: 'Forbidden: You cannot register a rider profile for another user.' });
+    }
+  }
 
   try {
     // 1. Check if rider exists by user_id

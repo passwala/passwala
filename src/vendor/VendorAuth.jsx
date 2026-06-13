@@ -6,113 +6,237 @@ const VendorAuth = ({ onLogin }) => {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+  const [step, setStep] = useState('PHONE'); // 'PHONE' or 'OTP'
+  const [loginMethod, setLoginMethod] = useState('SMS'); // 'SMS' or 'WHATSAPP'
+  const [whatsappOtp, setWhatsappOtp] = useState('');
+  const [otpVal, setOtpVal] = useState('');
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     const clean = phone.replace(/\D/g, '');
-    if (clean.length !== 10) { toast.error('Enter a valid 10-digit number'); return; }
+    if (clean.length !== 10) {
+      toast.error('Enter a valid 10-digit mobile number');
+      return;
+    }
     setLoading(true);
-    toast.success('Welcome to Passwala Partner!');
-    onLogin(clean, { name: 'Vendor Partner' });
+    setLoginMethod('SMS');
+    setTimeout(() => {
+      setLoading(false);
+      toast.success('Welcome back to Passwala Partner!');
+      onLogin(clean, { name: 'Vendor Partner' });
+    }, 800);
+  };
+
+  const handleWhatsAppLogin = async (e) => {
+    if (e) e.preventDefault();
+    const clean = phone.replace(/\D/g, '');
+    if (clean.length !== 10) {
+      toast.error('Enter a valid 10-digit mobile number');
+      return;
+    }
+    setLoading(true);
+    try {
+      const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      const res = await fetch(`${BASE_API}/api/users/send-whatsapp-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: clean })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setLoginMethod('WHATSAPP');
+        setStep('OTP');
+        if (data.provider === 'mock' && data.otp) {
+          setWhatsappOtp(data.otp);
+          toast.success(`[MOCK WHATSAPP] OTP sent: ${data.otp}`, { duration: 8000 });
+        } else {
+          toast.success('OTP sent successfully via WhatsApp!');
+        }
+      } else {
+        toast.error(data.error || 'Failed to send WhatsApp OTP');
+      }
+    } catch (err) {
+      toast.error('Network error. Failed to send OTP.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e) => {
+    if (e) e.preventDefault();
+    if (otpVal.length !== 6) {
+      toast.error('Enter 6-digit OTP');
+      return;
+    }
+    setLoading(true);
+    try {
+      const clean = phone.replace(/\D/g, '');
+      const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      const res = await fetch(`${BASE_API}/api/users/verify-whatsapp-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: clean, otp: otpVal, role: 'VENDOR' })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success('Welcome back to Passwala Partner!');
+        onLogin(clean, { name: data.user.displayName || 'Vendor Partner' });
+      } else {
+        toast.error(data.error || 'Invalid OTP. Please try again.');
+      }
+    } catch (error) {
+      toast.error('Verification Failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const isValid = phone.length === 10;
 
   return (
-    <div className="va-page">
-
-      {/* ── DESKTOP LEFT ASIDE ── */}
-      <aside className="va-aside">
-        <div className="va-aside-glow1" />
-        <div className="va-aside-glow2" />
-        <div className="va-aside-dots" />
-
-        <div className="va-aside-brand">
-          <div className="va-aside-logo">
-            <img src="/logo.png" alt="" width={22} height={22} style={{objectFit:'contain'}} />
+    <div className="va-new-container">
+      {/* Left Form Panel */}
+      <div className="va-new-left">
+        <div className="va-new-form-wrapper">
+          {/* Brand Logo */}
+          <div className="va-new-brand">
+            <img src="/logo.png" alt="Passwala Logo" className="va-new-logo" />
+            <span className="va-new-brand-text">Passwala Business Suite</span>
           </div>
-          <div>
-            <p className="va-aside-bname">Passwala</p>
-            <p className="va-aside-btag">Partner Portal</p>
+
+          {/* Heading and Taglines */}
+          <div className="va-new-header">
+            <h1 className="va-new-title">
+              Grow Your Store, <br />
+              <span className="va-accent-text">Partner Portal</span>
+            </h1>
+            <p className="va-new-subtitle">
+              Welcome back, manage your business and orders efficiently today.
+            </p>
           </div>
-        </div>
 
-        <div className="va-aside-hero">
-          <div className="va-aside-chip">● For Vendors &amp; Experts</div>
-          <h1 className="va-aside-h1">
-            Run your store.<br/>
-            <span className="va-aside-orange">Grow faster.</span>
-          </h1>
-          <p className="va-aside-desc">Manage products, track orders, receive instant payouts and reach thousands of nearby customers.</p>
-        </div>
+          {step === 'PHONE' ? (
+            /* Login Form */
+            <form onSubmit={handleSubmit} className="va-new-form">
+              <div className="va-new-input-group">
+                <label className="va-new-label">Mobile Number</label>
+                <div className={`va-new-input-wrapper ${focused ? 'va-new-focused' : ''} ${isValid ? 'va-new-valid' : ''}`}>
+                  <span className="va-new-flag">🇮🇳</span>
+                  <span className="va-new-code">+91</span>
+                  <input
+                    type="tel"
+                    placeholder="Enter 10-digit number"
+                    maxLength={10}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                    onFocus={() => setFocused(true)}
+                    onBlur={() => setFocused(false)}
+                    className="va-new-input"
+                    autoFocus
+                  />
+                  {isValid && <span className="va-new-tick">✓</span>}
+                </div>
+              </div>
 
-        <div className="va-aside-pills">
-          {['📦 Inventory management','📊 Sales analytics','💸 Instant payouts','🛵 Live delivery tracking'].map(t => (
-            <div key={t} className="va-aside-pill">{t}</div>
-          ))}
-          <p className="va-aside-copy">© 2026 Passwala Technologies</p>
-        </div>
-      </aside>
+              {/* Remember Me and Need Help */}
+              <div className="va-new-options">
+                <label className="va-new-checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="va-new-checkbox"
+                  />
+                  <span>Remember me</span>
+                </label>
+                <span className="va-new-forgot" onClick={() => toast('Please contact Admin support to reset/recover partner details.')}>
+                  Need Help?
+                </span>
+              </div>
 
-      {/* ── MOBILE DARK HEADER ── */}
-      <div className="va-mob-header">
-        <div className="va-mob-glow1" /><div className="va-mob-glow2" />
-        <div className="va-mob-brand">
-          <div className="va-mob-logo">
-            <img src="/logo.png" alt="" width={24} height={24} style={{objectFit:'contain'}} />
-          </div>
-          <span className="va-mob-bname">Passwala Partner</span>
-        </div>
-        <div className="va-mob-headline">
-          <p className="va-mob-tagline">For Vendors &amp; Experts</p>
-          <h2 className="va-mob-title">Run your store. <span className="va-mob-orange">Grow faster.</span></h2>
+              {/* Submit Buttons */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+                <button
+                  type="button"
+                  onClick={handleWhatsAppLogin}
+                  disabled={loading}
+                  className="va-new-btn va-new-btn-active"
+                  style={{
+                    background: '#25D366',
+                    color: 'white',
+                    borderColor: '#25D366',
+                    boxShadow: '0 4px 12px rgba(37, 211, 102, 0.15)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  {loading && loginMethod === 'WHATSAPP' ? (
+                    <span className="va-new-spinner" style={{ borderColor: 'white', borderTopColor: 'transparent' }}></span>
+                  ) : (
+                    <>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                      Login via WhatsApp
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          ) : (
+            /* OTP Verification Form */
+            <form onSubmit={handleVerifyOtp} className="va-new-form" style={{ animation: 'fadeIn 0.3s ease' }}>
+              <div className="va-new-input-group">
+                <label className="va-new-label">Enter 6-digit OTP sent to WhatsApp</label>
+                <div className={`va-new-input-wrapper ${focused ? 'va-new-focused' : ''}`}>
+                  <input
+                    type="tel"
+                    placeholder="Enter 6-digit OTP"
+                    maxLength={6}
+                    value={otpVal}
+                    onChange={(e) => setOtpVal(e.target.value.replace(/\D/g, ''))}
+                    onFocus={() => setFocused(true)}
+                    onBlur={() => setFocused(false)}
+                    className="va-new-input"
+                    style={{ paddingLeft: '1rem', letterSpacing: '2px', textAlign: 'center', fontWeight: 'bold' }}
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', width: '100%', marginTop: '1.5rem' }}>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="va-new-btn va-new-btn-active"
+                  style={{ flex: 1 }}
+                >
+                  {loading ? <span className="va-new-spinner"></span> : 'Verify & Login'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStep('PHONE')}
+                  className="va-new-btn"
+                  style={{ flex: 1 }}
+                >
+                  Back
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
 
-      {/* ── FORM CARD ── */}
-      <div className="va-form-card">
-
-        {/* Desktop heading only */}
-        <div className="va-desk-head">
-          <div className="va-desk-logo">
-            <img src="/logo.png" alt="" width={28} height={28} style={{objectFit:'contain'}} />
-          </div>
-          <h2 className="va-desk-title">Sign in to Partner Portal</h2>
-          <p className="va-desk-sub">Enter your mobile number to continue</p>
+      {/* Right Illustration Panel */}
+      <div className="va-new-right">
+        <div className="va-illustration-card">
+          <img
+            src="/vendor_login_illustration.png"
+            alt="Vendor Portal Illustration"
+            className="va-illustration-image"
+          />
         </div>
-
-        {/* Mobile heading */}
-        <h3 className="va-mob-form-title">Sign in</h3>
-        <p className="va-mob-form-sub">Enter your 10-digit mobile number</p>
-
-        <label className="va-label">Mobile Number</label>
-        <form onSubmit={handleSubmit} className="va-form">
-          <div className={`va-field${focused?' va-f':''}${isValid?' va-ok':''}`}>
-            <span className="va-flag">🇮🇳</span>
-            <span className="va-code">+91</span>
-            <input
-              className="va-inp"
-              type="tel" placeholder="Enter 10-digit number"
-              maxLength={10} value={phone}
-              onChange={e => setPhone(e.target.value.replace(/\D/g,''))}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              autoFocus
-            />
-            {isValid && <span className="va-tick">✓</span>}
-          </div>
-          <button className={`va-btn${isValid?' va-btn-on':''}`} type="submit" disabled={!isValid||loading}>
-            {loading ? <><span className="loader-ring"/>Signing in…</> : <>Continue <span className="va-arr">→</span></>}
-          </button>
-        </form>
-
-        <div className="va-feats">
-          {[['📦','Products'],['📊','Analytics'],['💸','Payouts'],['🛵','Delivery']].map(([i,t])=>(
-            <div key={t} className="va-feat"><span>{i}</span><span className="va-feat-t">{t}</span></div>
-          ))}
-        </div>
-
-        <p className="va-terms">By continuing you agree to our <span className="va-lnk">Terms</span> &amp; <span className="va-lnk">Privacy Policy</span></p>
       </div>
     </div>
   );

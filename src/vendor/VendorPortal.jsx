@@ -30,7 +30,9 @@ import {
   ChevronRight,
   TrendingUp,
   Settings,
-  Layers
+  Layers,
+  Calendar,
+  Ticket
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { auth } from '../firebase';
@@ -159,13 +161,49 @@ const VendorPortal = ({ user, onLogout }) => {
 
       setStoreId(foundStoreId);
 
-      const { data: vendorOrders } = await supabase.from('orders').select('*').eq('store_id', foundStoreId);
-      const ordersList = vendorOrders || [];
+      let ordersList = [];
+      let pendingCount = 0;
+      let totalEarnings = 0;
+      let deliveredCount = 0;
 
-      const pendingList = ordersList.filter(o => o.status === 'PLACED' || o.status === 'PREPARING');
-      const deliveredToday = ordersList.filter(o => o.status === 'DELIVERED' && new Date(o.created_at) >= today);
+      if (businessType === 'event') {
+        const userId = vendorData?.user_id || user?.id;
+        const { data: bookings, error: bookingsError } = await supabase
+          .from('event_bookings')
+          .select(`
+            *,
+            events(created_by)
+          `);
+        
+        if (!bookingsError && bookings) {
+          const userBookings = bookings.filter(b => b.events?.created_by === userId);
+          ordersList = userBookings.map(b => ({
+            ...b,
+            created_at: b.created_at,
+            total_amount: b.total_amount,
+            status: b.status
+          }));
+          
+          // Total active tickets sold (CONFIRMED + COMPLETED)
+          const activeBookings = ordersList.filter(o => o.status === 'CONFIRMED' || o.status === 'COMPLETED');
+          pendingCount = activeBookings.length;
+          
+          // Total checked-in attendees (all COMPLETED bookings)
+          const checkedInAll = ordersList.filter(o => o.status === 'COMPLETED');
+          deliveredCount = checkedInAll.length;
 
-      const totalEarnings = deliveredToday.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+          // Total revenue from all non-CANCELLED bookings
+          totalEarnings = activeBookings.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+        }
+      } else {
+        const { data: vendorOrders } = await supabase.from('orders').select('*').eq('store_id', foundStoreId);
+        ordersList = vendorOrders || [];
+        const pendingList = ordersList.filter(o => o.status === 'PLACED' || o.status === 'PREPARING');
+        pendingCount = pendingList.length;
+        const deliveredToday = ordersList.filter(o => o.status === 'DELIVERED' && new Date(o.created_at) >= today);
+        deliveredCount = deliveredToday.length;
+        totalEarnings = deliveredToday.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+      }
 
       // Fetch Real Rating
       let realRating = 4.8;
@@ -203,7 +241,8 @@ const VendorPortal = ({ user, onLogout }) => {
       }
 
       ordersList.forEach(order => {
-        if (order.status === 'DELIVERED' && order.created_at) {
+        const isCompleted = businessType === 'event' ? order.status !== 'CANCELLED' : order.status === 'DELIVERED';
+        if (isCompleted && order.created_at) {
           const orderDate = new Date(order.created_at).toDateString();
           if (weeklyRevenueMap[orderDate]) {
             weeklyRevenueMap[orderDate].revenue += parseFloat(order.total_amount || 0);
@@ -217,9 +256,9 @@ const VendorPortal = ({ user, onLogout }) => {
       }));
 
       setStats({
-        pending: pendingList.length,
+        pending: pendingCount,
         earnings: totalEarnings,
-        orders: deliveredToday.length,
+        orders: deliveredCount,
         rating: realRating,
         weeklyData
       });
@@ -266,6 +305,16 @@ const VendorPortal = ({ user, onLogout }) => {
             playNotificationBeep();
           }
         })
+        // ✅ Watch event_bookings — updates "Checked In Today" live when QR is scanned
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'event_bookings'
+        }, (payload) => {
+          if (payload.new?.status === 'COMPLETED') {
+            fetchLiveStats(); // refresh stats immediately
+          }
+        })
         .subscribe();
 
       return () => {
@@ -310,6 +359,13 @@ const VendorPortal = ({ user, onLogout }) => {
       const isLocallyCompleted = localStorage.getItem('vProfileCompleted') === 'true';
 
       if (supabase) {
+        // Query users table first to get user role
+        const { data: userData } = await supabase
+          .from('users')
+          .select('role')
+          .eq('phone', phone)
+          .maybeSingle();
+
         // First check service_providers table (prioritize service providers)
         let { data, error } = await supabase
           .from('service_providers')
@@ -317,7 +373,7 @@ const VendorPortal = ({ user, onLogout }) => {
           .eq('phone', phone)
           .maybeSingle();
 
-        let detectedType = 'service';
+        let detectedType = userData?.role === 'EVENT_ORGANIZER' ? 'event' : 'service';
 
         // If not found in service_providers, check vendors
         if (!data && !error) {
@@ -341,7 +397,7 @@ const VendorPortal = ({ user, onLogout }) => {
           }
           error = vError;
         } else if (data) {
-          detectedType = 'service';
+          detectedType = userData?.role === 'EVENT_ORGANIZER' ? 'event' : 'service';
         }
 
         if (error && !isLocallyCompleted) throw error;
@@ -426,8 +482,8 @@ const VendorPortal = ({ user, onLogout }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'profile', label: 'My Profile', icon: User },
-    { id: 'inventory', label: businessType === 'shop' ? 'Products' : 'Services', icon: businessType === 'shop' ? Package : Wrench },
-    { id: 'orders', label: businessType === 'shop' ? 'Orders' : 'Bookings', icon: FileText },
+    { id: 'inventory', label: businessType === 'shop' ? 'Products' : businessType === 'event' ? 'Events' : 'Services', icon: businessType === 'shop' ? Package : businessType === 'event' ? Calendar : Wrench },
+    { id: 'orders', label: businessType === 'shop' ? 'Orders' : businessType === 'event' ? 'Ticket Sales' : 'Bookings', icon: FileText },
     { id: 'earnings', label: 'Earnings', icon: IndianRupee },
     { id: 'reviews', label: 'Reviews & Ratings', icon: Star },
     { id: 'notifications', label: 'Notifications', icon: Bell },
@@ -449,20 +505,20 @@ const VendorPortal = ({ user, onLogout }) => {
             <span className="v-hero-badge-text" style={{ color: 'white' }}>Verified Partner</span>
           </div>
           <h1>Good {new Date().getHours() < 12 ? 'Morning' : (new Date().getHours() < 18 ? 'Afternoon' : 'Evening')}, {vendorData?.name?.split(' ')[0] || 'Partner'}!</h1>
-          <p>Your {businessType === 'shop' ? 'store' : 'service'} is currently online and accepting {businessType === 'shop' ? 'orders' : 'bookings'}. Here's your performance snapshot for today.</p>
+          <p>{businessType === 'event' ? 'Your event organizer portal is active. Here\'s your ticket sales snapshot.' : `Your ${businessType === 'shop' ? 'store' : 'service'} is currently online and accepting ${businessType === 'shop' ? 'orders' : 'bookings'}. Here's your performance snapshot for today.`}</p>
           
           <div style={{ display: 'flex', gap: '1.25rem', marginTop: '2.5rem' }}>
             <button 
               onClick={() => setActiveTab('orders')}
               className="v-banner-btn-primary"
             >
-              View Active {businessType === 'shop' ? 'Orders' : 'Bookings'} <ChevronRight size={18} />
+              View {businessType === 'event' ? 'Ticket Sales' : businessType === 'shop' ? 'Active Orders' : 'Active Bookings'} <ChevronRight size={18} />
             </button>
             <button 
               onClick={() => setActiveTab('inventory')}
               className="v-banner-btn-outline"
             >
-              Manage {businessType === 'shop' ? 'Inventory' : 'Services'}
+              Manage {businessType === 'event' ? 'Events' : businessType === 'shop' ? 'Inventory' : 'Services'}
             </button>
           </div>
         </motion.div>
@@ -482,20 +538,20 @@ const VendorPortal = ({ user, onLogout }) => {
           transition={{ delay: 0.1 }}
         >
           <div className="v-stat-header">
-            <div className="v-stat-icon v-icon-orange">
-              <Clock size={24} />
+            <div className={`v-stat-icon ${businessType === 'event' ? 'v-icon-blue' : 'v-icon-orange'}`}>
+              {businessType === 'event' ? <Ticket size={24} /> : <Clock size={24} />}
             </div>
           </div>
           <div className="v-stat-body" style={{ marginTop: '1rem' }}>
-            <span className="v-stat-label">Live {businessType === 'shop' ? 'Orders' : 'Jobs'}</span>
+            <span className="v-stat-label">{businessType === 'event' ? 'Total Ticket Sales' : `Live ${businessType === 'shop' ? 'Orders' : 'Jobs'}`}</span>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '4px' }}>
               <span className="v-stat-value">{stats.pending}</span>
-              <span className="v-stat-trend" style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>active now</span>
+              <span className="v-stat-trend" style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>{businessType === 'event' ? 'tickets sold' : 'active now'}</span>
             </div>
           </div>
           <div className="v-stat-footer" style={{ marginTop: '1.5rem' }}>
             <div className="v-progress-bar" style={{ height: '6px', background: '#f1f5f9', borderRadius: '10px', overflow: 'hidden' }}>
-              <div className="v-progress-fill" style={{ height: '100%', width: '65%', background: '#f97316' }}></div>
+              <div className="v-progress-fill" style={{ height: '100%', width: '65%', background: businessType === 'event' ? '#3b82f6' : '#f97316' }}></div>
             </div>
           </div>
         </motion.div>
@@ -513,7 +569,7 @@ const VendorPortal = ({ user, onLogout }) => {
             </div>
           </div>
           <div className="v-stat-body" style={{ marginTop: '1rem' }}>
-            <span className="v-stat-label">Today's Revenue</span>
+            <span className="v-stat-label">{businessType === 'event' ? 'Total Revenue' : "Today's Revenue"}</span>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '4px' }}>
               <span className="v-stat-value">₹{stats.earnings}</span>
               <span className="v-stat-trend" style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>net earnings</span>
@@ -534,20 +590,20 @@ const VendorPortal = ({ user, onLogout }) => {
           transition={{ delay: 0.3 }}
         >
           <div className="v-stat-header">
-            <div className="v-stat-icon v-icon-blue">
-              <Star size={24} />
+            <div className={`v-stat-icon ${businessType === 'event' ? 'v-icon-green' : 'v-icon-blue'}`}>
+              {businessType === 'event' ? <CheckCircle size={24} /> : <Star size={24} />}
             </div>
           </div>
           <div className="v-stat-body" style={{ marginTop: '1rem' }}>
-            <span className="v-stat-label">{businessType === 'shop' ? 'Store Reputation' : 'Service Reputation'}</span>
+            <span className="v-stat-label">{businessType === 'event' ? 'Total Checked In' : (businessType === 'shop' ? 'Store Reputation' : 'Service Reputation')}</span>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '4px' }}>
-              <span className="v-stat-value">{stats.rating}</span>
-              <span className="v-stat-trend" style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>customer rating</span>
+              <span className="v-stat-value">{businessType === 'event' ? stats.orders : stats.rating}</span>
+              <span className="v-stat-trend" style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>{businessType === 'event' ? 'attendees' : 'customer rating'}</span>
             </div>
           </div>
           <div className="v-stat-footer" style={{ marginTop: '1.5rem' }}>
             <div className="v-progress-bar" style={{ height: '6px', background: '#f1f5f9', borderRadius: '10px', overflow: 'hidden' }}>
-              <div className="v-progress-fill" style={{ height: '100%', width: '96%', background: '#2563eb' }}></div>
+              <div className="v-progress-fill" style={{ height: '100%', width: '96%', background: businessType === 'event' ? '#16a34a' : '#2563eb' }}></div>
             </div>
           </div>
         </motion.div>
@@ -803,7 +859,8 @@ const VendorPortal = ({ user, onLogout }) => {
       license_no: resolvedVendor.license_no || savedForm.license_no || 'Pending Verification',
       id: resolvedVendor.id || savedForm.id || localStorage.getItem('vPartnerId') || '4289',
       lat: resolvedVendor.lat || savedForm.lat || '',
-      lng: resolvedVendor.lng || savedForm.lng || ''
+      lng: resolvedVendor.lng || savedForm.lng || '',
+      category: resolvedVendor.category || savedForm.category || ''
     };
     const currentData = isEditingProfile ? editFormData : effectiveData;
 
@@ -887,7 +944,7 @@ const VendorPortal = ({ user, onLogout }) => {
             <div>
               <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', marginBottom: '6px' }}>{currentData?.name || 'Partner Profile'}</h2>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <div className="v-status-badge" style={{ display: 'inline-flex' }}>{businessType === 'shop' ? 'Shop Owner' : 'Service Provider'}</div>
+                <div className="v-status-badge" style={{ display: 'inline-flex' }}>{businessType === 'shop' ? 'Shop Owner' : businessType === 'event' ? 'Event Organizer' : 'Service Provider'}</div>
                 <div className="v-status-badge" style={{ background: '#f1f5f9', color: '#64748b', borderColor: '#e2e8f0' }}>ID: {currentData?.id?.toString().slice(0, 8)}</div>
               </div>
             </div>
@@ -960,6 +1017,17 @@ const VendorPortal = ({ user, onLogout }) => {
                       <option value="Personal Care & Hygiene">Personal Care & Hygiene</option>
                       <option value="Household & Pet Care">Household & Pet Care</option>
                     </>
+                  ) : businessType === 'event' ? (
+                    <>
+                      <option value="Music & Concerts">Music & Concerts</option>
+                      <option value="Comedy & Theatre">Comedy & Theatre</option>
+                      <option value="Workshops & Classes">Workshops & Classes</option>
+                      <option value="Parties & Nightlife">Parties & Nightlife</option>
+                      <option value="Festivals & Fairs">Festivals & Fairs</option>
+                      <option value="Sports & Fitness">Sports & Fitness</option>
+                      <option value="Corporate & Business">Corporate & Business</option>
+                      <option value="Other Events">Other Events</option>
+                    </>
                   ) : (
                     <>
                       <option value="Plumbing Services">Plumbing Services</option>
@@ -971,7 +1039,7 @@ const VendorPortal = ({ user, onLogout }) => {
                     </>
                   )}
                 </select> :
-                <div className="v-input v-readonly" style={{ padding: '14px 18px', background: '#f8fafc', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>{currentData?.category || 'General Store'}</div>
+                <div className="v-input v-readonly" style={{ padding: '14px 18px', background: '#f8fafc', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>{currentData?.category || (businessType === 'shop' ? 'General Store' : (businessType === 'event' ? 'Music & Concerts' : 'Plumbing Services'))}</div>
               }
             </div>
 
@@ -1158,6 +1226,20 @@ const VendorPortal = ({ user, onLogout }) => {
                <h4 style={{ fontWeight: 850, margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>Professional</h4>
                <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>Offer your expertise and specialized services.</p>
             </motion.div>
+
+            <motion.div 
+               whileHover={{ scale: 1.02, y: -5 }}
+               whileTap={{ scale: 0.98 }}
+               className={`type-card ${businessType === 'event' ? 'active' : ''}`} 
+               onClick={() => setBusinessType('event')} 
+               style={{ padding: '2rem 1.5rem', textAlign: 'center', cursor: 'pointer', borderRadius: '24px', border: businessType === 'event' ? '2px solid var(--v-primary)' : '1.5px solid #e2e8f0', background: businessType === 'event' ? 'var(--v-primary-soft)' : 'white', transition: 'all 0.3s ease' }}
+            >
+                <div style={{ width: '64px', height: '64px', borderRadius: '18px', background: businessType === 'event' ? 'white' : '#f8fafc', margin: '0 auto 1.25rem auto', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: businessType === 'event' ? '0 10px 20px rgba(249, 115, 22, 0.1)' : 'none' }}>
+                  <Calendar size={32} color={businessType === 'event' ? '#f97316' : '#94a3b8'} />
+                </div>
+                <h4 style={{ fontWeight: 850, margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>Event Organizer</h4>
+                <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>Organize events, concerts and sell passes online.</p>
+            </motion.div>
           </div>
 
           <button 
@@ -1222,8 +1304,8 @@ const VendorPortal = ({ user, onLogout }) => {
             </div>
 
             <div className="v-form-group">
-              <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', marginBottom: '8px' }}>{businessType === 'shop' ? 'SHOP NAME' : 'SERVICE BRAND NAME'}</label>
-              <input type="text" placeholder={`E.g. ${businessType === 'shop' ? 'The Urban Grocery' : 'Master Cleaners'}`} className="v-input" style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)' }} value={formData.business_name} onChange={e => setFormData({...formData, business_name: e.target.value})} />
+              <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', marginBottom: '8px' }}>{businessType === 'shop' ? 'SHOP NAME' : businessType === 'event' ? 'EVENT AGENCY NAME' : 'SERVICE BRAND NAME'}</label>
+              <input type="text" placeholder={`E.g. ${businessType === 'shop' ? 'The Urban Grocery' : businessType === 'event' ? 'Star Events' : 'Master Cleaners'}`} className="v-input" style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)' }} value={formData.business_name} onChange={e => setFormData({...formData, business_name: e.target.value})} />
             </div>
 
             <div className="v-form-group">
@@ -1244,6 +1326,17 @@ const VendorPortal = ({ user, onLogout }) => {
                     <option value="Beverages & Munchies">Beverages & Munchies</option>
                     <option value="Personal Care & Hygiene">Personal Care & Hygiene</option>
                     <option value="Household & Pet Care">Household & Pet Care</option>
+                  </>
+                ) : businessType === 'event' ? (
+                  <>
+                    <option value="Music & Concerts">Music & Concerts</option>
+                    <option value="Comedy & Theatre">Comedy & Theatre</option>
+                    <option value="Workshops & Classes">Workshops & Classes</option>
+                    <option value="Parties & Nightlife">Parties & Nightlife</option>
+                    <option value="Festivals & Fairs">Festivals & Fairs</option>
+                    <option value="Sports & Fitness">Sports & Fitness</option>
+                    <option value="Corporate & Business">Corporate & Business</option>
+                    <option value="Other Events">Other Events</option>
                   </>
                 ) : (
                   <>
@@ -1415,8 +1508,8 @@ const VendorPortal = ({ user, onLogout }) => {
                 lat: finalLat,
                 lng: finalLng
               };
-              if (businessType === 'shop') {
-                tablePayload.category = formData.category || 'Grocery';
+              if (businessType === 'shop' || businessType === 'event') {
+                tablePayload.category = formData.category || (businessType === 'shop' ? 'Grocery' : 'Music & Concerts');
               }
 
               if (supabase) {
@@ -1427,9 +1520,9 @@ const VendorPortal = ({ user, onLogout }) => {
                     const { data: existingUser } = await supabase.from('users').select('id').eq('phone', currentPhone).maybeSingle();
                     if (existingUser) {
                       userId = existingUser.id;
-                      // Update existing user role to VENDOR or SERVICE_PROVIDER and set photo_url
+                      // Update existing user role and set photo_url
                       const userUpdatePayload = {
-                        role: businessType === 'shop' ? 'VENDOR' : 'SERVICE_PROVIDER'
+                        role: businessType === 'shop' ? 'VENDOR' : businessType === 'event' ? 'EVENT_ORGANIZER' : 'SERVICE_PROVIDER'
                       };
                       const localPhoto = localStorage.getItem('vProfileImage');
                       if (localPhoto) {
@@ -1441,7 +1534,7 @@ const VendorPortal = ({ user, onLogout }) => {
                       const userInsertPayload = {
                         phone: currentPhone,
                         full_name: formData.name,
-                        role: businessType === 'shop' ? 'VENDOR' : 'SERVICE_PROVIDER'
+                        role: businessType === 'shop' ? 'VENDOR' : businessType === 'event' ? 'EVENT_ORGANIZER' : 'SERVICE_PROVIDER'
                       };
                       const localPhoto = localStorage.getItem('vProfileImage');
                       if (localPhoto) {
@@ -1596,7 +1689,7 @@ const VendorPortal = ({ user, onLogout }) => {
               <img src="/logo.png" alt="Logo" className="v-sidebar-logo" />
             </div>
             <div className="v-brand-info">
-              <span className="v-brand-name">Passwala</span>
+              <span className="v-brand-name">Passwala Business Suite</span>
               <span className="v-brand-tag">PARTNER</span>
             </div>
           </div>
@@ -1649,13 +1742,13 @@ const VendorPortal = ({ user, onLogout }) => {
               <Menu size={20} />
             </button>
             <div className="v-status-badge">
-              <span>{businessType === 'shop' ? 'STORE ONLINE' : 'SERVICE ONLINE'}</span>
+              <span>{businessType === 'shop' ? 'STORE ONLINE' : businessType === 'event' ? 'EVENT PORTAL ACTIVE' : 'SERVICE ONLINE'}</span>
             </div>
           </div>
 
           <div className="v-top-right">
              <div className="v-user-info" style={{ textAlign: 'right' }}>
-               <span style={{ fontSize: '0.95rem', fontWeight: 850, color: '#0f172a' }}>{vendorData?.business_name || (businessType === 'shop' ? 'My Store' : 'My Service')}</span>
+               <span style={{ fontSize: '0.95rem', fontWeight: 850, color: '#0f172a' }}>{vendorData?.business_name || (businessType === 'shop' ? 'My Store' : businessType === 'event' ? 'My Events Agency' : 'My Service')}</span>
                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--v-text-muted)' }}>{vendorData?.id?.toString().slice(0, 10).toUpperCase()}</span>
              </div>
              <div className="v-avatar" style={{ width: '42px', height: '42px', borderRadius: '14px', background: 'linear-gradient(135deg, #f97316 0%, #ff8f3d 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', fontWeight: 900, boxShadow: '0 8px 20px rgba(249, 115, 22, 0.2)' }}>

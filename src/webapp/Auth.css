@@ -7,14 +7,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
 :root {
-  --auth-bg-dark: #ffffff; /* Switched to White Minimalist Theme */
+  --auth-bg-dark: #ffffff;
+  /* Switched to White Minimalist Theme */
   --auth-card-white: #ffffff;
   --auth-text-dark: #0f172a;
   --auth-text-sub: #475569;
   --auth-text-muted: #94a3b8;
   --auth-border: #e2e8f0;
   --auth-input-bg: #ffffff;
-  --auth-action-color: #ff7622; /* Vibrant Passwala Orange */
+  --auth-action-color: #ff7622;
+  /* Vibrant Passwala Orange */
   --auth-action-hover: #f5660f;
   --auth-card-shadow: 0 -15px 35px rgba(255, 118, 34, 0.05), 0 -15px 35px rgba(0, 0, 0, 0.05);
 }
@@ -34,151 +36,93 @@ body.auth-active {
   height: 100vh;
   height: 100dvh;
   width: 100vw;
+  background-color: #ffffff !important;
   display: flex;
-  justify-content: center;
-  align-items: center;
-  background: var(--auth-bg-dark); /* Very light subtle background */
+  flex-direction: column;
+  justify-content: flex-end;
   font-family: 'Plus Jakarta Sans', sans-serif;
-  z-index: 9999;
-  box-sizing: border-box;
   overflow: hidden;
 }
 
-body.dark-mode {
-  --auth-bg-dark: #0c0d12;
-  --auth-card-white: #12141c;
-  --auth-text-dark: #f5f6f9;
-  --auth-text-sub: #a3a7b5;
-  --auth-text-muted: #6f7485;
-  --auth-border: #222533;
-  --auth-input-bg: #1a1d29;
-  --auth-card-shadow: 0 -15px 35px rgba(0, 0, 0, 0.3);
-}
-
-/* Onboarding Desktop Wrapper Container */
 .auth-container {
-  width: 100%;
-  max-width: 440px;
-  height: 100%;
-  max-height: 920px;
-  background: var(--auth-card-white); /* Adapted Theme */
   display: flex;
   flex-direction: column;
+  height: 100%;
+  width: 100%;
   position: relative;
-  overflow: hidden;
-  box-shadow: 0 30px 70px rgba(0,0,0,0.15); /* Softened shadow */
+  justify-content: space-between;
+  background-color: #ffffff !important;
 }
 
-@media (min-width: 480px) {
-  .auth-container {
-    border-radius: 28px;
-    height: 95vh;
-    border: 4px solid #1a1a1a;
-  }
-}
-
-/* ==========================================================================
-   PART 1: THE DARK PROMO BANNER HEADER (TOP HALF)
-   ========================================================================== */
 .promo-header-section {
-  flex: 1.1; /* Takes slightly more space to accommodate floating 3D elements */
-  background: var(--auth-bg-dark);
   position: relative;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  padding: 4rem 1.5rem 1.5rem; /* Increased top padding to safely clear the back button */
+  justify-content: center;
+  padding: 8.5rem 1.5rem 1rem; /* Added generous padding to completely clear the logo */
+  box-sizing: border-box;
+  text-align: center;
   overflow: hidden;
+  background-color: #ffffff !important;
 }
 
-/* Slide Transition Animations */
 .slide-content-wrapper {
-  width: 100%;
-  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-around;
-  text-align: center;
-  position: relative;
-  animation: slideFadeIn 0.5s ease-out;
+  justify-content: center;
+  width: 100%;
+  animation: slideFadeIn 0.5s ease;
 }
 
 @keyframes slideFadeIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .promo-title-banner {
-  font-size: 1.85rem;
-  font-weight: 850;
+  font-size: 1.45rem;
+  font-weight: 800;
   color: var(--auth-text-dark);
-  margin: 0 0 1rem;
-  letter-spacing: -0.8px;
-  line-height: 1.25;
-  text-transform: uppercase;
-  max-width: 100%;
-  padding: 0 1rem; /* Standard minimal padding, full width usage */
-  text-shadow: none;
+  margin: 1rem 0 1.5rem; /* Margin spacing */
+  padding: 0 1rem;
+  line-height: 1.35;
+  letter-spacing: -0.5px;
 }
 
-/* Stage Area for Floating Elements */
 .floating-stage {
-  position: relative;
   width: 100%;
-  flex: 1;
-  min-height: 100px;
-  max-height: 240px;
+  height: 160px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 10px 0;
+  position: relative;
 }
 
 .slide-premium-img {
-  width: 100%;
-  height: 100%;
   max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
-  mix-blend-mode: multiply; /* THIS MAKES THE WHITE BACKGROUND 100% TRANSPARENT */
-  filter: contrast(1.15) brightness(1.05); /* Pushes off-white pixels to pure white so they disappear */
-  animation: floatIllustration 4s ease-in-out infinite;
-  transform-origin: center bottom;
-}
-
-@keyframes floatIllustration {
-  0%, 100% {
-    transform: translateY(0) scale(1.15); /* Moderated scale to prevent overlap */
-  }
-  50% {
-    transform: translateY(-8px) scale(1.18);
-  }
-}
-
-/* 3D Wax Seal Badge (CSS High Fidelity representation) */
-.wax-seal-badge {
-  position: relative;
-  width: 96px;
-  height: 96px;
-  background: radial-gradient(circle at 35% 35%, #ff833b 0%, #e04a00 100%);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-  animation: float-seal 3.5s ease-in-out infinite;
-  box-shadow: 
-    0 15px 35px rgba(224, 74, 0, 0.45),
-    inset 0 3px 5px rgba(255, 255, 255, 0.5),
-    inset 0 -8px 15px rgba(0, 0, 0, 0.35);
+  filter: brightness(1.15) contrast(1.15) drop-shadow(0 15px 30px rgba(0, 0, 0, 0.06));
+  mix-blend-mode: multiply;
 }
 
 /* Scalloped physical details for 3D wax look */
 .wax-seal-badge::before {
   content: '';
   position: absolute;
-  top: -8px; left: -8px; right: -8px; bottom: -8px;
+  top: -8px;
+  left: -8px;
+  right: -8px;
+  bottom: -8px;
   border-radius: 50%;
   border: 10px dashed #e04a00;
   opacity: 0.85;
@@ -189,7 +133,10 @@ body.dark-mode {
 .wax-seal-badge::after {
   content: '';
   position: absolute;
-  top: -4px; left: -4px; right: -4px; bottom: -4px;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
   border-radius: 50%;
   border: 6px dashed #ff833b;
   opacity: 0.5;
@@ -220,26 +167,40 @@ body.dark-mode {
 /* Variant Themes for Slides */
 .wax-seal-badge.expert {
   background: radial-gradient(circle at 35% 35%, #468dfa 0%, #1c4fd1 100%);
-  box-shadow: 
+  box-shadow:
     0 15px 35px rgba(28, 79, 209, 0.45),
     inset 0 3px 5px rgba(255, 255, 255, 0.5),
     inset 0 -8px 15px rgba(0, 0, 0, 0.35);
 }
-.wax-seal-badge.expert::before { border-color: #1c4fd1; }
-.wax-seal-badge.expert::after { border-color: #468dfa; }
+
+.wax-seal-badge.expert::before {
+  border-color: #1c4fd1;
+}
+
+.wax-seal-badge.expert::after {
+  border-color: #468dfa;
+}
+
 .wax-seal-badge.expert .wax-seal-inner {
   background: radial-gradient(circle at 35% 35%, #1c4fd1 0%, #123696 100%);
 }
 
 .wax-seal-badge.delivery {
   background: radial-gradient(circle at 35% 35%, #9d62ff 0%, #5d17db 100%);
-  box-shadow: 
+  box-shadow:
     0 15px 35px rgba(93, 23, 219, 0.45),
     inset 0 3px 5px rgba(255, 255, 255, 0.5),
     inset 0 -8px 15px rgba(0, 0, 0, 0.35);
 }
-.wax-seal-badge.delivery::before { border-color: #5d17db; }
-.wax-seal-badge.delivery::after { border-color: #9d62ff; }
+
+.wax-seal-badge.delivery::before {
+  border-color: #5d17db;
+}
+
+.wax-seal-badge.delivery::after {
+  border-color: #9d62ff;
+}
+
 .wax-seal-badge.delivery .wax-seal-inner {
   background: radial-gradient(circle at 35% 35%, #5d17db 0%, #3a009c 100%);
 }
@@ -251,11 +212,11 @@ body.dark-mode {
   height: 48px;
   border-radius: 50%;
   background: radial-gradient(circle at 30% 30%, #e2e8f0 0%, #94a3b8 100%);
-  border: 1px solid rgba(255,255,255,0.4);
-  box-shadow: 
-    0 10px 20px rgba(0,0,0,0.35),
-    inset 0 2px 3px rgba(255,255,255,0.6),
-    inset 0 -4px 8px rgba(0,0,0,0.3);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow:
+    0 10px 20px rgba(0, 0, 0, 0.35),
+    inset 0 2px 3px rgba(255, 255, 255, 0.6),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -266,7 +227,7 @@ body.dark-mode {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  border: 1.5px dashed rgba(0,0,0,0.15);
+  border: 1.5px dashed rgba(0, 0, 0, 0.15);
   background: transparent;
 }
 
@@ -284,18 +245,18 @@ body.dark-mode {
   z-index: 5;
   animation: float-coin-right 4.5s ease-in-out infinite;
   background: radial-gradient(circle at 30% 30%, #94cbfd 0%, #3b82f6 100%);
-  box-shadow: 
+  box-shadow:
     0 10px 20px rgba(59, 130, 246, 0.3),
-    inset 0 2px 3px rgba(255,255,255,0.6),
-    inset 0 -4px 8px rgba(0,0,0,0.3);
+    inset 0 2px 3px rgba(255, 255, 255, 0.6),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.3);
 }
 
 .coin-element.coin-gold {
   background: radial-gradient(circle at 30% 30%, #fef08a 0%, #ca8a04 100%);
-  box-shadow: 
+  box-shadow:
     0 10px 20px rgba(202, 138, 4, 0.35),
-    inset 0 2px 3px rgba(255,255,255,0.6),
-    inset 0 -4px 8px rgba(0,0,0,0.3);
+    inset 0 2px 3px rgba(255, 255, 255, 0.6),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.3);
 }
 
 /* Tiny Confetti ribbons floating */
@@ -309,13 +270,15 @@ body.dark-mode {
 }
 
 .confetti-element.c1 {
-  left: 10%; top: 110px;
+  left: 10%;
+  top: 110px;
   transform: rotate(35deg);
   animation: float-coin-left 5s ease-in-out infinite;
 }
 
 .confetti-element.c2 {
-  right: 12%; top: 120px;
+  right: 12%;
+  top: 120px;
   transform: rotate(-25deg);
   background: #ff7622;
   animation: float-coin-right 5.2s ease-in-out infinite;
@@ -333,7 +296,8 @@ body.dark-mode {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.15); /* Changed for white theme visibility */
+  background: rgba(0, 0, 0, 0.15);
+  /* Changed for white theme visibility */
   transition: all 0.3s ease;
   cursor: pointer;
 }
@@ -341,26 +305,51 @@ body.dark-mode {
 .promo-dot.active {
   width: 18px;
   border-radius: 10px;
-  background: var(--auth-action-color); /* Matches premium Passwala Orange */
+  background: var(--auth-action-color);
+  /* Matches premium Passwala Orange */
 }
 
 /* Animations declarations */
 @keyframes float-seal {
-  0% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-10px) rotate(2deg); }
-  100% { transform: translateY(0) rotate(0deg); }
+  0% {
+    transform: translateY(0) rotate(0deg);
+  }
+
+  50% {
+    transform: translateY(-10px) rotate(2deg);
+  }
+
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
 }
 
 @keyframes float-coin-left {
-  0% { transform: translateY(0) rotate(-15deg) scale(0.9); }
-  50% { transform: translateY(-8px) rotate(-10deg) scale(0.93); }
-  100% { transform: translateY(0) rotate(-15deg) scale(0.9); }
+  0% {
+    transform: translateY(0) rotate(-15deg) scale(0.9);
+  }
+
+  50% {
+    transform: translateY(-8px) rotate(-10deg) scale(0.93);
+  }
+
+  100% {
+    transform: translateY(0) rotate(-15deg) scale(0.9);
+  }
 }
 
 @keyframes float-coin-right {
-  0% { transform: translateY(0) rotate(12deg) scale(1.05); }
-  50% { transform: translateY(-14px) rotate(22deg) scale(1.1); }
-  100% { transform: translateY(0) rotate(12deg) scale(1.05); }
+  0% {
+    transform: translateY(0) rotate(12deg) scale(1.05);
+  }
+
+  50% {
+    transform: translateY(-14px) rotate(22deg) scale(1.1);
+  }
+
+  100% {
+    transform: translateY(0) rotate(12deg) scale(1.05);
+  }
 }
 
 
@@ -377,19 +366,29 @@ body.dark-mode {
   z-index: 15;
   animation: slideUpCard 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   overflow-y: auto;
-  
+
   /* Hide scrollbar for a native app feel */
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }
 
 .form-content-sheet::-webkit-scrollbar {
-  display: none; /* Chrome, Safari and Opera */
+  display: none;
+  /* Chrome, Safari and Opera */
 }
 
 @keyframes slideUpCard {
-  from { transform: translateY(100px); opacity: 0.5; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(100px);
+    opacity: 0.5;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .sheet-title {
@@ -423,7 +422,7 @@ body.dark-mode {
   cursor: pointer;
   transition: all 0.2s ease;
   user-select: none;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 .country-selector-box:hover {
@@ -442,7 +441,7 @@ body.dark-mode {
   height: 54px;
   padding: 0 1rem;
   transition: all 0.2s ease;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 .phone-field-box:focus-within {
@@ -560,7 +559,8 @@ body.dark-mode {
   margin: 1.5rem 0;
 }
 
-.premium-divider::before, .premium-divider::after {
+.premium-divider::before,
+.premium-divider::after {
   content: '';
   flex: 1;
   height: 1px;
@@ -586,13 +586,13 @@ body.dark-mode {
   justify-content: center;
   cursor: pointer;
   transition: all 0.25s ease;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
 }
 
 .circle-social-btn:hover {
   border-color: #cbd5e1;
   transform: scale(1.06);
-  box-shadow: 0 6px 12px rgba(0,0,0,0.06);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.06);
 }
 
 .circle-social-btn:active {
@@ -722,8 +722,13 @@ body.dark-mode {
 }
 
 @keyframes spinRotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Back navigation button */
@@ -735,8 +740,8 @@ body.dark-mode {
 }
 
 .auth-back-btn {
-  background: rgba(0,0,0,0.4);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: #ffffff;
   width: 40px;
   height: 40px;
@@ -750,7 +755,7 @@ body.dark-mode {
 }
 
 .auth-back-btn:hover {
-  background: rgba(255,255,255,0.15);
+  background: rgba(255, 255, 255, 0.15);
   transform: scale(1.05);
 }
 
@@ -760,7 +765,7 @@ body.dark-mode {
     height: 100vh;
     height: 100dvh;
   }
-  
+
   .auth-container {
     height: 100%;
     height: 100dvh;
@@ -770,57 +775,70 @@ body.dark-mode {
     flex-direction: column;
     justify-content: space-between;
   }
-  
+
   .promo-header-section {
-    flex: 1 !important; /* Expands dynamically to occupy all remaining top space */
-    padding: 4rem 1rem 0.75rem; /* Increased top padding to clear absolute back button */
+    flex: 1 !important;
+    /* Expands dynamically to occupy all remaining top space */
+    padding: 7rem 1rem 0.5rem;
+    /* Increased top padding to clear the 80px centered brand logo */
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
   }
-  
-  .promo-title-banner {
-    font-size: 1.3rem !important; /* Scale typography elegantly */
-    margin: 0 0 0.5rem;
-    padding: 0 1rem !important; /* Free up width for the text */
+
+  .slide-content-wrapper {
+    justify-content: center !important;
+    gap: 1rem !important;
+    padding-top: 1.5rem;
   }
-  
+
+  .promo-title-banner {
+    font-size: 1.3rem !important;
+    /* Scale typography elegantly */
+    margin: 0 0 0.5rem;
+    padding: 0 1rem !important;
+    /* Free up width for the text */
+  }
+
   .floating-stage {
     flex: 1 !important;
     height: auto !important;
     min-height: 80px !important;
     max-height: 200px !important;
   }
-  
+
   .promo-dot-indicator {
     margin-top: 0.25rem;
   }
-  
+
   .form-content-sheet {
-    flex: none !important; /* Card hugs the elements exactly, preventing stretching and clipping */
-    padding: 1.5rem 1.25rem 1.5rem; /* Reduced bottom padding to prevent cutoff */
+    flex: none !important;
+    /* Card hugs the elements exactly, preventing stretching and clipping */
+    padding: 1.5rem 1.25rem 1.5rem;
+    /* Reduced bottom padding to prevent cutoff */
     border-radius: 24px 24px 0 0;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    gap: 0.85rem; /* Reduced cohesive spacing between all inputs to keep everything visible */
+    gap: 0.85rem;
+    /* Reduced cohesive spacing between all inputs to keep everything visible */
   }
-  
+
   .sheet-title {
     margin: 0 0 0.25rem !important;
   }
-  
+
   .premium-phone-group {
     margin: 0 !important;
     gap: 8px;
   }
-  
+
   .remember-login-wrapper {
     margin: 0 !important;
   }
-  
+
   .sheet-action-btn {
     height: 48px !important;
     font-size: 0.95rem !important;
@@ -834,7 +852,7 @@ body.dark-mode {
   .promo-header-section {
     display: none !important;
   }
-  
+
   .form-content-sheet {
     height: 100% !important;
     border-radius: 0 !important;
@@ -849,7 +867,10 @@ body.dark-mode {
    ========================================================================== */
 .notif-prompt-overlay {
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(4px);
   z-index: 1000;
@@ -861,8 +882,13 @@ body.dark-mode {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .notif-prompt-card {
@@ -880,14 +906,24 @@ body.dark-mode {
 }
 
 @keyframes scaleUp {
-  from { transform: scale(0.95) translateY(10px); opacity: 0; }
-  to { transform: scale(1) translateY(0); opacity: 1; }
+  from {
+    transform: scale(0.95) translateY(10px);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
 }
 
 /* Zepto Style specific components inside the sheet */
 .zepto-location-overlay {
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(3px);
   z-index: 1000;
@@ -899,8 +935,15 @@ body.dark-mode {
 }
 
 @keyframes fadeInOverlay {
-  from { opacity: 0; backdrop-filter: blur(0px); }
-  to { opacity: 1; backdrop-filter: blur(3px); }
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+
+  to {
+    opacity: 1;
+    backdrop-filter: blur(3px);
+  }
 }
 
 .zepto-location-sheet {
@@ -915,8 +958,13 @@ body.dark-mode {
 }
 
 @keyframes slideUpSheet {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
 }
 
 /* Zepto Style specific components inside the sheet */
@@ -1033,7 +1081,7 @@ body.dark-mode {
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
   margin-bottom: 1rem;
   cursor: pointer;
 }
@@ -1073,8 +1121,8 @@ body.dark-mode {
   justify-content: center;
   gap: 8px;
   padding: 1rem;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--auth-card-white);
+  border: 1px solid var(--auth-border);
   border-radius: 16px;
   font-weight: 700;
   color: var(--auth-text-dark);
@@ -1084,7 +1132,7 @@ body.dark-mode {
 }
 
 .zepto-search-btn:hover {
-  background: #f8fafc;
+  background: var(--auth-bg-dark);
 }
 
 .notif-icon-wrapper {
@@ -1119,7 +1167,8 @@ body.dark-mode {
   width: 100%;
 }
 
-.notif-btn-allow, .notif-btn-deny {
+.notif-btn-allow,
+.notif-btn-deny {
   flex: 1;
   height: 48px;
   border-radius: 12px;
@@ -1199,8 +1248,15 @@ body.dark-mode {
 }
 
 @keyframes adminCardEntrance {
-  from { opacity: 0; transform: scale(0.96) translateY(10px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .admin-auth-card .auth-illustration {
@@ -1222,8 +1278,17 @@ body.dark-mode {
 }
 
 @keyframes adminShieldPulse {
-  0%, 100% { transform: scale(1); opacity: 0.6; }
-  50% { transform: scale(1.3); opacity: 0.9; }
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+
+  50% {
+    transform: scale(1.3);
+    opacity: 0.9;
+  }
 }
 
 .admin-auth-card .auth-content {
@@ -1297,7 +1362,7 @@ body.dark-mode {
   transition: color 0.25s ease;
 }
 
-.admin-auth-card .input-group input:focus + .input-icon {
+.admin-auth-card .input-group input:focus+.input-icon {
   color: #f97316;
 }
 
@@ -1352,13 +1417,13 @@ body.dark-mode {
     border-radius: 0 !important;
     flex-direction: row !important;
   }
-  
+
   .auth-container:not(.admin-auth-card) .promo-header-section {
     flex: 1.2 !important;
     height: 100vh !important;
     padding: 3rem !important;
   }
-  
+
   .auth-container:not(.admin-auth-card) .form-content-sheet {
     flex: 1 !important;
     height: 100vh !important;

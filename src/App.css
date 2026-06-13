@@ -216,26 +216,26 @@
   }
 }
 
-/* Tablet: bottom nav becomes 64px left sidebar */
+/* Tablet: bottom nav becomes centered docked bottom bar */
 @media (min-width: 768px) {
   .webapp-main {
-    margin-left: 64px !important;
+    margin-left: 0 !important;
     padding-bottom: 2rem !important;
   }
   .webapp-main.profile-mode {
-    margin-left: 64px !important;
+    margin-left: 0 !important;
   }
 }
 
-/* Desktop: sidebar expands to 220px */
+/* Desktop: bottom nav becomes centered docked bottom bar */
 @media (min-width: 1024px) {
   .webapp-main {
-    margin-left: 220px !important;
+    margin-left: 0 !important;
     padding-top: 64px !important;    /* desktop navbar is 64px tall */
     padding-bottom: 2.5rem !important;
   }
   .webapp-main.profile-mode {
-    margin-left: 220px !important;
+    margin-left: 0 !important;
     padding-top: 64px !important;
   }
 }

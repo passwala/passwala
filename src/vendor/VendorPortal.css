@@ -766,6 +766,11 @@ body.dark-mode {
   color: white;
 }
 
+.v-badge-warning {
+  background: rgba(249, 115, 22, 0.92);
+  color: white;
+}
+
 .v-card-actions {
   position: absolute;
   top: 16px;
@@ -1658,7 +1663,7 @@ select.v-input:focus {
 
 /* Responsive Forms & Layouts */
 .v-form-card {
-  padding: 3rem !important;
+  padding: 3rem;
   margin-bottom: 4rem !important;
   border: 1px solid var(--v-primary) !important;
   box-shadow: 0 30px 60px -12px rgba(249, 115, 22, 0.1) !important;

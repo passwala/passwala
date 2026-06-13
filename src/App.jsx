@@ -469,14 +469,14 @@ const AppContent = ({
         ) : (
           <>
             {/* Global Navbar Logic */}
-            {(['/privacy-policy', '/terms', '/refunds-cancellation', '/data-deletion', '/policies'].includes(locationPath) || (locationPath === '/' && (!effectiveUser || !isWebappMode))) ? (
+            {(!isWebappMode && (['/privacy-policy', '/terms', '/refunds-cancellation', '/data-deletion', '/policies'].includes(locationPath) || (locationPath === '/' && !effectiveUser))) ? (
               <Navbar
                 isAuthenticated={!!effectiveUser} user={effectiveUser} onLogout={handleLogout}
                 onOpenProfile={() => navigate('/profile')} onOpenAI={() => navigate('/')}
                 onJoin={() => navigate('/auth')}
               />
             ) : (
-              (effectiveUser && isProfileComplete) && (
+              (isWebappMode && effectiveUser && isProfileComplete) && (
                 <WebappNavbar
                   user={effectiveUser} location={location} onLocationChange={setLocation}
                   isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)}
@@ -508,7 +508,11 @@ const AppContent = ({
                 <Routes>
                   <Route path="/admin" element={
                     <Suspense fallback={<div className="flex h-screen items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-4 border-[#ff6b00] border-t-transparent"></div></div>}>
-                      <AdminPanel />
+                      {sessionStorage.getItem('admin_token') ? (
+                        <AdminPanel location={location} onLogout={() => { sessionStorage.removeItem('admin_token'); window.location.reload(); }} />
+                      ) : (
+                        <AdminAuth onAdminLogin={() => { window.location.reload(); }} />
+                      )}
                     </Suspense>
                   } />
                   
@@ -571,9 +575,9 @@ const AppContent = ({
                   <Route path="/ride-checkout" element={effectiveUser ? <RideCheckout /> : <Navigate to="/" />} />
                   <Route path="/ride-ticket" element={effectiveUser ? <RideTicket /> : <Navigate to="/" />} />
                   <Route path="/events" element={effectiveUser ? <EventHub onBack={() => navigate('/')} /> : <Navigate to="/" />} />
-                  <Route path="/events/:id" element={effectiveUser ? <EventDetails user={effectiveUser} /> : <Navigate to="/" />} />
-                  <Route path="/events/checkout" element={effectiveUser ? <EventCheckout /> : <Navigate to="/" />} />
+                  <Route path="/events/checkout" element={effectiveUser ? <EventCheckout user={effectiveUser} /> : <Navigate to="/" />} />
                   <Route path="/events/ticket" element={effectiveUser ? <EventTicket /> : <Navigate to="/" />} />
+                  <Route path="/events/:id" element={effectiveUser ? <EventDetails user={effectiveUser} /> : <Navigate to="/" />} />
                   <Route path="/profile" element={effectiveUser ? <WebappProfile user={effectiveUser} onLogout={handleLogout} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} onUpdateUser={(updated) => setUser(updated)} /> : <Navigate to="/" />} />
                   <Route path="/order-history" element={effectiveUser ? <OrderHistory /> : <Navigate to="/" />} />
                   <Route path="/wallet" element={effectiveUser ? <Wallet user={effectiveUser} /> : <Navigate to="/" />} />

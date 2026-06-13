@@ -101,16 +101,21 @@ export const CartProvider = ({ children, user }) => {
         if (!supabase) return;
         try {
           if (cartItems.length === 0) {
-            const { error: clearErr } = await supabase.from('carts').delete().eq('user_id', userId);
+            const { error: clearErr } = await supabase
+              .from('carts')
+              .delete()
+              .eq('user_id', userId);
             if (clearErr && clearErr.code !== 'PGRST205' && !clearErr.message?.includes('schema cache')) {
               console.warn('Failed to clear cart in Supabase:', clearErr);
             }
           } else {
-            const { error: syncErr } = await supabase.from('carts').upsert({
-              user_id: userId,
-              items: cartItems,
-              updated_at: new Date()
-            });
+            // onConflict: 'user_id' tells Supabase to UPDATE on duplicate user_id (fixes 409)
+            const { error: syncErr } = await supabase
+              .from('carts')
+              .upsert(
+                { user_id: userId, items: cartItems, updated_at: new Date() },
+                { onConflict: 'user_id', ignoreDuplicates: false }
+              );
             if (syncErr && syncErr.code !== 'PGRST205' && !syncErr.message?.includes('schema cache')) {
               console.warn('Failed to sync cart to Supabase:', syncErr);
             }
@@ -126,18 +131,8 @@ export const CartProvider = ({ children, user }) => {
   }, [cartItems, user, isLoaded]);
 
   const addToCart = (item) => {
-    let stockLimitMet = false;
     setCartItems(prev => {
       const existing = prev.find(i => i.id === item.id && i.type === item.type);
-      const currentQty = existing ? existing.qty : 0;
-      
-      if (item.type !== 'service' && item.stock !== undefined && item.stock !== null) {
-        if (currentQty >= item.stock) {
-          stockLimitMet = true;
-          return prev;
-        }
-      }
-      
       if (existing) {
         return prev.map(i =>
           i.id === item.id && i.type === item.type
@@ -147,11 +142,6 @@ export const CartProvider = ({ children, user }) => {
       }
       return [...prev, { ...item, qty: 1 }];
     });
-    
-    if (stockLimitMet) {
-      toast.error(`Out of stock: Only ${item.stock} units are available.`);
-      return;
-    }
     setCartOpen(true);
   };
 
@@ -160,26 +150,11 @@ export const CartProvider = ({ children, user }) => {
   };
 
   const updateQty = (id, type, delta) => {
-    let stockLimitMet = false;
-    let limitValue = 0;
-    
     setCartItems(prev => {
-      const item = prev.find(i => i.id === id && i.type === type);
-      if (item && type !== 'service' && item.stock !== undefined && item.stock !== null && delta > 0) {
-        if (item.qty >= item.stock) {
-          stockLimitMet = true;
-          limitValue = item.stock;
-          return prev;
-        }
-      }
       return prev
         .map(i => i.id === id && i.type === type ? { ...i, qty: i.qty + delta } : i)
         .filter(i => i.qty > 0);
     });
-
-    if (stockLimitMet) {
-      toast.error(`Out of stock: Only ${limitValue} units are available.`);
-    }
   };
 
   const clearCart = () => setCartItems([]);

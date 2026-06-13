@@ -159,6 +159,8 @@ function RiderAuth({ onLogin }) {
     licenseImage: ''
   });
   const [cameraConfig, setCameraConfig] = useState({ isOpen: false, field: '', mode: 'user' });
+  const [loginMethod, setLoginMethod] = useState('SMS'); // 'SMS' or 'WHATSAPP'
+  const [whatsappOtp, setWhatsappOtp] = useState('');
 
   const openCamera = (field, mode) => {
     setCameraConfig({ isOpen: true, field, mode });
@@ -201,8 +203,70 @@ function RiderAuth({ onLogin }) {
       toast.error('Please enter a valid 10-digit number');
       return;
     }
-    toast.success('Phone Verified!');
-    setStep('PROFILE_SETUP');
+    setLoading(true);
+    const toastId = toast.loading('Verifying Rider...');
+    try {
+      if (!supabase) throw new Error("Database connection error");
+      const { data: ud } = await supabase.from('users').select('id, role, full_name').eq('phone', phone).maybeSingle();
+      if (ud && ud.role === 'RIDER') {
+        const { data: rd } = await supabase.from('riders').select('*').eq('user_id', ud.id).maybeSingle();
+        if (rd) {
+          toast.dismiss(toastId);
+          toast.success('Welcome back, Rider!');
+          onLogin(phone, {
+            name: ud.full_name || 'Rider Partner',
+            vehicleNo: rd.vehicle_no,
+            licenseNo: rd.license_no,
+            idProof: rd.id_proof,
+            user_id: ud.id,
+            rider_id: rd.id
+          });
+          return;
+        }
+      }
+      toast.dismiss(toastId);
+      toast.success('Phone Verified! Please setup profile.');
+      setStep('PROFILE_SETUP');
+    } catch (err) {
+      console.warn("Rider verification lookup failed, forcing setup profile:", err);
+      toast.dismiss(toastId);
+      setStep('PROFILE_SETUP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleWhatsAppLogin = async () => {
+    if (phone.length !== 10) {
+      toast.error('Please enter a valid 10-digit number');
+      return;
+    }
+    setLoading(true);
+    try {
+      const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      const res = await fetch(`${BASE_API}/api/users/send-whatsapp-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phone })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setLoginMethod('WHATSAPP');
+        setStep('OTP');
+        if (data.provider === 'mock' && data.otp) {
+          setWhatsappOtp(data.otp);
+          toast.success(`[MOCK WHATSAPP] OTP sent: ${data.otp}`, { duration: 8000 });
+        } else {
+          toast.success('OTP sent successfully via WhatsApp!');
+        }
+      } else {
+        toast.error(data.error || 'Failed to send WhatsApp OTP');
+      }
+    } catch (err) {
+      toast.error('Network error. Failed to send OTP.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleVerifyOtp = async () => {
@@ -212,12 +276,53 @@ function RiderAuth({ onLogin }) {
     }
     setLoading(true);
     try {
-      if (confirmationResult) {
-        await confirmationResult.confirm(otp);
-        toast.success('OTP Verified!');
-        setStep('PROFILE_SETUP');
+      if (loginMethod === 'WHATSAPP') {
+        const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+        const res = await fetch(`${BASE_API}/api/users/verify-whatsapp-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: phone, otp: otp, role: 'RIDER' })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          toast.success('OTP Verified!');
+          const toastId = toast.loading('Syncing Rider Session...');
+          try {
+            if (!supabase) throw new Error("Database connection error");
+            const { data: ud } = await supabase.from('users').select('id, role, full_name').eq('phone', phone).maybeSingle();
+            if (ud && ud.role === 'RIDER') {
+              const { data: rd } = await supabase.from('riders').select('*').eq('user_id', ud.id).maybeSingle();
+              if (rd) {
+                toast.dismiss(toastId);
+                toast.success('Welcome back, Rider!');
+                onLogin(phone, {
+                  name: ud.full_name || 'Rider Partner',
+                  vehicleNo: rd.vehicle_no,
+                  licenseNo: rd.license_no,
+                  idProof: rd.id_proof,
+                  user_id: ud.id,
+                  rider_id: rd.id
+                });
+                return;
+              }
+            }
+            toast.dismiss(toastId);
+            setStep('PROFILE_SETUP');
+          } catch (err) {
+            toast.dismiss(toastId);
+            setStep('PROFILE_SETUP');
+          }
+        } else {
+          toast.error(data.error || 'Invalid WhatsApp OTP');
+        }
       } else {
-        toast.error('Verification session expired or invalid');
+        if (confirmationResult) {
+          await confirmationResult.confirm(otp);
+          toast.success('OTP Verified!');
+          setStep('PROFILE_SETUP');
+        } else {
+          toast.error('Verification session expired or invalid');
+        }
       }
     } catch (error) {
       console.error(error);
@@ -420,19 +525,35 @@ function RiderAuth({ onLogin }) {
                       maxLength={10}
                       value={phone}
                       onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-                      style={{ paddingLeft: '3.5rem' }}
                     />
                   </div>
                 </div>
-                <button onClick={handleSendOtp} className="rider-btn-primary">
-                  Continue
+                
+                <button
+                  onClick={handleWhatsAppLogin}
+                  className="rider-btn-primary"
+                  style={{
+                    background: '#25D366',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(37, 211, 102, 0.15)',
+                    marginTop: '1.25rem'
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                  Login via WhatsApp
                 </button>
               </div>
             ) : step === 'OTP' ? (
               <div style={{ animation: 'slideUp 0.3s ease-out' }}>
                 <div className="rider-input-group">
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <label className="rider-label" style={{ marginBottom: 0 }}>Enter OTP</label>
+                    <label className="rider-label" style={{ marginBottom: 0 }}>
+                      Enter {loginMethod === 'WHATSAPP' ? 'WhatsApp' : 'SMS'} OTP
+                    </label>
                     <button onClick={() => setStep('PHONE')} style={{ color: 'var(--rider-primary)', fontSize: '0.875rem', fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer' }}>Change Number</button>
                   </div>
                   <input

@@ -1,36 +1,168 @@
 import express from 'express';
 import supabase from '../supabase.js';
+import nodemailer from 'nodemailer';
 
 const router = express.Router();
 
-// Get all upcoming events (with optional category/search filters)
+// ── Email Helper ─────────────────────────────────────────────────────────────
+const sendBookingEmail = async ({ toEmail, toName, event, tier, booking }) => {
+  if (!process.env.SMTP_USER || process.env.SMTP_USER === 'your_email@gmail.com') return;
+  try {
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: false,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    });
+    const eventDate = event?.event_date ? new Date(event.event_date).toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' }) : 'TBA';
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || `Passwala Events <${process.env.SMTP_USER}>`,
+      to: toEmail,
+      subject: `🎫 Your Ticket Confirmed — ${event?.title || 'Event'}`,
+      html: `
+        <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
+          <div style="background:linear-gradient(135deg,#ff6b00,#f97316);padding:32px 24px;text-align:center">
+            <img src="https://passwala.in/logo.png" alt="Passwala" style="height:40px;margin-bottom:16px" onerror="this.style.display='none'">
+            <h1 style="color:white;margin:0;font-size:24px">🎫 Ticket Confirmed!</h1>
+            <p style="color:rgba(255,255,255,0.9);margin:8px 0 0">Your spot is secured. We can't wait to see you!</p>
+          </div>
+          <div style="padding:32px 24px">
+            <h2 style="color:#0f172a;font-size:20px;margin:0 0 4px">${event?.title || 'Event'}</h2>
+            <p style="color:#64748b;font-size:14px;margin:0 0 24px">📅 ${eventDate} &nbsp;|&nbsp; 📍 ${event?.venue_name || 'Venue TBA'}</p>
+            <div style="background:#f8fafc;border-radius:12px;padding:20px;margin-bottom:20px">
+              <table style="width:100%;border-collapse:collapse;font-size:14px">
+                <tr><td style="color:#64748b;padding:6px 0">Invoice No.</td><td style="color:#0f172a;font-weight:700;text-align:right">${booking.invoice_number}</td></tr>
+                <tr><td style="color:#64748b;padding:6px 0">Ticket Type</td><td style="color:#0f172a;font-weight:700;text-align:right">${tier?.tier_name || 'Standard'}</td></tr>
+                <tr><td style="color:#64748b;padding:6px 0">Qty</td><td style="color:#0f172a;font-weight:700;text-align:right">${booking.ticket_count} ticket(s)</td></tr>
+                <tr><td style="color:#64748b;padding:6px 0">Total Paid</td><td style="color:#ff6b00;font-weight:900;font-size:16px;text-align:right">₹${booking.total_amount}</td></tr>
+              </table>
+            </div>
+            <div style="background:#fff7ed;border:2px dashed #fb923c;border-radius:12px;padding:20px;text-align:center;margin-bottom:20px">
+              <p style="color:#64748b;font-size:12px;margin:0 0 8px;text-transform:uppercase;font-weight:700">Your Entry Pass ID</p>
+              <p style="color:#0f172a;font-size:16px;font-weight:900;font-family:monospace;letter-spacing:1px;margin:0">${booking.qr_code_hash}</p>
+              <p style="color:#94a3b8;font-size:11px;margin:8px 0 0">Show this QR code from your Order History at the venue gate</p>
+            </div>
+            <p style="color:#64748b;font-size:13px;text-align:center">Open Passwala app → Order History → My Events → View Ticket</p>
+          </div>
+          <div style="background:#f8fafc;padding:20px 24px;text-align:center">
+            <p style="color:#94a3b8;font-size:12px;margin:0">Passwala — Ahmedabad's Event Platform | <a href="https://passwala.in" style="color:#ff6b00">passwala.in</a></p>
+          </div>
+        </div>
+      `
+    });
+    console.log(`[Email] Booking confirmation sent to ${toEmail}`);
+  } catch (err) {
+    console.warn('[Email] Failed to send booking confirmation:', err.message);
+  }
+};
+
+/**
+ * Check whether the booking window is currently open for a tier.
+ * Supports full ISO datetime strings stored in booking_open / booking_close.
+ * If neither column is set, booking is always open (no restriction).
+ *
+ * Returns { open: boolean, reason: string|null }
+ */
+function checkBookingWindow(tier) {
+  const { booking_open, booking_close } = tier || {};
+
+  // If neither field is set, booking is always open
+  if (!booking_open && !booking_close) return { open: true, reason: null };
+
+  const now = new Date();
+
+  const openTime  = booking_open  ? new Date(booking_open)  : null;
+  const closeTime = booking_close ? new Date(booking_close) : null;
+
+  if (openTime && !isNaN(openTime) && now < openTime) {
+    return { open: false, reason: 'Booking has not opened yet' };
+  }
+  if (closeTime && !isNaN(closeTime) && now > closeTime) {
+    return { open: false, reason: 'Booking window has closed' };
+  }
+  return { open: true, reason: null };
+}
+
+// Get events (with optional category/search/filter params)
 router.get('/search', async (req, res) => {
   try {
-    const { query, category } = req.query;
+    const { query, category, filter } = req.query;
+    const isPast = filter === 'past';
+    const now = new Date().toISOString();
 
     let supabaseQuery = supabase
       .from('events')
-      .select('*, event_ticket_tiers(*)')
-      .in('status', ['UPCOMING', 'ONGOING', 'SOLD_OUT'])
-      .order('event_date', { ascending: true });
+      .select('*, event_ticket_tiers(*)');
 
-    if (category && category !== 'All') {
+    if (isPast) {
+      // Past events: event_date before now, any status
+      supabaseQuery = supabaseQuery
+        .lt('event_date', now)
+        .order('event_date', { ascending: false });
+    } else {
+      // Upcoming events: only bookable statuses
+      supabaseQuery = supabaseQuery
+        .in('status', ['UPCOMING', 'ONGOING', 'SOLD_OUT'])
+        .order('event_date', { ascending: true });
+    }
+
+    // Only apply category filter when a specific category is selected
+    if (category && category !== 'All' && category !== 'undefined') {
       supabaseQuery = supabaseQuery.eq('category', category);
     }
 
-    if (query) {
-      supabaseQuery = supabaseQuery.ilike('title', `%${query}%`);
+    if (query && query.trim()) {
+      supabaseQuery = supabaseQuery.ilike('title', `%${query.trim()}%`);
     }
 
     const { data: events, error } = await supabaseQuery;
-
     if (error) throw error;
-    res.json({ success: true, events });
+
+    // ─── Attach organizer_name via vendors.user_id = events.created_by ───────
+    const createdByIds = [...new Set((events || []).map(e => e.created_by).filter(Boolean))];
+    let vendorMap = {}; // user_id → business_name
+    if (createdByIds.length > 0) {
+      const { data: vendors } = await supabase
+        .from('vendors')
+        .select('user_id, business_name, owner_name')
+        .in('user_id', createdByIds);
+      if (vendors) {
+        vendors.forEach(v => {
+          vendorMap[v.user_id] = v.business_name || v.owner_name || null;
+        });
+      }
+    }
+
+    const nowDate = new Date();
+
+    // ─── Visibility Rule (only for upcoming) ───────────────────────────
+    let visibleEvents = (events || []);
+    if (!isPast) {
+      visibleEvents = visibleEvents.filter(event => {
+        const tiers = event.event_ticket_tiers || [];
+        if (tiers.length === 0) return true;
+        return tiers.some(tier => {
+          const { booking_close } = tier;
+          if (!booking_close) return true;
+          const closeTime = new Date(booking_close);
+          if (isNaN(closeTime)) return true;
+          return nowDate <= closeTime;
+        });
+      });
+    }
+
+    visibleEvents = visibleEvents.map(event => ({
+      ...event,
+      organizer_name: vendorMap[event.created_by] || null
+    }));
+
+    res.json({ success: true, events: visibleEvents });
   } catch (err) {
     console.error('Events Search Error:', err);
-    res.status(500).json({ error: 'Failed to search events' });
+    res.status(500).json({ error: 'Failed to search events', details: err.message });
   }
 });
+
 
 // Get specific event details
 router.get('/:id', async (req, res) => {
@@ -43,20 +175,97 @@ router.get('/:id', async (req, res) => {
       .single();
 
     if (error || !event) return res.status(404).json({ error: 'Event not found' });
-    res.json({ success: true, event });
+
+    // Fetch organizer name from vendors
+    let organizer_name = null;
+    if (event.created_by) {
+      const { data: vendor } = await supabase
+        .from('vendors')
+        .select('business_name, owner_name')
+        .eq('user_id', event.created_by)
+        .maybeSingle();
+      organizer_name = vendor?.business_name || vendor?.owner_name || null;
+    }
+
+    res.json({ success: true, event: { ...event, organizer_name } });
   } catch (err) {
     console.error('Event Fetch Error:', err);
     res.status(500).json({ error: 'Failed to fetch event details' });
   }
 });
 
+// Resolve a user's DB UUID from uid / phone / email (used by EventCheckout)
+router.post('/resolve-id', async (req, res) => {
+  try {
+    let { uid, phone, email } = req.body;
+    let userId = null;
+
+    // Extract phone from whatsapp-uid pattern if no direct phone provided
+    if (!phone && uid && uid.startsWith('whatsapp-')) {
+      phone = uid.replace('whatsapp-', '');
+    }
+
+    if (phone) {
+      const clean = String(phone).replace(/\D/g, '').slice(-10);
+      if (clean.length === 10) {
+        const { data } = await supabase.from('users').select('id').eq('phone', clean).maybeSingle();
+        if (data?.id) userId = data.id;
+      }
+    }
+    if (!userId && uid) {
+      const { data } = await supabase.from('users').select('id').eq('uid', uid).maybeSingle();
+      if (data?.id) userId = data.id;
+    }
+    if (!userId && email) {
+      const { data } = await supabase.from('users').select('id').eq('email', email).maybeSingle();
+      if (data?.id) userId = data.id;
+    }
+
+    if (!userId) return res.status(404).json({ error: 'User not found' });
+    res.json({ id: userId });
+  } catch (err) {
+    console.error('Resolve-id error:', err);
+    res.status(500).json({ error: 'Failed to resolve user ID' });
+  }
+});
+
 // Book a ticket
 router.post('/book', async (req, res) => {
   try {
-    const { userId, eventId, tierId, ticketCount } = req.body;
+    let { userId, userPhone, userUid, userEmail, eventId, tierId, ticketCount } = req.body;
+
+    // Extract phone from whatsapp-uid pattern if no direct phone provided
+    if (!userPhone && userUid?.startsWith('whatsapp-')) {
+      userPhone = userUid.replace('whatsapp-', '');
+    }
+
+    // Resolve userId from all available identifiers (service-role key bypasses RLS)
+    if (!userId) {
+      if (userPhone) {
+        const cleanPhone = String(userPhone).replace(/\D/g, '').slice(-10);
+        const { data: foundUser } = await supabase
+          .from('users').select('id').eq('phone', cleanPhone).maybeSingle();
+        if (foundUser?.id) userId = foundUser.id;
+      }
+      if (!userId && userUid) {
+        const { data: foundUser } = await supabase
+          .from('users').select('id').eq('uid', userUid).maybeSingle();
+        if (foundUser?.id) userId = foundUser.id;
+      }
+      if (!userId && userEmail) {
+        const { data: foundUser } = await supabase
+          .from('users').select('id').eq('email', userEmail).maybeSingle();
+        if (foundUser?.id) userId = foundUser.id;
+      }
+    }
 
     if (!userId || !eventId || !tierId || !ticketCount) {
-      return res.status(400).json({ error: 'Missing required booking fields' });
+      const missing = [];
+      if (!userId) missing.push('user (please log in again)');
+      if (!eventId) missing.push('event');
+      if (!tierId) missing.push('ticket tier');
+      if (!ticketCount) missing.push('ticket count');
+      return res.status(400).json({ error: `Booking failed: Missing ${missing.join(', ')}` });
     }
 
     // Atomic check of seat availability
@@ -68,8 +277,27 @@ router.post('/book', async (req, res) => {
 
     if (tierErr) throw tierErr;
 
+    // ── Booking window validation ──
+    const windowCheck = checkBookingWindow(tier);
+    if (!windowCheck.open) {
+      return res.status(400).json({ error: windowCheck.reason || 'Booking window is closed for this tier.' });
+    }
+
     if (tier.available_seats < ticketCount) {
       return res.status(400).json({ error: 'Not enough seats available in this tier.' });
+    }
+
+    // ── Duplicate booking check ──
+    const { data: existingBooking } = await supabase
+      .from('event_bookings')
+      .select('id, status')
+      .eq('user_id', userId)
+      .eq('event_id', eventId)
+      .neq('status', 'CANCELLED')
+      .maybeSingle();
+
+    if (existingBooking) {
+      return res.status(400).json({ error: 'You already have an active booking for this event. Check your Order History.' });
     }
 
     // Decrement seats
@@ -114,6 +342,22 @@ router.post('/book', async (req, res) => {
       // Revert seats on failure
       await supabase.from('event_ticket_tiers').update({ available_seats: tier.available_seats }).eq('id', tierId);
       throw insertErr;
+    }
+
+    // ── Fire-and-forget email notification ────────────────────────────────
+    if (userEmail) {
+      const { data: eventData } = await supabase.from('events').select('title, venue_name, event_date').eq('id', eventId).maybeSingle();
+      const { data: userData } = await supabase.from('users').select('full_name, email').eq('id', userId).maybeSingle();
+      const recipientEmail = userData?.email || userEmail;
+      if (recipientEmail) {
+        sendBookingEmail({
+          toEmail: recipientEmail,
+          toName: userData?.full_name || 'Valued Customer',
+          event: eventData,
+          tier,
+          booking
+        }).catch(() => {}); // non-blocking
+      }
     }
 
     res.json({ success: true, booking });

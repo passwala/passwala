@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -36,9 +36,7 @@ export const useAuth = () => {
     }
   });
 
-  const [authLoading, setAuthLoading] = useState(() => {
-    return !localStorage.getItem('passwala_user');
-  });
+  const [authLoading, setAuthLoading] = useState(true);
 
   const [isProfileComplete, setIsProfileComplete] = useState(() => {
     return localStorage.getItem('passwala_profile_complete') === 'true';
@@ -81,7 +79,7 @@ export const useAuth = () => {
     }
   }, [user]);
 
-  const handleLogout = async (skipToast = false) => {
+  const handleLogout = useCallback(async (skipToast = false) => {
     try {
       const userId = user?.id || user?.uid || user?.user_id;
       if (userId && (user?.role === 'RIDER' || appMode === 'rider')) {
@@ -123,7 +121,54 @@ export const useAuth = () => {
         localStorage.setItem('passwala_vendor_notifications', notifStatus);
       }
     }
-  };
+  }, [user, navigate, appMode]);
+
+  // Suspension check effect to block suspended users in real-time
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+
+    const checkSuspension = async () => {
+      try {
+        if (!supabase) return;
+        
+        let orFilters = [];
+        if (user.user_id) orFilters.push(`id.eq.${user.user_id}`);
+        if (user.id && String(user.id).includes('-') && user.id.length === 36) orFilters.push(`id.eq.${user.id}`);
+        if (user.uid) orFilters.push(`uid.eq.${user.uid}`);
+        
+        const cleanPhone = String(user.phone || user.phoneNumber || '').replace(/[\s\-().]/g, '').replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, '');
+        if (cleanPhone && /^\d{10}$/.test(cleanPhone)) {
+          orFilters.push(`phone.eq.${cleanPhone}`);
+        }
+
+        if (orFilters.length === 0) return;
+
+        const { data, error } = await supabase
+          .from('users')
+          .select('is_suspended')
+          .or(orFilters.join(','))
+          .maybeSingle();
+
+        if (!error && data && data.is_suspended && active) {
+          toast.error('Your account is suspended. Please contact support.', { id: 'suspended-toast', duration: 10000 });
+          handleLogout(true);
+        }
+      } catch (err) {
+        console.warn('Suspension check failed:', err);
+      }
+    };
+
+    checkSuspension();
+    
+    // Check every 8 seconds for fast, responsive security response
+    const interval = setInterval(checkSuspension, 8000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [user, handleLogout]);
 
   useEffect(() => {
     const alreadyShown = sessionStorage.getItem('v_initial_splash_done');

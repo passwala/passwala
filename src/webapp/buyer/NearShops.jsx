@@ -118,7 +118,7 @@ const NearShops = ({ location, userCoords }) => {
                    detail: p.description,
                    price: p.price,
                    image: getCleanProductImage(p.image_url || p.image),
-                   stock: p.stock_quantity // Map stock here
+                   stock: 9999
                 })));
             } else {
                 setShopCatalog([]);
@@ -140,7 +140,7 @@ const NearShops = ({ location, userCoords }) => {
       type: selectedShop.type === 'SERVICES' ? 'service' : 'product',
       store: selectedShop.name,
       shop_id: selectedShop.id,
-      stock: product.stock // Pass stock property
+      stock: 9999
     });
     toast.success(`${product.name} added to cart`);
   };
@@ -624,10 +624,9 @@ const NearShops = ({ location, userCoords }) => {
                                   </div>
                                 ) : (
                                    <button 
-                                     disabled={selectedShop.type !== 'SERVICES' && product.stock <= 0}
                                      onClick={(e) => handleAddToCart(e, product)} 
                                      style={{ 
-                                       background: (selectedShop.type !== 'SERVICES' && product.stock <= 0) ? '#cbd5e1' : 'var(--primary)', 
+                                       background: 'var(--primary)', 
                                        color: 'white', 
                                        border: 'none', 
                                        padding: '6px 14px', 
@@ -635,15 +634,15 @@ const NearShops = ({ location, userCoords }) => {
                                        display: 'flex', 
                                        alignItems: 'center', 
                                        gap: '6px',
-                                       cursor: (selectedShop.type !== 'SERVICES' && product.stock <= 0) ? 'not-allowed' : 'pointer',
+                                       cursor: 'pointer',
                                        fontWeight: 700,
                                        fontSize: '0.8rem',
                                        transition: 'transform 0.2s active'
                                      }}
-                                     onMouseDown={(e) => { if (!(selectedShop.type !== 'SERVICES' && product.stock <= 0)) e.currentTarget.style.transform = 'scale(0.95)'; }}
-                                     onMouseUp={(e) => { if (!(selectedShop.type !== 'SERVICES' && product.stock <= 0)) e.currentTarget.style.transform = 'scale(1)'; }}
+                                     onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
+                                     onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                                    >
-                                     {selectedShop.type !== 'SERVICES' && product.stock <= 0 ? t('out_of_stock') : <><Plus size={16} /> {t('add_to_cart')}</>}
+                                     <Plus size={16} /> {t('add_to_cart')}
                                    </button>
                                 );
                               })()}

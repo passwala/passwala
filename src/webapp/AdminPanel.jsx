@@ -51,7 +51,9 @@ const adminSupabase = (supabaseUrl && supabaseKey)
   ? createClient(supabaseUrl, supabaseKey)
   : null;
 
-const API_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+const API_URL = window.location.protocol === 'https:' 
+  ? '' 
+  : (import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3004`);
 const ActivityFeed = ({ onLogout }) => {
   const [recent, setRecent] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -126,7 +128,7 @@ const ActivityFeed = ({ onLogout }) => {
 };
 
 const TABLE_SCHEMAS = {
-  users: { phone: '', full_name: '', email: '', role: 'BUYER', photo_url: '' },
+  users: { phone: '', full_name: '', email: '', role: 'BUYER', photo_url: '', is_suspended: false },
   admins: { username: '', password_hash: '', role: 'SUPERADMIN' },
   vendors: { phone: '', full_name: '', name: '', user_id: '', business_name: '', aadhar_no: '', license_no: '', address: '', category: '', is_verified: false, profile_completed: false },
   riders: { phone: '', full_name: '', user_id: '', vehicle_no: '', license_no: '', id_proof: '', is_active: false, is_verified: false, rating: 0, total_deliveries: 0 },
@@ -149,7 +151,7 @@ const TABLE_SCHEMAS = {
 };
 
 const DATABASE_SCHEMAS = {
-  users: ['phone', 'full_name', 'email', 'photo_url', 'role'],
+  users: ['phone', 'full_name', 'email', 'photo_url', 'role', 'is_suspended'],
   vendors: ['user_id', 'phone', 'is_verified', 'name', 'business_name', 'aadhar_no', 'license_no', 'address', 'category', 'profile_completed'],
   riders: ['user_id', 'vehicle_no', 'license_no', 'id_proof', 'is_active', 'is_verified', 'rating', 'total_deliveries'],
   service_providers: ['user_id', 'business_name', 'about', 'rating', 'is_verified', 'phone', 'full_name', 'name', 'aadhar_no', 'license_no', 'address', 'profile_completed'],
@@ -213,7 +215,8 @@ const tabSections = [
       { id: 'city_vehicles_panel', label: 'City Vehicles', icon: Truck, table: 'city_vehicles' },
       { id: 'ticket_bookings_panel', label: 'Ride Bookings', icon: MapPin, table: 'ticket_bookings' },
       { id: 'events_panel', label: 'Events', icon: Sparkles, table: 'events' },
-      { id: 'event_bookings_panel', label: 'Event Bookings', icon: Calendar, table: 'event_bookings' }
+      { id: 'event_bookings_panel', label: 'Event Bookings', icon: Calendar, table: 'event_bookings' },
+      { id: 'event_approvals_panel', label: 'Event Approvals', icon: ShieldCheck },
     ]
   },
   {
@@ -255,6 +258,148 @@ const formatDateForInput = (val) => {
   } catch (e) {
     return '';
   }
+};
+
+// ── Event Approvals Panel ─────────────────────────────────────────
+const EventApprovalsPanel = ({ API_URL }) => {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(null);
+
+  const adminKey = sessionStorage.getItem('admin_token') || '';
+
+  const fetchPending = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/events/pending`, {
+        headers: { 'x-admin-key': adminKey }
+      });
+      const data = await res.json();
+      setEvents(data.events || []);
+    } catch (err) {
+      toast.error('Failed to load pending events');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchPending(); }, []);
+
+  const handleAction = async (id, action) => {
+    setActionLoading(id + action);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/events/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+        body: JSON.stringify({ id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(action === 'approve' ? '✅ Event approved! Visible to buyers.' : '❌ Event rejected.');
+        setEvents(prev => prev.filter(e => e.id !== id));
+      } else {
+        toast.error(data.error || 'Action failed');
+      }
+    } catch (err) {
+      toast.error('Network error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const formatDate = (d) => d ? new Date(d).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+
+  return (
+    <div style={{ padding: '0 0 4rem 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+        <div>
+          <h1 className="admin-hero-title" style={{ marginBottom: '0.25rem' }}>Event Approvals</h1>
+          <p style={{ color: '#64748b', margin: 0 }}>
+            Review and approve events before they go live to buyers.
+          </p>
+        </div>
+        <span style={{ marginLeft: 'auto', background: '#ff6b00', color: '#fff', borderRadius: '20px', padding: '4px 14px', fontWeight: 700, fontSize: '0.85rem' }}>
+          {events.length} Pending
+        </span>
+        <button onClick={fetchPending} style={{ background: '#f1f5f9', border: 'none', borderRadius: '10px', padding: '8px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>
+          ↻ Refresh
+        </button>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '4rem', color: '#94a3b8' }}>Loading pending events...</div>
+      ) : events.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '4rem 2rem', background: '#f8fafc', borderRadius: '20px', border: '2px dashed #e2e8f0' }}>
+          <ShieldCheck size={48} color="#22c55e" style={{ marginBottom: '1rem' }} />
+          <h3 style={{ color: '#166534', margin: '0 0 0.5rem' }}>All Clear!</h3>
+          <p style={{ color: '#64748b', margin: 0 }}>No events are pending approval right now.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: '1.5rem' }}>
+          {events.map(event => {
+            const minPrice = event.event_ticket_tiers?.length
+              ? Math.min(...event.event_ticket_tiers.map(t => t.price))
+              : 0;
+            return (
+              <div key={event.id} style={{ background: '#fff', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.07)', border: '1px solid #e2e8f0', display: 'flex', gap: 0 }}>
+                {/* Banner */}
+                <div style={{ width: '200px', minWidth: '200px', height: '160px', background: '#1e293b', flexShrink: 0, position: 'relative' }}>
+                  {event.banner_url && (
+                    <img src={event.banner_url} alt={event.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  )}
+                  <span style={{ position: 'absolute', top: 10, left: 10, background: '#f59e0b', color: '#fff', borderRadius: '10px', padding: '3px 10px', fontSize: '0.7rem', fontWeight: 700 }}>
+                    ⏳ PENDING
+                  </span>
+                </div>
+
+                {/* Details */}
+                <div style={{ flex: 1, padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <h3 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{event.title}</h3>
+                      <span style={{ background: '#f1f5f9', color: '#475569', borderRadius: '8px', padding: '2px 10px', fontSize: '0.75rem', fontWeight: 600 }}>{event.category}</span>
+                    </div>
+                    <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#ff6b00' }}>from ₹{minPrice}</span>
+                  </div>
+
+                  <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0', lineHeight: 1.5 }}>
+                    {event.description?.slice(0, 120)}{event.description?.length > 120 ? '...' : ''}
+                  </p>
+
+                  <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
+                    <span>📅 {formatDate(event.event_date)}</span>
+                    <span>📍 {event.venue_name}</span>
+                    <span>🎟 {event.event_ticket_tiers?.length || 0} tier(s)</span>
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px dashed #e2e8f0' }}>
+                    <button
+                      onClick={() => handleAction(event.id, 'approve')}
+                      disabled={actionLoading === event.id + 'approve'}
+                      style={{ background: '#22c55e', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem', opacity: actionLoading === event.id + 'approve' ? 0.6 : 1 }}
+                    >
+                      {actionLoading === event.id + 'approve' ? 'Approving...' : '✅ Approve'}
+                    </button>
+                    <button
+                      onClick={() => handleAction(event.id, 'reject')}
+                      disabled={actionLoading === event.id + 'reject'}
+                      style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem', opacity: actionLoading === event.id + 'reject' ? 0.6 : 1 }}
+                    >
+                      {actionLoading === event.id + 'reject' ? 'Rejecting...' : '❌ Reject'}
+                    </button>
+                    <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#94a3b8', alignSelf: 'center' }}>
+                      Submitted {formatDate(event.created_at)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 };
 
 const AdminPanel = ({ onLogout, location }) => {
@@ -322,6 +467,8 @@ const AdminPanel = ({ onLogout, location }) => {
   const [serviceCategoriesList, setServiceCategoriesList] = useState([]);
   const [servicesList, setServicesList] = useState([]);
   const [addressesList, setAddressesList] = useState([]);
+  const [pendingEvents, setPendingEvents] = useState([]);
+  const [pendingEventsLoading, setPendingEventsLoading] = useState(false);
 
   const fetchReferences = useCallback(async () => {
     try {
@@ -588,7 +735,7 @@ const AdminPanel = ({ onLogout, location }) => {
   }, [onLogout]);
 
   const fetchData = useCallback(async () => {
-    if (['dashboard_panel', 'people_map_panel', 'reports_panel', 'settings_panel'].includes(activeAdminTab)) {
+    if (['dashboard_panel', 'people_map_panel', 'reports_panel', 'settings_panel', 'event_approvals_panel'].includes(activeAdminTab)) {
       setLoading(false);
       return;
     }
@@ -610,7 +757,7 @@ const AdminPanel = ({ onLogout, location }) => {
       // Update State & Cache
       let filteredData = suData || [];
       if (currentTable === 'products') {
-        filteredData = filteredData.filter(p => p.description !== 'Service item auto-registered' && p.stock_quantity !== 9999);
+        filteredData = filteredData.filter(p => p.description !== 'Service item auto-registered');
       }
       setData(filteredData);
       localStorage.setItem(`admin_cache_${currentTable}`, JSON.stringify(filteredData));
@@ -648,17 +795,34 @@ const AdminPanel = ({ onLogout, location }) => {
     }
   }, [activeAdminTab, onLogout]);
 
+  // Load static system settings and statistics once on mount
   useEffect(() => {
     fetchStats();
     fetchReferences();
     fetchPlatformSettings();
-    if (activeAdminTab === 'people_map_panel') {
+  }, [fetchStats, fetchReferences, fetchPlatformSettings]);
+
+  // Sync active tab data instantly when switching tabs
+  useEffect(() => {
+    // Custom panels that manage their own data — just reset sync status
+    const customPanels = ['event_approvals_panel'];
+    if (customPanels.includes(activeAdminTab)) {
+      setSyncStatus('cloud');
+      setLoading(false);
+    } else if (activeAdminTab === 'people_map_panel') {
       fetchPeopleMapData();
     } else {
       fetchData();
     }
     localStorage.setItem('admin_active_tab', activeAdminTab);
-  }, [activeAdminTab, fetchData, fetchPeopleMapData, fetchReferences, fetchStats, fetchPlatformSettings]);
+  }, [activeAdminTab, fetchData, fetchPeopleMapData]);
+
+  // Refresh dashboard analytics specifically when visiting the dashboard tab
+  useEffect(() => {
+    if (activeAdminTab === 'dashboard_panel') {
+      fetchStats();
+    }
+  }, [activeAdminTab, fetchStats]);
 
   const handleExecuteDelete = async () => {
     if (!deleteConfirmId) return;
@@ -861,7 +1025,48 @@ const AdminPanel = ({ onLogout, location }) => {
     }
   };
 
+  const handleToggleSuspend = async (item) => {
+    try {
+      const nextSuspended = !item.is_suspended;
+      const adminKey = sessionStorage.getItem('admin_token') || '';
+      const response = await fetch(`${API_URL}/api/admin/upsert`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey 
+        },
+        body: JSON.stringify({
+          table: 'users',
+          payload: { ...item, is_suspended: nextSuspended }
+        })
+      });
+      if (response.status === 401) {
+        toast.error('Session expired. Please login again.');
+        onLogout();
+        return;
+      }
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update suspension status');
+      }
+
+      toast.success(nextSuspended ? 'User suspended successfully! 🚫' : 'User unsuspended successfully! ✅');
+      
+      // Update local state
+      setData(prev => prev.map(d => d.id === item.id ? { ...d, is_suspended: nextSuspended } : d));
+      
+      // Update cache
+      const cacheKey = `admin_cache_${currentTab.table}`;
+      const cached = JSON.parse(localStorage.getItem(cacheKey) || '[]');
+      localStorage.setItem(cacheKey, JSON.stringify(cached.map(d => d.id === item.id ? { ...d, is_suspended: nextSuspended } : d)));
+    } catch (err) {
+      console.error(err);
+      toast.error('Suspension update failed: ' + err.message);
+    }
+  };
+
   const openModal = (item = null) => {
+    fetchReferences(); // Lazy-load fresh lookup relations for select dropdowns
     setEditingItem(item);
     const schema = TABLE_SCHEMAS[currentTab.table];
 
@@ -1074,9 +1279,15 @@ const AdminPanel = ({ onLogout, location }) => {
                         displayVal = parts.join(' ');
                       }
 
-                      return (
+                       return (
                         <td key={k}>
-                          {k === 'status' || k === 'role' ? (
+                          {k === 'is_suspended' ? (
+                            v ? (
+                              <span className="status-badge" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600 }}>Suspended</span>
+                            ) : (
+                              <span className="status-badge" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600 }}>Active</span>
+                            )
+                          ) : k === 'status' || k === 'role' ? (
                             <span className={`status-badge ${v}`}>{v}</span>
                           ) : typeof v === 'boolean' ? (
                             v ? <span style={{color: '#10b981', fontWeight: 800}}>✅</span> : <span style={{color: '#ef4444', fontWeight: 800}}>❌</span>
@@ -1090,6 +1301,28 @@ const AdminPanel = ({ onLogout, location }) => {
                     })}
                     <td className="actions-cell">
                       <div className="control-cell">
+                        {currentTab.table === 'users' && (
+                          <button 
+                            className="suspend-btn" 
+                            style={{
+                              background: item.is_suspended ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                              color: item.is_suspended ? '#10b981' : '#ef4444',
+                              border: 'none',
+                              borderRadius: '8px',
+                              padding: '6px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.2s',
+                              outline: 'none'
+                            }} 
+                            title={item.is_suspended ? "Unsuspend User" : "Suspend User"}
+                            onClick={() => handleToggleSuspend(item)}
+                          >
+                            {item.is_suspended ? <CheckCircle size={16} /> : <XCircle size={16} />}
+                          </button>
+                        )}
                         {['vendors', 'service_providers', 'riders'].includes(currentTab.table) && (
                           <button 
                             className="verify-btn" 
@@ -1393,20 +1626,20 @@ const AdminPanel = ({ onLogout, location }) => {
         <p style={{ color: '#64748b', marginBottom: '2rem' }}>Comprehensive performance reporting and metric evaluations.</p>
 
         <div className="main-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
-          <div className="stat-card p-gradient" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 10px 25px rgba(99, 102, 241, 0.15)' }}>
+          <div className="stat-card" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 10px 25px rgba(99, 102, 241, 0.15)' }}>
             <span style={{ fontSize: '0.9rem', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>Total Revenue</span>
-            <h3 style={{ fontSize: '2.25rem', fontWeight: 900, margin: '0.5rem 0' }}>₹{stats?.totalRevenue?.toLocaleString() || 0}</h3>
-            <p style={{ fontSize: '0.85rem', margin: 0, opacity: 0.9 }}>Real-time earnings</p>
+            <h3 style={{ fontSize: '2.25rem', fontWeight: 900, margin: '0.5rem 0', color: '#ffffff' }}>₹{stats?.totalRevenue?.toLocaleString() || 0}</h3>
+            <p style={{ fontSize: '0.85rem', margin: 0, opacity: 0.9, color: '#ffffff' }}>Real-time earnings</p>
           </div>
-          <div className="stat-card o-gradient" style={{ background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', color: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 10px 25px rgba(249, 115, 22, 0.15)' }}>
+          <div className="stat-card" style={{ background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', color: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 10px 25px rgba(249, 115, 22, 0.15)' }}>
             <span style={{ fontSize: '0.9rem', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>Average Order Value</span>
-            <h3 style={{ fontSize: '2.25rem', fontWeight: 900, margin: '0.5rem 0' }}>₹{stats?.averageOrderValue?.toLocaleString() || 0}</h3>
-            <p style={{ fontSize: '0.85rem', margin: 0, opacity: 0.9 }}>🎯 Optimized delivery margins</p>
+            <h3 style={{ fontSize: '2.25rem', fontWeight: 900, margin: '0.5rem 0', color: '#ffffff' }}>₹{stats?.averageOrderValue?.toLocaleString() || 0}</h3>
+            <p style={{ fontSize: '0.85rem', margin: 0, opacity: 0.9, color: '#ffffff' }}>🎯 Optimized delivery margins</p>
           </div>
-          <div className="stat-card b-gradient" style={{ background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)', color: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 10px 25px rgba(6, 182, 212, 0.15)' }}>
+          <div className="stat-card" style={{ background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)', color: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 10px 25px rgba(6, 182, 212, 0.15)' }}>
             <span style={{ fontSize: '0.9rem', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>Orders Completed</span>
-            <h3 style={{ fontSize: '2.25rem', fontWeight: 900, margin: '0.5rem 0' }}>{stats?.ordersCompleted || 0}</h3>
-            <p style={{ fontSize: '0.85rem', margin: 0, opacity: 0.9 }}>⚡ 98.4% Fulfillment rate</p>
+            <h3 style={{ fontSize: '2.25rem', fontWeight: 900, margin: '0.5rem 0', color: '#ffffff' }}>{stats?.ordersCompleted || 0}</h3>
+            <p style={{ fontSize: '0.85rem', margin: 0, opacity: 0.9, color: '#ffffff' }}>⚡ 98.4% Fulfillment rate</p>
           </div>
         </div>
 
@@ -1659,7 +1892,7 @@ const AdminPanel = ({ onLogout, location }) => {
               {section.items.map((tab) => (
                 <button
                   key={tab.id}
-                  className={`nav-item ${activeAdminTab === tab.id ? 'active' : ''}`}
+                  className={`admin-nav-item ${activeAdminTab === tab.id ? 'active' : ''}`}
                   onClick={() => {
                     setActiveAdminTab(tab.id);
                     setIsSidebarOpen(false);
@@ -1716,6 +1949,8 @@ const AdminPanel = ({ onLogout, location }) => {
                 renderReports()
               ) : activeAdminTab === 'settings_panel' ? (
                 renderSettings()
+              ) : activeAdminTab === 'event_approvals_panel' ? (
+                <EventApprovalsPanel API_URL={API_URL} />
               ) : syncStatus === 'missing_table' ? (
                 <div className="missing-table-notice animate-fade-in" style={{ padding: '3rem', background: '#fff1f2', borderRadius: '24px', border: '2px dashed #f43f5e', textAlign: 'center' }}>
                   <Database size={48} color="#f43f5e" style={{ marginBottom: '1rem' }} />

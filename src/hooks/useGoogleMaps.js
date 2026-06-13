@@ -5,25 +5,34 @@ let isScriptLoaded = false;
 let callbacks = [];
 
 export function useGoogleMaps() {
-  const [loaded, setLoaded] = useState(isScriptLoaded || typeof window !== 'undefined' && !!window.google && !!window.google.maps);
+  const [loaded, setLoaded] = useState(
+    isScriptLoaded || (typeof window !== 'undefined' && !!window.google?.maps)
+  );
 
   useEffect(() => {
-    if (isScriptLoaded || (typeof window !== 'undefined' && !!window.google && !!window.google.maps)) {
-      setLoaded(true);
+    // Skip if already loaded
+    if (isScriptLoaded || (typeof window !== 'undefined' && !!window.google?.maps)) {
+      if (!loaded) setLoaded(true);
       return;
     }
 
-    const handleLoad = () => {
-      setLoaded(true);
-    };
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
+    // Skip silently when key is missing/placeholder — prevents InvalidKeyMapError spam
+    if (!apiKey || apiKey === 'YOUR_GOOGLE_MAPS_API_KEY_HERE' || apiKey.includes('YOUR_')) {
+      console.warn('[Maps] VITE_GOOGLE_MAPS_API_KEY not set — map features disabled.');
+      return;
+    }
+
+    const handleLoad = () => setLoaded(true);
     callbacks.push(handleLoad);
 
     if (!isScriptLoading) {
       isScriptLoading = true;
-      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
+      // loading=async eliminates the "loaded without loading=async" warning
+      // &map_ids=default enables AdvancedMarkerElement support
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry,marker&loading=async&map_ids=default`;
       script.async = true;
       script.defer = true;
       script.onload = () => {
@@ -33,7 +42,7 @@ export function useGoogleMaps() {
         callbacks = [];
       };
       script.onerror = () => {
-        console.error('Failed to load Google Maps script.');
+        console.error('[Maps] Failed to load Google Maps script.');
         isScriptLoading = false;
       };
       document.head.appendChild(script);

@@ -196,6 +196,19 @@ export const userAuth = async (req, res, next) => {
 
     req.user = decodedUser;
 
+    // Block suspended users
+    if (decodedUser && decodedUser.uid) {
+      const { data: dbUser, error: dbErr } = await supabase
+        .from('users')
+        .select('is_suspended')
+        .eq('uid', decodedUser.uid)
+        .maybeSingle();
+
+      if (!dbErr && dbUser && dbUser.is_suspended) {
+        return res.status(403).json({ error: 'Forbidden: Your account has been suspended by the administrator.' });
+      }
+    }
+
     if (!req.params.uid) {
       return next();
     }
@@ -684,6 +697,128 @@ router.put('/:id/fcm-token', async (req, res) => {
   } catch (err) {
     console.error('FCM Token Save Route Error:', err);
     res.status(500).json({ error: 'Server Error saving FCM token' });
+  }
+});
+
+// Global Map to persist across hot reloads in development
+global.whatsappOtpStore = global.whatsappOtpStore || new Map();
+
+// Periodic cleanup of expired OTPs
+if (!global.whatsappOtpStoreCleanupInterval) {
+  global.whatsappOtpStoreCleanupInterval = setInterval(() => {
+    const now = Date.now();
+    for (const [phone, item] of global.whatsappOtpStore.entries()) {
+      if (now > item.expiresAt) {
+        global.whatsappOtpStore.delete(phone);
+      }
+    }
+  }, 60000);
+}
+
+// POST /api/users/send-whatsapp-otp — Generate and send real OTP
+router.post('/send-whatsapp-otp', async (req, res) => {
+  const { phone } = req.body;
+  const cleanPhone = normalizePhone(phone);
+  if (!cleanPhone) {
+    return res.status(400).json({ success: false, error: 'Valid 10-digit mobile number required' });
+  }
+
+  try {
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    global.whatsappOtpStore.set(cleanPhone, {
+      otp,
+      expiresAt: Date.now() + 5 * 60 * 1000 // 5 mins
+    });
+
+    const { sendWhatsAppOTP } = await import('../utils/whatsapp.js');
+    const result = await sendWhatsAppOTP(cleanPhone, otp);
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'WhatsApp OTP sent successfully', 
+      provider: result.provider,
+      otp: result.provider === 'mock' ? otp : undefined
+    });
+  } catch (err) {
+    console.error('WhatsApp OTP send error:', err);
+    res.status(500).json({ success: false, error: 'Failed to send WhatsApp OTP: ' + err.message });
+  }
+});
+
+// POST /api/users/verify-whatsapp-otp — Verify WhatsApp OTP & login
+router.post('/verify-whatsapp-otp', async (req, res) => {
+  const { phone, otp, role } = req.body;
+  const cleanPhone = normalizePhone(phone);
+  if (!cleanPhone || !otp) {
+    return res.status(400).json({ success: false, error: 'Phone number and OTP are required' });
+  }
+
+  const stored = global.whatsappOtpStore.get(cleanPhone);
+  if (!stored) {
+    return res.status(400).json({ success: false, error: 'OTP expired or not requested' });
+  }
+
+  if (Date.now() > stored.expiresAt) {
+    global.whatsappOtpStore.delete(cleanPhone);
+    return res.status(400).json({ success: false, error: 'OTP expired' });
+  }
+
+  if (stored.otp !== otp) {
+    return res.status(400).json({ success: false, error: 'Invalid OTP code' });
+  }
+
+  global.whatsappOtpStore.delete(cleanPhone);
+
+  try {
+    const uid = `whatsapp-${cleanPhone}`;
+    const userRole = role ? String(role).toUpperCase() : 'BUYER';
+
+    let { data: existingUser } = await supabase
+      .from('users')
+      .select('*')
+      .eq('phone', cleanPhone)
+      .maybeSingle();
+
+    if (!existingUser) {
+      const { data: newUser, error: createErr } = await supabase
+        .from('users')
+        .insert([{
+          uid,
+          phone: cleanPhone,
+          full_name: userRole === 'BUYER' ? 'Passwala User' : (userRole === 'VENDOR' ? 'Vendor Partner' : 'Rider Partner'),
+          role: userRole
+        }])
+        .select()
+        .single();
+
+      if (createErr) throw createErr;
+      existingUser = newUser;
+    } else if (existingUser.role !== userRole && userRole !== 'BUYER') {
+      const { data: updatedUser } = await supabase
+        .from('users')
+        .update({ role: userRole })
+        .eq('id', existingUser.id)
+        .select()
+        .single();
+      existingUser = updatedUser;
+    }
+
+    res.status(200).json({
+      success: true,
+      user: {
+        id: existingUser.id,
+        uid: existingUser.uid,
+        displayName: existingUser.full_name,
+        phoneNumber: existingUser.phone,
+        email: existingUser.email,
+        photoURL: existingUser.photo_url,
+        authProvider: 'phone',
+        role: existingUser.role.toLowerCase()
+      }
+    });
+  } catch (err) {
+    console.error('WhatsApp verification database error:', err);
+    res.status(500).json({ success: false, error: 'Database session initialization failed' });
   }
 });
 

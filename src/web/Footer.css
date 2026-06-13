@@ -95,20 +95,12 @@
 .footer-socials-v2 svg {
   cursor: pointer;
   color: #a1a1aa;
-  background: rgba(255,255,255,0.05);
-  padding: 10px;
-  border-radius: 50%;
-  width: 42px;
-  height: 42px;
-  box-sizing: border-box;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .footer-socials-v2 svg:hover {
   color: white;
-  background: var(--primary);
   transform: translateY(-4px);
-  box-shadow: 0 8px 20px rgba(255, 107, 0, 0.3);
 }
 
 .footer-bottom-v2 {

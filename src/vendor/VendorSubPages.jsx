@@ -1,5 +1,6 @@
 import React from 'react';
-import { Package, FileText, IndianRupee, Wallet, Star, Bell, HelpCircle, CheckCircle, Clock, MapPin, Download, ArrowUpRight, ArrowDownRight, Tag, Trash2, PackagePlus, Camera, Wrench, AlertTriangle } from 'lucide-react';
+import ReactDOM from 'react-dom';
+import { Package, FileText, IndianRupee, Wallet, Star, Bell, HelpCircle, CheckCircle, Clock, MapPin, Download, ArrowUpRight, ArrowDownRight, Tag, Trash2, PackagePlus, Camera, Wrench, AlertTriangle, X, Calendar, ScanLine, Zap, QrCode } from 'lucide-react';
 import { supabase } from '../supabase';
 import { toast } from 'react-hot-toast';
 // eslint-disable-next-line no-unused-vars
@@ -7,9 +8,262 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { getOSRMRoute } from '../utils/dijkstra';
 import { AHMEDABAD_AREA_COORDS } from '../utils/constants';
+import jsQR from 'jsqr';
+
+// ── QR Scanner Modal (camera-based) ─────────────────────────────────────────
+const QRScannerModal = ({ isOpen, onClose, onScan }) => {
+  const videoRef = React.useRef(null);
+  const canvasRef = React.useRef(null);
+  const streamRef = React.useRef(null);
+  const animFrameRef = React.useRef(null);
+  const scanFoundRef = React.useRef(false);
+  const cooldownRef = React.useRef(false);      // 1.5s cooldown between invalid scans
+  const [scanning, setScanning] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const [scanned, setScanned] = React.useState(false);
+  const [invalidMsg, setInvalidMsg] = React.useState('');
+
+  // Only accept proper Passwalaa QR codes — reject plain barcodes / random numbers
+  const isValidQR = (data) => {
+    if (!data) return false;
+    const d = data.trim();
+    // Accept PW-EVT prefix, UUID format, or any non-pure-numeric string
+    const isPureNumeric = /^\d+$/.test(d);
+    return !isPureNumeric && d.length > 8;
+  };
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      scanFoundRef.current = false;
+      cooldownRef.current = false;
+      setScanned(false);
+      setInvalidMsg('');
+      return;
+    }
+    setError(null);
+    setScanned(false);
+    setInvalidMsg('');
+    scanFoundRef.current = false;
+    cooldownRef.current = false;
+
+    const startCamera = async () => {
+      // Camera API requires HTTPS (or localhost)
+      const isSecure = window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      if (!isSecure) {
+        setError('🔒 Scanner requires HTTPS. Please open the app on a secure (https://) connection or localhost to use the camera.');
+        return;
+      }
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError('Camera not supported on this browser. Please use Chrome or Safari on a mobile device.');
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+        });
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+          setScanning(true);
+          startScanLoop();
+        }
+      } catch (err) {
+        if (err.name === 'NotAllowedError') {
+          setError('Camera access denied. Please tap "Allow" when prompted, or enable camera in your browser settings.');
+        } else if (err.name === 'NotFoundError') {
+          setError('No camera found on this device.');
+        } else {
+          setError('Could not start camera: ' + err.message);
+        }
+      }
+    };
+
+    const startScanLoop = () => {
+      const tick = () => {
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
+          animFrameRef.current = requestAnimationFrame(tick);
+          return;
+        }
+        if (scanFoundRef.current || cooldownRef.current) {
+          animFrameRef.current = requestAnimationFrame(tick);
+          return;
+        }
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: 'dontInvert'
+        });
+
+        if (code && code.data) {
+          if (isValidQR(code.data)) {
+            // Valid Passwalaa QR — accept it
+            scanFoundRef.current = true;
+            setScanned(true);
+            setTimeout(() => {
+              onScan(code.data.trim());
+            }, 400);
+            return;
+          } else {
+            // Invalid QR (barcode number etc) — cooldown 1.5s, show message
+            cooldownRef.current = true;
+            setInvalidMsg('Invalid code — show the ticket QR');
+            setTimeout(() => {
+              cooldownRef.current = false;
+              setInvalidMsg('');
+            }, 1500);
+          }
+        }
+
+        animFrameRef.current = requestAnimationFrame(tick);
+      };
+      animFrameRef.current = requestAnimationFrame(tick);
+    };
+
+    startCamera();
+
+    return () => {
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      setScanning(false);
+    };
+  }, [isOpen]);
+
+
+  if (!isOpen) return null;
+
+  const modalContent = (
+    <div style={{
+      position: 'fixed', inset: 0,
+      background: 'rgba(0,0,0,0.82)',
+      zIndex: 999999,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backdropFilter: 'blur(6px)',
+      padding: '1.5rem',
+    }}>
+      <div style={{
+        background: '#0f172a',
+        borderRadius: '22px',
+        padding: '1.75rem',
+        width: '100%',
+        maxWidth: '440px',
+        border: '1px solid rgba(255,255,255,0.12)',
+        boxShadow: '0 30px 60px rgba(0,0,0,0.6)',
+      }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg,#16a34a,#15803d)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <QrCode size={20} color="white" />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, color: 'white', fontWeight: 800, fontSize: '1.05rem' }}>Scan QR to Check In</h3>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.78rem' }}>Point camera at attendee's ticket QR</p>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', borderRadius: '10px', width: '34px', height: '34px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Camera Preview — fixed 300px height */}
+        <div style={{ position: 'relative', width: '100%', height: '300px', borderRadius: '16px', overflow: 'hidden', background: '#000', marginBottom: '1.25rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <video ref={videoRef} style={{ width: '100%', height: '100%', objectFit: 'cover' }} playsInline muted />
+          <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+          {/* Dark vignette to guide eye to center */}
+          <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.55) 100%)' }} />
+
+          {/* Scanner frame — 190×190 with explicit L-bracket corners */}
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: '190px', height: '190px', position: 'relative' }}>
+              {/* Top-left corner */}
+              <div style={{ position: 'absolute', top: 0, left: 0, width: '26px', height: '26px', borderTop: '3px solid #22c55e', borderLeft: '3px solid #22c55e', borderRadius: '2px 0 0 0' }} />
+              {/* Top-right corner */}
+              <div style={{ position: 'absolute', top: 0, right: 0, width: '26px', height: '26px', borderTop: '3px solid #22c55e', borderRight: '3px solid #22c55e', borderRadius: '0 2px 0 0' }} />
+              {/* Bottom-left corner */}
+              <div style={{ position: 'absolute', bottom: 0, left: 0, width: '26px', height: '26px', borderBottom: '3px solid #22c55e', borderLeft: '3px solid #22c55e', borderRadius: '0 0 0 2px' }} />
+              {/* Bottom-right corner */}
+              <div style={{ position: 'absolute', bottom: 0, right: 0, width: '26px', height: '26px', borderBottom: '3px solid #22c55e', borderRight: '3px solid #22c55e', borderRadius: '0 0 2px 0' }} />
+              {/* Animated scan line */}
+              <div style={{ position: 'absolute', top: 0, left: '4px', right: '4px', height: '2px', background: 'linear-gradient(90deg, transparent, #22c55e, transparent)', animation: 'scanline 2s linear infinite', boxShadow: '0 0 6px #22c55e' }} />
+            </div>
+          </div>
+
+          {/* Loading state */}
+          {!scanning && !error && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '10px', background: 'rgba(0,0,0,0.6)' }}>
+              <div style={{ width: '32px', height: '32px', border: '3px solid rgba(255,255,255,0.15)', borderTop: '3px solid #22c55e', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              <span style={{ color: '#94a3b8', fontSize: '0.82rem', fontWeight: 600 }}>Starting camera...</span>
+            </div>
+          )}
+          {/* Error state */}
+          {error && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '10px', background: 'rgba(0,0,0,0.7)', padding: '1.5rem', textAlign: 'center' }}>
+              <span style={{ fontSize: '2.5rem' }}>📷</span>
+              <p style={{ color: '#f59e0b', fontSize: '0.85rem', fontWeight: 700, margin: 0, lineHeight: 1.4 }}>{error}</p>
+            </div>
+          )}
+          {/* ✅ QR Detected — green flash */}
+          {scanned && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px', background: 'rgba(22,163,74,0.85)', transition: 'all 0.3s' }}>
+              <div style={{ width: '64px', height: '64px', background: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 30px rgba(34,197,94,0.6)' }}>
+                <span style={{ fontSize: '2rem' }}>✓</span>
+              </div>
+              <span style={{ color: 'white', fontWeight: 800, fontSize: '1rem', letterSpacing: '0.5px' }}>QR Detected!</span>
+            </div>
+          )}
+          {/* ❌ Invalid code feedback (cooldown) */}
+          {invalidMsg && (
+            <div style={{ position: 'absolute', bottom: '16px', left: 0, right: 0, textAlign: 'center' }}>
+              <span style={{ background: 'rgba(239,68,68,0.85)', color: 'white', fontSize: '0.75rem', fontWeight: 700, padding: '5px 14px', borderRadius: '20px', letterSpacing: '0.5px' }}>
+                ⚠ {invalidMsg}
+              </span>
+            </div>
+          )}
+          {/* "Align QR here" label — only when actively scanning and no invalid msg */}
+          {scanning && !error && !scanned && !invalidMsg && (
+            <div style={{ position: 'absolute', bottom: '16px', left: 0, right: 0, textAlign: 'center' }}>
+              <span style={{ background: 'rgba(0,0,0,0.6)', color: '#4ade80', fontSize: '0.72rem', fontWeight: 700, padding: '4px 12px', borderRadius: '20px', letterSpacing: '0.5px' }}>
+                ALIGN QR CODE WITHIN FRAME
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Tip */}
+        <p style={{ color: '#475569', fontSize: '0.72rem', textAlign: 'center', margin: '1rem 0 0 0', lineHeight: 1.5 }}>
+          📱 Ask attendee to open <strong style={{ color: '#94a3b8' }}>Order History → My Events → View Ticket</strong>
+        </p>
+
+        <style>{`
+          @keyframes scanline {
+            0% { top: 4px; }
+            100% { top: calc(100% - 6px); }
+          }
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    </div>
+  );
+
+  return ReactDOM.createPortal(modalContent, document.body);
+};
+
 
 export const ConfirmModal = ({ isOpen, title, message, confirmText, cancelText, onConfirm, onCancel, type = 'danger' }) => {
-  return (
+  const content = (
     <AnimatePresence>
       {isOpen && (
         <div 
@@ -25,7 +279,7 @@ export const ConfirmModal = ({ isOpen, title, message, confirmText, cancelText, 
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 99999,
+            zIndex: 999999,
             padding: '1.5rem',
           }}
         >
@@ -108,13 +362,31 @@ export const ConfirmModal = ({ isOpen, title, message, confirmText, cancelText, 
       )}
     </AnimatePresence>
   );
+  return ReactDOM.createPortal(content, document.body);
 };
 
-export const VendorInventory = ({ businessType, storeId }) => {
+export const VendorInventory = ({ vendorData, businessType, storeId }) => {
   const [items, setItems] = React.useState([]);
   const [showForm, setShowForm] = React.useState(false);
   const [editingId, setEditingId] = React.useState(null);
-  const [newItem, setNewItem] = React.useState({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: '' });
+  const [newItem, setNewItem] = React.useState({ 
+    name: '', 
+    detail: '', 
+    price: '299', 
+    image: null, 
+    barcode: '', 
+    barcode_type: 'EAN-13', 
+    stock_quantity: '', 
+    category_id: '', 
+    category: 'Music & Concerts', 
+    venue_name: '', 
+    event_date: '',
+    booking_start: '',
+    booking_end: '',
+    ticket_tiers: [
+      { tier_name: 'General Admission', price: '299', total_seats: '100', booking_open: '', booking_close: '' }
+    ]
+  });
   const [confirmDialog, setConfirmDialog] = React.useState({
     isOpen: false,
     title: '',
@@ -125,37 +397,82 @@ export const VendorInventory = ({ businessType, storeId }) => {
     type: 'danger'
   });
 
+  // Compute minimum allowed datetime string (now, in local timezone, YYYY-MM-DDTHH:MM format)
+  const nowMin = React.useMemo(() => {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }, [showForm]);
+
   React.useEffect(() => {
     const fetchCatalog = async () => {
-      if (!storeId) {
+      if (!storeId && !vendorData?.user_id) {
         setItems([]);
         return;
       }
 
       let dbItems = [];
-      const isValidUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(storeId);
-      if (supabase && isValidUuid) {
+      const isValidUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(storeId || vendorData?.user_id);
+      if (supabase && (isValidUuid || businessType === 'event')) {
         try {
-          const targetTable = businessType === 'shop' ? 'products' : 'services';
-          const idCol = businessType === 'shop' ? 'store_id' : 'provider_id';
-          const { data, error } = await supabase.from(targetTable).select('*').eq(idCol, storeId);
+          const targetTable = businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : 'services';
+          let query = supabase.from(targetTable).select('*');
+          if (businessType === 'event') {
+            const userId = vendorData?.user_id;
+            if (userId) {
+              query = query.eq('created_by', userId);
+            } else {
+              query = query.eq('created_by', storeId);
+            }
+          } else {
+            const idCol = businessType === 'shop' ? 'store_id' : 'provider_id';
+            query = query.eq(idCol, storeId);
+          }
+
+          const { data, error } = await query;
           if (!error && data) {
             let filteredData = data;
             if (businessType === 'shop') {
               filteredData = data.filter(item => item.description !== 'Service item auto-registered');
             }
-            dbItems = filteredData.map(item => ({
-              id: item.id,
-              name: item.name || item.title,
-              detail: item.description || item.category,
-              price: item.price,
-              image: item.image_url || item.image,
-              barcode: item.barcode || '',
-              barcode_type: item.barcode_type || 'EAN-13',
-              stock_quantity: item.stock_quantity || 0,
-              type: businessType || 'shop',
-              category_id: item.category_id
-            }));
+
+            const mapped = [];
+            for (const item of filteredData) {
+              let eventPrice = 299;
+              let totalSeats = 0;
+              let availableSeats = 0;
+              if (businessType === 'event') {
+                try {
+                  const { data: tiers } = await supabase.from('event_ticket_tiers').select('price, total_seats, available_seats').eq('event_id', item.id);
+                  if (tiers && tiers.length > 0) {
+                    eventPrice = Math.min(...tiers.map(t => t.price));
+                    totalSeats = tiers.reduce((s, t) => s + (t.total_seats || 0), 0);
+                    availableSeats = tiers.reduce((s, t) => s + (t.available_seats || 0), 0);
+                  }
+                } catch (e) { console.warn(e); }
+              } else {
+                eventPrice = item.price;
+              }
+
+              mapped.push({
+                id: item.id,
+                name: item.name || item.title,
+                detail: item.description || item.category,
+                price: eventPrice,
+                total_seats: totalSeats,
+                available_seats: availableSeats,
+                image: item.image_url || item.banner_url || item.image,
+                barcode: item.barcode || '',
+                barcode_type: item.barcode_type || 'EAN-13',
+                stock_quantity: 9999,
+                type: businessType || 'shop',
+                category_id: item.category_id,
+                category: item.category,
+                venue_name: item.venue_name,
+                event_date: item.event_date ? new Date(item.event_date).toISOString().slice(0, 16) : ''
+              });
+            }
+            dbItems = mapped;
           }
         } catch (e) { console.error(e); }
       }
@@ -187,11 +504,12 @@ export const VendorInventory = ({ businessType, storeId }) => {
     fetchCatalog();
 
     if (storeId && supabase) {
-      const targetTable = businessType === 'shop' ? 'products' : 'services';
-      const idCol = businessType === 'shop' ? 'store_id' : 'provider_id';
+      const targetTable = businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : 'services';
+      const idCol = businessType === 'shop' ? 'store_id' : businessType === 'event' ? 'created_by' : 'provider_id';
+      const filterVal = businessType === 'event' ? (vendorData?.user_id || storeId) : storeId;
       
       const sub = supabase.channel(`vendor_inventory_${storeId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: targetTable, filter: `${idCol}=eq.${storeId}` }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: targetTable, filter: `${idCol}=eq.${filterVal}` }, () => {
           fetchCatalog();
         })
         .subscribe();
@@ -200,7 +518,7 @@ export const VendorInventory = ({ businessType, storeId }) => {
         supabase.removeChannel(sub);
       };
     }
-  }, [storeId, businessType]);
+  }, [storeId, businessType, vendorData]);
 
   // Synchronize react items state to localStorage automatically on state changes
   React.useEffect(() => {
@@ -210,9 +528,138 @@ export const VendorInventory = ({ businessType, storeId }) => {
 
   const handleAdd = async (e) => {
     e.preventDefault();
-    if (!newItem.name || !newItem.price) return;
+
+    if (businessType === 'event') {
+      const validTiers = (newItem.ticket_tiers || []).filter(t => t.price);
+      if (validTiers.length > 0) {
+        newItem.price = String(Math.min(...validTiers.map(t => parseFloat(t.price))));
+      } else {
+        newItem.price = '0';
+      }
+    }
+
+    if (!newItem.name) {
+      toast.error("Please enter a title.");
+      return;
+    }
+    if (!newItem.price) {
+      toast.error("Please specify pricing.");
+      return;
+    }
+
+    if (businessType === 'event') {
+      if (!newItem.ticket_tiers || newItem.ticket_tiers.length === 0) {
+        toast.error("Please add at least one ticket category.");
+        return;
+      }
+      for (const tier of newItem.ticket_tiers) {
+        if (!tier.tier_name || !tier.tier_name.trim()) {
+          toast.error("Please enter a name for all ticket categories.");
+          return;
+        }
+        if (!tier.price || parseFloat(tier.price) < 0) {
+          toast.error(`Please enter a valid price for the category "${tier.tier_name}".`);
+          return;
+        }
+        if (!tier.total_seats || parseInt(tier.total_seats) < 1) {
+          toast.error(`Seats for "${tier.tier_name}" must be at least 1.`);
+          return;
+        }
+        // Ensure seats are a clean integer — no decimals
+        tier.total_seats = String(Math.floor(Math.max(1, parseInt(tier.total_seats))));
+      }
+    }
 
     if (editingId) {
+      if (storeId || vendorData?.user_id) {
+        try {
+          const targetTable = businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : 'services';
+          let updatePayload = {};
+          if (businessType === 'shop') {
+            updatePayload = {
+              name: newItem.name,
+              description: newItem.detail || 'Updated Manually',
+              price: parseFloat(newItem.price),
+              image_url: newItem.image,
+              barcode: newItem.barcode || null,
+              barcode_type: newItem.barcode_type || 'EAN-13',
+              stock_quantity: parseInt(newItem.stock_quantity) || 0
+            };
+          } else if (businessType === 'event') {
+            updatePayload = {
+              title: newItem.name,
+              description: newItem.detail || 'Updated Manually',
+              category: newItem.category || 'Music & Concerts',
+              venue_name: newItem.venue_name || 'Ahmedabad Venue',
+              event_date: newItem.event_date ? new Date(newItem.event_date).toISOString() : new Date().toISOString(),
+              banner_url: newItem.image,
+              booking_start: newItem.booking_start ? new Date(newItem.booking_start).toISOString() : null,
+              booking_end: newItem.booking_end ? new Date(newItem.booking_end).toISOString() : null
+            };
+            // Also update the event_ticket_tiers dynamically matching tier_name
+            const { data: existingTiers } = await supabase.from('event_ticket_tiers').select('id, tier_name').eq('event_id', editingId);
+            const existingMap = {};
+            if (existingTiers) {
+              existingTiers.forEach(t => {
+                existingMap[t.tier_name] = t.id;
+              });
+            }
+
+            const currentTierNames = [];
+            for (const t of (newItem.ticket_tiers || [])) {
+              currentTierNames.push(t.tier_name);
+              const tierPayload = {
+                event_id: editingId,
+                tier_name: t.tier_name,
+                price: parseFloat(t.price) || 0,
+                total_seats: parseInt(t.total_seats) || 100,
+                available_seats: parseInt(t.total_seats) || 100,
+                booking_open:  t.booking_open  ? new Date(t.booking_open).toISOString()  : null,
+                booking_close: t.booking_close ? new Date(t.booking_close).toISOString() : null
+              };
+
+              const existingId = existingMap[t.tier_name];
+              if (existingId) {
+                const { data: dbTier } = await supabase.from('event_ticket_tiers').select('total_seats, available_seats').eq('id', existingId).maybeSingle();
+                if (dbTier) {
+                  const soldSeats = Math.max(0, dbTier.total_seats - dbTier.available_seats);
+                  tierPayload.available_seats = Math.max(0, parseInt(t.total_seats) - soldSeats);
+                }
+                await supabase.from('event_ticket_tiers').update(tierPayload).eq('id', existingId);
+              } else {
+                await supabase.from('event_ticket_tiers').insert([tierPayload]);
+              }
+            }
+
+            if (existingTiers) {
+              const toDelete = existingTiers.filter(t => !currentTierNames.includes(t.tier_name));
+              for (const t of toDelete) {
+                await supabase.from('event_ticket_tiers').delete().eq('id', t.id);
+              }
+            }
+          } else {
+            updatePayload = {
+              title: newItem.name,
+              price: parseFloat(newItem.price),
+              category_id: null,
+              description: newItem.detail || 'Updated Manually',
+              duration_minutes: 60
+            };
+          }
+          
+          const { error } = await supabase.from(targetTable).update(updatePayload).eq('id', editingId);
+          if (error) {
+            console.error('Supabase update error:', error);
+            toast.error(`Failed to update database: ${error.message}`);
+            return;
+          }
+        } catch (err) {
+          console.error(err);
+          toast.error('Failed to update listing due to connection issue.');
+          return;
+        }
+      }
+
       setItems(prev => {
         const updated = prev.map(item => item.id === editingId ? {
           ...item,
@@ -222,37 +669,22 @@ export const VendorInventory = ({ businessType, storeId }) => {
           image: newItem.image,
           barcode: newItem.barcode || '',
           barcode_type: newItem.barcode_type || 'EAN-13',
-          stock_quantity: newItem.stock_quantity ? parseInt(newItem.stock_quantity) : 0,
+          stock_quantity: parseInt(newItem.stock_quantity) || 0,
           type: businessType || 'shop',
-          category_id: newItem.category_id || null
+          category_id: newItem.category_id || null,
+          category: newItem.category,
+          venue_name: newItem.venue_name,
+          event_date: newItem.event_date,
+          booking_start: newItem.booking_start,
+          booking_end: newItem.booking_end
         } : item);
         localStorage.setItem('vVendorItems', JSON.stringify(updated.filter(i => !i.id.toString().startsWith('d') && !i.id.toString().startsWith('s'))));
         return updated;
       });
-      if (storeId) {
-        try {
-          const targetTable = businessType === 'shop' ? 'products' : 'services';
-          const updatePayload = businessType === 'shop' ? {
-            name: newItem.name,
-            description: newItem.detail || 'Updated Manually',
-            price: parseFloat(newItem.price),
-            image_url: newItem.image,
-            barcode: newItem.barcode || null,
-            barcode_type: newItem.barcode_type || 'EAN-13',
-            stock_quantity: newItem.stock_quantity ? parseInt(newItem.stock_quantity) : 0
-          } : {
-            title: newItem.name,
-            price: parseFloat(newItem.price),
-            category_id: null,
-            description: newItem.detail || 'Updated Manually',
-            duration_minutes: 60
-          };
-          await supabase.from(targetTable).update(updatePayload).eq('id', editingId);
-        } catch (err) { console.error(err); }
-      }
 
+      toast.success('Listing updated successfully!');
       setEditingId(null);
-      setNewItem({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: null });
+      setNewItem({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: null, category: 'Music & Concerts', venue_name: '', event_date: '', booking_start: '', booking_end: '', ticket_tiers: [{ tier_name: 'General Admission', price: '299', total_seats: '100' }] });
       setShowForm(false);
       return;
     }
@@ -266,64 +698,162 @@ export const VendorInventory = ({ businessType, storeId }) => {
       image: newItem.image,
       barcode: newItem.barcode || '',
       barcode_type: newItem.barcode_type || 'EAN-13',
-      stock_quantity: newItem.stock_quantity ? parseInt(newItem.stock_quantity) : 0,
+      stock_quantity: parseInt(newItem.stock_quantity) || 0,
       type: businessType || 'shop',
-      category_id: newItem.category_id || null
+      category_id: newItem.category_id || null,
+      category: newItem.category,
+      venue_name: newItem.venue_name,
+      event_date: newItem.event_date,
+      booking_start: newItem.booking_start,
+      booking_end: newItem.booking_end
     };
 
-    setItems(prev => {
-      const cleanPrev = prev.filter(i => !i.id.toString().startsWith('d') && !i.id.toString().startsWith('s'));
-      const updated = [newProductObj, ...cleanPrev];
-      localStorage.setItem('vVendorItems', JSON.stringify(updated));
-      return updated;
-    });
-    setNewItem({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: businessType === 'shop' ? '44444444-4444-4444-4444-444444444444' : '77777777-7777-7777-7777-777777777777' });
-    setShowForm(false);
-
-    if (storeId && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(storeId)) {
+    if ((storeId || vendorData?.user_id) && (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(storeId) || businessType === 'event')) {
       try {
-        const targetTable = businessType === 'shop' ? 'products' : 'services';
-        const payload = businessType === 'shop' ? {
-          store_id: storeId,
-          name: newProductObj.name,
-          category_id: null,
-          description: newProductObj.detail || 'Added Manually',
-          price: parseFloat(newProductObj.price),
-          image_url: newProductObj.image,
-          barcode: newProductObj.barcode || null,
-          barcode_type: newProductObj.barcode_type || 'EAN-13',
-          stock_quantity: newProductObj.stock_quantity ? parseInt(newProductObj.stock_quantity) : 0,
-          is_active: true
-        } : {
-          provider_id: storeId,
-          title: newProductObj.name,
-          category_id: null,
-          description: newProductObj.detail || 'Added Manually',
-          price: parseFloat(newProductObj.price),
-          duration_minutes: 60
-        };
+        const targetTable = businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : 'services';
+        let payload = {};
+        if (businessType === 'shop') {
+          payload = {
+            store_id: storeId,
+            name: newProductObj.name,
+            category_id: null,
+            description: newProductObj.detail || 'Added Manually',
+            price: parseFloat(newProductObj.price),
+            image_url: newProductObj.image,
+            barcode: newProductObj.barcode || null,
+            barcode_type: newProductObj.barcode_type || 'EAN-13',
+            stock_quantity: parseInt(newItem.stock_quantity) || 0,
+            is_active: true
+          };
+        } else if (businessType === 'event') {
+          payload = {
+            title: newProductObj.name,
+            description: newProductObj.detail || 'Added Manually',
+            category: newItem.category || 'Music & Concerts',
+            venue_name: newItem.venue_name || 'Ahmedabad Venue',
+            venue_lat: 23.0225,
+            venue_lng: 72.5714,
+            event_date: newItem.event_date ? new Date(newItem.event_date).toISOString() : new Date().toISOString(),
+            banner_url: newProductObj.image || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=400&q=80',
+            status: 'PENDING_APPROVAL',
+            created_by: vendorData?.user_id || null,
+            booking_start: newItem.booking_start ? new Date(newItem.booking_start).toISOString() : null,
+            booking_end: newItem.booking_end ? new Date(newItem.booking_end).toISOString() : null
+          };
+        } else {
+          payload = {
+            provider_id: storeId,
+            title: newProductObj.name,
+            category_id: null,
+            description: newProductObj.detail || 'Added Manually',
+            price: parseFloat(newProductObj.price),
+            duration_minutes: 60
+          };
+        }
+
         const { data, error } = await supabase.from(targetTable).insert([payload]).select();
-        if (!error && data && data[0]) {
+        if (error) {
+          console.error('Supabase insert error:', error);
+          toast.error(`Failed to publish listing: ${error.message}`);
+          return;
+        }
+
+        if (data && data[0]) {
+          // If event, insert default ticket tier
+          if (businessType === 'event') {
+            const tiersPayload = (newItem.ticket_tiers && newItem.ticket_tiers.length > 0)
+              ? newItem.ticket_tiers.map(t => ({
+                  event_id: data[0].id,
+                  tier_name: t.tier_name || 'General Admission',
+                  price: parseFloat(t.price) || 299,
+                  total_seats: parseInt(t.total_seats) || 100,
+                  available_seats: parseInt(t.total_seats) || 100,
+                  booking_open:  t.booking_open  ? new Date(t.booking_open).toISOString()  : null,
+                  booking_close: t.booking_close ? new Date(t.booking_close).toISOString() : null
+                }))
+              : [{
+                  event_id: data[0].id,
+                  tier_name: 'General Admission',
+                  price: parseFloat(newProductObj.price) || 299,
+                  total_seats: 200,
+                  available_seats: 200
+                }];
+            await supabase.from('event_ticket_tiers').insert(tiersPayload);
+          }
+
           const dbObj = {
             id: data[0].id,
             name: data[0].name || data[0].title,
             detail: data[0].description || data[0].category || 'Added Manually',
-            price: data[0].price,
-            image: data[0].image_url || data[0].image,
+            price: businessType === 'event' ? parseFloat(newProductObj.price) : data[0].price,
+            image: data[0].image_url || data[0].banner_url || data[0].image,
             barcode: data[0].barcode || '',
             barcode_type: data[0].barcode_type || 'EAN-13',
             stock_quantity: data[0].stock_quantity || 0,
             type: businessType || 'shop',
-            category_id: data[0].category_id
+            category_id: data[0].category_id,
+            category: data[0].category,
+            venue_name: data[0].venue_name,
+            event_date: data[0].event_date,
+            booking_start: data[0].booking_start,
+            booking_end: data[0].booking_end
           };
           setItems(prev => [dbObj, ...prev.filter(i => i.id !== localId && !i.id.toString().startsWith('d') && !i.id.toString().startsWith('s'))]);
         }
-      } catch (err) { console.error(err); }
+      } catch (err) {
+        console.error(err);
+        toast.error('Failed to publish listing due to connection issue.');
+        return;
+      }
+    } else {
+      setItems(prev => {
+        const cleanPrev = prev.filter(i => !i.id.toString().startsWith('d') && !i.id.toString().startsWith('s'));
+        const updated = [newProductObj, ...cleanPrev];
+        localStorage.setItem('vVendorItems', JSON.stringify(updated));
+        return updated;
+      });
     }
+
+    toast.success('Listing published successfully!');
+    setNewItem({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: businessType === 'shop' ? '44444444-4444-4444-4444-444444444444' : '77777777-7777-7777-7777-777777777777', category: 'Music & Concerts', venue_name: '', event_date: '', booking_start: '', booking_end: '', ticket_tiers: [{ tier_name: 'General Admission', price: '299', total_seats: '100' }] });
+    setShowForm(false);
   };
 
-  const handleEditClick = (item) => {
+  const handleEditClick = async (item) => {
     setEditingId(item.id);
+
+    // Helper: convert ISO timestamp to datetime-local input format (YYYY-MM-DDTHH:MM)
+    const toLocal = (iso) => {
+      if (!iso) return '';
+      try {
+        const d = new Date(iso);
+        const tzOffset = d.getTimezoneOffset() * 60000;
+        return new Date(d - tzOffset).toISOString().slice(0, 16);
+      } catch { return ''; }
+    };
+
+    let tiers = [{ tier_name: 'General Admission', price: item.price || '299', total_seats: '100', booking_open: '', booking_close: '' }];
+    if (businessType === 'event') {
+      try {
+        const { data: dbTiers } = await supabase
+          .from('event_ticket_tiers')
+          .select('*')
+          .eq('event_id', item.id);
+        if (dbTiers && dbTiers.length > 0) {
+          tiers = dbTiers.map(t => ({
+            id: t.id,
+            tier_name: t.tier_name,
+            price: String(t.price),
+            total_seats: String(t.total_seats),
+            booking_open:  t.booking_open  ? toLocal(t.booking_open)  : '',
+            booking_close: t.booking_close ? toLocal(t.booking_close) : ''
+          }));
+        }
+      } catch (err) {
+        console.warn("Failed to load ticket tiers:", err);
+      }
+    }
+
     setNewItem({
       name: item.name,
       detail: item.detail || '',
@@ -332,7 +862,13 @@ export const VendorInventory = ({ businessType, storeId }) => {
       barcode: item.barcode || '',
       barcode_type: item.barcode_type || 'EAN-13',
       stock_quantity: item.stock_quantity || '',
-      category_id: item.category_id || null
+      category_id: item.category_id || null,
+      category: item.category || 'Music & Concerts',
+      venue_name: item.venue_name || '',
+      event_date: toLocal(item.event_date),
+      booking_start: toLocal(item.booking_start),
+      booking_end: toLocal(item.booking_end),
+      ticket_tiers: tiers
     });
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -348,8 +884,8 @@ export const VendorInventory = ({ businessType, storeId }) => {
       type: 'danger',
       onConfirm: async () => {
         setItems(prev => prev.filter(item => item.id !== id));
-        if (storeId) {
-          try { await supabase.from(businessType === 'shop' ? 'products' : 'services').delete().eq('id', id); } catch (e) { console.error(e); }
+        if (storeId || vendorData?.user_id) {
+          try { await supabase.from(businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : 'services').delete().eq('id', id); } catch (e) { console.error(e); }
         }
       }
     });
@@ -363,153 +899,400 @@ export const VendorInventory = ({ businessType, storeId }) => {
             <div className="v-hero-badge-icon" style={{ background: '#fff7ed' }}>
               {businessType === 'shop' ? (
                 <Package size={20} color="#f97316" />
+              ) : businessType === 'event' ? (
+                <Package size={20} color="#f97316" />
               ) : (
                 <Wrench size={20} color="#f97316" />
               )}
             </div>
             <span className="v-hero-badge-text" style={{ color: '#f97316' }}>
-              {businessType === 'shop' ? 'Store Management' : 'Service Management'}
+              {businessType === 'shop' ? 'Store Management' : businessType === 'event' ? 'Event Management' : 'Service Management'}
             </span>
           </div>
-          <h1 className="v-hero-title">{businessType === 'shop' ? 'Product Catalog' : 'Service Menu'}</h1>
+          <h1 className="v-hero-title">{businessType === 'shop' ? 'Product Catalog' : businessType === 'event' ? 'Events & Shows' : 'Service Menu'}</h1>
           <p className="v-hero-subtitle">
-            Manage your digital storefront and keep your price list updated for local customers.
+            {businessType === 'event' ? 'Manage your events, ticket pricing, and passes details for local audiences.' : 'Manage your digital storefront and keep your price list updated for local customers.'}
           </p>
         </div>
 
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => { setEditingId(null); setNewItem({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: null }); setShowForm(true); }}
+          onClick={() => { setEditingId(null); setNewItem({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: null, category: 'Music & Concerts', venue_name: '', event_date: '', booking_start: '', booking_end: '', ticket_tiers: [{ tier_name: 'General Admission', price: '299', total_seats: '100' }] }); setShowForm(true); }}
           className="v-btn-primary"
         >
           <PackagePlus size={20} />
-          {businessType === 'shop' ? 'Add Product' : 'Add Service'}
+          {businessType === 'shop' ? 'Add Product' : businessType === 'event' ? 'Add Event' : 'Add Service'}
         </motion.button>
       </div>
 
       <AnimatePresence>
         {showForm && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -20 }}
-            className="v-data-card v-form-card"
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(15, 23, 42, 0.45)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 99999,
+              padding: '1.5rem',
+            }}
+            onClick={() => setShowForm(false)}
           >
-            <div className="v-form-header">
-              <div>
-                <h3 className="v-form-header-title">
-                  {editingId ? 'Edit Listing' : 'Publish New Offering'}
-                </h3>
-                <p className="v-form-header-subtitle">Create a professional listing to attract more local orders.</p>
-              </div>
-              <button onClick={() => setShowForm(false)} className="v-action-btn delete"><Trash2 size={20} /></button>
-            </div>
-
-            <form style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }} onSubmit={handleAdd}>
-              <div className="v-form-row-2col">
-                <div className="v-form-group">
-                  <label>Title of the {businessType === 'shop' ? 'Product' : 'Service'}</label>
-                  <input required type="text" className="v-input" placeholder="E.g. Full Home Sanitize" value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} />
-                </div>
-                <div className="v-form-group">
-                  <label>Base Price (₹)</label>
-                  <div style={{ position: 'relative' }}>
-                    <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', fontWeight: 900, color: '#94a3b8' }}>₹</span>
-                    <input required type="number" className="v-input" style={{ paddingLeft: '36px' }} placeholder="0.00" value={newItem.price} onChange={e => setNewItem({ ...newItem, price: e.target.value })} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              style={{
+                width: '100%',
+                maxWidth: '650px',
+                maxHeight: '90vh',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                margin: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                borderRadius: '28px',
+                overflow: 'hidden',
+                background: 'white'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <form 
+                onSubmit={handleAdd} 
+                style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  maxHeight: '90vh', 
+                  width: '100%', 
+                  margin: 0 
+                }}
+              >
+                <div className="v-form-header" style={{ padding: '2.5rem 3rem 1.5rem 3rem', marginBottom: 0, borderBottom: '1px solid #f1f5f9' }}>
+                  <div>
+                    <h3 className="v-form-header-title" style={{ fontSize: '1.5rem', fontWeight: 950, color: '#0f172a', marginBottom: '4px' }}>
+                      {editingId ? (businessType === 'event' ? 'Edit Event' : 'Edit Listing') : (businessType === 'event' ? 'Publish New Event' : 'Publish New Offering')}
+                    </h3>
+                    <p className="v-form-header-subtitle">Create a professional listing to attract more local orders.</p>
                   </div>
+                  <button type="button" onClick={() => setShowForm(false)} className="v-action-btn delete" style={{ background: '#f1f5f9', color: '#64748b' }}><X size={20} /></button>
                 </div>
-              </div>
 
-              {businessType === 'service' && (
-                <div className="v-form-group">
-                  <label>Service Category</label>
-                  <select required className="v-input" value={newItem.category_id || '77777777-7777-7777-7777-777777777777'} onChange={e => setNewItem({ ...newItem, category_id: e.target.value })}>
-                    <option value="77777777-7777-7777-7777-777777777777">Plumbing</option>
-                    <option value="77777777-7777-7777-7777-111111111111">Electrical</option>
-                    <option value="77777777-7777-7777-7777-222222222222">AC & Appliance</option>
-                    <option value="77777777-7777-7777-7777-333333333333">Carpentry</option>
-                    <option value="77777777-7777-7777-7777-444444444444">Painting</option>
-                    <option value="77777777-7777-7777-7777-555555555555">Cleaning</option>
-                  </select>
-                </div>
-              )}
-
-              {businessType === 'shop' && (
-                <div className="v-form-row-3col">
-                  <div className="v-form-group">
-                    <label>Barcode Type</label>
-                    <select className="v-input" value={newItem.barcode_type} onChange={e => setNewItem({ ...newItem, barcode_type: e.target.value })}>
-                      <option value="EAN-13">EAN-13</option>
-                      <option value="UPCA-2">UPCA-2</option>
-                      <option value="UPC-A">UPC-A</option>
-                      <option value="EAN-8">EAN-8</option>
-                    </select>
-                  </div>
-                  <div className="v-form-group">
-                    <label>Barcode Number</label>
-                    <input type="text" maxLength={20} className="v-input" placeholder="E.g. 8901234567890" value={newItem.barcode} onChange={e => setNewItem({ ...newItem, barcode: e.target.value.replace(/\D/g, '') })} />
-                  </div>
-                  <div className="v-form-group">
-                    <label>Stock</label>
-                    <input type="number" className="v-input" placeholder="0" value={newItem.stock_quantity} onChange={e => setNewItem({ ...newItem, stock_quantity: e.target.value })} />
-                  </div>
-                </div>
-              )}
-
-              <div className="v-form-group">
-                <label>Description & Unique Selling Points</label>
-                <textarea className="v-input" style={{ minHeight: '120px', resize: 'vertical' }} placeholder="What makes this special? List features, warranty, or delivery times..." value={newItem.detail} onChange={e => setNewItem({ ...newItem, detail: e.target.value })} />
-              </div>
-
-              {businessType === 'shop' && (
-                <div className="v-form-group">
-                  <label>Visual Presentation</label>
-                  <div
-                    className="v-input v-upload-zone"
-                    onClick={(e) => {
-                      if (e.target.id !== 'inventory-upload') {
-                        document.getElementById('inventory-upload').click();
-                      }
-                    }}
-                  >
-                    <input id="inventory-upload" type="file" hidden accept="image/*" onClick={(e) => e.stopPropagation()} onChange={(e) => {
-                      const file = e.target.files[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          setNewItem(prev => ({ ...prev, image: reader.result }));
-                          e.target.value = '';
-                        };
-                        reader.readAsDataURL(file);
-                      } else {
-                        e.target.value = '';
-                      }
-                    }} />
-                    {newItem.image ? (
-                      <div style={{ position: 'relative', width: '220px', height: '150px', margin: '0 auto' }}>
-                        <img src={newItem.image} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '16px' }} />
-                        <div style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setNewItem(prev => ({ ...prev, image: null })); }}><Trash2 size={16} color="#ef4444" /></div>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <Camera size={40} color="#cbd5e1" style={{ marginBottom: '1rem' }} />
-                        <p style={{ margin: 0, fontWeight: 800, color: '#1e293b' }}>Click to upload cover photo</p>
-                        <p style={{ margin: '4px 0 0 0', color: '#94a3b8', fontSize: '0.85rem' }}>High-res photos increase conversion by 40%</p>
+                <div 
+                  style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '2rem',
+                    overflowY: 'auto',
+                    flex: 1,
+                    padding: '2.5rem 3rem'
+                  }}
+                >
+                  <div className="v-form-row-2col">
+                    <div className="v-form-group" style={businessType === 'event' ? { gridColumn: '1 / -1' } : {}}>
+                      <label>Title of the {businessType === 'shop' ? 'Product' : businessType === 'event' ? 'Event' : 'Service'}</label>
+                      <input required type="text" className="v-input" placeholder={businessType === 'event' ? "E.g. Live Music Night" : "E.g. Full Home Sanitize"} value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} />
+                    </div>
+                    {businessType !== 'event' && (
+                      <div className="v-form-group">
+                        <label>Base Price (₹)</label>
+                        <div style={{ position: 'relative' }}>
+                          <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', fontWeight: 900, color: '#94a3b8' }}>₹</span>
+                          <input 
+                            required 
+                            type="number" 
+                            className="v-input" 
+                            style={{ paddingLeft: '36px' }} 
+                            placeholder="0.00" 
+                            value={newItem.price} 
+                            onChange={e => setNewItem({ ...newItem, price: e.target.value })} 
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
-                </div>
-              )}
 
-              <div className="v-form-actions">
-                <button type="button" onClick={() => setShowForm(false)} className="v-btn-outline">Discard</button>
-                <button type="submit" className="v-btn-primary">
-                  {editingId ? 'Update Listing' : (businessType === 'shop' ? 'Publish to Store' : 'Publish Service')}
-                </button>
-              </div>
-            </form>
-          </motion.div>
+                  {businessType === 'event' && (
+                    <>
+                      <div className="v-form-row-2col">
+                        <div className="v-form-group">
+                          <label>Event Category</label>
+                          <select required className="v-input" value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value })}>
+                            <option value="Music & Concerts">Music & Concerts</option>
+                            <option value="Comedy & Theatre">Comedy & Theatre</option>
+                            <option value="Workshops & Classes">Workshops & Classes</option>
+                            <option value="Parties & Nightlife">Parties & Nightlife</option>
+                            <option value="Festivals & Fairs">Festivals & Fairs</option>
+                            <option value="Sports & Fitness">Sports & Fitness</option>
+                            <option value="Corporate & Business">Corporate & Business</option>
+                            <option value="Other Events">Other Events</option>
+                          </select>
+                        </div>
+                        <div className="v-form-group">
+                          <label>Event Date & Time</label>
+                          <input 
+                            required 
+                            type="datetime-local" 
+                            className="v-input" 
+                            min={nowMin}
+                            value={newItem.event_date} 
+                            onChange={e => setNewItem({ ...newItem, event_date: e.target.value })} 
+                          />
+                        </div>
+                      </div>
+
+                      <div className="v-form-group">
+                        <label>Venue Name</label>
+                        <input required type="text" className="v-input" placeholder="E.g. Town Hall, Satellite" value={newItem.venue_name} onChange={e => setNewItem({ ...newItem, venue_name: e.target.value })} />
+                      </div>
+
+                      <div className="v-form-group" style={{ marginTop: '1rem', background: '#f8fafc', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                          <span style={{ fontWeight: 800, color: '#334155', fontSize: '0.95rem', letterSpacing: '0.5px', textTransform: 'uppercase' }}>Ticket Categories & Pricing</span>
+                          <button 
+                            type="button" 
+                            className="v-btn-secondary" 
+                            style={{ padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 700 }}
+                            onClick={() => {
+                              const currentTiers = newItem.ticket_tiers || [];
+                              setNewItem({
+                                ...newItem,
+                                ticket_tiers: [...currentTiers, { tier_name: '', price: '', total_seats: '100', booking_open: '', booking_close: '' }]
+                              });
+                            }}
+                          >
+                            + Add Category
+                          </button>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                          {(newItem.ticket_tiers || []).map((tier, idx) => (
+                            <div key={idx} style={{ background: 'white', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '1rem 1.25rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                              {/* Row 1: Name | Price | Seats | Delete */}
+                              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '0.75rem', alignItems: 'end' }}>
+                                <div>
+                                  <label style={{ fontSize: '0.73rem', fontWeight: 700, color: '#64748b', marginBottom: '4px', display: 'block' }}>Category Name</label>
+                                  <input
+                                    required
+                                    type="text"
+                                    className="v-input"
+                                    placeholder="E.g. VIP, Premium, Couple"
+                                    value={tier.tier_name}
+                                    onChange={e => {
+                                      const updated = [...newItem.ticket_tiers];
+                                      updated[idx].tier_name = e.target.value;
+                                      setNewItem({ ...newItem, ticket_tiers: updated });
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: '0.73rem', fontWeight: 700, color: '#64748b', marginBottom: '4px', display: 'block' }}>Price (₹)</label>
+                                  <input
+                                    required
+                                    type="number"
+                                    className="v-input"
+                                    placeholder="299"
+                                    value={tier.price}
+                                    onChange={e => {
+                                      const updated = [...newItem.ticket_tiers];
+                                      updated[idx].price = e.target.value;
+                                      let minPrice = e.target.value;
+                                      updated.forEach(t => {
+                                        if (t.price && parseFloat(t.price) < parseFloat(minPrice)) minPrice = t.price;
+                                      });
+                                      setNewItem({ ...newItem, ticket_tiers: updated, price: minPrice });
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: '0.73rem', fontWeight: 700, color: '#64748b', marginBottom: '4px', display: 'block' }}>Total Seats</label>
+                                  <input
+                                    required
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    className="v-input"
+                                    placeholder="100"
+                                    value={tier.total_seats}
+                                    onChange={e => {
+                                      const val = Math.max(1, parseInt(e.target.value) || 1);
+                                      const updated = [...newItem.ticket_tiers];
+                                      updated[idx].total_seats = String(val);
+                                      setNewItem({ ...newItem, ticket_tiers: updated });
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <button
+                                    type="button"
+                                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '8px' }}
+                                    disabled={(newItem.ticket_tiers || []).length <= 1}
+                                    onClick={() => {
+                                      const updated = (newItem.ticket_tiers || []).filter((_, i) => i !== idx);
+                                      let minPrice = updated[0]?.price || '299';
+                                      updated.forEach(t => {
+                                        if (t.price && parseFloat(t.price) < parseFloat(minPrice)) minPrice = t.price;
+                                      });
+                                      setNewItem({ ...newItem, ticket_tiers: updated, price: minPrice });
+                                    }}
+                                  >
+                                    <Trash2 size={17} />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Row 2: Booking Open | Booking Close */}
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed #e2e8f0' }}>
+                                <div>
+                                  <label style={{ fontSize: '0.73rem', fontWeight: 700, color: '#16a34a', marginBottom: '4px', display: 'block' }}>✅ Book Open Time</label>
+                                  <input
+                                    type="datetime-local"
+                                    className="v-input"
+                                    min={nowMin}
+                                    value={tier.booking_open || ''}
+                                    onChange={e => {
+                                      const updated = [...newItem.ticket_tiers];
+                                      updated[idx].booking_open = e.target.value;
+                                      if (updated[idx].booking_close && updated[idx].booking_close < e.target.value) {
+                                        updated[idx].booking_close = '';
+                                      }
+                                      setNewItem({ ...newItem, ticket_tiers: updated });
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: '0.73rem', fontWeight: 700, color: '#dc2626', marginBottom: '4px', display: 'block' }}>🔒 Book Close Time</label>
+                                  <input
+                                    type="datetime-local"
+                                    className="v-input"
+                                    min={tier.booking_open || nowMin}
+                                    value={tier.booking_close || ''}
+                                    onChange={e => {
+                                      const updated = [...newItem.ticket_tiers];
+                                      updated[idx].booking_close = e.target.value;
+                                      setNewItem({ ...newItem, ticket_tiers: updated });
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {businessType === 'service' && (
+                    <div className="v-form-group">
+                      <label>Service Category</label>
+                      <select required className="v-input" value={newItem.category_id || '77777777-7777-7777-7777-777777777777'} onChange={e => setNewItem({ ...newItem, category_id: e.target.value })}>
+                        <option value="77777777-7777-7777-7777-555555555555">Cleaning</option>
+                        <option value="77777777-7777-7777-7777-111111111111">Electrical</option>
+                        <option value="77777777-7777-7777-7777-222222222222">AC & Appliance</option>
+                        <option value="77777777-7777-7777-7777-333333333333">Carpentry</option>
+                        <option value="77777777-7777-7777-7777-444444444444">Painting</option>
+                        <option value="77777777-7777-7777-7777-777777777777">Plumbing</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {businessType === 'shop' && (
+                    <>
+                      <div className="v-form-row-2col">
+                      <div className="v-form-group">
+                        <label>Barcode Type</label>
+                        <select className="v-input" value={newItem.barcode_type} onChange={e => setNewItem({ ...newItem, barcode_type: e.target.value })}>
+                          <option value="EAN-13">EAN-13</option>
+                          <option value="UPCA-2">UPCA-2</option>
+                          <option value="UPC-A">UPC-A</option>
+                          <option value="EAN-8">EAN-8</option>
+                        </select>
+                      </div>
+                      <div className="v-form-group">
+                        <label>Barcode Number</label>
+                        <input type="text" maxLength={20} className="v-input" placeholder="E.g. 8901234567890" value={newItem.barcode} onChange={e => setNewItem({ ...newItem, barcode: e.target.value.replace(/\D/g, '') })} />
+                      </div>
+                    </div>
+                    <div className="v-form-row-2col" style={{ marginTop: '-1rem' }}>
+                      <div className="v-form-group">
+                        <label>Stock Quantity</label>
+                        <input required type="number" className="v-input" placeholder="E.g. 50" value={newItem.stock_quantity} onChange={e => setNewItem({ ...newItem, stock_quantity: e.target.value })} />
+                      </div>
+                    </div>
+                  </>
+                  )}
+
+                  <div className="v-form-group">
+                    <label>Description & Unique Selling Points</label>
+                    <textarea className="v-input" style={{ minHeight: '120px', resize: 'vertical' }} placeholder="What makes this special? List features, warranty, or delivery times..." value={newItem.detail} onChange={e => setNewItem({ ...newItem, detail: e.target.value })} />
+                  </div>
+
+                  {(businessType === 'shop' || businessType === 'event') && (
+                    <div className="v-form-group">
+                      <label>Visual Presentation</label>
+                      <div
+                        className="v-input v-upload-zone"
+                        onClick={(e) => {
+                          if (e.target.id !== 'inventory-upload') {
+                            document.getElementById('inventory-upload').click();
+                          }
+                        }}
+                      >
+                        <input id="inventory-upload" type="file" hidden accept="image/*" onClick={(e) => e.stopPropagation()} onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setNewItem(prev => ({ ...prev, image: reader.result }));
+                              e.target.value = '';
+                            };
+                            reader.readAsDataURL(file);
+                          } else {
+                            e.target.value = '';
+                          }
+                        }} />
+                        {newItem.image ? (
+                          <div style={{ position: 'relative', width: '220px', height: '150px', margin: '0 auto' }}>
+                            <img src={newItem.image} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '16px' }} />
+                            <div style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setNewItem(prev => ({ ...prev, image: null })); }}><Trash2 size={16} color="#ef4444" /></div>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <Camera size={40} color="#cbd5e1" style={{ marginBottom: '1rem' }} />
+                            <p style={{ margin: 0, fontWeight: 800, color: '#1e293b' }}>Click to upload cover photo</p>
+                            <p style={{ margin: '4px 0 0 0', color: '#94a3b8', fontSize: '0.85rem' }}>High-res photos increase conversion by 40%</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div 
+                  className="v-form-actions" 
+                  style={{ 
+                    padding: '1.5rem 3rem 2.5rem 3rem', 
+                    borderTop: '1px solid #f1f5f9', 
+                    background: 'white',
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    gap: '1rem'
+                  }}
+                >
+                  <button type="button" onClick={() => setShowForm(false)} className="v-btn-outline">Discard</button>
+                  <button type="submit" className="v-btn-primary">
+                    {editingId ? (businessType === 'event' ? 'Update Event' : 'Update Listing') : (businessType === 'shop' ? 'Publish to Store' : businessType === 'event' ? 'Publish Event' : 'Publish Service')}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
@@ -571,22 +1354,66 @@ export const VendorInventory = ({ businessType, storeId }) => {
                 </div>
 
                 <div style={{ position: 'absolute', bottom: '16px', left: '16px' }}>
-                  <span className={`v-badge-premium ${businessType === 'shop' ? 'v-badge-info' : 'v-badge-success'}`}>
-                    {businessType === 'shop' ? (item.stock_quantity > 0 ? `In Stock: ${item.stock_quantity}` : 'Out of Stock') : 'Active Service'}
+                  <span className={`v-badge-premium ${
+                    businessType === 'shop' ? 'v-badge-info' :
+                    businessType === 'event'
+                      ? (item.status === 'PENDING_APPROVAL' ? '' : item.status === 'REJECTED' ? '' : 'v-badge-warning')
+                      : 'v-badge-success'
+                  }`} style={
+                    businessType === 'event' && item.status === 'PENDING_APPROVAL'
+                      ? { background: '#f59e0b', color: '#fff' }
+                      : businessType === 'event' && item.status === 'REJECTED'
+                      ? { background: '#ef4444', color: '#fff' }
+                      : {}
+                  }>
+                    {businessType === 'shop'
+                      ? 'In Stock'
+                      : businessType === 'event'
+                        ? (item.status === 'PENDING_APPROVAL' ? '⏳ Pending Approval' : item.status === 'REJECTED' ? '❌ Rejected' : 'Active Event')
+                        : 'Active Service'}
                   </span>
                 </div>
               </div>
 
               <div className="v-card-content">
                 <h4 className="v-card-title">{item.name}</h4>
-                <p className="v-card-detail">{item.detail || 'High quality listing with professional support.'}</p>
+                <p className="v-card-detail">{item.detail || (businessType === 'event' ? item.category || 'Upcoming event' : 'High quality listing with professional support.')}</p>
+
+                {businessType === 'event' && item.total_seats > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                    <div style={{
+                      flex: 1, height: '5px', borderRadius: '10px',
+                      background: '#e2e8f0', overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        height: '100%', borderRadius: '10px',
+                        width: `${Math.max(0, Math.min(100, (item.available_seats / item.total_seats) * 100))}%`,
+                        background: item.available_seats === 0 ? '#ef4444'
+                          : item.available_seats / item.total_seats < 0.2 ? '#f59e0b'
+                          : '#22c55e',
+                        transition: 'width 0.4s ease'
+                      }} />
+                    </div>
+                    <span style={{
+                      fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap',
+                      color: item.available_seats === 0 ? '#ef4444'
+                        : item.available_seats / item.total_seats < 0.2 ? '#f59e0b'
+                        : '#22c55e'
+                    }}>
+                      {item.available_seats === 0 ? 'Sold Out' : `${item.available_seats} seats left`}
+                    </span>
+                  </div>
+                )}
 
                 <div className="v-card-footer">
                   <div className="v-price-tag">
+                    {businessType === 'event' && <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600, marginRight: '2px' }}>from</span>}
                     <span className="v-price-currency">₹</span>
                     <span className="v-price-amount">{item.price}</span>
                   </div>
-                  <button onClick={() => handleEditClick(item)} className="v-card-edit-btn">Edit Listing</button>
+                  <button onClick={() => handleEditClick(item)} className="v-card-edit-btn">
+                    {businessType === 'event' ? 'Edit Event' : 'Edit Listing'}
+                  </button>
                 </div>
               </div>
             </motion.div>
@@ -681,10 +1508,8 @@ function VendorOrderTrackingMap({ order, riderCoords, businessType }) {
     return () => {
       activeMarkers.current.forEach(m => m.setMap(null));
       activePolylines.current.forEach(p => p.setMap(null));
-      activeMarkers.current = []; activePolylines.current = [];
       googleMapInstance.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGoogleLoaded]);
 
   // Draw markers and routes
@@ -866,10 +1691,11 @@ function VendorOrderMapWrapper({ order, businessType }) {
   );
 }
 
-export const VendorOrders = ({ storeId, businessType }) => {
+export const VendorOrders = ({ storeId, businessType, vendorData }) => {
   const [activeTab, setActiveTab] = React.useState('active');
   const [orders, setOrders] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
+  const [qrScannerOpen, setQrScannerOpen] = React.useState({ open: false, booking: null });
   const [confirmDialog, setConfirmDialog] = React.useState({
     isOpen: false,
     title: '',
@@ -889,7 +1715,46 @@ export const VendorOrders = ({ storeId, businessType }) => {
     try {
       if (isInitial) setLoading(true);
 
-      if (businessType === 'service') {
+      if (businessType === 'event') {
+        const userId = vendorData?.user_id || storeId;
+        const { data, error } = await supabase
+          .from('event_bookings')
+          .select(`
+            *,
+            users(full_name, phone),
+            events(title, created_by)
+          `)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (!error && data) {
+          const userBookings = data.filter(b => b.events?.created_by === userId);
+          const mappedBookings = userBookings.map(b => ({
+            id: b.id,
+            created_at: b.created_at,
+            status: b.status,
+            total_amount: b.total_amount,
+            subtotal: b.base_amount,
+            qr_code_hash: b.qr_code_hash,
+            ticket_count: b.ticket_count,
+            event_title: b.events?.title || 'Event Ticket',
+            users: b.users,
+            addresses: {
+              address_line_1: 'Digital E-Ticket',
+              society: 'Digital Pass'
+            },
+            order_items: [{
+              quantity: b.ticket_count,
+              products: {
+                name: `${b.events?.title || 'Event Ticket'} (x${b.ticket_count} Tickets)`
+              }
+            }]
+          }));
+          setOrders(mappedBookings);
+        } else {
+          setOrders([]);
+        }
+      } else if (businessType === 'service') {
         const { data, error } = await supabase
           .from('service_bookings')
           .select(`
@@ -1133,21 +1998,14 @@ export const VendorOrders = ({ storeId, businessType }) => {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
 
     try {
-      if (newStatus === 'CANCELLED' && !isService) {
-        const { data: items } = await supabase.from('order_items').select('product_id, quantity').eq('order_id', orderId);
-        if (items && items.length > 0) {
-          for (const item of items) {
-            if (item.product_id) {
-              const { data: prod } = await supabase.from('products').select('stock_quantity').eq('id', item.product_id).maybeSingle();
-              if (prod) {
-                await supabase.from('products').update({ stock_quantity: (prod.stock_quantity || 0) + (parseInt(item.quantity) || 1) }).eq('id', item.product_id);
-              }
-            }
-          }
-        }
-      }
 
-      if (isService) {
+      if (businessType === 'event') {
+        const { error } = await supabase
+          .from('event_bookings')
+          .update({ status: newStatus })
+          .eq('id', orderId);
+        if (error) throw error;
+      } else if (isService) {
         const { error: bookingErr } = await supabase
           .from('service_bookings')
           .update({ status: newStatus })
@@ -1210,13 +2068,16 @@ export const VendorOrders = ({ storeId, businessType }) => {
 
   const getStatusStyle = (status) => {
     const isService = businessType === 'service';
+    const isEvent = businessType === 'event';
     switch (status) {
       case 'PENDING':
-      case 'PLACED': return { bg: '#fff7ed', text: '#f97316', dot: '#f97316', label: isService ? 'New Booking' : 'New Order', icon: <Bell size={14} /> };
-      case 'ACCEPTED': return { bg: '#e0f2fe', text: '#0ea5e9', dot: '#0ea5e9', label: isService ? 'Expert Assigned' : 'Rider Accepted', icon: <CheckCircle size={14} /> };
-      case 'PREPARING': return { bg: '#eff6ff', text: '#3b82f6', dot: '#3b82f6', label: isService ? 'Expert Preparing' : 'In Progress', icon: <Clock size={14} /> };
-      case 'SHIPPED': return { bg: '#faf5ff', text: '#a855f7', dot: '#a855f7', label: isService ? 'Expert En Route' : 'Out for Delivery', icon: <MapPin size={14} /> };
-      case 'DELIVERED': return { bg: '#f0fdf4', text: '#22c55e', dot: '#22c55e', label: isService ? 'Service Completed' : 'Completed', icon: <CheckCircle size={14} /> };
+      case 'PLACED': return { bg: '#fff7ed', text: '#f97316', dot: '#f97316', label: isEvent ? 'Ticket Booked' : isService ? 'New Booking' : 'New Order', icon: <Bell size={14} /> };
+      case 'ACCEPTED': 
+      case 'CONFIRMED': return { bg: '#e0f2fe', text: '#0ea5e9', dot: '#0ea5e9', label: isEvent ? 'Ticket Booked' : isService ? 'Expert Assigned' : 'Rider Accepted', icon: <CheckCircle size={14} /> };
+      case 'PREPARING': return { bg: '#eff6ff', text: '#3b82f6', dot: '#3b82f6', label: isEvent ? 'Processing' : isService ? 'Expert Preparing' : 'In Progress', icon: <Clock size={14} /> };
+      case 'SHIPPED': return { bg: '#faf5ff', text: '#a855f7', dot: '#a855f7', label: isEvent ? 'Dispatched' : isService ? 'Expert En Route' : 'Out for Delivery', icon: <MapPin size={14} /> };
+      case 'COMPLETED':
+      case 'DELIVERED': return { bg: '#f0fdf4', text: '#22c55e', dot: '#22c55e', label: isEvent ? 'Attended / Checked In' : isService ? 'Service Completed' : 'Completed', icon: <CheckCircle size={14} /> };
       default: return { bg: '#f1f5f9', text: '#64748b', dot: '#64748b', label: status, icon: <FileText size={14} /> };
     }
   };
@@ -1239,11 +2100,27 @@ export const VendorOrders = ({ storeId, businessType }) => {
             <div className="v-hero-badge-icon" style={{ background: '#fef2f2' }}>
               <FileText size={24} color="#ef4444" />
             </div>
-            <span className="v-hero-badge-text" style={{ color: '#ef4444' }}>Fulfillment Dashboard</span>
+            <span className="v-hero-badge-text" style={{ color: '#ef4444' }}>{businessType === 'event' ? 'Ticket Booking Console' : 'Fulfillment Dashboard'}</span>
           </div>
-          <h1 className="v-hero-title">{businessType === 'service' ? 'Live Bookings' : 'Live Orders'}</h1>
-          <p className="v-hero-subtitle">{businessType === 'service' ? 'Real-time tracking and operational control for your services' : 'Real-time tracking and operational control for your store'}</p>
+          <h1 className="v-hero-title">{businessType === 'service' ? 'Live Bookings' : businessType === 'event' ? 'Ticket Bookings' : 'Live Orders'}</h1>
+          <p className="v-hero-subtitle">{businessType === 'service' ? 'Real-time tracking and operational control for your services' : businessType === 'event' ? 'Real-time tracking and control of ticket bookings and passes' : 'Real-time tracking and operational control for your store'}</p>
         </div>
+        {businessType === 'event' && (
+          <button
+            onClick={() => setQrScannerOpen({ open: true, booking: null })}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '10px',
+              padding: '14px 24px',
+              background: 'linear-gradient(135deg, #0f172a, #1e293b)',
+              color: 'white', border: 'none', borderRadius: '16px',
+              fontWeight: 800, cursor: 'pointer', fontSize: '0.95rem',
+              boxShadow: '0 4px 20px rgba(15,23,42,0.3)',
+              whiteSpace: 'nowrap', flexShrink: 0
+            }}
+          >
+            <ScanLine size={18} /> Scan QR to Check In
+          </button>
+        )}
       </div>
 
       <div className="v-tab-group" style={{ marginBottom: '3rem' }}>
@@ -1254,31 +2131,35 @@ export const VendorOrders = ({ storeId, businessType }) => {
             className={`v-tab-btn ${activeTab === tab ? 'active' : ''}`}
             style={{ padding: '12px 32px' }}
           >
-            {tab === 'active' ? (businessType === 'service' ? 'Ongoing Bookings' : 'Ongoing Missions') : 'Past Records'}
+            {tab === 'active' ? (businessType === 'service' ? 'Ongoing Bookings' : businessType === 'event' ? 'Booked Tickets' : 'Ongoing Missions') : 'Past Records'}
           </button>
         ))}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {(() => {
-          const filteredList = orders.filter(o => activeTab === 'active' ? (o.status !== 'DELIVERED' && o.status !== 'CANCELLED') : (o.status === 'DELIVERED' || o.status === 'CANCELLED'));
+          const filteredList = orders.filter(o => activeTab === 'active'
+            ? (o.status !== 'DELIVERED' && o.status !== 'CANCELLED' && o.status !== 'COMPLETED')
+            : (o.status === 'DELIVERED' || o.status === 'CANCELLED' || o.status === 'COMPLETED'));
           
           if (filteredList.length === 0) {
             return (
               <div style={{ padding: '8rem 2rem', textAlign: 'center', background: 'white', borderRadius: '40px', border: '2px dashed #e2e8f0' }}>
                 <div style={{ width: '100px', height: '100px', background: '#f8fafc', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem auto' }}>
-                  {businessType === 'service' ? (
+                  {businessType === 'event' ? (
+                    <Calendar size={48} color="#cbd5e1" />
+                  ) : businessType === 'service' ? (
                     <Wrench size={48} color="#cbd5e1" />
                   ) : (
                     <Package size={48} color="#cbd5e1" />
                   )}
                 </div>
-                <h3 style={{ fontWeight: 950, color: '#1e293b', fontSize: '1.5rem', letterSpacing: '-0.5px' }}>{businessType === 'service' ? 'No Bookings' : 'Station Idle'}</h3>
-                <p style={{ color: '#64748b', margin: '0.75rem 0 2rem 0', fontWeight: 600 }}>{businessType === 'service' ? 'Your service station is ready to receive bookings. New bookings will trigger a priority alert.' : 'Your store is ready to receive missions. New orders will trigger a priority alert.'}</p>
+                <h3 style={{ fontWeight: 950, color: '#1e293b', fontSize: '1.5rem', letterSpacing: '-0.5px' }}>{businessType === 'event' ? 'No Ticket Sales' : businessType === 'service' ? 'No Bookings' : 'Station Idle'}</h3>
+                <p style={{ color: '#64748b', margin: '0.75rem 0 2rem 0', fontWeight: 600 }}>{businessType === 'event' ? 'No tickets have been booked for your events yet. New sales will appear here instantly.' : businessType === 'service' ? 'Your service station is ready to receive bookings. New bookings will trigger a priority alert.' : 'Your store is ready to receive missions. New orders will trigger a priority alert.'}</p>
                 <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: '#f0fdf4', color: '#16a34a', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 900, marginBottom: '1rem' }}>
                     <div className="v-pulse-dot" style={{ background: '#16a34a' }}></div>
-                    OPERATIONAL
+                    {businessType === 'event' ? 'TICKET SERVER ACTIVE' : 'OPERATIONAL'}
                   </div>
                 </div>
               </div>
@@ -1325,7 +2206,7 @@ export const VendorOrders = ({ storeId, businessType }) => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3rem', marginBottom: '2rem', alignItems: 'center' }}>
                   <div>
-                    <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{isService ? 'Customer Profile' : 'Customer Entity'}</p>
+                    <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{businessType === 'event' ? 'Ticket Holder' : isService ? 'Customer Profile' : 'Customer Entity'}</p>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <div style={{ width: '40px', height: '40px', background: '#f8fafc', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#475569', border: '1px solid #e2e8f0' }}>
                         {(order.users?.full_name || 'U').charAt(0)}
@@ -1338,7 +2219,7 @@ export const VendorOrders = ({ storeId, businessType }) => {
                   </div>
 
                   <div>
-                    <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{isService ? 'Service Address' : 'Destination Node'}</p>
+                    <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{businessType === 'event' ? 'Delivery Mode' : isService ? 'Service Address' : 'Destination Node'}</p>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', color: '#1e293b' }}>
                       <MapPin size={18} color="var(--v-primary)" style={{ marginTop: '2px', flexShrink: 0 }} />
                       <span style={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.4 }}>{order.addresses?.society || 'Geo-location Pending'}</span>
@@ -1347,7 +2228,7 @@ export const VendorOrders = ({ storeId, businessType }) => {
                 </div>
 
                 <div style={{ background: '#f8fafc', borderRadius: '20px', padding: '1.5rem', marginBottom: '2rem', border: '1px solid #f1f5f9' }}>
-                  <p style={{ margin: '0 0 12px 0', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase' }}>{isService ? 'Booked Services' : 'Inventory Manifest'}</p>
+                  <p style={{ margin: '0 0 12px 0', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase' }}>{businessType === 'event' ? 'Ticket Manifest' : isService ? 'Booked Services' : 'Inventory Manifest'}</p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                     {order.order_items?.map((item, idx) => (
                       <div key={idx} style={{ background: 'white', border: '1px solid #e2e8f0', padding: '6px 14px', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
@@ -1365,83 +2246,107 @@ export const VendorOrders = ({ storeId, businessType }) => {
                   </div>
                 )}
 
-                <div style={{ display: 'flex', gap: '1.25rem' }}>
-                  {['PENDING', 'PLACED'].includes(order.status) && (
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => updateStatus(order.id, 'PREPARING')}
-                      className="v-btn-primary"
-                      style={{ flex: 1, padding: '16px' }}
-                    >
-                      {isService ? 'Confirm Booking' : 'Confirm Order'}
-                    </motion.button>
-                  )}
-                  {order.status === 'ACCEPTED' && (
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => updateStatus(order.id, 'PREPARING')}
-                      className="v-btn-primary"
-                      style={{ flex: 1, padding: '16px' }}
-                    >
-                      {isService ? 'Initiate Service' : 'Initiate Fulfillment'}
-                    </motion.button>
-                  )}
-                  {order.status === 'PREPARING' && (
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => updateStatus(order.id, 'SHIPPED')}
-                      className="v-btn-primary"
-                      style={{ flex: 1, padding: '16px', background: '#16a34a', boxShadow: '0 10px 25px rgba(22, 163, 74, 0.2)' }}
-                    >
-                      {isService ? 'Dispatch Expert' : 'Confirm Ready for Pickup'}
-                    </motion.button>
-                  )}
-                  {['SHIPPED', 'DISPATCHED'].includes(order.status) && (
-                    isService ? (
+                <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
+                  {businessType === 'event' ? (
+                    order.status === 'CONFIRMED' || order.status === 'PENDING' || order.status === 'PLACED' ? (
                       <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() => updateStatus(order.id, 'DELIVERED')}
+                        onClick={() => updateStatus(order.id, 'COMPLETED')}
                         className="v-btn-primary"
-                        style={{ flex: 1, padding: '16px', background: '#2563eb', boxShadow: '0 10px 25px rgba(37, 99, 235, 0.2)' }}
+                        style={{ flex: 1, padding: '16px', background: '#16a34a', boxShadow: '0 10px 25px rgba(22, 163, 74, 0.2)' }}
                       >
-                        Confirm Service Completed
+                        ✅ Check In Attendee / Redeem Pass
                       </motion.button>
                     ) : (
                       <div
-                        style={{ flex: 1, padding: '16px', background: '#f1f5f9', color: '#64748b', borderRadius: '14px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e2e8f0' }}
+                        style={{ flex: 1, padding: '16px', background: '#f0fdf4', color: '#16a34a', borderRadius: '14px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #bbf7d0', gap: '8px' }}
                       >
-                        Out for Delivery by Rider
+                        ✅ {order.status === 'COMPLETED' ? 'Checked In & Verified' : 'Cancelled / Expired'}
                       </div>
                     )
-                  )}
-                  {['PENDING', 'PLACED', 'ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED'].includes(order.status) ? (
-                    <button
-                      onClick={() => {
-                        setConfirmDialog({
-                          isOpen: true,
-                          title: isService ? 'Cancel Booking' : 'Emergency Override',
-                          message: isService 
-                            ? 'Are you sure you want to CANCEL this booking? This cannot be undone and the customer will be notified.'
-                            : 'Are you sure you want to CANCEL this order? This cannot be undone and the customer will be notified.',
-                          confirmText: isService ? 'Cancel Booking' : 'Cancel Order',
-                          cancelText: 'Keep Active',
-                          type: 'danger',
-                          onConfirm: () => updateStatus(order.id, 'CANCELLED')
-                        });
-                      }}
-                      className="v-btn-outline"
-                      style={{ padding: '14px 32px', fontWeight: 800, color: '#ef4444', borderColor: '#fecaca', background: '#fef2f2' }}
-                    >
-                      {isService ? 'Cancel Booking' : 'Cancel Order'}
-                    </button>
                   ) : (
-                    <button className="v-btn-outline" style={{ padding: '14px 32px', fontWeight: 800 }}>
-                      {isService ? 'Booking Protocol' : 'Order Protocol'}
-                    </button>
+                    <>
+                      {['PENDING', 'PLACED'].includes(order.status) && (
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => updateStatus(order.id, 'PREPARING')}
+                          className="v-btn-primary"
+                          style={{ flex: 1, padding: '16px' }}
+                        >
+                          {isService ? 'Confirm Booking' : 'Confirm Order'}
+                        </motion.button>
+                      )}
+                      {order.status === 'ACCEPTED' && (
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => updateStatus(order.id, 'PREPARING')}
+                          className="v-btn-primary"
+                          style={{ flex: 1, padding: '16px' }}
+                        >
+                          {isService ? 'Initiate Service' : 'Initiate Fulfillment'}
+                        </motion.button>
+                      )}
+                      {order.status === 'PREPARING' && (
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => updateStatus(order.id, 'SHIPPED')}
+                          className="v-btn-primary"
+                          style={{ flex: 1, padding: '16px', background: '#16a34a', boxShadow: '0 10px 25px rgba(22, 163, 74, 0.2)' }}
+                        >
+                          {isService ? 'Dispatch Expert' : 'Confirm Ready for Pickup'}
+                        </motion.button>
+                      )}
+                      {['SHIPPED', 'DISPATCHED'].includes(order.status) && (
+                        isService ? (
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => updateStatus(order.id, 'DELIVERED')}
+                            className="v-btn-primary"
+                            style={{ flex: 1, padding: '16px', background: '#2563eb', boxShadow: '0 10px 25px rgba(37, 99, 235, 0.2)' }}
+                          >
+                            Confirm Service Completed
+                          </motion.button>
+                        ) : (
+                          <div
+                            style={{ flex: 1, padding: '16px', background: '#f1f5f9', color: '#64748b', borderRadius: '14px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e2e8f0' }}
+                          >
+                            Out for Delivery by Rider
+                          </div>
+                        )
+                      )}
+                    </>
+                  )}
+                  {businessType !== 'event' && (
+                    ['PENDING', 'PLACED', 'ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED', 'CONFIRMED'].includes(order.status) ? (
+                      <button
+                        onClick={() => {
+                          setConfirmDialog({
+                            isOpen: true,
+                            title: isService ? 'Cancel Booking' : 'Emergency Override',
+                            message: isService 
+                              ? 'Are you sure you want to CANCEL this booking? This cannot be undone and the customer will be notified.'
+                              : 'Are you sure you want to CANCEL this order? This cannot be undone and the customer will be notified.',
+                            confirmText: isService ? 'Cancel Booking' : 'Cancel Order',
+                            cancelText: 'Keep Active',
+                            type: 'danger',
+                            onConfirm: () => updateStatus(order.id, 'CANCELLED')
+                          });
+                        }}
+                        className="v-btn-outline"
+                        style={{ padding: '14px 32px', fontWeight: 800, color: '#ef4444', borderColor: '#fecaca', background: '#fef2f2' }}
+                      >
+                        {isService ? 'Cancel Booking' : 'Cancel Order'}
+                      </button>
+                    ) : (
+                      <button className="v-btn-outline" style={{ padding: '14px 32px', fontWeight: 800 }}>
+                        {isService ? 'Booking Protocol' : 'Order Protocol'}
+                      </button>
+                    )
                   )}
                 </div>
               </motion.div>
@@ -1462,27 +2367,76 @@ export const VendorOrders = ({ storeId, businessType }) => {
         }}
         onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
       />
+      <QRScannerModal
+        isOpen={qrScannerOpen.open}
+        onClose={() => setQrScannerOpen({ open: false, booking: null })}
+        onScan={async (scannedHash) => {
+          const { data, error } = await supabase
+            .from('event_bookings')
+            .select('id, status, users(full_name, phone), events(title)')
+            .eq('qr_code_hash', scannedHash)
+            .maybeSingle();
+
+          if (error || !data) {
+            toast.error('❌ Invalid QR — Ticket not found');
+            return;
+          }
+          if (data.status === 'COMPLETED') {
+            toast.success(`✅ ${data.users?.full_name || 'Attendee'} already checked in`);
+            setQrScannerOpen({ open: false, booking: null });
+            return;
+          }
+          if (data.status === 'CANCELLED') {
+            toast.error('⛔ This ticket has been cancelled');
+            return;
+          }
+          await updateStatus(data.id, 'COMPLETED');
+          toast.success(`🎉 ${data.users?.full_name || 'Attendee'} checked in for ${data.events?.title || 'the event'}!`);
+          setQrScannerOpen({ open: false, booking: null });
+        }}
+      />
     </div>
   );
 };
 
-export const VendorEarnings = ({ storeId }) => {
+export const VendorEarnings = ({ storeId, vendorData, businessType }) => {
   const [earnings, setEarnings] = React.useState(0);
   const [orderCount, setOrderCount] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
     const fetchEarnings = async () => {
-      if (!storeId) {
+      if (!storeId && !vendorData?.user_id) {
         setEarnings(0); setOrderCount(0); setLoading(false); return;
       }
       try {
-        const { data, error } = await supabase.from('orders').select('total_amount, status').eq('store_id', storeId);
-        if (!error && data) {
-          const delivered = data.filter(o => o.status === 'DELIVERED');
-          const total = delivered.reduce((sum, o) => sum + (o.total_amount || 0), 0);
-          setEarnings(total);
-          setOrderCount(delivered.length);
+        if (businessType === 'event') {
+          // Events revenue comes from event_bookings, linked via events.created_by = user_id
+          const userId = vendorData?.user_id || storeId;
+          const { data: events } = await supabase.from('events').select('id').eq('created_by', userId);
+          if (events && events.length > 0) {
+            const eventIds = events.map(e => e.id);
+            const { data, error } = await supabase
+              .from('event_bookings')
+              .select('total_amount, status')
+              .in('event_id', eventIds)
+              .in('status', ['CONFIRMED', 'COMPLETED']);
+            if (!error && data) {
+              const total = data.reduce((sum, b) => sum + (b.total_amount || 0), 0);
+              setEarnings(total);
+              setOrderCount(data.length);
+            }
+          } else {
+            setEarnings(0); setOrderCount(0);
+          }
+        } else {
+          const { data, error } = await supabase.from('orders').select('total_amount, status').eq('store_id', storeId);
+          if (!error && data) {
+            const delivered = data.filter(o => o.status === 'DELIVERED');
+            const total = delivered.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+            setEarnings(total);
+            setOrderCount(delivered.length);
+          }
         }
       } catch (err) {
         console.error("Earnings fetch error:", err);
@@ -1491,7 +2445,7 @@ export const VendorEarnings = ({ storeId }) => {
       }
     };
     fetchEarnings();
-  }, [storeId]);
+  }, [storeId, vendorData, businessType]);
 
   return (
     <div className="v-container animate-fade-in">
@@ -1548,11 +2502,11 @@ export const VendorEarnings = ({ storeId }) => {
             </div>
             <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#1e40af', background: '#dbeafe', padding: '6px 14px', borderRadius: '10px', letterSpacing: '0.5px' }}>VOLUME</span>
           </div>
-          <p style={{ margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Total Conversions</p>
+          <p style={{ margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>{businessType === 'event' ? 'Total Ticket Sales' : 'Total Conversions'}</p>
           <h2 style={{ margin: 0, fontSize: '3rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-1.5px' }}>{orderCount}</h2>
           <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #f1f5f9', display: 'flex', gap: '1rem' }}>
             <div style={{ flex: 1 }}>
-              <span style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 800 }}>AVG ORDER</span>
+              <span style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 800 }}>{businessType === 'event' ? 'AVG TICKET' : 'AVG ORDER'}</span>
               <span style={{ fontWeight: 900, color: '#1e293b' }}>₹{orderCount > 0 ? (earnings / orderCount).toFixed(0) : 0}</span>
             </div>
             <div style={{ flex: 1, textAlign: 'right' }}>

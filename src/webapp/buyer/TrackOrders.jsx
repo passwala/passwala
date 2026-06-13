@@ -296,6 +296,7 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
       }
     } catch (e) { console.warn('Map bounds error', e); }
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.status, riderCoords, routeToStorePoints, routeToCustomerPoints, storeLatLng, customerLatLng, providerDetails, isService]);
 
   return (

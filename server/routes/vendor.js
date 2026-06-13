@@ -1,7 +1,10 @@
 import express from 'express';
 import supabase from '../supabase.js';
+import { adminAuth } from './admin.js';
 
 const router = express.Router();
+
+router.use(adminAuth); // Secure all vendor endpoints with Admin JWT verification
 
 // GET /api/vendor/apps — Get all vendor applications
 router.get('/apps', async (req, res) => {

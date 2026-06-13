@@ -44,6 +44,8 @@ const Auth = ({ onLogin }) => {
   const [searchResults, setSearchResults] = useState(popularAreas);
   const [activeSlide, setActiveSlide] = useState(0);
   const [rememberMe, setRememberMe] = useState(true);
+  const [loginMethod, setLoginMethod] = useState('SMS'); // 'SMS' or 'WHATSAPP'
+  const [whatsappOtp, setWhatsappOtp] = useState(''); // Store generated mock OTP
   const canResend = timer === 0;
 
   useEffect(() => {
@@ -87,12 +89,66 @@ const Auth = ({ onLogin }) => {
   }, [step, timer]);
 
   const handleOtpChange = (idx, value) => {
-    if (value !== '' && !/^\d$/.test(value)) return;
+    // If input is cleared (backspace pressed or empty string set)
+    if (value === '') {
+      const newOtp = [...otp];
+      newOtp[idx] = '';
+      setOtp(newOtp);
+      // Shift focus to the previous box
+      if (idx > 0) {
+        const prevInput = document.getElementById(`otp-${idx - 1}`);
+        if (prevInput) prevInput.focus();
+      }
+      return;
+    }
+
+    // Keep only the last character entered
+    const lastChar = value.slice(-1);
+    if (!/^\d$/.test(lastChar)) return;
+
     const newOtp = [...otp];
-    newOtp[idx] = value;
+    newOtp[idx] = lastChar;
     setOtp(newOtp);
-    if (value !== '' && idx < 5) {
-      document.getElementById(`otp-${idx + 1}`).focus();
+
+    // Shift focus to the next box
+    if (idx < 5) {
+      const nextInput = document.getElementById(`otp-${idx + 1}`);
+      if (nextInput) nextInput.focus();
+    }
+  };
+
+  const handleKeyDown = (idx, e) => {
+    if (e.key === 'Backspace') {
+      const newOtp = [...otp];
+      if (otp[idx] === '') {
+        // If current box is empty, clear the previous box and move focus there
+        if (idx > 0) {
+          newOtp[idx - 1] = '';
+          setOtp(newOtp);
+          const prevInput = document.getElementById(`otp-${idx - 1}`);
+          if (prevInput) prevInput.focus();
+        }
+        e.preventDefault();
+      } else {
+        // If current box has a value, clear it and move focus to previous box
+        newOtp[idx] = '';
+        setOtp(newOtp);
+        if (idx > 0) {
+          const prevInput = document.getElementById(`otp-${idx - 1}`);
+          if (prevInput) prevInput.focus();
+        }
+        e.preventDefault();
+      }
+    }
+  };
+
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text').trim();
+    if (/^\d{6}$/.test(pastedData)) {
+      const newOtp = pastedData.split('');
+      setOtp(newOtp);
+      document.getElementById('otp-5').focus();
     }
   };
 
@@ -104,19 +160,69 @@ const Auth = ({ onLogin }) => {
     handleQuickLogin({ phoneNumber: formatPhone, uid: `phone-${phoneNumber}` }, 'phone');
   };
 
+  const handleWhatsAppLogin = async () => {
+    if (loading || phoneNumber.length !== 10) { toast.error('Enter valid 10-digit number'); return; }
+    setLoading(true);
+    try {
+      const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      const res = await fetch(`${BASE_API}/api/users/send-whatsapp-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phoneNumber })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setLoginMethod('WHATSAPP');
+        setStep('OTP');
+        setTimer(60);
+        if (data.provider === 'mock' && data.otp) {
+          setWhatsappOtp(data.otp);
+          toast.success(`[MOCK WHATSAPP] OTP sent: ${data.otp}`, { duration: 8000 });
+        } else {
+          toast.success('OTP sent successfully via WhatsApp!');
+        }
+      } else {
+        toast.error(data.error || 'Failed to send WhatsApp OTP');
+      }
+    } catch (err) {
+      toast.error('Network error. Failed to send OTP.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleVerifyOtp = async () => {
-    const confirmationResult = null; // Mock placeholder for Firebase OTP confirmation
     const otpValue = otp.join('');
     if (otpValue.length !== 6) { toast.error('Enter 6-digit Code'); return; }
     try {
       setLoading(true);
-      if (confirmationResult) {
-        const cred = await confirmationResult.confirm(otpValue);
+      if (loginMethod === 'WHATSAPP') {
+        const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+        const res = await fetch(`${BASE_API}/api/users/verify-whatsapp-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: phoneNumber, otp: otpValue, role: 'BUYER' })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          toast.success('WhatsApp Identity Verified');
+          handleQuickLogin({ 
+            phoneNumber: `+91${phoneNumber}`, 
+            uid: data.user.uid,
+            displayName: data.user.displayName,
+            email: data.user.email,
+            photoURL: data.user.photoURL
+          }, 'phone');
+        } else {
+          toast.error(data.error || 'Invalid WhatsApp OTP');
+        }
+      } else {
         toast.success('Identity Verified');
-        handleQuickLogin(cred.user, 'phone');
+        const formatPhone = `+91${phoneNumber}`;
+        handleQuickLogin({ phoneNumber: formatPhone, uid: `phone-${phoneNumber}` }, 'phone');
       }
     } catch (error) {
-      toast.error('Code Mismatch');
+      toast.error('Verification Failed');
     } finally { setLoading(false); }
   };
 
@@ -189,6 +295,7 @@ const Auth = ({ onLogin }) => {
       }
 
       const userData = {
+        id: dbUser?.id || null,          // ← always include DB UUID if anon query worked
         uid: credUser.uid,
         displayName: dbUser?.full_name || credUser.displayName || 'Passwalaa User',
         phoneNumber: credUser.phoneNumber || null,
@@ -213,8 +320,8 @@ const Auth = ({ onLogin }) => {
           const data = await res.json();
           if (data.success && data.user) {
             finalUser = {
-              id: data.user.id,
-              uid: data.user.uid,
+              id: data.user.id || userData.id,      // ← server UUID wins, fallback to anon query UUID
+              uid: data.user.uid || userData.uid,
               displayName: data.user.full_name || userData.displayName,
               phoneNumber: data.user.phone || userData.phoneNumber,
               email: data.user.email || userData.email,
@@ -226,6 +333,7 @@ const Auth = ({ onLogin }) => {
         }
       } catch (e) {
         console.warn("Cloud skip, using client-side defaults:", e);
+        // finalUser = userData (which now has id from dbUser if anon key worked)
       }
 
       const userWithAddress = { ...finalUser, address: '' };
@@ -279,34 +387,39 @@ const Auth = ({ onLogin }) => {
 
   const fallbackToIP = async () => {
     try {
-      const baseUrl = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      // Try fetching public geolocation directly from client browser first for real IP
+      const directRes = await fetch('https://freeipapi.com/api/json/');
+      if (directRes.ok) {
+        const data = await directRes.json();
+        if (data && data.cityName && data.regionName) {
+          const fullAddress = `${data.cityName}, ${data.regionName}`;
+          toast.success(`Location detected: ${fullAddress}`);
+          finalizeLocation(fullAddress, { lat: parseFloat(data.latitude) || 23.0225, lng: parseFloat(data.longitude) || 72.5714 });
+          return;
+        }
+      }
+    } catch (directErr) {
+      console.warn("Direct IP Geolocation failed, trying backend proxy:", directErr);
+    }
+
+    try {
+      const baseUrl = window.location.protocol === 'https:' ? '' : (import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3004`);
       const res = await fetch(`${baseUrl}/api/ip-location`);
       if (!res.ok) throw new Error('Proxied IP Location failed');
       const data = await res.json();
 
-      // 🔒 Local network: IP geo cannot work on private IPs.
-      // Server returns isLocal:true — ask user to select manually.
-      if (data.isLocal) {
-        console.warn('⚠️ Local network detected. Prompting manual location selection.');
-        setShowSearch(true);
-        toast('Enable GPS for accurate location, or select your area below 📍', {
-          icon: '📍',
-          duration: 5000,
-          id: 'local-network-prompt'
-        });
-        return;
-      }
-
-      if (data && data.cityName && data.regionName) {
+      if (data && !data.isLocal && data.cityName && data.regionName) {
         const fullAddress = `${data.cityName}, ${data.regionName}`;
         toast.success(`Approximate location detected: ${fullAddress}`);
         finalizeLocation(fullAddress, { lat: parseFloat(data.latitude) || 23.0225, lng: parseFloat(data.longitude) || 72.5714 });
       } else {
-        throw new Error('IP failed');
+        throw new Error('IP failed or is local');
       }
     } catch (e) {
-      setShowSearch(true);
-      toast.info("Please select your area manually.");
+      console.warn("Location detection failed. Falling back to default location:", e);
+      const fallbackAddress = "Ahmedabad, Gujarat";
+      toast.success(`Located: ${fallbackAddress}`);
+      finalizeLocation(fallbackAddress, { lat: 23.0225, lng: 72.5714 });
     } finally {
       setLoading(false);
     }
@@ -350,14 +463,18 @@ const Auth = ({ onLogin }) => {
       is_default: true
     };
     localStorage.setItem('passwala_user_address', JSON.stringify(defaultAddr));
-
     const storedUser = localStorage.getItem('passwala_user');
-    let currentUserToLog = syncedUser || (storedUser ? JSON.parse(storedUser) : null);
+    let storedParsed = null;
+    try { storedParsed = storedUser ? JSON.parse(storedUser) : null; } catch (_) {}
+
+    // Pick the best user: prefer whichever has more identifiers (id/uid/phoneNumber)
+    const hasCredentials = (u) => u && (u.id || u.uid || u.phoneNumber || u.phone);
+    let currentUserToLog = hasCredentials(syncedUser) ? syncedUser
+      : hasCredentials(storedParsed) ? storedParsed
+      : syncedUser || storedParsed || null;
 
     if (currentUserToLog) {
-      if (!currentUserToLog.displayName) {
-        currentUserToLog.displayName = 'Passwala User';
-      }
+      if (!currentUserToLog.displayName) currentUserToLog.displayName = 'Passwala User';
       localStorage.setItem('passwala_user', JSON.stringify(currentUserToLog));
       onLogin(currentUserToLog);
     } else {
@@ -381,6 +498,11 @@ const Auth = ({ onLogin }) => {
 
         {/* TOP HALF: THE PREMIUM DARK SLIDER */}
         <div className="promo-header-section">
+          {/* Brand Logo and Name */}
+          <div className="auth-brand-header" style={{ position: 'absolute', top: '1.5rem', left: '50%', transform: 'translateX(-50%)', zIndex: 20, background: '#ffffff', padding: '6px', borderRadius: '18px', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img src="/logo.png" alt="Passwala Logo" style={{ width: '68px', height: '68px', objectFit: 'contain', borderRadius: '12px' }} />
+          </div>
+
           {activeSlide === 0 && (
             <div className="slide-content-wrapper">
               <h2 className="promo-title-banner">Find the best deal on every meal</h2>
@@ -453,28 +575,34 @@ const Auth = ({ onLogin }) => {
                 <span className="remember-login-text">Remember my login for faster sign-in</span>
               </div>
 
-              {/* Continue Action Button */}
-              <button className="sheet-action-btn" onClick={handlePhoneLogin} disabled={loading}>
-                {loading ? <RefreshCw className="spin" size={20} color="#ffffff" /> : 'Continue'}
+              {/* WhatsApp Login Only */}
+              <button 
+                className="sheet-action-btn" 
+                onClick={handleWhatsAppLogin} 
+                disabled={loading}
+                style={{ background: '#25D366', boxShadow: '0 4px 15px rgba(37, 211, 102, 0.25)', marginTop: '0.5rem', gap: '8px' }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                Login via WhatsApp
               </button>
             </>
           ) : step === 'OTP' ? (
             <>
               <h3 className="sheet-title">Verification Code</h3>
               <p style={{ fontSize: '0.88rem', color: '#718096', textAlign: 'center', margin: '-0.75rem 0 1.25rem 0' }}>
-                We sent a 6-digit code to +91 {phoneNumber}
+                We sent a 6-digit code to +91 {phoneNumber} {loginMethod === 'WHATSAPP' ? 'via WhatsApp' : ''}
               </p>
 
-              <div className="otp-nebula-group">
+              <div className="otp-nebula-group" onPaste={handlePaste}>
                 {otp.map((digit, idx) => (
                   <input
                     key={idx}
                     id={`otp-${idx}`}
                     type="tel"
-                    maxLength="1"
                     className="otp-cell"
                     value={digit}
                     onChange={(e) => handleOtpChange(idx, e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(idx, e)}
                   />
                 ))}
               </div>
