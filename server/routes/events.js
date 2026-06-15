@@ -100,8 +100,9 @@ router.get('/search', async (req, res) => {
         .lt('event_date', now)
         .order('event_date', { ascending: false });
     } else {
-      // Upcoming events: only bookable statuses
+      // Upcoming events: only bookable statuses AND event_date is today or in the future
       supabaseQuery = supabaseQuery
+        .gte('event_date', now)
         .in('status', ['UPCOMING', 'ONGOING', 'SOLD_OUT'])
         .order('event_date', { ascending: true });
     }

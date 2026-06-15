@@ -84,14 +84,15 @@ const EventDetails = ({ user }) => {
   if (!event) return null;
 
   const tiers = event.event_ticket_tiers || [];
-  const anyTierOpen = tiers.length === 0 || tiers.some(t => checkBookingWindow(t).open);
+  const eventDateObj = new Date(event.event_date);
+  const hasEnded = event.event_date && eventDateObj < new Date();
+  const anyTierOpen = !hasEnded && (tiers.length === 0 || tiers.some(t => checkBookingWindow(t).open));
   const isSoldOut = event.status === 'SOLD_OUT';
-  const isDisabled = isSoldOut || !anyTierOpen;
+  const isDisabled = hasEnded || isSoldOut || !anyTierOpen;
   const minPrice = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : null;
   const totalSeats = tiers.reduce((s, t) => s + (t.available_seats || 0), 0);
   const description = event.description || '';
   const shortDesc = description.slice(0, 200);
-  const eventDateObj = new Date(event.event_date);
   const formattedDate = eventDateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   const formattedTime = eventDateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
@@ -369,11 +370,12 @@ const EventDetails = ({ user }) => {
               <p className="ed2-sticky-val">{event.venue_name || 'TBA'}{event.city ? `, ${event.city}` : ''}</p>
             </div>
           </div>
-          <div className="ed2-sticky-divider" />
-          <div className="ed2-sticky-seats">
-            <span className={`ed2-seats-dot ${totalSeats === 0 ? 'sold' : totalSeats < 50 ? 'low' : 'avail'}`} />
-            {totalSeats === 0 ? 'Sold Out' : `${totalSeats} Available`}
-          </div>
+          {!hasEnded && anyTierOpen && (
+            <div className="ed2-sticky-seats">
+              <span className={`ed2-seats-dot ${totalSeats === 0 ? 'sold' : totalSeats < 50 ? 'low' : 'avail'}`} />
+              {totalSeats === 0 ? 'Sold Out' : `${totalSeats} Available`}
+            </div>
+          )}
           {minPrice && <p className="ed2-sticky-price">From ₹{minPrice}</p>}
           <button
             className={`ed2-book-btn ${isDisabled ? 'disabled' : ''}`}
@@ -383,7 +385,7 @@ const EventDetails = ({ user }) => {
               navigate('/events/checkout', { state: { event, user } });
             }}
           >
-            {isSoldOut ? 'Sold Out' : (!anyTierOpen ? 'Booking Closed' : 'Book Tickets')}
+            {hasEnded ? 'Event Ended' : isSoldOut ? 'Sold Out' : (!anyTierOpen ? 'Booking Closed' : 'Book Tickets')}
           </button>
         </aside>
       </div>
@@ -399,7 +401,7 @@ const EventDetails = ({ user }) => {
             navigate('/events/checkout', { state: { event, user } });
           }}
         >
-          {isSoldOut ? 'Sold Out' : (!anyTierOpen ? 'Booking Closed' : 'Book Tickets')}
+          {hasEnded ? 'Event Ended' : isSoldOut ? 'Sold Out' : (!anyTierOpen ? 'Booking Closed' : 'Book Tickets')}
         </button>
       </div>
     </div>

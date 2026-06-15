@@ -367,6 +367,12 @@ export const ConfirmModal = ({ isOpen, title, message, confirmText, cancelText, 
 
 export const VendorInventory = ({ vendorData, businessType, storeId }) => {
   const [items, setItems] = React.useState([]);
+  const loadedBusinessTypeRef = React.useRef(businessType);
+
+  React.useEffect(() => {
+    setItems([]);
+  }, [businessType]);
+
   const [showForm, setShowForm] = React.useState(false);
   const [eventWizardStep, setEventWizardStep] = React.useState(1);
   const wizardScrollRef = React.useRef(null);
@@ -421,6 +427,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
     const fetchCatalog = async () => {
       if (!storeId && !vendorData?.user_id) {
         setItems([]);
+        loadedBusinessTypeRef.current = businessType;
         return;
       }
 
@@ -481,6 +488,9 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                 type: businessType || 'shop',
                 category_id: item.category_id,
                 category: item.category,
+                status: item.status,
+                booking_start: item.booking_start,
+                booking_end: item.booking_end,
                 venue_name: item.venue_name,
                 event_date: item.event_date ? new Date(item.event_date).toISOString().slice(0, 16) : ''
               });
@@ -490,7 +500,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
         } catch (e) { console.error(e); }
       }
 
-      const localStored = JSON.parse(localStorage.getItem('vVendorItems') || '[]');
+      const localStored = JSON.parse(localStorage.getItem('vVendorItems_' + businessType) || '[]');
 
       // Prioritize Database items. If DB has data, use it.
       // Fallback to local storage ONLY if DB is empty to allow offline dev.
@@ -512,6 +522,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
       });
 
       setItems(unique);
+      loadedBusinessTypeRef.current = businessType;
     };
     
     fetchCatalog();
@@ -533,11 +544,13 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
     }
   }, [storeId, businessType, vendorData]);
 
-  // Synchronize react items state to localStorage automatically on state changes
   React.useEffect(() => {
+    if (loadedBusinessTypeRef.current !== businessType) {
+      return;
+    }
     const cleanItems = items.filter(i => !i.id.toString().startsWith('d') && !i.id.toString().startsWith('s'));
-    localStorage.setItem('vVendorItems', JSON.stringify(cleanItems));
-  }, [items]);
+    localStorage.setItem('vVendorItems_' + businessType, JSON.stringify(cleanItems));
+  }, [items, businessType]);
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -693,7 +706,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
           booking_start: newItem.booking_start,
           booking_end: newItem.booking_end
         } : item);
-        localStorage.setItem('vVendorItems', JSON.stringify(updated.filter(i => !i.id.toString().startsWith('d') && !i.id.toString().startsWith('s'))));
+        localStorage.setItem('vVendorItems_' + businessType, JSON.stringify(updated.filter(i => !i.id.toString().startsWith('d') && !i.id.toString().startsWith('s'))));
         return updated;
       });
 
@@ -885,7 +898,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
       setItems(prev => {
         const cleanPrev = prev.filter(i => !i.id.toString().startsWith('d') && !i.id.toString().startsWith('s'));
         const updated = [newProductObj, ...cleanPrev];
-        localStorage.setItem('vVendorItems', JSON.stringify(updated));
+        localStorage.setItem('vVendorItems_' + businessType, JSON.stringify(updated));
         return updated;
       });
     }
@@ -2508,24 +2521,41 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                 </div>
 
                 <div style={{ position: 'absolute', bottom: '16px', left: '16px' }}>
-                  <span className={`v-badge-premium ${
-                    businessType === 'shop' ? 'v-badge-info' :
-                    businessType === 'event'
-                      ? (item.status === 'PENDING_APPROVAL' ? '' : item.status === 'REJECTED' ? '' : 'v-badge-warning')
-                      : 'v-badge-success'
-                  }`} style={
-                    businessType === 'event' && item.status === 'PENDING_APPROVAL'
-                      ? { background: '#f59e0b', color: '#fff' }
-                      : businessType === 'event' && item.status === 'REJECTED'
-                      ? { background: '#ef4444', color: '#fff' }
-                      : {}
-                  }>
-                    {businessType === 'shop'
-                      ? 'In Stock'
-                      : businessType === 'event'
-                        ? (item.status === 'PENDING_APPROVAL' ? '⏳ Pending Approval' : item.status === 'REJECTED' ? '❌ Rejected' : 'Active Event')
-                        : 'Active Service'}
-                  </span>
+                  {(() => {
+                    const isClosed = businessType === 'event' && (
+                      item.status === 'CLOSED' || 
+                      (item.booking_end && new Date(item.booking_end) < new Date()) || 
+                      (item.event_date && new Date(item.event_date) < new Date())
+                    );
+                    return (
+                      <span className={`v-badge-premium ${
+                        businessType === 'shop' ? 'v-badge-info' :
+                        businessType === 'event'
+                          ? (item.status === 'PENDING_APPROVAL' ? '' : item.status === 'REJECTED' ? '' : isClosed ? '' : 'v-badge-warning')
+                          : 'v-badge-success'
+                      }`} style={
+                        businessType === 'event' && item.status === 'PENDING_APPROVAL'
+                          ? { background: '#f59e0b', color: '#fff' }
+                          : businessType === 'event' && item.status === 'REJECTED'
+                          ? { background: '#ef4444', color: '#fff' }
+                          : isClosed
+                          ? { background: '#6b7280', color: '#fff' }
+                          : {}
+                      }>
+                        {businessType === 'shop'
+                          ? 'In Stock'
+                          : businessType === 'event'
+                            ? (item.status === 'PENDING_APPROVAL'
+                                ? '⏳ Pending Approval'
+                                : item.status === 'REJECTED'
+                                ? '❌ Rejected'
+                                : isClosed
+                                ? '🚫 Event Closed'
+                                : 'Active Event')
+                            : 'Active Service'}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
 

@@ -220,6 +220,7 @@ const tabSections = [
       { id: 'events_panel', label: 'Events', icon: Sparkles, table: 'events' },
       { id: 'event_bookings_panel', label: 'Event Bookings', icon: Calendar, table: 'event_bookings' },
       { id: 'event_approvals_panel', label: 'Event Approvals', icon: ShieldCheck },
+      { id: 'upgrade_requests_panel', label: 'Upgrade Requests', icon: ShieldCheck },
     ]
   },
   {
@@ -405,7 +406,222 @@ const EventApprovalsPanel = ({ API_URL }) => {
   );
 };
 
-const AdminPanel = ({ onLogout, location }) => {
+// ── Upgrade Requests Panel ─────────────────────────────────────────
+const UpgradeRequestsPanel = ({ API_URL }) => {
+  const [requests, setRequests] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [actionLoading, setActionLoading] = React.useState(null);
+
+  const adminKey = sessionStorage.getItem('admin_token') || '';
+
+  const fetchRequests = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/fetch?table=event_organizer_requests`, {
+        headers: { 'x-admin-key': adminKey }
+      });
+      const data = await res.json();
+      if (data.success) {
+        const sorted = (data.data || []).sort((a, b) => {
+          if (a.request_status === 'SUBMITTED' && b.request_status !== 'SUBMITTED') return -1;
+          if (a.request_status !== 'SUBMITTED' && b.request_status === 'SUBMITTED') return 1;
+          return new Date(b.created_at) - new Date(a.created_at);
+        });
+        setRequests(sorted);
+      } else {
+        toast.error(data.error || 'Failed to load requests');
+      }
+    } catch (err) {
+      toast.error('Failed to load upgrade requests');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => { fetchRequests(); }, []);
+
+  const handleAction = async (id, action) => {
+    setActionLoading(id + action);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/upgrade/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+        body: JSON.stringify({ id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(action === 'approve' ? '✅ Upgrade approved! Vendor role is now EVENT_ORGANIZER.' : '❌ Upgrade rejected.');
+        fetchRequests();
+      } else {
+        toast.error(data.error || 'Action failed');
+      }
+    } catch (err) {
+      toast.error('Network error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const formatDate = (d) => d ? new Date(d).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+
+  const pendingCount = requests.filter(r => r.request_status === 'SUBMITTED').length;
+
+  return (
+    <div style={{ padding: '0 0 4rem 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+        <div>
+          <h1 className="admin-hero-title" style={{ marginBottom: '0.25rem' }}>Upgrade Requests</h1>
+          <p style={{ color: '#64748b', margin: 0 }}>
+            Approve shop vendors requesting to unlock Event Organizer privileges.
+          </p>
+        </div>
+        <span style={{ marginLeft: 'auto', background: '#ff6b00', color: '#fff', borderRadius: '20px', padding: '4px 14px', fontWeight: 700, fontSize: '0.85rem' }}>
+          {pendingCount} Pending
+        </span>
+        <button onClick={fetchRequests} style={{ background: '#f1f5f9', border: 'none', borderRadius: '10px', padding: '8px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>
+          ↻ Refresh
+        </button>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '4rem', color: '#94a3b8' }}>Loading requests...</div>
+      ) : requests.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '4rem 2rem', background: '#f8fafc', borderRadius: '20px', border: '2px dashed #e2e8f0' }}>
+          <ShieldCheck size={48} color="#22c55e" style={{ marginBottom: '1rem' }} />
+          <h3 style={{ color: '#166534', margin: '0 0 0.5rem' }}>All Clear!</h3>
+          <p style={{ color: '#64748b', margin: 0 }}>No upgrade requests found in the system.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: '1.5rem' }}>
+          {requests.map(req => (
+            <div key={req.id} style={{ background: '#fff', borderRadius: '20px', padding: '1.5rem', boxShadow: '0 2px 12px rgba(0,0,0,0.07)', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{req.business_name}</h3>
+                  <p style={{ color: '#64748b', fontSize: '0.85rem', margin: 0 }}>
+                    Vendor User ID: <span style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>{req.user_id}</span>
+                  </p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{
+                    background: req.request_status === 'PENDING' ? '#f59e0b' : req.request_status === 'APPROVED' ? '#22c55e' : '#ef4444',
+                    color: '#fff',
+                    borderRadius: '10px',
+                    padding: '4px 12px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    display: 'inline-block',
+                    marginBottom: '0.25rem'
+                  }}>
+                    {req.request_status}
+                  </span>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    Payment: <span style={{ fontWeight: 700, color: req.payment_status === 'PAID' ? '#22c55e' : '#f59e0b' }}>{req.payment_status}</span> (₹{req.payment_amount})
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', background: '#f8fafc', padding: '1rem', borderRadius: '12px', fontSize: '0.85rem' }}>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block' }}>Requested Console</span>
+                  <strong style={{ color: '#ff6b00', textTransform: 'uppercase' }}>{req.target_console || 'event'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block' }}>Aadhaar Card No.</span>
+                  <strong style={{ color: '#0f172a' }}>{req.aadhar_no || '—'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block' }}>Phone Contact</span>
+                  <strong style={{ color: '#0f172a' }}>{req.phone || '—'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block' }}>Payment ID</span>
+                  <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>{req.payment_id || '—'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block' }}>Submitted At</span>
+                  <strong style={{ color: '#0f172a' }}>{formatDate(req.created_at)}</strong>
+                </div>
+              </div>
+
+              {req.request_status === 'SUBMITTED' && (
+                <div style={{ display: 'flex', gap: '0.75rem', borderTop: '1px dashed #e2e8f0', paddingTop: '1rem' }}>
+                  <button
+                    onClick={() => handleAction(req.id, 'approve')}
+                    disabled={actionLoading === req.id + 'approve'}
+                    style={{ background: '#22c55e', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem', opacity: actionLoading === req.id + 'approve' ? 0.6 : 1 }}
+                  >
+                    {actionLoading === req.id + 'approve' ? 'Approving...' : '✅ Approve & Upgrade'}
+                  </button>
+                  <button
+                    onClick={() => handleAction(req.id, 'reject')}
+                    disabled={actionLoading === req.id + 'reject'}
+                    style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem', opacity: actionLoading === req.id + 'reject' ? 0.6 : 1 }}
+                  >
+                    {actionLoading === req.id + 'reject' ? 'Rejecting...' : '❌ Reject'}
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AdminPanel = ({ onLogout, location, setLocation }) => {
+  const handleLocationClick = async () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser');
+      return;
+    }
+
+    toast.loading('Detecting your GPS location...', { id: 'admin-geo' });
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18`, {
+            headers: {
+              'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
+            }
+          });
+          const data = await res.json();
+          if (data.address) {
+            const area = data.address.suburb || data.address.neighbourhood || data.address.residential || data.address.village || '';
+            const city = data.address.city || data.address.town || data.address.state_district || '';
+            
+            if (area && city) {
+              const fullAddr = `${area}, ${city}`;
+              if (setLocation) setLocation(fullAddr, { lat: latitude, lng: longitude });
+              toast.success(`Location updated to: ${area}`, { id: 'admin-geo' });
+            } else if (city) {
+              const state = data.address.state || '';
+              const fullAddr = `${city}${state ? `, ${state}` : ''}`;
+              if (setLocation) setLocation(fullAddr, { lat: latitude, lng: longitude });
+              toast.success(`Location updated to: ${city}`, { id: 'admin-geo' });
+            } else {
+              toast.error('Could not determine city name from coordinates.', { id: 'admin-geo' });
+            }
+          } else {
+            toast.error('Failed to resolve address.', { id: 'admin-geo' });
+          }
+        } catch (err) {
+          console.error(err);
+          toast.error('Error reverse geocoding location.', { id: 'admin-geo' });
+        }
+      },
+      (error) => {
+        console.error('GPS error:', error);
+        toast.error(`GPS access failed: ${error.message}`, { id: 'admin-geo' });
+      },
+      { timeout: 10000, maximumAge: 60000, enableHighAccuracy: true }
+    );
+  };
+
   const [activeAdminTab, setActiveAdminTab] = useState(() => localStorage.getItem('admin_active_tab') || 'dashboard_panel');
   const [eventWizardStep, setEventWizardStep] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -869,7 +1085,7 @@ const AdminPanel = ({ onLogout, location }) => {
   }, [onLogout]);
 
   const fetchData = useCallback(async () => {
-    if (['dashboard_panel', 'people_map_panel', 'reports_panel', 'settings_panel', 'event_approvals_panel'].includes(activeAdminTab)) {
+    if (['dashboard_panel', 'people_map_panel', 'reports_panel', 'settings_panel', 'event_approvals_panel', 'upgrade_requests_panel'].includes(activeAdminTab)) {
       setLoading(false);
       return;
     }
@@ -949,7 +1165,7 @@ const AdminPanel = ({ onLogout, location }) => {
   // Sync active tab data instantly when switching tabs
   useEffect(() => {
     // Custom panels that manage their own data — just reset sync status
-    const customPanels = ['event_approvals_panel'];
+    const customPanels = ['event_approvals_panel', 'upgrade_requests_panel'];
     if (customPanels.includes(activeAdminTab)) {
       setSyncStatus('cloud');
       setLoading(false);
@@ -2109,6 +2325,7 @@ const AdminPanel = ({ onLogout, location }) => {
           </div>
           <div 
             className="brand-tagline-location live-address clickable-location"
+            onClick={handleLocationClick}
             style={{ 
               display: 'flex', 
               alignItems: 'center', 
@@ -2120,7 +2337,8 @@ const AdminPanel = ({ onLogout, location }) => {
               background: 'rgba(255, 255, 255, 0.05)',
               borderRadius: '8px',
               width: '100%',
-              border: '1px solid rgba(255, 255, 255, 0.08)'
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              cursor: 'pointer'
             }}
           >
             <MapPin size={14} color="var(--primary)" className="tag-pin-icon" />
@@ -2194,6 +2412,8 @@ const AdminPanel = ({ onLogout, location }) => {
                 renderSettings()
               ) : activeAdminTab === 'event_approvals_panel' ? (
                 <EventApprovalsPanel API_URL={API_URL} />
+              ) : activeAdminTab === 'upgrade_requests_panel' ? (
+                <UpgradeRequestsPanel API_URL={API_URL} />
               ) : syncStatus === 'missing_table' ? (
                 <div className="missing-table-notice animate-fade-in" style={{ padding: '3rem', background: '#fff1f2', borderRadius: '24px', border: '2px dashed #f43f5e', textAlign: 'center' }}>
                   <Database size={48} color="#f43f5e" style={{ marginBottom: '1rem' }} />

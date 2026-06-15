@@ -404,7 +404,7 @@ const AppContent = ({
                 <p className="font-semibold text-slate-400">Loading Secure Admin Console...</p>
               </div>
             }>
-              <AdminPanel location={location} onLogout={() => { setIsAdmin(false); sessionStorage.removeItem('admin_session'); sessionStorage.removeItem('admin_active'); sessionStorage.removeItem('admin_token'); sessionStorage.removeItem('admin_code'); }} />
+              <AdminPanel location={location} setLocation={setLocation} onLogout={() => { setIsAdmin(false); sessionStorage.removeItem('admin_session'); sessionStorage.removeItem('admin_active'); sessionStorage.removeItem('admin_token'); sessionStorage.removeItem('admin_code'); }} />
             </Suspense>
           )}
         </AdminErrorBoundary>
@@ -509,7 +509,7 @@ const AppContent = ({
                   <Route path="/admin" element={
                     <Suspense fallback={<div className="flex h-screen items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-4 border-[#ff6b00] border-t-transparent"></div></div>}>
                       {sessionStorage.getItem('admin_token') ? (
-                        <AdminPanel location={location} onLogout={() => { sessionStorage.removeItem('admin_token'); window.location.reload(); }} />
+                        <AdminPanel location={location} setLocation={setLocation} onLogout={() => { sessionStorage.removeItem('admin_token'); window.location.reload(); }} />
                       ) : (
                         <AdminAuth onAdminLogin={() => { window.location.reload(); }} />
                       )}

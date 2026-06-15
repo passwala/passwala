@@ -99,6 +99,12 @@ const VendorPortal = ({ user, onLogout }) => {
   }, [onboardingSubStep, businessType, formData]);
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [hasShopConsole, setHasShopConsole] = useState(false);
+  const [hasEventConsole, setHasEventConsole] = useState(false);
+  const [hasServiceConsole, setHasServiceConsole] = useState(false);
+  const [hasRentalConsole, setHasRentalConsole] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeTarget, setUpgradeTarget] = useState('event'); // 'event' | 'service' | 'rental' | 'shop'
   const [editFormData, setEditFormData] = useState({});
   const [isUpdating, setIsUpdating] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -366,12 +372,28 @@ const VendorPortal = ({ user, onLogout }) => {
           .eq('phone', phone)
           .maybeSingle();
 
-        // First check service_providers table (prioritize service providers)
-        let { data, error } = await supabase
+        // Check service_providers
+        const { data: spData } = await supabase
           .from('service_providers')
           .select('*')
           .eq('phone', phone)
           .maybeSingle();
+
+        // Check vendors
+        const { data: vData } = await supabase
+          .from('vendors')
+          .select('*')
+          .eq('phone', phone)
+          .maybeSingle();
+
+        // Check approved upgrade requests
+        const { data: approvedRequests } = await supabase
+          .from('event_organizer_requests')
+          .select('target_console')
+          .eq('phone', phone)
+          .eq('request_status', 'APPROVED');
+
+        const approvedConsoles = approvedRequests ? approvedRequests.map(r => r.target_console) : [];
 
         const EVENT_CATEGORIES = [
           "Music & Concerts",
@@ -384,39 +406,67 @@ const VendorPortal = ({ user, onLogout }) => {
           "Other Events"
         ];
 
-        let detectedType = (userData?.role === 'EVENT_ORGANIZER' || (data && EVENT_CATEGORIES.includes(data.category))) ? 'event' : 'service';
+        const hasEvent = (userData?.role === 'EVENT_ORGANIZER' || (spData && EVENT_CATEGORIES.includes(spData.category)) || approvedConsoles.includes('event'));
+        const hasShop = (!!vData || approvedConsoles.includes('shop'));
+        const hasService = ((!!spData && !EVENT_CATEGORIES.includes(spData.category) && spData.category !== 'Rental') || approvedConsoles.includes('service'));
+        const hasRental = ((!!spData && spData.category === 'Rental') || approvedConsoles.includes('rental'));
 
-        // Auto-heal/sync user role if there's a mismatch
-        if (data && EVENT_CATEGORIES.includes(data.category) && userData && userData.role !== 'EVENT_ORGANIZER') {
-          await supabase.from('users').update({ role: 'EVENT_ORGANIZER' }).eq('phone', phone);
+        setHasEventConsole(hasEvent);
+        setHasShopConsole(hasShop);
+        setHasServiceConsole(hasService);
+        setHasRentalConsole(hasRental);
+
+        let data = null;
+        let detectedType = 'shop';
+
+        const storedType = localStorage.getItem('vBusinessType') || 'shop';
+
+        if (storedType === 'event' && hasEvent) {
+          data = spData;
+          detectedType = 'event';
+        } else if (storedType === 'shop' && hasShop) {
+          data = vData;
+          detectedType = 'shop';
+        } else if (storedType === 'service' && hasService) {
+          data = spData;
+          detectedType = 'service';
+        } else if (storedType === 'rental' && hasRental) {
+          data = spData;
+          detectedType = 'rental';
+        } else if (hasShop) {
+          data = vData;
+          detectedType = 'shop';
+        } else if (hasEvent) {
+          data = spData;
+          detectedType = 'event';
+        } else if (hasService) {
+          data = spData;
+          detectedType = 'service';
+        } else if (hasRental) {
+          data = spData;
+          detectedType = 'rental';
+        } else {
+          data = spData || vData;
+          if (hasEvent) detectedType = 'event';
+          else if (hasService) detectedType = 'service';
+          else if (hasRental) detectedType = 'rental';
+          else detectedType = 'shop';
         }
 
-        // If not found in service_providers, check vendors
-        if (!data && !error) {
-          const { data: vData, error: vError } = await supabase
-            .from('vendors')
-            .select('*')
-            .eq('phone', phone)
+        if (detectedType === 'shop' && data) {
+          const { data: storeData } = await supabase
+            .from('stores')
+            .select('id, lat, lng')
+            .eq('vendor_id', data.id)
             .maybeSingle();
-          if (vData) {
-            data = vData;
-            detectedType = 'shop';
-            const { data: storeData } = await supabase
-              .from('stores')
-              .select('lat, lng')
-              .eq('vendor_id', vData.id)
-              .maybeSingle();
-            if (storeData) {
-              data.lat = storeData.lat;
-              data.lng = storeData.lng;
-            }
+          if (storeData) {
+            data.lat = storeData.lat;
+            data.lng = storeData.lng;
+            setStoreId(storeData.id);
           }
-          error = vError;
         } else if (data) {
-          detectedType = (userData?.role === 'EVENT_ORGANIZER' || EVENT_CATEGORIES.includes(data.category)) ? 'event' : 'service';
+          setStoreId(data.id);
         }
-
-        if (error && !isLocallyCompleted) throw error;
 
         if (data) {
           setVendorData(data);
@@ -498,8 +548,8 @@ const VendorPortal = ({ user, onLogout }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'profile', label: 'My Profile', icon: User },
-    { id: 'inventory', label: businessType === 'shop' ? 'Products' : businessType === 'event' ? 'Events' : 'Services', icon: businessType === 'shop' ? Package : businessType === 'event' ? Calendar : Wrench },
-    { id: 'orders', label: businessType === 'shop' ? 'Orders' : businessType === 'event' ? 'Ticket Sales' : 'Bookings', icon: FileText },
+    { id: 'inventory', label: businessType === 'shop' ? 'Products' : businessType === 'event' ? 'Events' : businessType === 'rental' ? 'Rentals' : 'Services', icon: businessType === 'shop' ? Package : businessType === 'event' ? Calendar : Wrench },
+    { id: 'orders', label: businessType === 'shop' ? 'Orders' : businessType === 'event' ? 'Ticket Sales' : businessType === 'rental' ? 'Rental Bookings' : 'Bookings', icon: FileText },
     { id: 'earnings', label: 'Earnings', icon: IndianRupee },
     { id: 'reviews', label: 'Reviews & Ratings', icon: Star },
     { id: 'notifications', label: 'Notifications', icon: Bell },
@@ -677,11 +727,80 @@ const VendorPortal = ({ user, onLogout }) => {
            <div style={{ marginTop: 'auto', padding: '1.25rem', background: 'rgba(255,255,255,0.05)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Quick Tip</span>
              <p style={{ margin: '8px 0 0 0', fontSize: '0.85rem', color: '#cbd5e1', lineHeight: 1.5 }}>Add high-quality photos to your listings to increase conversion by up to 30%.</p>
-           </div>
-        </div>
-      </div>
-    </div>
-  );
+            </div>
+         </div>
+       </div>
+
+            {(() => {
+          const upgrades = [];
+          if (!hasEventConsole) {
+            upgrades.push({
+              target: 'event',
+              title: "Want to organize events & sell tickets?",
+              desc: "Upgrade your vendor profile to add event tickets for a one-time setup fee of ₹499.",
+              btn: "Request Event Console",
+              color: '#ea580c',
+              bg: '#fff7ed'
+            });
+          }
+          if (!hasServiceConsole) {
+            upgrades.push({
+              target: 'service',
+              title: "Want to offer professional services?",
+              desc: "Upgrade your vendor profile to list expert services (cleaning, salon, etc.) for a setup fee of ₹499.",
+              btn: "Request Profession Console",
+              color: '#6366f1',
+              bg: '#eef2ff'
+            });
+          }
+          if (!hasRentalConsole) {
+            upgrades.push({
+              target: 'rental',
+              title: "Want to rent out vehicles or equipment?",
+              desc: "Upgrade your vendor profile to list rental items and vehicles for a setup fee of ₹499.",
+              btn: "Request Rental Console",
+              color: '#06b6d4',
+              bg: '#ecfeff'
+            });
+          }
+          if (!hasShopConsole) {
+            upgrades.push({
+              target: 'shop',
+              title: "Want to open a digital retail shop?",
+              desc: "Upgrade your vendor profile to sell products to local customers for a setup fee of ₹499.",
+              btn: "Request Store Console",
+              color: '#10b981',
+              bg: '#f0fdf4'
+            });
+          }
+
+          if (upgrades.length === 0) return null;
+
+          return (
+            <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '2rem' }}>
+              {upgrades.map(upg => (
+                <div key={upg.target} className="v-stat-card animate-fade-in" style={{ border: `2px dashed ${upg.color}`, background: upg.bg, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem 2rem', borderRadius: '24px' }}>
+                  <div>
+                    <h4 style={{ color: upg.color, fontWeight: 900, margin: 0, fontSize: '1.15rem' }}>{upg.title}</h4>
+                    <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '4px 0 0 0' }}>{upg.desc}</p>
+                  </div>
+                  <button 
+                    className="v-btn-primary" 
+                    onClick={() => {
+                      setUpgradeTarget(upg.target);
+                      setShowUpgradeModal(true);
+                    }}
+                    style={{ padding: '12px 24px', borderRadius: '12px', background: upg.color, borderColor: upg.color, color: 'white', fontWeight: 800, cursor: 'pointer' }}
+                  >
+                    {upg.btn}
+                  </button>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+     </div>
+   );
 
 
   const handleUpdateProfile = async () => {
@@ -1758,11 +1877,57 @@ const VendorPortal = ({ user, onLogout }) => {
               <Menu size={20} />
             </button>
             <div className="v-status-badge">
-              <span>{businessType === 'shop' ? 'STORE ONLINE' : businessType === 'event' ? 'EVENT PORTAL ACTIVE' : 'SERVICE ONLINE'}</span>
+              <span>{businessType === 'shop' ? 'STORE ONLINE' : businessType === 'event' ? 'EVENT PORTAL ACTIVE' : businessType === 'rental' ? 'RENTALS ONLINE' : 'SERVICE ONLINE'}</span>
             </div>
           </div>
 
           <div className="v-top-right">
+             {(() => {
+               const activeConsoles = [];
+               if (hasShopConsole) activeConsoles.push({ id: 'shop', label: 'Store' });
+               if (hasEventConsole) activeConsoles.push({ id: 'event', label: 'Events' });
+               if (hasServiceConsole) activeConsoles.push({ id: 'service', label: 'Profession' });
+               if (hasRentalConsole) activeConsoles.push({ id: 'rental', label: 'Rentals' });
+
+               if (activeConsoles.length <= 1) return null;
+
+               return (
+                 <div style={{ position: 'relative', marginRight: '1rem' }}>
+                   <select
+                     value={businessType}
+                     onChange={(e) => {
+                       const targetType = e.target.value;
+                       setBusinessType(targetType);
+                       localStorage.setItem('vBusinessType', targetType);
+                       toast.success(`Switched to ${targetType === 'shop' ? 'Store' : targetType === 'event' ? 'Event' : targetType === 'rental' ? 'Rentals' : 'Profession'} Console!`);
+                       checkVendorStatus();
+                     }}
+                     style={{
+                       background: '#ea580c',
+                       color: 'white',
+                       border: 'none',
+                       padding: '10px 18px',
+                       borderRadius: '12px',
+                       fontWeight: 800,
+                       fontSize: '0.85rem',
+                       cursor: 'pointer',
+                       boxShadow: '0 4px 12px rgba(249, 115, 22, 0.2)',
+                       outline: 'none',
+                       appearance: 'none',
+                       paddingRight: '30px',
+                       backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
+                       backgroundRepeat: 'no-repeat',
+                       backgroundPosition: 'right 8px center',
+                       backgroundSize: '16px'
+                     }}
+                   >
+                     {activeConsoles.map(c => (
+                       <option key={c.id} value={c.id} style={{ color: '#0f172a' }}>{c.label} Console</option>
+                     ))}
+                   </select>
+                 </div>
+               );
+             })()}
              <div className="v-user-info" style={{ textAlign: 'right' }}>
                <span style={{ fontSize: '0.95rem', fontWeight: 850, color: '#0f172a' }}>{vendorData?.business_name || (businessType === 'shop' ? 'My Store' : businessType === 'event' ? 'My Events Agency' : 'My Service')}</span>
                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--v-text-muted)' }}>{vendorData?.id?.toString().slice(0, 10).toUpperCase()}</span>
@@ -1831,6 +1996,116 @@ const VendorPortal = ({ user, onLogout }) => {
           </motion.div>
         </div>
       )}
+      {showUpgradeModal && (() => {
+        const modalConfig = {
+          event: {
+            title: "Upgrade to Event Organizer",
+            desc: "Organize live events, workshops, music shows, and sell digital entry tickets directly on Passwalaa. A one-time activation fee of ₹499.00 applies.",
+            color: '#ea580c'
+          },
+          service: {
+            title: "Upgrade to Profession Console",
+            desc: "Offer professional services (cleaning, home services, salon, repairs) and accept appointments. A one-time activation fee of ₹499.00 applies.",
+            color: '#6366f1'
+          },
+          rental: {
+            title: "Upgrade to Rental Console",
+            desc: "Rent out vehicles, bikes, party equipment, or properties, manage availability and rental logs. A one-time activation fee of ₹499.00 applies.",
+            color: '#06b6d4'
+          },
+          shop: {
+            title: "Upgrade to Store Console",
+            desc: "Open a digital retail store, list products, keep track of inventory and fulfill local delivery orders. A one-time activation fee of ₹499.00 applies.",
+            color: '#10b981'
+          }
+        }[upgradeTarget || 'event'];
+
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem', backdropFilter: 'blur(4px)' }} onClick={() => setShowUpgradeModal(false)}>
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              style={{ background: 'white', borderRadius: '24px', padding: '2.5rem', maxWidth: '500px', width: '100%', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#0f172a' }}>{modalConfig.title}</h3>
+                <button onClick={() => setShowUpgradeModal(false)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', color: '#64748b' }}>✕</button>
+              </div>
+              
+              <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: '2rem' }}>
+                {modalConfig.desc}
+              </p>
+
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const bName = e.target.elements.business_name.value;
+                const aadhar = e.target.elements.aadhar_no.value;
+                
+                const toastId = toast.loading("Initiating payment...");
+                try {
+                  setTimeout(async () => {
+                    const paymentId = `pay_upgrade_${Math.random().toString(36).substring(2, 10)}`;
+                    
+                    // Insert request to database
+                    const { error } = await supabase.from('event_organizer_requests').insert([{
+                      user_id: vendorData.user_id || '00000000-0000-0000-0000-000000000000',
+                      phone: vendorData.phone || '9999999999',
+                      business_name: bName,
+                      aadhar_no: aadhar,
+                      payment_status: 'PAID',
+                      payment_id: paymentId,
+                      request_status: 'SUBMITTED',
+                      amount: 499.00,
+                      target_console: upgradeTarget
+                    }]);
+
+                    toast.dismiss(toastId);
+                    if (error) {
+                      toast.error(`Request submission failed: ${error.message}`);
+                    } else {
+                      toast.success("Upgrade fee paid & request submitted for Admin approval!", { duration: 5000 });
+                      setShowUpgradeModal(false);
+                    }
+                  }, 1500);
+                } catch (err) {
+                  toast.dismiss(toastId);
+                  toast.error(err.message);
+                }
+              }}>
+                <div className="v-form-group" style={{ marginBottom: '1.25rem' }}>
+                  <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', display: 'block', marginBottom: '6px' }}>Business/Brand Name *</label>
+                  <input type="text" name="business_name" required className="v-input" defaultValue={vendorData?.business_name || ''} style={{ padding: '12px', borderRadius: '12px', border: '1.5px solid var(--v-border)' }} />
+                </div>
+                
+                <div className="v-form-group" style={{ marginBottom: '1.25rem' }}>
+                  <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', display: 'block', marginBottom: '6px' }}>Aadhaar Number (KYC) *</label>
+                  <input type="text" name="aadhar_no" required maxLength={12} className="v-input" defaultValue={vendorData?.aadhar_no || ''} style={{ padding: '12px', borderRadius: '12px', border: '1.5px solid var(--v-border)' }} />
+                </div>
+
+                <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '16px', border: '1px solid #e2e8f0', marginBottom: '2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#475569', fontWeight: 600 }}>
+                    <span>One-time Setup Fee</span>
+                    <span>₹499.00</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', color: '#0f172a', fontWeight: 900, marginTop: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '8px' }}>
+                    <span>Total Amount</span>
+                    <span>₹499.00</span>
+                  </div>
+                </div>
+
+                <button 
+                  type="submit" 
+                  className="v-btn-primary" 
+                  style={{ width: '100%', padding: '14px', borderRadius: '14px', background: modalConfig.color, borderColor: modalConfig.color, color: 'white', fontWeight: 800, cursor: 'pointer', fontSize: '1rem', boxShadow: `0 4px 12px ${modalConfig.color}33` }}
+                >
+                  Pay ₹499 & Submit Request
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

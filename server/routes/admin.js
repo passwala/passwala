@@ -42,7 +42,8 @@ const ALLOWED_ADMIN_TABLES = [
   'event_ticket_tiers',
   'city_routes',
   'city_vehicles',
-  'ticket_bookings'
+  'ticket_bookings',
+  'event_organizer_requests'
 ];
 
 function base64urlEncode(strOrBuffer) {
@@ -863,6 +864,152 @@ router.post('/events/reject', async (req, res) => {
         res.status(200).json({ success: true, event: data, reason });
     } catch (error) {
         console.error('❌ Event Reject Error:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/admin/upgrade/approve — Approve vendor console upgrade request
+router.post('/upgrade/approve', async (req, res) => {
+    try {
+        const { id } = req.body;
+        if (!id) return res.status(400).json({ error: 'Request ID is required' });
+
+        // 1. Fetch request details
+        const { data: request, error: fetchErr } = await supabase
+            .from('event_organizer_requests')
+            .select('*')
+            .eq('id', id)
+            .single();
+        if (fetchErr) throw fetchErr;
+
+        // 2. Fetch full name from users
+        const { data: userRecord } = await supabase
+            .from('users')
+            .select('full_name')
+            .eq('id', request.user_id)
+            .single();
+
+        const targetConsole = request.target_console || 'event';
+
+        if (targetConsole === 'event') {
+            // Upsert into service_providers table (used for events category)
+            const { error: spError } = await supabase
+                .from('service_providers')
+                .upsert({
+                    user_id: request.user_id,
+                    phone: request.phone,
+                    full_name: userRecord?.full_name || 'Vendor Partner',
+                    business_name: request.business_name,
+                    category: 'Comedy & Theatre', // Default category
+                    is_verified: true,
+                    profile_completed: true
+                }, { onConflict: 'user_id' });
+            if (spError) throw spError;
+
+            // Update role to EVENT_ORGANIZER
+            const { error: userError } = await supabase
+                .from('users')
+                .update({ role: 'EVENT_ORGANIZER' })
+                .eq('id', request.user_id);
+            if (userError) throw userError;
+        } else if (targetConsole === 'service') {
+            // Professional Services
+            const { error: spError } = await supabase
+                .from('service_providers')
+                .upsert({
+                    user_id: request.user_id,
+                    phone: request.phone,
+                    full_name: userRecord?.full_name || 'Vendor Partner',
+                    business_name: request.business_name,
+                    category: 'Plumbing Services', 
+                    is_verified: true,
+                    profile_completed: true
+                }, { onConflict: 'user_id' });
+            if (spError) throw spError;
+
+            // Update role to SERVICE_PROVIDER
+            const { error: userError } = await supabase
+                .from('users')
+                .update({ role: 'SERVICE_PROVIDER' })
+                .eq('id', request.user_id);
+            if (userError) throw userError;
+        } else if (targetConsole === 'rental') {
+            // Rental & Vehicles
+            const { error: spError } = await supabase
+                .from('service_providers')
+                .upsert({
+                    user_id: request.user_id,
+                    phone: request.phone,
+                    full_name: userRecord?.full_name || 'Vendor Partner',
+                    business_name: request.business_name,
+                    category: 'Rental', 
+                    is_verified: true,
+                    profile_completed: true
+                }, { onConflict: 'user_id' });
+            if (spError) throw spError;
+
+            // Update role to SERVICE_PROVIDER
+            const { error: userError } = await supabase
+                .from('users')
+                .update({ role: 'SERVICE_PROVIDER' })
+                .eq('id', request.user_id);
+            if (userError) throw userError;
+        } else if (targetConsole === 'shop') {
+            // Retail Store
+            const { error: vError } = await supabase
+                .from('vendors')
+                .upsert({
+                    user_id: request.user_id,
+                    phone: request.phone,
+                    name: userRecord?.full_name || 'Vendor Partner',
+                    business_name: request.business_name,
+                    category: 'Grocery',
+                    is_verified: true,
+                    profile_completed: true
+                }, { onConflict: 'user_id' });
+            if (vError) throw vError;
+
+            // Update role to VENDOR
+            const { error: userError } = await supabase
+                .from('users')
+                .update({ role: 'VENDOR' })
+                .eq('id', request.user_id);
+            if (userError) throw userError;
+        }
+
+        // 5. Update request status to APPROVED
+        const { data: updatedRequest, error: updateErr } = await supabase
+            .from('event_organizer_requests')
+            .update({ request_status: 'APPROVED', payment_status: 'PAID' })
+            .eq('id', id)
+            .select()
+            .single();
+        if (updateErr) throw updateErr;
+
+        res.status(200).json({ success: true, request: updatedRequest });
+    } catch (error) {
+        console.error('❌ Upgrade Approve Error:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/admin/upgrade/reject — Reject console upgrade request
+router.post('/upgrade/reject', async (req, res) => {
+    try {
+        const { id } = req.body;
+        if (!id) return res.status(400).json({ error: 'Request ID is required' });
+
+        const { data, error } = await supabase
+            .from('event_organizer_requests')
+            .update({ request_status: 'REJECTED' })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.status(200).json({ success: true, request: data });
+    } catch (error) {
+        console.error('❌ Upgrade Reject Error:', error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
