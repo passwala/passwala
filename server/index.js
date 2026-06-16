@@ -1,6 +1,9 @@
+// Fix #1: dotenv MUST be imported before any other module that reads process.env.
+// In ESM, static imports are hoisted — supabase.js & notifications.js read process.env
+// at module load time, so dotenv.config() on line 18 is already too late.
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import os from 'os';
 import userRoutes from './routes/users.js';
 import vendorRoutes from './routes/vendor.js';
@@ -10,16 +13,17 @@ import orderRoutes from './routes/orders.js';
 import aiRoutes from './routes/ai.js';
 import cityRidesRoutes from './routes/city_rides.js';
 import eventRoutes from './routes/events.js';
-import { apiLimiter } from './utils/rateLimiter.js';
+import { apiLimiter, adminLimiter } from './utils/rateLimiter.js';
 import supabase from './supabase.js';
 import morgan from 'morgan';
 import { sendNotification } from './utils/notifications.js';
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3004;
+const isDev = process.env.NODE_ENV !== 'production';
 
-app.use(morgan('combined'));
+// Fix #6: Use concise 'dev' format locally; 'combined' only in production
+app.use(morgan(isDev ? 'dev' : 'combined'));
 
 // CORS Security Whitelist
 const allowedOrigins = [
@@ -52,8 +56,14 @@ app.use(cors({
     // Check if origin matches localhost, 127.0.0.1, or local network IP on any dev port
     const isLocalhostOrIP = /https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+):(3000|3001|3002|3003|3004|3005)/.test(origin);
     
-    // Allow exact matches, local environments, or any Vercel/localtunnel preview deployments
-    const isAllowed = isLocalhostOrIP || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app') || origin.endsWith('.loca.lt') || origin.endsWith('.ngrok.io') || origin.endsWith('.ngrok-free.app');
+    // Fix #8: ngrok/localtunnel ONLY allowed in development, not production
+    const isDevTunnel = isDev && (
+      origin.endsWith('.ngrok.io') || 
+      origin.endsWith('.ngrok-free.app') || 
+      origin.endsWith('.loca.lt')
+    );
+
+    const isAllowed = isLocalhostOrIP || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app') || isDevTunnel;
                       
     if (isAllowed) {
       callback(null, true);
@@ -107,8 +117,8 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Register Admin Portal routes first to bypass global rate limits (secured by cryptographic JWT keys)
-app.use('/api/admin', adminRoutes);
+// Admin routes use a dedicated limiter (200 req/min — dashboard makes ~11 parallel fetches on mount)
+app.use('/api/admin', adminLimiter, adminRoutes);
 
 // Apply Global Rate Limiting to all other /api endpoints
 app.use('/api', apiLimiter);
@@ -121,7 +131,19 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/city-rides', cityRidesRoutes);
 app.use('/api/events', eventRoutes);
 
+// Fix #13: Bounded route cache with max 500 entries to prevent memory leak
+const ROUTE_CACHE_MAX = 500;
 const routeCache = new Map();
+const _routeCacheAdd = (key, value) => {
+  if (routeCache.size >= ROUTE_CACHE_MAX) {
+    // Evict the oldest entry (first inserted key in Map iteration order)
+    routeCache.delete(routeCache.keys().next().value);
+  }
+  routeCache.set(key, value);
+};
+
+// Fix #3: Allowlist profile values to prevent URL path injection into OSRM requests
+const ALLOWED_OSRM_PROFILES = new Set(['driving', 'walking', 'cycling']);
 
 app.get('/api/route', async (req, res) => {
   try {
@@ -129,7 +151,10 @@ app.get('/api/route', async (req, res) => {
     if (!startLat || !startLng || !endLat || !endLng) {
       return res.status(400).json({ error: 'Missing coordinates' });
     }
-    const cacheKey = `${startLng},${startLat}|${endLng},${endLat}|${profile}`;
+    // Fix #3: Reject unknown profiles — only allow 'driving', 'walking', 'cycling'
+    const safeProfile = ALLOWED_OSRM_PROFILES.has(profile) ? profile : 'driving';
+
+    const cacheKey = `${startLng},${startLat}|${endLng},${endLat}|${safeProfile}`;
     if (routeCache.has(cacheKey)) {
       const cached = routeCache.get(cacheKey);
       if (Date.now() - cached.timestamp < 30 * 60 * 1000) {
@@ -138,7 +163,7 @@ app.get('/api/route', async (req, res) => {
         routeCache.delete(cacheKey);
       }
     }
-    const url = `https://router.project-osrm.org/route/v1/${profile}/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
+    const url = `https://router.project-osrm.org/route/v1/${safeProfile}/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
@@ -146,7 +171,7 @@ app.get('/api/route', async (req, res) => {
     });
     if (!response.ok) throw new Error('OSRM API failed');
     const data = await response.json();
-    routeCache.set(cacheKey, { data, timestamp: Date.now() });
+    _routeCacheAdd(cacheKey, { data, timestamp: Date.now() });
     res.json(data);
   } catch (err) {
     console.error('Routing failed:', err.message);
@@ -193,6 +218,21 @@ app.get('/api/ip-location', async (req, res) => {
   }
 });
 
+// Fix #1: Production error logging endpoint — called by App.jsx ErrorBoundary
+// Only logs in production; dev errors are already surfaced in the browser console.
+app.post('/api/log-error', (req, res) => {
+  const { message, stack, component } = req.body || {};
+  if (message) {
+    console.error('[ClientError]', {
+      message,
+      component: component || 'unknown',
+      // Log only the first line of the stack to avoid verbose noise
+      stack: stack ? stack.split('\n')[0] : undefined
+    });
+  }
+  res.status(204).end(); // No Content — fire-and-forget
+});
+
 // 404 Handler
 app.use((req, res) => {
   res.status(404).json({
@@ -222,9 +262,22 @@ const getLocalIP = () => {
   return 'localhost';
 };
 
-// Auto-Cancel Cron Job: Cancel orders stuck in PENDING/PLACED/ORDERED for over 15 mins
+// Fix #10: Auto-Cancel Cron with circuit-breaker backoff
+// Suspends itself after MAX_CANCEL_FAILURES consecutive DB errors to prevent log floods.
 const AUTO_CANCEL_MINUTES = 15;
+let _cancelJobFailures = 0;
+const MAX_CANCEL_FAILURES = 5;
+
 setInterval(async () => {
+  // Circuit breaker: stop executing after too many consecutive failures
+  if (_cancelJobFailures >= MAX_CANCEL_FAILURES) {
+    if (_cancelJobFailures === MAX_CANCEL_FAILURES) {
+      console.error('[AutoCancel] SUSPENDED after 5 consecutive failures. Check Supabase connection.');
+      _cancelJobFailures++; // go past threshold so this log only fires once
+    }
+    return;
+  }
+
   try {
     const cutoffTime = new Date(Date.now() - AUTO_CANCEL_MINUTES * 60000).toISOString();
     
@@ -235,13 +288,16 @@ setInterval(async () => {
       .lt('created_at', cutoffTime);
 
     if (fetchErr) {
-      console.error('Auto-cancel fetch error:', fetchErr.message);
+      _cancelJobFailures++;
+      console.error(`[AutoCancel] Fetch error (${_cancelJobFailures}/${MAX_CANCEL_FAILURES}):`, fetchErr.message);
       return;
     }
 
+    _cancelJobFailures = 0; // reset on successful DB contact
+
     if (stuckOrders && stuckOrders.length > 0) {
       const orderIds = stuckOrders.map(o => o.id);
-      console.log(`Auto-canceling ${orderIds.length} stuck orders...`);
+      console.log(`[AutoCancel] Canceling ${orderIds.length} stuck order(s)...`);
       
       const { error: updateErr } = await supabase
         .from('orders')
@@ -249,9 +305,9 @@ setInterval(async () => {
         .in('id', orderIds);
 
       if (updateErr) {
-        console.error('Auto-cancel update error:', updateErr.message);
+        console.error('[AutoCancel] Update error:', updateErr.message);
       } else {
-        console.log('Auto-canceled orders successfully:', orderIds);
+        console.log('[AutoCancel] Canceled orders:', orderIds);
         for (const order of stuckOrders) {
           if (order.user_id) {
             await sendNotification(order.user_id, 'ORDER_CANCELLED', 'Your order was cancelled (no vendor response).');
@@ -260,7 +316,8 @@ setInterval(async () => {
       }
     }
   } catch (err) {
-    console.error('Auto-cancel job error:', err.message);
+    _cancelJobFailures++;
+    console.error(`[AutoCancel] Unexpected error (${_cancelJobFailures}/${MAX_CANCEL_FAILURES}):`, err.message);
   }
 }, 60000); // Run every 1 minute
 

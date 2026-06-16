@@ -742,6 +742,10 @@ router.delete('/delete', async (req, res) => {
                 await supabase.from('deals').delete().in('store_id', storeIds);
                 await supabase.from('stores').delete().in('id', storeIds);
             }
+        } else if (table === 'events') {
+            // Cascade: remove all bookings and tiers before the event itself
+            await supabase.from('event_bookings').delete().eq('event_id', id);
+            await supabase.from('event_ticket_tiers').delete().eq('event_id', id);
         }
 
         const { data, error } = await supabase.from(table).delete().eq('id', id).select();

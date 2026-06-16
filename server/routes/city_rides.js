@@ -1,6 +1,7 @@
 import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';
+import crypto from 'crypto';
 import supabase from '../supabase.js';
 
 const router = express.Router();
@@ -320,7 +321,7 @@ router.post('/book', async (req, res) => {
     }
 
     // Generate QR Code hash
-    const qrHash = `PW-RIDE-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    const qrHash = `PW-RIDE-${Date.now()}-${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
 
     // Create booking record
     const { data: booking, error: insertErr } = await supabase
@@ -721,6 +722,12 @@ router.post('/update-status', async (req, res) => {
       return res.status(400).json({ error: 'bookingId and status are required' });
     }
 
+    // Allowlist valid ride stage values to prevent state machine corruption
+    const ALLOWED_RIDE_STAGES = new Set(['PENDING', 'CONFIRMED', 'PICKED_UP', 'ARRIVED', 'COMPLETED', 'CANCELLED']);
+    if (!ALLOWED_RIDE_STAGES.has(status)) {
+      return res.status(400).json({ error: `Invalid status "${status}". Must be one of: PENDING, CONFIRMED, PICKED_UP, ARRIVED, COMPLETED, CANCELLED` });
+    }
+
     // First fetch current seat_numbers
     const { data: currentBooking, error: fetchErr } = await supabase
       .from('ticket_bookings')
@@ -932,6 +939,11 @@ router.post('/driver-update-status', async (req, res) => {
     const { bookingId, status } = req.body;
     if (!bookingId || !status) {
       return res.status(400).json({ error: 'bookingId and status are required' });
+    }
+
+    const ALLOWED_DRIVER_STATUSES = new Set(['COMPLETED', 'CANCELLED']);
+    if (!ALLOWED_DRIVER_STATUSES.has(status)) {
+      return res.status(400).json({ error: `Invalid status "${status}". Allowed: COMPLETED, CANCELLED` });
     }
 
     const { data: booking, error } = await supabase

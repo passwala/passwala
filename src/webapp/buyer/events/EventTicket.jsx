@@ -1,20 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { QRCode } from 'react-qr-code';
-import { Download, Calendar, MapPin, CheckCircle } from 'lucide-react';
+import { Download, Calendar, MapPin, CheckCircle, ArrowLeft } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const BASE_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
 
+// Fix #9: Named constant so both the timer and the SVG ring share the same source value
+const REDIRECT_SECONDS = 6;
+
+// Fix #4: Shared GST rate — mirrors server/routes/events.js and EventCheckout.jsx
+const GST_RATE = 0.09; // 9% CGST + 9% SGST = 18%
+
 const EventTicket = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { booking, event: initialEvent, tier, isFromCheckout = false } = location.state || {};
+  const { booking, event: initialEvent, tier, fromCheckout: isFromCheckout = false } = location.state || {};
   const [event, setEvent] = useState(initialEvent || {});
   const [ticketStatus] = useState(booking?.status || 'CONFIRMED');
-  const [countdown, setCountdown] = useState(6);
+  // Fix #9: REDIRECT_SECONDS used here instead of magic number 6
+  const [countdown, setCountdown] = useState(REDIRECT_SECONDS);
 
   useEffect(() => {
     if (!isFromCheckout) return;
@@ -72,8 +79,9 @@ const EventTicket = () => {
       // ── Tax breakdown (Entertainment: 18% GST = CGST 9% + SGST 9% exclusive)
       // Server adds tax ON TOP of base (exclusive), not inclusive
       const baseAmt  = parseFloat(booking.base_amount  || (grandTotal / 1.18).toFixed(2) || pricePerTicket * ticketCount);
-      const cgst     = parseFloat((booking.cgst_amount || (baseAmt * 0.09)).toFixed(2));
-      const sgst     = parseFloat((booking.sgst_amount || (baseAmt * 0.09)).toFixed(2));
+      // Fix #4: Use GST_RATE constant — replaces hardcoded 0.09 fallback values
+      const cgst     = parseFloat((booking.cgst_amount || (baseAmt * GST_RATE)).toFixed(2));
+      const sgst     = parseFloat((booking.sgst_amount || (baseAmt * GST_RATE)).toFixed(2));
       const taxable  = parseFloat(baseAmt.toFixed(2));
 
       // ── Organizer info — from server-enriched organizer_name field
@@ -310,9 +318,17 @@ const EventTicket = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-main)', paddingBottom: '2rem' }}>
-      {/* Header */}
+      {/* Fix #5: Ticket page header with back button */}
       <div style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'white' }}>
+        <button
+          onClick={() => navigate(-1)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: '#64748b' }}
+          aria-label="Go back"
+        >
+          <ArrowLeft size={22} />
+        </button>
         <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>Your Ticket</h2>
+        <div style={{ width: 30 }} />{/* spacer to center title */}
       </div>
 
       <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
@@ -339,7 +355,7 @@ const EventTicket = () => {
                 <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5" />
                 <circle
                   cx="18" cy="18" r="15.9" fill="none" stroke="white" strokeWidth="2.5"
-                  strokeDasharray={`${(countdown / 6) * 100} 100`}
+              strokeDasharray={`${(countdown / REDIRECT_SECONDS) * 100} 100`}
                   strokeLinecap="round"
                 />
               </svg>
@@ -403,7 +419,7 @@ const EventTicket = () => {
               <QRCode value={booking.qr_code_hash} size={150} />
             </div>
             <p style={{ margin: '15px 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)', letterSpacing: '2px' }}>
-              {booking.qr_code_hash?.split('-')[2]}
+              {booking.qr_code_hash?.split('-').slice(3).join('-') || booking.qr_code_hash}
             </p>
             <div style={{
               marginTop: '15px',

@@ -41,7 +41,8 @@ const EventDetails = ({ user }) => {
         .select('id, title, banner_url, event_date, venue_name, event_ticket_tiers(price)')
         .eq('category', category)
         .neq('id', id)
-        .in('status', ['UPCOMING', 'ONGOING', 'SOLD_OUT', 'PUBLISHED'])
+        // Fix #7: removed 'PUBLISHED' — only valid statuses are UPCOMING/ONGOING/SOLD_OUT
+        .in('status', ['UPCOMING', 'ONGOING', 'SOLD_OUT'])
         .limit(8);
       setSimilarEvents(data || []);
     } catch (_) {}
@@ -86,9 +87,10 @@ const EventDetails = ({ user }) => {
   const tiers = event.event_ticket_tiers || [];
   const eventDateObj = new Date(event.event_date);
   const hasEnded = event.event_date && eventDateObj < new Date();
-  const anyTierOpen = !hasEnded && (tiers.length === 0 || tiers.some(t => checkBookingWindow(t).open));
+  const anyTierOpen = !hasEnded && tiers.length > 0 && tiers.some(t => checkBookingWindow(t).open);
   const isSoldOut = event.status === 'SOLD_OUT';
-  const isDisabled = hasEnded || isSoldOut || !anyTierOpen;
+  // Fix #9: isDisabled also covers events with no tiers (no tiers = can't book)
+  const isDisabled = hasEnded || isSoldOut || !anyTierOpen || tiers.length === 0;
   const minPrice = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : null;
   const totalSeats = tiers.reduce((s, t) => s + (t.available_seats || 0), 0);
   const description = event.description || '';
@@ -96,10 +98,12 @@ const EventDetails = ({ user }) => {
   const formattedDate = eventDateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   const formattedTime = eventDateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
-  // Parse tags from category or tags field
+  // Fix #23: Deduplicate tags — filter out any tag that exactly matches event.category
+  // to prevent the category appearing twice (once in tags, once in guide section)
   const tags = event.tags
     ? (Array.isArray(event.tags) ? event.tags : event.tags.split(',').map(t => t.trim()))
     : (event.category ? [event.category] : []);
+  const uniqueTags = [...new Set(tags)].filter(t => t && t !== 'Other Events');
 
   return (
     <div className="ed2-root">
@@ -109,6 +113,12 @@ const EventDetails = ({ user }) => {
           src={event.banner_url || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200&q=80'}
           alt={event.title}
           className="ed2-banner-img"
+          loading="lazy"
+          onError={(e) => {
+            // Fix #8: show fallback if banner URL is broken
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200&q=80';
+          }}
         />
         <div className="ed2-banner-overlay" />
         {event.status === 'SOLD_OUT' && <div className="ed2-soldout-badge">SOLD OUT</div>}
@@ -119,11 +129,10 @@ const EventDetails = ({ user }) => {
 
       {/* ── TAG CHIPS ── */}
       {(() => {
-        const visibleTags = tags.filter(t => t && t !== 'Other Events');
-        if (visibleTags.length === 0 && !event.views) return null;
+        if (uniqueTags.length === 0 && !event.views) return null;
         return (
           <div className="ed2-tags-row">
-            {visibleTags.map((tag, i) => (
+            {uniqueTags.map((tag, i) => (
               <span key={i} className="ed2-tag">{tag}</span>
             ))}
             {event.views && (
@@ -376,7 +385,7 @@ const EventDetails = ({ user }) => {
               {totalSeats === 0 ? 'Sold Out' : `${totalSeats} Available`}
             </div>
           )}
-          {minPrice && <p className="ed2-sticky-price">From ₹{minPrice}</p>}
+          {/* Fix #9: Only show the book button if there are tiers available */}
           <button
             className={`ed2-book-btn ${isDisabled ? 'disabled' : ''}`}
             disabled={isDisabled}
@@ -385,7 +394,7 @@ const EventDetails = ({ user }) => {
               navigate('/events/checkout', { state: { event, user } });
             }}
           >
-            {hasEnded ? 'Event Ended' : isSoldOut ? 'Sold Out' : (!anyTierOpen ? 'Booking Closed' : 'Book Tickets')}
+            {hasEnded ? 'Event Ended' : isSoldOut ? 'Sold Out' : tiers.length === 0 ? 'No Tickets' : (!anyTierOpen ? 'Booking Closed' : 'Book Tickets')}
           </button>
         </aside>
       </div>
@@ -393,6 +402,7 @@ const EventDetails = ({ user }) => {
       {/* ── MOBILE BOTTOM BAR ── */}
       <div className="ed2-bottom-bar">
         {minPrice && <div className="ed2-bottom-price">From <strong>₹{minPrice}</strong></div>}
+        {/* Fix #9: Only show book button if tiers exist */}
         <button
           className={`ed2-book-btn ${isDisabled ? 'disabled' : ''}`}
           disabled={isDisabled}
@@ -401,7 +411,7 @@ const EventDetails = ({ user }) => {
             navigate('/events/checkout', { state: { event, user } });
           }}
         >
-          {hasEnded ? 'Event Ended' : isSoldOut ? 'Sold Out' : (!anyTierOpen ? 'Booking Closed' : 'Book Tickets')}
+          {hasEnded ? 'Event Ended' : isSoldOut ? 'Sold Out' : tiers.length === 0 ? 'No Tickets' : (!anyTierOpen ? 'Booking Closed' : 'Book Tickets')}
         </button>
       </div>
     </div>

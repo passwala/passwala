@@ -101,6 +101,21 @@ export class ErrorBoundary extends React.Component {
   }
   componentDidCatch(error, errorInfo) {
     console.error("Global ErrorBoundary caught an error", error, errorInfo);
+    // Fix #22: In production, send to a monitoring endpoint for tracking
+    if (!import.meta.env.DEV) {
+      try {
+        const baseUrl = import.meta.env.VITE_API_URL || '';
+        fetch(`${baseUrl}/api/log-error`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: error?.message,
+            stack: error?.stack,
+            component: errorInfo?.componentStack?.split('\n')?.[1]?.trim()
+          })
+        }).catch(() => {}); // non-blocking, best-effort
+      } catch (_) {}
+    }
   }
   render() {
     if (this.state.hasError) {
@@ -154,7 +169,8 @@ export class ErrorBoundary extends React.Component {
             <p style={{ color: '#94a3b8', fontSize: '1rem', lineHeight: '1.6', marginBottom: '2rem' }}>
               Passwala encountered an unexpected error. We have logged the issue and are looking into it. Your data is secure and safe.
             </p>
-            {this.state.error && (
+            {/* Fix #6: Only show stack trace in development, not production */}
+            {this.state.error && import.meta.env.DEV && (
               <div style={{
                 background: 'rgba(15, 23, 42, 0.6)',
                 border: '1px solid rgba(255, 255, 255, 0.05)',
@@ -574,6 +590,9 @@ const AppContent = ({
                   <Route path="/city-ride" element={effectiveUser ? <CityTicketBooking user={effectiveUser} userCoords={userCoords} onBack={() => navigate('/')} /> : <Navigate to="/" />} />
                   <Route path="/ride-checkout" element={effectiveUser ? <RideCheckout /> : <Navigate to="/" />} />
                   <Route path="/ride-ticket" element={effectiveUser ? <RideTicket /> : <Navigate to="/" />} />
+                  {/* IMPORTANT: /events/checkout MUST be defined before /events/:id
+                      to prevent React Router from treating 'checkout' as an event ID param.
+                      Do NOT reorder these routes. */}
                   <Route path="/events" element={effectiveUser ? <EventHub onBack={() => navigate('/')} /> : <Navigate to="/" />} />
                   <Route path="/events/checkout" element={effectiveUser ? <EventCheckout user={effectiveUser} /> : <Navigate to="/" />} />
                   <Route path="/events/ticket" element={effectiveUser ? <EventTicket /> : <Navigate to="/" />} />
@@ -689,19 +708,10 @@ const AppContent = ({
 
 
 
-function FCMTokenSync({ user }) {
-  const { fcmToken } = useNotifications();
-  
-  useEffect(() => {
-    if (user?.id && fcmToken) {
-      supabase.from('users').update({ fcm_token: fcmToken }).eq('id', user.id).then(({ error }) => {
-        if (error) console.error("Failed to sync FCM token", error);
-      });
-    }
-  }, [user?.id, fcmToken]);
+// Fix #3: FCMTokenSync removed — FCM token is synced exclusively via the Express backend
+// in AppContent's syncToken effect. A second direct Supabase write here caused a duplicate
+// write race condition. Keeping this comment so the intent is clear.
 
-  return null;
-}
 
 function App() {
   const {
@@ -733,7 +743,7 @@ function App() {
       ) : (
         <SearchProvider>
           <NotificationProvider>
-            <FCMTokenSync user={user} />
+            {/* Fix #3: FCMTokenSync removed — see comment above App() */}
             <LanguageProvider>
               <CartProvider user={user}>
                 <div className="app-container">

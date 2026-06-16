@@ -23,3 +23,17 @@ export const authLimiter = rateLimit({
     message: 'Too many authentication attempts from this IP. Please try again after 15 minutes.'
   }
 });
+
+// Fix: Admin dashboard makes ~11 parallel requests on mount (8 reference tables
+// + stats + settings + data fetch) and re-fires on every tab switch.
+// 20 req/min is an auth-endpoint limit — far too tight for a single-operator admin panel.
+// Raised to 200 req/min with a clear descriptive comment.
+export const adminLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 200,            // 200 requests/min per IP — admin dashboard is heavy on parallel fetches
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Too many admin requests, please slow down.'
+  }
+});

@@ -6,6 +6,9 @@ import { checkBookingWindow } from '../../../utils/checkBookingWindow';
 
 const BASE_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
 
+// Fix #19: Mirror the server-side GST_RATE so both sides stay in sync
+const GST_RATE = 0.09; // 9% CGST + 9% SGST = 18% (Gujarat entertainment services)
+
 
 // Extract the best identifiers from any user-shaped object
 const extractIds = (obj) => {
@@ -104,9 +107,9 @@ const EventCheckout = ({ user: routeUser }) => {
   const selectedTier = event.event_ticket_tiers?.find(t => t.id === selectedTierId);
   const baseAmount = (selectedTier?.price || 0) * ticketCount;
   
-  // Gujarat GST calculation
-  const cgstAmount = Number((baseAmount * 0.09).toFixed(2));
-  const sgstAmount = Number((baseAmount * 0.09).toFixed(2));
+  // Fix #19: Use shared GST_RATE (mirrors server-side constant)
+  const cgstAmount = Number((baseAmount * GST_RATE).toFixed(2));
+  const sgstAmount = Number((baseAmount * GST_RATE).toFixed(2));
   const totalAmount = baseAmount + cgstAmount + sgstAmount;
 
   // Booking window check for selected tier
@@ -115,6 +118,12 @@ const EventCheckout = ({ user: routeUser }) => {
 
   const handleBookTicket = async () => {
     if (!selectedTier) return;
+
+    // Fix #5: Validate ticket count before sending to server
+    if (!Number.isInteger(ticketCount) || ticketCount < 1) {
+      toast.error('Please select at least 1 ticket.');
+      return;
+    }
 
     if (resolving) {
       toast.error('Still loading your account info, please wait...');
@@ -159,7 +168,7 @@ const EventCheckout = ({ user: routeUser }) => {
       }
 
       toast.success('Event Tickets Booked Successfully!');
-      navigate('/events/ticket', { state: { booking: { ...data.booking, fromCheckout: true }, event, tier: selectedTier } });
+      navigate('/events/ticket', { state: { booking: data.booking, event, tier: selectedTier, fromCheckout: true } });
     } catch (err) {
       console.error(err);
       toast.error(err.message || 'Error booking tickets');
@@ -170,7 +179,15 @@ const EventCheckout = ({ user: routeUser }) => {
 
   return (
     <div style={{ background: 'var(--bg-surface)', minHeight: '100vh', paddingBottom: '100px' }}>
+      {/* Fix #18: Add back button to header */}
       <div style={{ background: 'white', padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: 'var(--shadow-sm)' }}>
+        <button
+          onClick={() => navigate(-1)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--secondary)' }}
+          aria-label="Go back"
+        >
+          <ArrowLeft size={22} />
+        </button>
         <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>Confirm Booking</h2>
       </div>
 

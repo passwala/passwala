@@ -203,6 +203,13 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
     activeMarkers.current = [];
     activePolylines.current = [];
 
+    const map = googleMapInstance.current;
+    const riderPos = riderCoords?.lat && riderCoords?.lng
+      ? { lat: parseFloat(riderCoords.lat), lng: parseFloat(riderCoords.lng) }
+      : (isService && providerDetails?.lat && providerDetails?.lng
+        ? { lat: parseFloat(providerDetails.lat), lng: parseFloat(providerDetails.lng) }
+        : null);
+
     // Helper: create marker using google.maps.Marker
     const createMarker = (position, title, svgIconStr) => {
       return new window.google.maps.Marker({
@@ -214,13 +221,6 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
         } : undefined
       });
     };
-
-    const map = googleMapInstance.current;
-    const riderPos = riderCoords?.lat && riderCoords?.lng
-      ? { lat: parseFloat(riderCoords.lat), lng: parseFloat(riderCoords.lng) }
-      : (isService && providerDetails?.lat && providerDetails?.lng
-        ? { lat: parseFloat(providerDetails.lat), lng: parseFloat(providerDetails.lng) }
-        : null);
 
     const storePt = { lat: storeLatLng[0], lng: storeLatLng[1] };
     const custPt  = { lat: customerLatLng[0], lng: customerLatLng[1] };
@@ -314,7 +314,55 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
   const [cancelPromptId, setCancelPromptId] = useState(null);
   const [rideBookings, setRideBookings] = useState([]);
   const [rideLoading, setRideLoading] = useState(true);
+  const [eventBookings, setEventBookings] = useState([]);
   const { addNotification } = useNotifications();
+
+  // ── Fetch event bookings (event_bookings table) ─────────────────────────
+  const fetchEventBookings = useCallback(async () => {
+    if (!user) return;
+    const uid = user.id || user.uid;
+    if (!uid) return;
+    try {
+      // Resolve to UUID if needed
+      let resolvedId = uid;
+      if (!uid || uid.length !== 36) {
+        const phone = user.phoneNumber?.replace(/\D/g, '').slice(-10) || user.phone?.replace(/\D/g, '').slice(-10);
+        const orFilters = [];
+        if (uid) orFilters.push(`uid.eq.${uid}`);
+        if (user.email) orFilters.push(`email.eq.${user.email}`);
+        if (phone) orFilters.push(`phone.eq.${phone}`);
+        if (orFilters.length > 0) {
+          const { data: u } = await supabase.from('users').select('id').or(orFilters.join(',')).maybeSingle();
+          if (u?.id) resolvedId = u.id;
+        }
+      }
+      if (!resolvedId || resolvedId.length !== 36) return;
+      const { data, error } = await supabase
+        .from('event_bookings')
+        .select('*, events(id, title, banner_url, event_date, venue_name), event_ticket_tiers(tier_name, price)')
+        .eq('user_id', resolvedId)
+        .order('created_at', { ascending: false });
+      if (!error) setEventBookings(data || []);
+    } catch (e) {
+      console.warn('Event bookings fetch failed:', e);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchEventBookings();
+    // Realtime: update booking status live
+    const uid = user?.id || user?.uid;
+    const evtSub = uid ? supabase
+      .channel('event_booking_updates')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'event_bookings' }, (payload) => {
+        setEventBookings(prev => prev.map(b =>
+          b.id === payload.new.id ? { ...b, ...payload.new } : b
+        ));
+      })
+      .subscribe() : null;
+    return () => { if (evtSub) supabase.removeChannel(evtSub); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   // ── Fetch city ride bookings ────────────────────────────────────────────
   const fetchRideBookings = useCallback(async () => {
@@ -1033,7 +1081,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
          <div className="live-status">
            <div className="live-pulse"></div> 
            <span>
-             {activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status)).length + rideBookings.filter(b => b.status === 'CONFIRMED').length} ACTIVE ORDERS
+             {activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status)).length + rideBookings.filter(b => b.status === 'CONFIRMED').length + eventBookings.filter(b => b.status === 'CONFIRMED').length} ACTIVE ORDERS
            </span>
          </div>
       </div>
@@ -1246,6 +1294,67 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                 </div>
               </motion.div>
             ))}
+          </div>
+        )}
+
+        {/* ── EVENT BOOKINGS SECTION ── */}
+        {eventBookings.filter(b => b.status !== 'CANCELLED').length > 0 && (
+          <div style={{ marginTop: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', padding: '0 4px' }}>
+              <div style={{ width: 28, height: 28, background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: 16 }}>🎫</span>
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>My Event Tickets</h3>
+              <span style={{ marginLeft: 'auto', background: '#f5f3ff', color: '#7c3aed', fontSize: '0.72rem', fontWeight: 800, padding: '3px 10px', borderRadius: 20, border: '1px solid #ddd6fe' }}>
+                {eventBookings.filter(b => b.status !== 'CANCELLED').length} TICKET{eventBookings.filter(b => b.status !== 'CANCELLED').length !== 1 ? 'S' : ''}
+              </span>
+            </div>
+            {eventBookings.filter(b => b.status !== 'CANCELLED').map((booking, i) => {
+              const ev = booking.events;
+              const tier = booking.event_ticket_tiers;
+              const evDate = ev?.event_date ? new Date(ev.event_date) : null;
+              return (
+                <motion.div
+                  key={booking.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.08 }}
+                  className="tracking-card glass"
+                  style={{ marginBottom: '1.25rem', border: '1.5px solid #ddd6fe', boxShadow: '0 8px 24px rgba(124,58,237,0.10)' }}
+                >
+                  <div className="card-top">
+                    <div className="shop-info">
+                      <div style={{ width: 44, height: 44, borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}>
+                        {ev?.banner_url
+                          ? <img src={ev.banner_url} alt={ev.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🎫</div>
+                        }
+                      </div>
+                      <div>
+                        <h4 style={{ margin: 0, fontWeight: 800 }}>{ev?.title || 'Event Ticket'}</h4>
+                        <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                          {tier?.tier_name || 'General'} × {booking.ticket_count} • ₹{booking.total_amount}
+                        </p>
+                        {evDate && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                            📅 {evDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} • 📍 {ev?.venue_name || 'Venue TBA'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="order-id-v2" style={{ background: '#f5f3ff', color: '#7c3aed' }}>#{booking.id.slice(0, 8)}</div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
+                    <button
+                      className="rider-contact-btn"
+                      style={{ background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: 'white', border: 'none' }}
+                      onClick={() => navigate('/events/ticket', { state: { booking, event: ev, tier } })}
+                    >🎫 View Ticket</button>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         )}
       </div>

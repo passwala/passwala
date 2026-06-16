@@ -81,6 +81,9 @@ export const useAuth = () => {
 
   const handleLogout = useCallback(async (skipToast = false) => {
     try {
+      // Fix #4: Read notifStatus BEFORE clearing localStorage (was read after clear in catch)
+      const notifStatus = localStorage.getItem('passwala_vendor_notifications');
+
       const userId = user?.id || user?.uid || user?.user_id;
       if (userId && (user?.role === 'RIDER' || appMode === 'rider')) {
         try {
@@ -95,8 +98,6 @@ export const useAuth = () => {
         await auth.signOut().catch(e => console.warn('Firebase Signout Skip:', e));
       }
 
-      const notifStatus = localStorage.getItem('passwala_vendor_notifications');
-      
       localStorage.clear();
       sessionStorage.clear();
 
@@ -115,33 +116,33 @@ export const useAuth = () => {
       }
     } catch (error) {
       console.error('Logout error:', error);
-      const notifStatus = localStorage.getItem('passwala_vendor_notifications');
+      // notifStatus already captured at the top of the try block
       localStorage.clear();
-      if (notifStatus) {
-        localStorage.setItem('passwala_vendor_notifications', notifStatus);
-      }
     }
   }, [user, navigate, appMode]);
 
-  // Suspension check effect to block suspended users in real-time
+  // Fix #15: Replace 8-second polling with Supabase Realtime for suspension check.
+  // This eliminates N queries/second for N concurrent users and provides instant response.
   useEffect(() => {
     if (!user) return;
-    let active = true;
 
+    const resolveUserId = () => {
+      if (user.user_id) return `id.eq.${user.user_id}`;
+      if (user.id && String(user.id).includes('-') && user.id.length === 36) return `id.eq.${user.id}`;
+      return null;
+    };
+    const filterStr = resolveUserId();
+    if (!filterStr) return;
+
+    // Initial check on mount
     const checkSuspension = async () => {
       try {
-        if (!supabase) return;
-        
+        const cleanPhone = String(user.phone || user.phoneNumber || '').replace(/[\s\-().]/g, '').replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, '');
         let orFilters = [];
         if (user.user_id) orFilters.push(`id.eq.${user.user_id}`);
         if (user.id && String(user.id).includes('-') && user.id.length === 36) orFilters.push(`id.eq.${user.id}`);
         if (user.uid) orFilters.push(`uid.eq.${user.uid}`);
-        
-        const cleanPhone = String(user.phone || user.phoneNumber || '').replace(/[\s\-().]/g, '').replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, '');
-        if (cleanPhone && /^\d{10}$/.test(cleanPhone)) {
-          orFilters.push(`phone.eq.${cleanPhone}`);
-        }
-
+        if (cleanPhone && /^\d{10}$/.test(cleanPhone)) orFilters.push(`phone.eq.${cleanPhone}`);
         if (orFilters.length === 0) return;
 
         const { data, error } = await supabase
@@ -150,7 +151,7 @@ export const useAuth = () => {
           .or(orFilters.join(','))
           .maybeSingle();
 
-        if (!error && data && data.is_suspended && active) {
+        if (!error && data?.is_suspended) {
           toast.error('Your account is suspended. Please contact support.', { id: 'suspended-toast', duration: 10000 });
           handleLogout(true);
         }
@@ -158,15 +159,25 @@ export const useAuth = () => {
         console.warn('Suspension check failed:', err);
       }
     };
-
     checkSuspension();
-    
-    // Check every 8 seconds for fast, responsive security response
-    const interval = setInterval(checkSuspension, 8000);
+
+    // Fix #15: Subscribe to realtime changes on this user's row for instant suspension
+    const channel = supabase
+      .channel(`user-suspension-${user.id || user.user_id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'users', filter: filterStr },
+        (payload) => {
+          if (payload.new?.is_suspended) {
+            toast.error('Your account has been suspended. Please contact support.', { id: 'suspended-toast', duration: 10000 });
+            handleLogout(true);
+          }
+        }
+      )
+      .subscribe();
 
     return () => {
-      active = false;
-      clearInterval(interval);
+      supabase.removeChannel(channel);
     };
   }, [user, handleLogout]);
 
@@ -211,7 +222,8 @@ export const useAuth = () => {
             role: 'BUYER'
           };
           const userPhone = manualUser.phone || manualUser.phoneNumber;
-          if (supabase && userPhone) {
+          // Fix #24: supabase is never null — removed dead null check
+          if (userPhone) {
             try {
               const cleanPhone = String(userPhone).replace(/[\s\-().]/g, '').replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, '');
               const { data: usr } = await supabase.from('users')
@@ -248,86 +260,74 @@ export const useAuth = () => {
         return;
       }
 
+      // Fix #24: supabase is never null — removed dead null-check wrapper
       let finalUser = u;
-      if (supabase) {
-        try {
-          const rawPhone = u.phoneNumber;                         // e.g. +919825551190
-          const phoneNo = rawPhone?.replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, ''); // 10-digit clean
-          
-          let orFilter = [];
-          if (u.email) orFilter.push(`email.eq.${u.email}`);
-          if (phoneNo) orFilter.push(`phone.eq.${phoneNo}`);   // stored clean (new standard)
-          if (rawPhone) orFilter.push(`phone.eq.${rawPhone}`); // stored with +91 (legacy)
-          
-          const { data: usr } = await supabase.from('users')
-            .select('id, full_name, role, photo_url')
-            .or(orFilter.join(','))
-            .maybeSingle();
+      try {
+        const rawPhone = u.phoneNumber;                         // e.g. +919825551190
+        const phoneNo = rawPhone?.replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, ''); // 10-digit clean
+        
+        let orFilter = [];
+        if (u.email) orFilter.push(`email.eq.${u.email}`);
+        if (phoneNo) orFilter.push(`phone.eq.${phoneNo}`);   // stored clean (new standard)
+        if (rawPhone) orFilter.push(`phone.eq.${rawPhone}`); // stored with +91 (legacy)
+        
+        const { data: usr } = await supabase.from('users')
+          .select('id, full_name, role, photo_url')
+          .or(orFilter.join(','))
+          .maybeSingle();
 
-          if (usr) {
-            finalUser = {
-              ...u,
-              id: usr.id,
-              uid: u.uid,
-              email: u.email,
-              phoneNumber: u.phoneNumber,
-              displayName: usr.full_name || u.displayName || manualUser?.displayName,
-              photoURL: usr.photo_url || u.photoURL || manualUser?.photoURL,
-              role: 'BUYER'
-            };
+        if (usr) {
+          finalUser = {
+            ...u,
+            id: usr.id,
+            uid: u.uid,
+            email: u.email,
+            phoneNumber: u.phoneNumber,
+            displayName: usr.full_name || u.displayName || manualUser?.displayName,
+            photoURL: usr.photo_url || u.photoURL || manualUser?.photoURL,
+            role: 'BUYER'
+          };
 
-            const { data: addr } = await supabase.from('addresses').select('*').eq('user_id', usr.id).maybeSingle();
-            if (addr) {
-              setIsProfileComplete(true);
-              const parsed = parseAddressLine(addr.address_line_1);
-              addr.house_no = parsed.house_no;
-              addr.floor = parsed.floor;
-              addr.society = parsed.society;
+          const { data: addr } = await supabase.from('addresses').select('*').eq('user_id', usr.id).maybeSingle();
+          if (addr) {
+            setIsProfileComplete(true);
+            const parsed = parseAddressLine(addr.address_line_1);
+            addr.house_no = parsed.house_no;
+            addr.floor = parsed.floor;
+            addr.society = parsed.society;
 
-              setUserAddress(addr);
-              localStorage.setItem('passwala_user_address', JSON.stringify(addr));
-              
-              const displayLoc = addr.society || addr.city || localStorage.getItem('passwala_location') || 'India';
-              localStorage.setItem('passwala_location', displayLoc);
-            } else {
-              const { data: addrLegacy } = await supabase.from('addresses').select('*').eq('user_id', u.uid).maybeSingle();
-              setIsProfileComplete(!!addrLegacy || wasComplete);
-              if (addrLegacy) {
-                const parsed = parseAddressLine(addrLegacy.address_line_1);
-                addrLegacy.house_no = parsed.house_no;
-                addrLegacy.floor = parsed.floor;
-                addrLegacy.society = parsed.society;
-
-                setUserAddress(addrLegacy);
-                localStorage.setItem('passwala_user_address', JSON.stringify(addrLegacy));
-              }
-            }
+            setUserAddress(addr);
+            localStorage.setItem('passwala_user_address', JSON.stringify(addr));
+            
+            const displayLoc = addr.society || addr.city || localStorage.getItem('passwala_location') || 'India';
+            localStorage.setItem('passwala_location', displayLoc);
           } else {
-            finalUser = {
-              ...u,
-              uid: u.uid,
-              email: u.email,
-              phoneNumber: u.phoneNumber,
-              displayName: u.displayName || manualUser?.displayName,
-              photoURL: u.photoURL || manualUser?.photoURL,
-              role: 'BUYER'
-            };
-            setIsProfileComplete(wasComplete);
+            const { data: addrLegacy } = await supabase.from('addresses').select('*').eq('user_id', u.uid).maybeSingle();
+            setIsProfileComplete(!!addrLegacy || wasComplete);
+            if (addrLegacy) {
+              const parsed = parseAddressLine(addrLegacy.address_line_1);
+              addrLegacy.house_no = parsed.house_no;
+              addrLegacy.floor = parsed.floor;
+              addrLegacy.society = parsed.society;
+
+              setUserAddress(addrLegacy);
+              localStorage.setItem('passwala_user_address', JSON.stringify(addrLegacy));
+            }
           }
-        } catch (err) {
-          console.error("Auto Sync Failed", err);
+        } else {
+          finalUser = {
+            ...u,
+            uid: u.uid,
+            email: u.email,
+            phoneNumber: u.phoneNumber,
+            displayName: u.displayName || manualUser?.displayName,
+            photoURL: u.photoURL || manualUser?.photoURL,
+            role: 'BUYER'
+          };
           setIsProfileComplete(wasComplete);
         }
-      } else {
-        finalUser = {
-          ...u,
-          uid: u.uid,
-          email: u.email,
-          phoneNumber: u.phoneNumber,
-          displayName: u.displayName || manualUser?.displayName,
-          photoURL: u.photoURL || manualUser?.photoURL,
-          role: 'BUYER'
-        };
+      } catch (err) {
+        console.error("Auto Sync Failed", err);
         setIsProfileComplete(wasComplete);
       }
 

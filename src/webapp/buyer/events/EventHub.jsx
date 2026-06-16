@@ -22,15 +22,16 @@ const FALLBACK_IMG = 'https://images.unsplash.com/photo-1492684223066-81342ee5ff
 
 const EventHub = () => {
   const navigate = useNavigate();
-  const [allEvents, setAllEvents]     = useState([]);
-  const [loading, setLoading]         = useState(true);
+  const [events, setEvents]             = useState([]);
+  const [total, setTotal]               = useState(0);
+  const [loading, setLoading]           = useState(true);
   const [activeCategory, setActiveCategory] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery]   = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [timeFilter, setTimeFilter]   = useState('upcoming');
-  const [page, setPage]               = useState(1);
-  const abortRef    = useRef(null);
-  const refreshRef  = useRef(null);
+  const [timeFilter, setTimeFilter]     = useState('upcoming');
+  const [page, setPage]                 = useState(1);
+  const abortRef   = useRef(null);
+  const refreshRef = useRef(null);
 
   // Debounce search input by 400ms
   useEffect(() => {
@@ -41,8 +42,8 @@ const EventHub = () => {
   // Reset page when filters change
   useEffect(() => { setPage(1); }, [activeCategory, debouncedQuery, timeFilter]);
 
+  // Fix #11: Pass page/pageSize to server — only fetch 12 events per request
   const fetchEvents = useCallback(async (silent = false) => {
-    // Cancel any in-flight request
     if (abortRef.current) abortRef.current.abort();
     abortRef.current = new AbortController();
 
@@ -51,6 +52,8 @@ const EventHub = () => {
       const params = new URLSearchParams({
         category: activeCategory,
         query: debouncedQuery,
+        page: String(page),
+        pageSize: String(PAGE_SIZE),
         ...(timeFilter === 'past' ? { filter: 'past' } : {})
       });
       const res = await fetch(`${BASE_URL}/api/events/search?${params}`, {
@@ -58,35 +61,39 @@ const EventHub = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setAllEvents(data.events || []);
+      setEvents(data.events || []);
+      setTotal(data.total ?? 0);  // Fix #11: use server total for pagination
     } catch (err) {
-      if (err.name === 'AbortError') return; // intentional cancel — ignore
+      if (err.name === 'AbortError') return;
       console.error(err);
       if (!silent) toast.error('Failed to load events');
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [activeCategory, debouncedQuery, timeFilter]);
+  }, [activeCategory, debouncedQuery, timeFilter, page]);
 
-  // Fetch on filter change
+  // Fetch on filter or page change
   useEffect(() => { fetchEvents(false); }, [fetchEvents]);
 
-  // Realtime + 60s polling
+  // Fix #14: Decouple Realtime channel from fetchEvents deps.
+  const fetchEventsRef = useRef(fetchEvents);
+  useEffect(() => { fetchEventsRef.current = fetchEvents; }, [fetchEvents]);
+
+  // Realtime + 60s polling — stable channel lifecycle
   useEffect(() => {
     const channel = supabase
       .channel('event-hub-seats')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'event_ticket_tiers' }, () => fetchEvents(true))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'event_ticket_tiers' }, () => fetchEventsRef.current(true))
       .subscribe();
-    refreshRef.current = setInterval(() => fetchEvents(true), 60000);
+    refreshRef.current = setInterval(() => fetchEventsRef.current(true), 60000);
     return () => { supabase.removeChannel(channel); clearInterval(refreshRef.current); };
-  }, [fetchEvents]);
+  }, []); // empty deps: channel created once, never torn down on filter change
 
   const formatShortDate = (d) =>
     new Date(d).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
 
-  // Pagination slice
-  const totalPages  = Math.ceil(allEvents.length / PAGE_SIZE);
-  const visibleEvts = allEvents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // Fix #11: Pagination computed from server total, not client array length
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
     <div className="eh-root">
@@ -114,8 +121,10 @@ const EventHub = () => {
         <div className="eh-search-bar">
           <Search size={18} className="eh-search-icon" />
           <input
+            id="event-search-input"
             type="text"
             placeholder="Search events, concerts, workshops..."
+            aria-label="Search events"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -139,10 +148,11 @@ const EventHub = () => {
       </div>
 
       {/* ── Result count ── */}
-      {!loading && allEvents.length > 0 && (
+      {!loading && total > 0 && (
         <p className="eh-result-count">
-          {allEvents.length} event{allEvents.length !== 1 ? 's' : ''} found
+          {total} event{total !== 1 ? 's' : ''} found
           {activeCategory !== 'All' ? ` in "${activeCategory}"` : ''}
+          {totalPages > 1 ? ` — page ${page} of ${totalPages}` : ''}
         </p>
       )}
 
@@ -152,7 +162,7 @@ const EventHub = () => {
           <div className="eh-spinner" />
           <p>Loading events...</p>
         </div>
-      ) : allEvents.length === 0 ? (
+      ) : events.length === 0 ? (
         <div className="eh-empty">
           <Calendar size={52} color="#ffe4cc" />
           <p>No {timeFilter === 'past' ? 'past' : 'upcoming'} events found{activeCategory !== 'All' ? ` in "${activeCategory}"` : ''}.</p>
@@ -163,7 +173,7 @@ const EventHub = () => {
       ) : (
         <>
           <div className="eh-grid">
-            {visibleEvts.map(event => {
+            {events.map(event => {
               const tiers     = event.event_ticket_tiers || [];
               const minPrice  = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : null;
               const totalSeats = tiers.reduce((s, t) => s + (t.available_seats || 0), 0);
@@ -228,7 +238,11 @@ const EventHub = () => {
               <button
                 className="eh-page-btn"
                 disabled={page === 1}
-                onClick={() => { setPage(p => p - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                onClick={() => {
+                  setPage(p => p - 1);
+                  // Fix #10: Use .webapp-main scroll container, not window (PWA/WebView)
+                  document.querySelector('.webapp-main')?.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
               >
                 <ChevronLeft size={16} /> Prev
               </button>
@@ -237,7 +251,10 @@ const EventHub = () => {
                   <button
                     key={n}
                     className={`eh-page-num ${n === page ? 'active' : ''}`}
-                    onClick={() => { setPage(n); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    onClick={() => {
+                    setPage(n);
+                    document.querySelector('.webapp-main')?.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
                   >
                     {n}
                   </button>
@@ -246,7 +263,10 @@ const EventHub = () => {
               <button
                 className="eh-page-btn"
                 disabled={page === totalPages}
-                onClick={() => { setPage(p => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                onClick={() => {
+                  setPage(p => p + 1);
+                  document.querySelector('.webapp-main')?.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
               >
                 Next <ChevronRight size={16} />
               </button>

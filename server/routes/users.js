@@ -560,17 +560,25 @@ router.put('/:uid/photo', userAuth, async (req, res) => {
       user = data;
     }
 
-    console.log("PHOTO UPLOAD REQUEST:", { identifier, user });
-
     if (!user) {
-      return res.status(404).json({ error: 'User account not found', debug: { identifier, user } });
+      return res.status(404).json({ error: 'User account not found' });
     }
+
+    console.log('[Photo] Update requested for user:', user.id);
 
     let finalPhotoUrl = photoURL;
     if (photoURL && photoURL.startsWith('data:image')) {
       const matches = photoURL.match(/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/);
       if (matches) {
-        const ext = matches[1];
+        const rawExt = matches[1].toLowerCase();
+
+        // Fix #6: Allowlist extensions — 'svg', 'php', 'html' etc. are execution vectors
+        const ALLOWED_PHOTO_EXTS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif']);
+        if (!ALLOWED_PHOTO_EXTS.has(rawExt)) {
+          return res.status(400).json({ error: `Invalid image type "${rawExt}". Allowed: jpg, jpeg, png, webp, gif` });
+        }
+
+        const ext = rawExt === 'jpg' ? 'jpeg' : rawExt; // normalize jpg→jpeg for content-type
         const base64Data = matches[2];
         const buffer = Buffer.from(base64Data, 'base64');
         
@@ -671,7 +679,9 @@ router.put('/:uid/name', userAuth, async (req, res) => {
 });
 
 // PUT /api/users/:id/fcm-token — Save user's FCM token for push notifications
-router.put('/:id/fcm-token', async (req, res) => {
+// Fix #8: Added userAuth — previously anyone knowing a user UUID could hijack their
+// push notifications by overwriting their FCM token.
+router.put('/:id/fcm-token', userAuth, async (req, res) => {
   const { id } = req.params;
   const { fcmToken, fcm_token } = req.body;
   const token = fcmToken || fcm_token;
@@ -700,23 +710,40 @@ router.put('/:id/fcm-token', async (req, res) => {
   }
 });
 
-// Global Map to persist across hot reloads in development
+// Fix #5: Supabase-backed OTP storage with in-memory fallback.
+// To enable persistent storage (survives server restarts), create this table:
+//   CREATE TABLE whatsapp_otps (
+//     phone TEXT PRIMARY KEY,
+//     otp   TEXT NOT NULL,
+//     expires_at TIMESTAMPTZ NOT NULL
+//   );
+// Without the table, OTPs fall back to the in-memory Map (lost on restart) with a warning.
 global.whatsappOtpStore = global.whatsappOtpStore || new Map();
 
-// Periodic cleanup of expired OTPs
-if (!global.whatsappOtpStoreCleanupInterval) {
-  global.whatsappOtpStoreCleanupInterval = setInterval(() => {
-    const now = Date.now();
-    for (const [phone, item] of global.whatsappOtpStore.entries()) {
-      if (now > item.expiresAt) {
-        global.whatsappOtpStore.delete(phone);
-      }
-    }
-  }, 60000);
-}
+const _otpSet = async (phone, otp, expiresAt) => {
+  try {
+    const { error } = await supabase.from('whatsapp_otps')
+      .upsert({ phone, otp, expires_at: new Date(expiresAt).toISOString() }, { onConflict: 'phone' });
+    if (!error) return;
+  } catch (_) {}
+  console.warn('[OTP] Supabase "whatsapp_otps" table missing — using in-memory store (OTPs lost on restart)');
+  global.whatsappOtpStore.set(phone, { otp, expiresAt });
+};
+const _otpGet = async (phone) => {
+  try {
+    const { data } = await supabase.from('whatsapp_otps')
+      .select('otp, expires_at').eq('phone', phone).maybeSingle();
+    if (data) return { otp: data.otp, expiresAt: new Date(data.expires_at).getTime() };
+  } catch (_) {}
+  return global.whatsappOtpStore.get(phone) || null;
+};
+const _otpDelete = async (phone) => {
+  try { await supabase.from('whatsapp_otps').delete().eq('phone', phone); } catch (_) {}
+  global.whatsappOtpStore.delete(phone);
+};
 
 // POST /api/users/send-whatsapp-otp — Generate and send real OTP
-router.post('/send-whatsapp-otp', async (req, res) => {
+router.post('/send-whatsapp-otp', authLimiter, async (req, res) => {
   const { phone } = req.body;
   const cleanPhone = normalizePhone(phone);
   if (!cleanPhone) {
@@ -724,11 +751,9 @@ router.post('/send-whatsapp-otp', async (req, res) => {
   }
 
   try {
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    global.whatsappOtpStore.set(cleanPhone, {
-      otp,
-      expiresAt: Date.now() + 5 * 60 * 1000 // 5 mins
-    });
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    // Fix #5: Use Supabase-backed store (falls back to in-memory with warning)
+    await _otpSet(cleanPhone, otp, Date.now() + 5 * 60 * 1000); // 5 min TTL
 
     const { sendWhatsAppOTP } = await import('../utils/whatsapp.js');
     const result = await sendWhatsAppOTP(cleanPhone, otp);
@@ -746,28 +771,33 @@ router.post('/send-whatsapp-otp', async (req, res) => {
 });
 
 // POST /api/users/verify-whatsapp-otp — Verify WhatsApp OTP & login
-router.post('/verify-whatsapp-otp', async (req, res) => {
+// Fix #4: authLimiter applied — previously no rate limit allowed brute-forcing all 900k OTP combinations
+router.post('/verify-whatsapp-otp', authLimiter, async (req, res) => {
   const { phone, otp, role } = req.body;
   const cleanPhone = normalizePhone(phone);
   if (!cleanPhone || !otp) {
     return res.status(400).json({ success: false, error: 'Phone number and OTP are required' });
   }
 
-  const stored = global.whatsappOtpStore.get(cleanPhone);
+  // Fix #5: Use Supabase-backed store
+  const stored = await _otpGet(cleanPhone);
   if (!stored) {
     return res.status(400).json({ success: false, error: 'OTP expired or not requested' });
   }
 
   if (Date.now() > stored.expiresAt) {
-    global.whatsappOtpStore.delete(cleanPhone);
+    await _otpDelete(cleanPhone);
     return res.status(400).json({ success: false, error: 'OTP expired' });
   }
 
+  // Fix #10: Delete OTP on wrong guess — previously unlimited retries were allowed
   if (stored.otp !== otp) {
-    return res.status(400).json({ success: false, error: 'Invalid OTP code' });
+    await _otpDelete(cleanPhone); // one-attempt policy
+    return res.status(400).json({ success: false, error: 'Invalid OTP code. Please request a new OTP.' });
   }
 
-  global.whatsappOtpStore.delete(cleanPhone);
+  // Correct OTP — consume it immediately
+  await _otpDelete(cleanPhone);
 
   try {
     const uid = `whatsapp-${cleanPhone}`;

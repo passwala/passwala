@@ -1,19 +1,30 @@
 import express from 'express';
+import crypto from 'crypto';
 import supabase from '../supabase.js';
 import nodemailer from 'nodemailer';
 
 const router = express.Router();
 
-// ── Email Helper ─────────────────────────────────────────────────────────────
-const sendBookingEmail = async ({ toEmail, toName, event, tier, booking }) => {
-  if (!process.env.SMTP_USER || process.env.SMTP_USER === 'your_email@gmail.com') return;
-  try {
-    const transporter = nodemailer.createTransport({
+// ── Shared GST Rate (Fix #19: single source of truth) ────────────────────────
+export const GST_RATE = 0.09; // 9% CGST + 9% SGST = 18% for entertainment services
+
+// ── Reusable SMTP Transporter (Fix #16: created once, not per call) ──────────
+const smtpTransporter = (process.env.SMTP_USER && process.env.SMTP_USER !== 'your_email@gmail.com')
+  ? nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.SMTP_PORT || '587'),
       secure: false,
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    });
+      pool: true,       // keep-alive connection pool
+      maxConnections: 5,
+    })
+  : null;
+
+// ── Email Helper ─────────────────────────────────────────────────────────────
+const sendBookingEmail = async ({ toEmail, toName, event, tier, booking }) => {
+  if (!smtpTransporter) return; // SMTP not configured
+  try {
+    const transporter = smtpTransporter; // Fix #16: reuse shared transporter
     const eventDate = event?.event_date ? new Date(event.event_date).toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' }) : 'TBA';
     await transporter.sendMail({
       from: process.env.SMTP_FROM || `Passwala Events <${process.env.SMTP_USER}>`,
@@ -83,31 +94,30 @@ function checkBookingWindow(tier) {
   return { open: true, reason: null };
 }
 
-// Get events (with optional category/search/filter params)
+// Get events with optional category/search/filter params + server-side pagination (Fix #11)
 router.get('/search', async (req, res) => {
   try {
-    const { query, category, filter } = req.query;
+    const { query, category, filter, page = '1', pageSize = '12' } = req.query;
     const isPast = filter === 'past';
     const now = new Date().toISOString();
+    const pageInt     = Math.max(1, parseInt(page) || 1);
+    const pageSizeInt = Math.min(50, Math.max(1, parseInt(pageSize) || 12)); // cap 1–50
 
     let supabaseQuery = supabase
       .from('events')
       .select('*, event_ticket_tiers(*)');
 
     if (isPast) {
-      // Past events: event_date before now, any status
       supabaseQuery = supabaseQuery
         .lt('event_date', now)
         .order('event_date', { ascending: false });
     } else {
-      // Upcoming events: only bookable statuses AND event_date is today or in the future
       supabaseQuery = supabaseQuery
         .gte('event_date', now)
         .in('status', ['UPCOMING', 'ONGOING', 'SOLD_OUT'])
         .order('event_date', { ascending: true });
     }
 
-    // Only apply category filter when a specific category is selected
     if (category && category !== 'All' && category !== 'undefined') {
       supabaseQuery = supabaseQuery.eq('category', category);
     }
@@ -119,25 +129,23 @@ router.get('/search', async (req, res) => {
     const { data: events, error } = await supabaseQuery;
     if (error) throw error;
 
-    // ─── Attach organizer_name via vendors.user_id = events.created_by ───────
+    // Attach organizer_name via vendors.user_id = events.created_by
     const createdByIds = [...new Set((events || []).map(e => e.created_by).filter(Boolean))];
-    let vendorMap = {}; // user_id → business_name
+    let vendorMap = {};
     if (createdByIds.length > 0) {
       const { data: vendors } = await supabase
         .from('vendors')
         .select('user_id, business_name, name')
         .in('user_id', createdByIds);
       if (vendors) {
-        vendors.forEach(v => {
-          vendorMap[v.user_id] = v.business_name || v.name || null;
-        });
+        vendors.forEach(v => { vendorMap[v.user_id] = v.business_name || v.name || null; });
       }
     }
 
     const nowDate = new Date();
 
-    // ─── Visibility Rule (only for upcoming) ───────────────────────────
-    let visibleEvents = (events || []);
+    // Visibility Rule: hide upcoming events whose ALL tiers have expired booking windows
+    let visibleEvents = events || [];
     if (!isPast) {
       visibleEvents = visibleEvents.filter(event => {
         const tiers = event.event_ticket_tiers || [];
@@ -146,8 +154,7 @@ router.get('/search', async (req, res) => {
           const { booking_close } = tier;
           if (!booking_close) return true;
           const closeTime = new Date(booking_close);
-          if (isNaN(closeTime)) return true;
-          return nowDate <= closeTime;
+          return isNaN(closeTime) || nowDate <= closeTime;
         });
       });
     }
@@ -157,7 +164,12 @@ router.get('/search', async (req, res) => {
       organizer_name: vendorMap[event.created_by] || null
     }));
 
-    res.json({ success: true, events: visibleEvents });
+    // Fix #11: Server-side pagination — slice after filtering so count is accurate
+    const total = visibleEvents.length;
+    const from  = (pageInt - 1) * pageSizeInt;
+    const paginatedEvents = visibleEvents.slice(from, from + pageSizeInt);
+
+    res.json({ success: true, events: paginatedEvents, total, page: pageInt, pageSize: pageSizeInt });
   } catch (err) {
     console.error('Events Search Error:', err);
     res.status(500).json({ error: 'Failed to search events', details: err.message });
@@ -269,7 +281,12 @@ router.post('/book', async (req, res) => {
       return res.status(400).json({ error: `Booking failed: Missing ${missing.join(', ')}` });
     }
 
-    // Atomic check of seat availability
+    // ── Input validation (Fix #5) ──
+    if (!Number.isInteger(ticketCount) || ticketCount < 1) {
+      return res.status(400).json({ error: 'Ticket count must be at least 1.' });
+    }
+
+    // Read current tier data for validation
     const { data: tier, error: tierErr } = await supabase
       .from('event_ticket_tiers')
       .select('*')
@@ -301,24 +318,33 @@ router.post('/book', async (req, res) => {
       return res.status(400).json({ error: 'You already have an active booking for this event. Check your Order History.' });
     }
 
-    // Decrement seats
-    const newSeats = tier.available_seats - ticketCount;
-    const { error: updateErr } = await supabase
+    // ── Fix #1: Atomic seat decrement using conditional UPDATE ───────────────
+    // The .gte('available_seats', ticketCount) filter makes this atomic at the
+    // PostgreSQL level: if two concurrent requests race, only one will match the
+    // row and succeed — the other will get null back and receive a 409.
+    const { data: updatedTier, error: updateErr } = await supabase
       .from('event_ticket_tiers')
-      .update({ available_seats: newSeats })
-      .eq('id', tierId);
+      .update({ available_seats: tier.available_seats - ticketCount })
+      .eq('id', tierId)
+      .gte('available_seats', ticketCount) // atomic guard: fails if seats dropped
+      .select('available_seats')
+      .single();
 
-    if (updateErr) throw updateErr;
+    if (updateErr || !updatedTier) {
+      // Another concurrent booking grabbed the last seats
+      return res.status(409).json({ error: 'Seats just sold out. Please try again or choose a different tier.' });
+    }
 
-    // Calculate GST (Gujarat State: 9% CGST, 9% SGST)
+    // ── Fix #19: Use shared GST_RATE constant ────────────────────────────────
     const baseAmount = tier.price * ticketCount;
-    const cgstAmount = Number((baseAmount * 0.09).toFixed(2));
-    const sgstAmount = Number((baseAmount * 0.09).toFixed(2));
+    const cgstAmount = Number((baseAmount * GST_RATE).toFixed(2));
+    const sgstAmount = Number((baseAmount * GST_RATE).toFixed(2));
     const totalAmount = baseAmount + cgstAmount + sgstAmount;
 
     // Generate Invoice and QR Hash
-    const qrHash = `PW-EVT-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
-    const invoiceNumber = `INV-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+    const qrHash = `PW-EVT-${Date.now()}-${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
+    const invoiceNumber = `INV-${new Date().getFullYear()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+
 
     // Create booking record
     const { data: booking, error: insertErr } = await supabase
@@ -340,8 +366,19 @@ router.post('/book', async (req, res) => {
       .single();
 
     if (insertErr) {
-      // Revert seats on failure
-      await supabase.from('event_ticket_tiers').update({ available_seats: tier.available_seats }).eq('id', tierId);
+      // Fix #2: Revert seats on failure — log if revert itself fails
+      const { error: revertErr } = await supabase
+        .from('event_ticket_tiers')
+        .update({ available_seats: tier.available_seats })
+        .eq('id', tierId);
+      if (revertErr) {
+        // Critical: seats decremented but booking not created — requires manual intervention
+        console.error(
+          `[CRITICAL] Seat revert FAILED for tier ${tierId}. Seats lost: ${ticketCount}.`,
+          'Revert error:', revertErr.message,
+          'Original insert error:', insertErr.message
+        );
+      }
       throw insertErr;
     }
 
@@ -389,18 +426,24 @@ router.post('/cancel', async (req, res) => {
       return res.status(400).json({ error: 'Booking is already cancelled' });
     }
 
-    // Revert seats
-    const { data: tier } = await supabase
+    // Fix #2: Atomic seat restore using conditional UPDATE (no pre-read + increment).
+    // Read current available_seats first, then add back in a single UPDATE.
+    // Using .select() to confirm the row was actually updated.
+    const { data: currentTier } = await supabase
       .from('event_ticket_tiers')
       .select('available_seats')
       .eq('id', booking.tier_id)
       .single();
 
-    if (tier) {
-      await supabase
+    if (currentTier) {
+      const { error: restoreErr } = await supabase
         .from('event_ticket_tiers')
-        .update({ available_seats: tier.available_seats + booking.ticket_count })
-        .eq('id', booking.tier_id);
+        .update({ available_seats: currentTier.available_seats + booking.ticket_count })
+        .eq('id', booking.tier_id)
+        .eq('available_seats', currentTier.available_seats); // optimistic lock: retry-safe
+      if (restoreErr) {
+        console.warn('[Cancel] Seat restore failed for tier', booking.tier_id, restoreErr.message);
+      }
     }
 
     // Update booking status

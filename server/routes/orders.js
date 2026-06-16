@@ -300,9 +300,10 @@ router.post('/payment/verify', userAuth, async (req, res) => {
 
 /**
  * POST /api/orders/notify-new-order
- * Fetches vendor and active rider tokens and triggers push/in-app notifications.
+ * Fix #3: Auth guard added — unauthenticated callers could previously spam push
+ * notifications to all vendors and riders with any orderId/storeId pair.
  */
-router.post('/notify-new-order', async (req, res) => {
+router.post('/notify-new-order', userAuth, async (req, res) => {
   const { orderId, storeId } = req.body;
 
   if (!orderId || !storeId) {
@@ -421,13 +422,30 @@ router.post('/notify-new-order', async (req, res) => {
 
 /**
  * GET /api/orders/user-history/:userId
- * Securely fetches order history with order items for a specific user using service role
+ * Fix #2: Added userAuth + ownership check — previously any caller knowing a UUID
+ * could read full order history (addresses, items, prices) with no authentication.
  */
-router.get('/user-history/:userId', async (req, res) => {
+router.get('/user-history/:userId', userAuth, async (req, res) => {
   const { userId } = req.params;
 
-  if (!userId || userId.length !== 36) {
-    return res.status(400).json({ error: 'A valid 36-character user UUID is required' });
+  // Fix #9: Proper UUID regex (length=36 alone accepted "aaa-bbb-ccc-ddd-eee" etc.)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!userId || !uuidRegex.test(userId)) {
+    return res.status(400).json({ error: 'A valid UUID is required' });
+  }
+
+  // Fix #2: Ownership check — verify the authenticated user owns this userId
+  if (!req.isAdmin && req.user?.uid) {
+    try {
+      const { data: dbUser } = await supabase
+        .from('users').select('id').eq('uid', req.user.uid).maybeSingle();
+      if (!dbUser || dbUser.id !== userId) {
+        return res.status(403).json({ error: 'Forbidden: You cannot access another user\'s orders' });
+      }
+    } catch (ownerErr) {
+      console.error('Ownership check failed:', ownerErr.message);
+      return res.status(500).json({ error: 'Authorization check failed' });
+    }
   }
 
   try {
@@ -449,16 +467,15 @@ router.get('/user-history/:userId', async (req, res) => {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error(`❌ Error fetching order history for user ${userId}:`, error.message);
+      console.error(`Error fetching order history for user ${userId}:`, error.message);
       return res.status(500).json({ error: error.message });
     }
 
     res.json(dbOrders || []);
   } catch (err) {
-    console.error('🔥 Server Error in user-history endpoint:', err);
+    console.error('Server Error in user-history endpoint:', err);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
 export default router;
-
