@@ -683,116 +683,157 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
       toast.error("Supabase client not initialized.");
       return;
     }
-    const toastId = toast.loading("Generating sales report...");
+    const toastId = toast.loading("Generating full sales report...");
+
+    // Helper: escape CSV cell
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const fmt = (d) => d ? new Date(d).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : 'N/A';
+    const inr = (n) => Number(n || 0).toFixed(2);
 
     try {
-      const reportRows = [];
+      const sections = [];
 
-      // 1. Fetch Store Orders
+      // ── SECTION 1: STORE ORDERS ──────────────────────────────────────────────
       const { data: storeOrders } = await adminSupabase
         .from('orders')
-        .select('id, created_at, status, total_amount, stores(name)')
+        .select('id, created_at, status, subtotal, total_amount, stores(name), users(full_name, phone), order_items(quantity, price_at_purchase, products(name))')
         .order('created_at', { ascending: false });
-      
-      if (storeOrders) {
-        storeOrders.forEach(o => {
-          reportRows.push({
-            id: o.id,
-            date: o.created_at ? new Date(o.created_at).toLocaleString() : 'N/A',
-            type: 'Store Order',
-            details: o.stores?.name ? `Store: ${o.stores.name}` : 'Marketplace Shop Order',
-            status: o.status || 'PENDING',
-            amount: o.total_amount || 0
-          });
+
+      if (storeOrders?.length > 0) {
+        const header = ['Order ID', 'Date & Time', 'Customer Name', 'Customer Phone', 'Store Name', 'Items Ordered', 'Subtotal (INR)', 'Tax (INR)', 'Total Amount (INR)', 'Status'];
+        const rows = storeOrders.map(o => {
+          const items = o.order_items?.map(i => `${i.products?.name || 'Item'} x${i.quantity}`).join(' | ') || 'N/A';
+          const subtotal = Number(o.subtotal || 0);
+          const total = Number(o.total_amount || 0);
+          const tax = (total - subtotal).toFixed(2);
+          return [
+            esc(o.id), esc(fmt(o.created_at)),
+            esc(o.users?.full_name || 'Customer'), esc(o.users?.phone || 'N/A'),
+            esc(o.stores?.name || 'Marketplace'), esc(items),
+            inr(subtotal), tax, inr(total), esc(o.status || 'PENDING')
+          ].join(',');
         });
+        const subtotal = storeOrders.reduce((s, o) => s + Number(o.total_amount || 0), 0);
+        sections.push([
+          '=== SHOP ORDERS ===',
+          header.join(','),
+          ...rows,
+          `SECTION TOTAL,,,,,,,,${inr(subtotal)},`,
+          ''
+        ].join('\n'));
       }
 
-      // 2. Fetch Service Bookings
+      // ── SECTION 2: HOME SERVICES ─────────────────────────────────────────────
       const { data: serviceBookings } = await adminSupabase
         .from('service_bookings')
-        .select('id, scheduled_at, status, total_amount, services(title)')
+        .select('id, created_at, scheduled_at, status, total_amount, services(title), users(full_name, phone), addresses(address_line_1, society, city)')
         .order('scheduled_at', { ascending: false });
 
-      if (serviceBookings) {
-        serviceBookings.forEach(sb => {
-          reportRows.push({
-            id: sb.id,
-            date: sb.scheduled_at ? new Date(sb.scheduled_at).toLocaleString() : 'N/A',
-            type: 'Home Service',
-            details: sb.services?.title ? `Service: ${sb.services.title}` : 'Home Booking',
-            status: sb.status || 'PENDING',
-            amount: sb.total_amount || 0
-          });
+      if (serviceBookings?.length > 0) {
+        const header = ['Booking ID', 'Booked On', 'Scheduled Date & Time', 'Customer Name', 'Customer Phone', 'Service Name', 'Service Address', 'Amount (INR)', 'Status'];
+        const rows = serviceBookings.map(sb => {
+          const addr = sb.addresses ? `${sb.addresses.society || sb.addresses.address_line_1 || ''}, ${sb.addresses.city || 'Ahmedabad'}` : 'N/A';
+          return [
+            esc(sb.id), esc(fmt(sb.created_at)), esc(fmt(sb.scheduled_at)),
+            esc(sb.users?.full_name || 'Customer'), esc(sb.users?.phone || 'N/A'),
+            esc(sb.services?.title || 'Home Service'), esc(addr),
+            inr(sb.total_amount), esc(sb.status || 'PENDING')
+          ].join(',');
         });
+        const subtotal = serviceBookings.reduce((s, o) => s + Number(o.total_amount || 0), 0);
+        sections.push([
+          '=== HOME SERVICES ===',
+          header.join(','),
+          ...rows,
+          `SECTION TOTAL,,,,,,,${inr(subtotal)},`,
+          ''
+        ].join('\n'));
       }
 
-      // 3. Fetch Ride Bookings
+      // ── SECTION 3: CITY RIDES ────────────────────────────────────────────────
       const { data: rideBookings } = await adminSupabase
         .from('ticket_bookings')
-        .select('id, created_at, status, total_price, city_routes(start_area, end_area)')
+        .select('id, created_at, status, total_price, seats_booked, travel_date, city_routes(start_area, end_area, distance_km, fare), users(full_name, phone)')
         .order('created_at', { ascending: false });
 
-      if (rideBookings) {
-        rideBookings.forEach(rb => {
-          const route = rb.city_routes;
-          const routeStr = route ? `Ride: ${route.start_area} to ${route.end_area}` : 'City Ride Ticket';
-          reportRows.push({
-            id: rb.id,
-            date: rb.created_at ? new Date(rb.created_at).toLocaleString() : 'N/A',
-            type: 'City Ride',
-            details: routeStr,
-            status: rb.status || 'CONFIRMED',
-            amount: rb.total_price || 0
-          });
+      if (rideBookings?.length > 0) {
+        const header = ['Booking ID', 'Booked On', 'Travel Date', 'Passenger Name', 'Passenger Phone', 'From', 'To', 'Distance (km)', 'Seats', 'Fare / Seat (INR)', 'Total Fare (INR)', 'Status'];
+        const rows = rideBookings.map(rb => {
+          const r = rb.city_routes;
+          return [
+            esc(rb.id), esc(fmt(rb.created_at)), esc(fmt(rb.travel_date)),
+            esc(rb.users?.full_name || 'Passenger'), esc(rb.users?.phone || 'N/A'),
+            esc(r?.start_area || 'N/A'), esc(r?.end_area || 'N/A'),
+            inr(r?.distance_km), rb.seats_booked || 1,
+            inr(r?.fare), inr(rb.total_price),
+            esc(rb.status || 'CONFIRMED')
+          ].join(',');
         });
+        const subtotal = rideBookings.reduce((s, o) => s + Number(o.total_price || 0), 0);
+        sections.push([
+          '=== CITY RIDES ===',
+          header.join(','),
+          ...rows,
+          `SECTION TOTAL,,,,,,,,,,,${inr(subtotal)},`,
+          ''
+        ].join('\n'));
       }
 
-      // 4. Fetch Event Bookings
+      // ── SECTION 4: EVENT TICKETS ─────────────────────────────────────────────
       const { data: eventBookings } = await adminSupabase
         .from('event_bookings')
-        .select('id, created_at, status, total_amount, events(title, show_type)')
+        .select('id, created_at, status, invoice_number, qr_code_hash, ticket_count, base_amount, cgst_amount, sgst_amount, total_amount, events(title, event_date, venue_name, category), event_ticket_tiers(tier_name, price), users(full_name, phone, email)')
         .order('created_at', { ascending: false });
 
-      if (eventBookings) {
-        eventBookings.forEach(eb => {
-          const ev = eb.events;
-          const evStr = ev ? `Event: ${ev.title} (${ev.show_type || 'single'})` : 'Event Pass Booking';
-          reportRows.push({
-            id: eb.id,
-            date: eb.created_at ? new Date(eb.created_at).toLocaleString() : 'N/A',
-            type: 'Event Ticket',
-            details: evStr,
-            status: eb.status || 'CONFIRMED',
-            amount: eb.total_amount || 0
-          });
-        });
+      if (eventBookings?.length > 0) {
+        const header = ['Booking ID', 'Invoice No.', 'Booked On', 'Event Date', 'Customer Name', 'Customer Phone', 'Customer Email', 'Event Name', 'Venue', 'Category', 'Ticket Tier', 'Price / Ticket (INR)', 'Qty', 'Base Amount (INR)', 'CGST 9% (INR)', 'SGST 9% (INR)', 'Total Amount (INR)', 'QR / Entry Pass', 'Status'];
+        const rows = eventBookings.map(eb => [
+          esc(eb.id), esc(eb.invoice_number || 'N/A'), esc(fmt(eb.created_at)),
+          esc(fmt(eb.events?.event_date)),
+          esc(eb.users?.full_name || 'Customer'), esc(eb.users?.phone || 'N/A'), esc(eb.users?.email || 'N/A'),
+          esc(eb.events?.title || 'Event'), esc(eb.events?.venue_name || 'N/A'), esc(eb.events?.category || 'N/A'),
+          esc(eb.event_ticket_tiers?.tier_name || 'General'), inr(eb.event_ticket_tiers?.price),
+          eb.ticket_count || 1,
+          inr(eb.base_amount), inr(eb.cgst_amount), inr(eb.sgst_amount), inr(eb.total_amount),
+          esc(eb.qr_code_hash || 'N/A'), esc(eb.status || 'CONFIRMED')
+        ].join(','));
+        const subtotal = eventBookings.reduce((s, o) => s + Number(o.total_amount || 0), 0);
+        sections.push([
+          '=== EVENT TICKETS ===',
+          header.join(','),
+          ...rows,
+          `SECTION TOTAL,,,,,,,,,,,,,,,,,${inr(subtotal)},`,
+          ''
+        ].join('\n'));
       }
 
       toast.dismiss(toastId);
 
-      if (reportRows.length === 0) {
+      if (sections.length === 0) {
         toast.error("No sales records found to export.");
         return;
       }
 
-      // Sort by Date (newest first)
-      reportRows.sort((a, b) => new Date(b.date) - new Date(a.date));
+      // Assemble final CSV with BOM for Excel UTF-8 auto-detection
+      const today = new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+      const grandTotal = [
+        ...(storeOrders || []).map(o => Number(o.total_amount || 0)),
+        ...(serviceBookings || []).map(o => Number(o.total_amount || 0)),
+        ...(rideBookings || []).map(o => Number(o.total_price || 0)),
+        ...(eventBookings || []).map(o => Number(o.total_amount || 0))
+      ].reduce((s, v) => s + v, 0);
 
-      // Generate CSV
-      const headers = ['Order/Booking ID', 'Date & Time', 'Sales Type', 'Items / Booking Details', 'Fulfillment Status', 'Revenue (INR)'];
       const csvContent = [
-        headers.join(','),
-        ...reportRows.map(row => [
-          `"${row.id}"`,
-          `"${row.date}"`,
-          `"${row.type}"`,
-          `"${row.details.replace(/"/g, '""')}"`,
-          `"${row.status}"`,
-          row.amount
-        ].join(','))
+        `PASSWALA PLATFORM — FULL SALES REPORT`,
+        `Generated: ${today}`,
+        `Grand Total Revenue (All Types): INR ${inr(grandTotal)}`,
+        '',
+        ...sections
       ].join('\n');
 
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      // UTF-8 BOM so Excel opens correctly
+      const BOM = '\uFEFF';
+      const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
@@ -800,7 +841,8 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success("Excel/CSV sales report downloaded!");
+      URL.revokeObjectURL(url);
+      toast.success("Full sales report downloaded — open in Excel!");
     } catch (e) {
       toast.dismiss(toastId);
       console.error(e);

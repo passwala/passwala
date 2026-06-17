@@ -2895,39 +2895,101 @@ export const VendorOrders = ({ storeId, businessType, vendorData }) => {
       toast.error("No sales records found to export.");
       return;
     }
-    toast.loading("Generating sales report...");
+    const toastId = toast.loading("Generating sales report...");
+
+    // Helper: escape CSV cell
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const fmt = (d) => d ? new Date(d).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : 'N/A';
+    const inr = (n) => Number(n || 0).toFixed(2);
 
     try {
-      // Generate CSV
-      const headers = ['Order/Booking ID', 'Date & Time', 'Fulfillment Status', 'Details / Items', 'Booking/Fulfillment Type', 'Amount (INR)'];
-      const csvContent = [
-        headers.join(','),
-        ...orders.map(o => {
-          const itemsStr = o.order_items?.map(item => `${item.products?.name || item.name} (x${item.quantity})`).join('; ') || 'N/A';
-          const typeStr = businessType === 'event' ? 'Event Ticket' : businessType === 'service' ? 'Home Service' : 'Store Order';
+      let header = [];
+      let rows = [];
+
+      if (businessType === 'event') {
+        // EVENT TICKETS — full detail with invoice, tier, GST breakdown, QR hash
+        header = ['Booking ID', 'Invoice No.', 'Booked On', 'Customer Name', 'Customer Phone', 'Event Name', 'Ticket Tier', 'Qty', 'Base Amount (INR)', 'CGST 9% (INR)', 'SGST 9% (INR)', 'Total Amount (INR)', 'QR / Entry Pass', 'Status'];
+        rows = orders.map(o => {
+          const itemName = o.order_items?.[0]?.products?.name || o.event_title || 'Event Ticket';
           return [
-            `"${o.id}"`,
-            `"${o.created_at ? new Date(o.created_at).toLocaleString() : 'N/A'}"`,
-            `"${o.status || 'PENDING'}"`,
-            `"${itemsStr.replace(/"/g, '""')}"`,
-            `"${typeStr}"`,
-            o.total_amount || 0
+            esc(o.id), esc(o.invoice_number || 'N/A'), esc(fmt(o.created_at)),
+            esc(o.users?.full_name || 'Customer'), esc(o.users?.phone || 'N/A'),
+            esc(o.event_title || itemName),
+            esc(o.tier_name || 'General'),
+            o.ticket_count || 1,
+            inr(o.subtotal || o.base_amount),
+            inr(o.cgst_amount),
+            inr(o.sgst_amount),
+            inr(o.total_amount),
+            esc(o.qr_code_hash || 'N/A'),
+            esc(o.status || 'CONFIRMED')
           ].join(',');
-        })
+        });
+
+      } else if (businessType === 'service') {
+        // HOME SERVICES — scheduled date, service name, address
+        header = ['Booking ID', 'Booked On', 'Scheduled Date & Time', 'Customer Name', 'Customer Phone', 'Service Name', 'Service Address', 'Amount (INR)', 'Status'];
+        rows = orders.map(o => {
+          const addr = o.addresses ? `${o.addresses.society || o.addresses.address_line_1 || ''}, ${o.addresses.city || 'Ahmedabad'}` : 'N/A';
+          const svcName = o.order_items?.[0]?.products?.name || 'Service';
+          return [
+            esc(o.id), esc(fmt(o.created_at)), esc(fmt(o.scheduled_at)),
+            esc(o.users?.full_name || 'Customer'), esc(o.users?.phone || 'N/A'),
+            esc(svcName), esc(addr),
+            inr(o.total_amount), esc(o.status || 'PENDING')
+          ].join(',');
+        });
+
+      } else {
+        // SHOP ORDERS — items, subtotal, tax, total
+        header = ['Order ID', 'Date & Time', 'Customer Name', 'Customer Phone', 'Delivery Address', 'Items Ordered', 'Subtotal (INR)', 'Tax (INR)', 'Total Amount (INR)', 'Status'];
+        rows = orders.map(o => {
+          const items = o.order_items?.map(i => `${i.products?.name || 'Item'} x${i.quantity}`).join(' | ') || 'N/A';
+          const addr = o.addresses ? `${o.addresses.society || o.addresses.address_line_1 || ''}, ${o.addresses.city || ''}` : 'N/A';
+          const subtotalVal = Number(o.subtotal || 0);
+          const totalVal = Number(o.total_amount || 0);
+          const tax = (totalVal - subtotalVal).toFixed(2);
+          return [
+            esc(o.id), esc(fmt(o.created_at)),
+            esc(o.users?.full_name || 'Customer'), esc(o.users?.phone || 'N/A'),
+            esc(addr), esc(items),
+            inr(subtotalVal), tax, inr(totalVal),
+            esc(o.status || 'PENDING')
+          ].join(',');
+        });
+      }
+
+      const grandTotal = orders.reduce((s, o) => s + Number(o.total_amount || 0), 0);
+      const typeLabel = businessType === 'event' ? 'EVENT TICKETS' : businessType === 'service' ? 'HOME SERVICES' : 'SHOP ORDERS';
+      const today = new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+
+      const totalColIdx = header.length - 2; // column before Status
+      const totalPad = ','.repeat(totalColIdx);
+      const csvContent = [
+        `PASSWALA — ${typeLabel} SALES REPORT`,
+        `Generated: ${today}`,
+        `Total Revenue: INR ${inr(grandTotal)}`,
+        '',
+        header.join(','),
+        ...rows,
+        `TOTAL${totalPad}${inr(grandTotal)},`
       ].join('\n');
 
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      // UTF-8 BOM so Excel auto-detects encoding
+      const BOM = '\uFEFF';
+      const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `vendor_sales_report_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute("download", `vendor_${businessType}_sales_report_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.dismiss();
-      toast.success("Excel/CSV sales report downloaded!");
+      URL.revokeObjectURL(url);
+      toast.dismiss(toastId);
+      toast.success("Sales report downloaded — open in Excel!");
     } catch (e) {
-      toast.dismiss();
+      toast.dismiss(toastId);
       console.error(e);
       toast.error(`Failed to export report: ${e.message}`);
     }
