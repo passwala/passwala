@@ -2045,7 +2045,7 @@ const VendorPortal = ({ user, onLogout }) => {
                 const toastId = toast.loading("Initiating payment...");
                 try {
                   setTimeout(async () => {
-                    const paymentId = `pay_upgrade_${Math.random().toString(36).substring(2, 10)}`;
+                    const paymentId = `pay_upgrade_${Array.from(crypto.getRandomValues(new Uint8Array(6))).map(b => b.toString(16).padStart(2, '0')).join('')}`;
                     
                     // Insert request to database
                     const { error } = await supabase.from('event_organizer_requests').insert([{

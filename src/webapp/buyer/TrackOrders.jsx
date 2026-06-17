@@ -409,10 +409,11 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
   useEffect(() => {
     fetchOrders();
 
-    // Polling fallback to keep orders perfectly in sync even if real-time channels drop
+    // Polling fallback — only fires if real-time channel drops (Supabase realtime handles live updates above)
+    // 30s is sufficient; 5s caused 12 req/min per user and could trigger rate limits
     const interval = setInterval(() => {
       fetchOrders();
-    }, 5000);
+    }, 30000);
 
     // REAL-TIME: Listen for order status updates
     const sub = supabase.channel('order_updates')

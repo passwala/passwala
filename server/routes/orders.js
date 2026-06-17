@@ -39,7 +39,7 @@ router.post('/payment/create', userAuth, async (req, res) => {
       }
       console.log(`[Razorpay Simulator] Creating mock payment order for DB Order: ${orderId}`);
       const mockOrder = {
-        id: `order_mock_${Math.random().toString(36).substring(2, 10)}`,
+        id: `order_mock_${crypto.randomBytes(4).toString('hex')}`,
         amount: Math.round(amount * 100),
         currency: 'INR',
         receipt: orderId,

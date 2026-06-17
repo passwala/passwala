@@ -2,6 +2,8 @@ import express from 'express';
 import crypto from 'crypto';
 import supabase from '../supabase.js';
 import nodemailer from 'nodemailer';
+import { userAuth } from './users.js';
+import { apiLimiter } from '../utils/rateLimiter.js';
 
 const router = express.Router();
 
@@ -208,7 +210,9 @@ router.get('/:id', async (req, res) => {
 });
 
 // Resolve a user's DB UUID from uid / phone / email (used by EventCheckout)
-router.post('/resolve-id', async (req, res) => {
+// Uses apiLimiter to prevent enumeration attacks from unauthenticated callers.
+// Full userAuth is not used here because WhatsApp OTP users have no Firebase token.
+router.post('/resolve-id', apiLimiter, async (req, res) => {
   try {
     let { uid, phone, email } = req.body;
     let userId = null;
@@ -242,8 +246,10 @@ router.post('/resolve-id', async (req, res) => {
   }
 });
 
-// Book a ticket
-router.post('/book', async (req, res) => {
+// Book a ticket — rate-limited to prevent abuse.
+// Note: userAuth is NOT used here because WhatsApp OTP users have no Firebase token.
+// The userId is validated by fetching from Supabase before processing.
+router.post('/book', apiLimiter, async (req, res) => {
   try {
     let { userId, userPhone, userUid, userEmail, eventId, tierId, ticketCount } = req.body;
 
@@ -406,10 +412,19 @@ router.post('/book', async (req, res) => {
   }
 });
 
-// Cancel Ticket
-router.post('/cancel', async (req, res) => {
+// Cancel Ticket — auth required to prevent unauthenticated cancellations
+router.post('/cancel', userAuth, async (req, res) => {
   try {
     const { bookingId, userId } = req.body;
+
+    // Ownership check: verify the authenticated user owns this booking (not just any caller)
+    if (!req.isAdmin && req.user?.uid) {
+      const { data: dbUser } = await supabase
+        .from('users').select('id').eq('uid', req.user.uid).maybeSingle();
+      if (!dbUser || (userId && dbUser.id !== userId)) {
+        return res.status(403).json({ error: 'Forbidden: You cannot cancel another user\'s booking' });
+      }
+    }
 
     const { data: booking, error: fetchErr } = await supabase
       .from('event_bookings')

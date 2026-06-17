@@ -651,7 +651,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
         if (isLocal) {
           console.warn("⚠️ API server is offline. Activating client-side mock checkout fallback.");
           razorpayOrder = {
-            id: `order_mock_${Math.random().toString(36).substring(2, 10)}`,
+            id: `order_mock_${Array.from(crypto.getRandomValues(new Uint8Array(4))).map(b => b.toString(16).padStart(2,'0')).join('')}`,
             amount: Math.round(total * 100),
             currency: 'INR',
             receipt: orderIdsString,
@@ -678,7 +678,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
               'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
-              razorpay_payment_id: `pay_mock_${Math.random().toString(36).substring(2, 10)}`,
+              razorpay_payment_id: `pay_mock_${Array.from(crypto.getRandomValues(new Uint8Array(4))).map(b => b.toString(16).padStart(2,'0')).join('')}`,
               razorpay_order_id: razorpayOrder.id,
               razorpay_signature: `mock_signature_sandbox`,
               orderId: orderIdsString
