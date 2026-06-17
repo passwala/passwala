@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Plus, Minus, Trash2, ShoppingBag, CheckCircle, Sparkles, MapPin } from 'lucide-react';
+import { X, Plus, Minus, Trash2, ShoppingBag, CheckCircle, Sparkles, MapPin, Tag } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { toast } from 'react-hot-toast';
@@ -43,6 +43,9 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
   const [showConfirm, setShowConfirm] = React.useState(false);
   const [supportedAreas, setSupportedAreas] = React.useState([]);
   const [isPlacingOrder, setIsPlacingOrder] = React.useState(false);
+  const [couponCode, setCouponCode] = React.useState('');
+  const [appliedCoupon, setAppliedCoupon] = React.useState(null); // { code, discount, message }
+  const [couponLoading, setCouponLoading] = React.useState(false);
 
 
   const getAuthToken = async () => {
@@ -89,6 +92,46 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
     }
     
     setShowConfirm(true);
+  };
+
+  const applyCoupon = async () => {
+    const trimmed = couponCode.trim().toUpperCase();
+    if (!trimmed) { toast.error('Enter a promo code'); return; }
+    if (appliedCoupon?.code === trimmed) { toast('Code already applied!'); return; }
+    setCouponLoading(true);
+    try {
+      const BASE_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      const res = await fetch(`${BASE_URL}/api/promo/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: trimmed, cartTotal: parseFloat((totalPrice * 1.05).toFixed(2)) })
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || 'Invalid promo code'); return; }
+      setAppliedCoupon({ code: data.code, discount: data.discount, message: data.message });
+      toast.success(data.message);
+    } catch (e) {
+      toast.error('Could not validate code. Check your connection.');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    toast('Promo code removed');
+  };
+
+  const redeemPromoCode = async (code) => {
+    try {
+      const BASE_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      await fetch(`${BASE_URL}/api/promo/redeem`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
+    } catch (_) { /* fire-and-forget */ }
   };
 
   const isSupportedArea = React.useMemo(() => {
@@ -714,7 +757,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
 
         toast.dismiss("payment_verify_loader");
 
-        if (verifySuccess) {
+          if (verifySuccess) {
           addNotification({
             type: 'ORDER_PLACED',
             title: 'Order Placed!',
@@ -722,6 +765,8 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
             storeId: createdOrders[0].storeId
           });
           toast.success(`Order #${orderIdsString.split(',')[0].slice(0, 6).toUpperCase()} placed successfully!`);
+          // Redeem promo code usage (fire-and-forget)
+          if (appliedCoupon?.code) { redeemPromoCode(appliedCoupon.code); setAppliedCoupon(null); setCouponCode(''); }
           setShowConfirm(false);
           clearCart();
           setCartOpen(false);
@@ -1034,6 +1079,56 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
               </div>
             )}
 
+            {/* Promo / Coupon Code Input */}
+            <div style={{ margin: '10px 0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {appliedCoupon ? (
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  background: 'linear-gradient(135deg,#dcfce7,#f0fdf4)', border: '1px solid #86efac',
+                  borderRadius: '12px', padding: '10px 14px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Tag size={15} color="#16a34a" />
+                    <div>
+                      <span style={{ fontWeight: 800, color: '#15803d', fontSize: '0.82rem' }}>{appliedCoupon.code}</span>
+                      <span style={{ fontSize: '0.75rem', color: '#166534', marginLeft: '8px' }}>−₹{appliedCoupon.discount.toFixed(0)} off applied!</span>
+                    </div>
+                  </div>
+                  <button onClick={removeCoupon} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px' }}>
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    value={couponCode}
+                    onChange={e => setCouponCode(e.target.value.toUpperCase())}
+                    onKeyDown={e => e.key === 'Enter' && applyCoupon()}
+                    placeholder="Promo code"
+                    maxLength={30}
+                    style={{
+                      flex: 1, padding: '9px 12px', borderRadius: '10px', border: '1.5px solid #e2e8f0',
+                      fontSize: '0.85rem', fontWeight: 600, letterSpacing: '0.05em',
+                      outline: 'none', background: '#f8fafc', textTransform: 'uppercase'
+                    }}
+                  />
+                  <button
+                    onClick={applyCoupon}
+                    disabled={couponLoading || !couponCode.trim()}
+                    style={{
+                      padding: '9px 16px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                      background: couponLoading || !couponCode.trim() ? '#e2e8f0' : '#ff7622',
+                      color: couponLoading || !couponCode.trim() ? '#94a3b8' : 'white',
+                      fontWeight: 700, fontSize: '0.82rem', transition: 'all 0.2s', whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {couponLoading ? '...' : 'Apply'}
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div className="price-breakdown-v3" style={{ borderTop: '1px dashed #e2e8f0', borderBottom: '1px dashed #e2e8f0', padding: '12px 0', margin: '12px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748b' }}>
                 <span>Item Subtotal</span>
@@ -1047,6 +1142,12 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
                 <span>Taxes & Charges (CGST 2.5% + SGST 2.5%)</span>
                 <span>₹{(totalPrice * 0.05).toFixed(2)}</span>
               </div>
+              {appliedCoupon && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#16a34a', fontWeight: 700 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Tag size={13} /> Promo ({appliedCoupon.code})</span>
+                  <span>−₹{appliedCoupon.discount.toFixed(2)}</span>
+                </div>
+              )}
             </div>
 
             <div className="cart-total">
@@ -1054,7 +1155,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
                 <span>{t('total')} ({totalItems} items)</span>
                 {totalPrice > 1000 && <span className="savings-badge">{t('savings')} ₹150 with Neighbor Discount</span>}
               </div>
-              <strong>₹{(totalPrice * 1.05).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+              <strong>₹{Math.max(0, parseFloat((totalPrice * 1.05).toFixed(2)) - (appliedCoupon?.discount || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
             </div>
             <button 
               className={`cart-checkout-btn ${(!isProfileComplete || !userAddress || !isSupportedArea) ? 'needs-address' : ''}`} 

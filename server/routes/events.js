@@ -479,4 +479,96 @@ router.post('/cancel', userAuth, async (req, res) => {
   }
 });
 
+// ── POST /api/events/checkin ─────────────────────────────────────────────────
+// Gate check-in: vendor/organizer scans attendee QR code → marks ticket COMPLETED.
+// Auth required — only authenticated vendor/organizer can scan.
+router.post('/checkin', userAuth, async (req, res) => {
+  try {
+    const { qr_code_hash } = req.body;
+
+    if (!qr_code_hash || typeof qr_code_hash !== 'string') {
+      return res.status(400).json({ error: 'QR code hash is required.' });
+    }
+
+    // Fetch the booking with full event + user + tier details for gate display
+    const { data: booking, error: fetchErr } = await supabase
+      .from('event_bookings')
+      .select(`
+        id, status, ticket_count, qr_code_hash, invoice_number,
+        events(id, title, event_date, venue_name, created_by),
+        event_ticket_tiers(tier_name, price),
+        users(full_name, phone)
+      `)
+      .eq('qr_code_hash', qr_code_hash)
+      .maybeSingle();
+
+    if (fetchErr) {
+      console.error('[checkin] DB fetch error:', fetchErr);
+      return res.status(500).json({ error: 'Failed to look up ticket.' });
+    }
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Ticket not found. Invalid QR code.' });
+    }
+
+    // Gate: reject cancelled tickets
+    if (booking.status === 'CANCELLED') {
+      return res.status(400).json({
+        error: 'This ticket has been cancelled and is not valid for entry.',
+        status: 'CANCELLED'
+      });
+    }
+
+    // Gate: reject already-scanned tickets (prevent re-entry)
+    if (booking.status === 'COMPLETED') {
+      return res.status(400).json({
+        error: 'This ticket has already been scanned and used.',
+        status: 'COMPLETED',
+        booking: {
+          attendee: booking.users?.full_name || 'Unknown',
+          event: booking.events?.title,
+          tier: booking.event_ticket_tiers?.tier_name,
+          ticket_count: booking.ticket_count,
+          invoice: booking.invoice_number
+        }
+      });
+    }
+
+    // Mark as COMPLETED (checked in)
+    const { data: updated, error: updateErr } = await supabase
+      .from('event_bookings')
+      .update({ status: 'COMPLETED' })
+      .eq('id', booking.id)
+      .eq('status', 'CONFIRMED') // optimistic lock: only update if still CONFIRMED
+      .select()
+      .single();
+
+    if (updateErr || !updated) {
+      // Race condition: another scan happened simultaneously
+      return res.status(409).json({ error: 'Ticket was already processed. Please try again.' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Check-in successful! Welcome.',
+      booking: {
+        id: booking.id,
+        attendee: booking.users?.full_name || 'Guest',
+        phone: booking.users?.phone || '',
+        event: booking.events?.title || 'Event',
+        event_date: booking.events?.event_date,
+        venue: booking.events?.venue_name,
+        tier: booking.event_ticket_tiers?.tier_name || 'General',
+        ticket_count: booking.ticket_count,
+        invoice: booking.invoice_number
+      }
+    });
+
+  } catch (err) {
+    console.error('[checkin] Unhandled error:', err);
+    res.status(500).json({ error: 'Server error during check-in.' });
+  }
+});
+
 export default router;
+

@@ -202,6 +202,7 @@ const tabSections = [
       { id: 'orders_panel', label: 'Product Orders', icon: ShoppingBag, table: 'orders' },
       { id: 'payments_panel', label: 'Payments', icon: CreditCard, table: 'service_bookings' },
       { id: 'deals_panel', label: 'Deals & Offers', icon: Tag, table: 'deals' },
+      { id: 'promo_codes_panel', label: 'Promo Codes', icon: Tag },
     ]
   },
   {
@@ -562,6 +563,154 @@ const UpgradeRequestsPanel = ({ API_URL }) => {
                   </button>
                 </div>
               )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Promo Codes Panel ────────────────────────────────────────────────────────
+const PromoCodesPanel = ({ supabase: sb }) => {
+  const [codes, setCodes] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [form, setForm] = React.useState({ code: '', type: 'flat', value: '', min_order: 0, max_discount: '', max_uses: '', expires_at: '' });
+  const [saving, setSaving] = React.useState(false);
+
+  const fetchCodes = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await sb.from('promo_codes').select('*').order('created_at', { ascending: false });
+      if (!error) setCodes(data || []);
+    } catch (_) {}
+    setLoading(false);
+  };
+
+  React.useEffect(() => { fetchCodes(); }, []);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    if (!form.code.trim() || !form.value) { toast.error('Code and value are required'); return; }
+    setSaving(true);
+    try {
+      const payload = {
+        code: form.code.trim().toUpperCase(),
+        type: form.type,
+        value: parseFloat(form.value),
+        min_order: parseFloat(form.min_order) || 0,
+        max_discount: form.max_discount ? parseFloat(form.max_discount) : null,
+        max_uses: form.max_uses ? parseInt(form.max_uses) : null,
+        expires_at: form.expires_at || null,
+        is_active: true
+      };
+      const { error } = await sb.from('promo_codes').insert([payload]);
+      if (error) throw error;
+      toast.success(`Code ${payload.code} created!`);
+      setForm({ code: '', type: 'flat', value: '', min_order: 0, max_discount: '', max_uses: '', expires_at: '' });
+      fetchCodes();
+    } catch (err) { toast.error(err.message); }
+    setSaving(false);
+  };
+
+  const toggleActive = async (id, current) => {
+    const { error } = await sb.from('promo_codes').update({ is_active: !current }).eq('id', id);
+    if (!error) setCodes(prev => prev.map(c => c.id === id ? { ...c, is_active: !current } : c));
+    else toast.error('Failed to update status');
+  };
+
+  const deleteCode = async (id) => {
+    const { error } = await sb.from('promo_codes').delete().eq('id', id);
+    if (!error) { setCodes(prev => prev.filter(c => c.id !== id)); toast.success('Deleted'); }
+    else toast.error('Delete failed');
+  };
+
+  const inputStyle = { width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.85rem', outline: 'none', background: '#f8fafc', boxSizing: 'border-box' };
+  const labelStyle = { fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '4px', display: 'block' };
+
+  return (
+    <div style={{ padding: '0 0 4rem 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+        <div>
+          <h1 className="admin-hero-title" style={{ marginBottom: '0.25rem' }}>Promo Codes</h1>
+          <p style={{ color: '#64748b', margin: 0 }}>Create and manage discount codes for buyers at checkout.</p>
+        </div>
+        <span style={{ marginLeft: 'auto', background: '#ff6b00', color: '#fff', borderRadius: '20px', padding: '4px 14px', fontWeight: 700, fontSize: '0.85rem' }}>{codes.filter(c => c.is_active).length} Active</span>
+      </div>
+
+      {/* CREATE FORM */}
+      <form onSubmit={handleCreate} style={{ background: 'white', borderRadius: '20px', padding: '1.5rem', boxShadow: '0 2px 12px rgba(0,0,0,0.07)', border: '1px solid #e2e8f0', marginBottom: '2rem' }}>
+        <h3 style={{ margin: '0 0 1.25rem', fontWeight: 800, fontSize: '1rem', color: '#0f172a' }}>➕ Create New Code</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
+          <div>
+            <label style={labelStyle}>Code *</label>
+            <input style={inputStyle} value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value.toUpperCase() }))} placeholder="SAVE50" maxLength={30} required />
+          </div>
+          <div>
+            <label style={labelStyle}>Type *</label>
+            <select style={inputStyle} value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))}>
+              <option value="flat">Flat ₹ Off</option>
+              <option value="percent">Percentage % Off</option>
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>{form.type === 'flat' ? 'Discount ₹ *' : 'Discount % *'}</label>
+            <input style={inputStyle} type="number" min={0} value={form.value} onChange={e => setForm(p => ({ ...p, value: e.target.value }))} placeholder={form.type === 'flat' ? '50' : '10'} required />
+          </div>
+          <div>
+            <label style={labelStyle}>Min. Order ₹</label>
+            <input style={inputStyle} type="number" min={0} value={form.min_order} onChange={e => setForm(p => ({ ...p, min_order: e.target.value }))} placeholder="0" />
+          </div>
+          {form.type === 'percent' && (
+            <div>
+              <label style={labelStyle}>Max Discount ₹ (cap)</label>
+              <input style={inputStyle} type="number" min={0} value={form.max_discount} onChange={e => setForm(p => ({ ...p, max_discount: e.target.value }))} placeholder="unlimited" />
+            </div>
+          )}
+          <div>
+            <label style={labelStyle}>Max Uses</label>
+            <input style={inputStyle} type="number" min={1} value={form.max_uses} onChange={e => setForm(p => ({ ...p, max_uses: e.target.value }))} placeholder="unlimited" />
+          </div>
+          <div>
+            <label style={labelStyle}>Expires At</label>
+            <input style={inputStyle} type="datetime-local" value={form.expires_at} onChange={e => setForm(p => ({ ...p, expires_at: e.target.value }))} />
+          </div>
+        </div>
+        <button type="submit" disabled={saving} style={{ marginTop: '1.25rem', padding: '10px 24px', background: saving ? '#94a3b8' : '#ff7622', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', fontSize: '0.9rem' }}>
+          {saving ? 'Creating...' : '✅ Create Code'}
+        </button>
+      </form>
+
+      {/* CODES TABLE */}
+      {loading ? <div style={{ textAlign: 'center', padding: '4rem', color: '#94a3b8' }}>Loading codes...</div> : codes.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '4rem 2rem', background: '#f8fafc', borderRadius: '20px', border: '2px dashed #e2e8f0' }}>
+          <Tag size={48} color="#94a3b8" style={{ marginBottom: '1rem' }} />
+          <h3 style={{ color: '#64748b' }}>No promo codes yet</h3>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: '0.75rem' }}>
+          {codes.map(c => (
+            <div key={c.id} style={{ background: 'white', borderRadius: '16px', padding: '1rem 1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '120px' }}>
+                <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '1rem', color: '#0f172a', letterSpacing: '0.05em' }}>{c.code}</span>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
+                  {c.type === 'flat' ? `₹${c.value} off` : `${c.value}% off${c.max_discount ? ` (max ₹${c.max_discount})` : ''}`}
+                  {c.min_order > 0 ? ` · min ₹${c.min_order}` : ''}
+                  {c.max_uses ? ` · ${c.used_count}/${c.max_uses} used` : ` · ${c.used_count} used`}
+                  {c.expires_at ? ` · expires ${new Date(c.expires_at).toLocaleDateString('en-IN')}` : ''}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ padding: '3px 12px', borderRadius: '20px', fontWeight: 700, fontSize: '0.75rem', background: c.is_active ? '#dcfce7' : '#fee2e2', color: c.is_active ? '#16a34a' : '#dc2626' }}>
+                  {c.is_active ? 'ACTIVE' : 'PAUSED'}
+                </span>
+                <button onClick={() => toggleActive(c.id, c.is_active)} style={{ padding: '6px 14px', border: '1.5px solid #e2e8f0', background: 'white', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.78rem', color: '#475569' }}>
+                  {c.is_active ? 'Pause' : 'Activate'}
+                </button>
+                <button onClick={() => deleteCode(c.id)} style={{ padding: '6px 10px', border: 'none', background: '#fee2e2', borderRadius: '8px', cursor: 'pointer', color: '#dc2626' }}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -1207,7 +1356,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
   // Sync active tab data instantly when switching tabs
   useEffect(() => {
     // Custom panels that manage their own data — just reset sync status
-    const customPanels = ['event_approvals_panel', 'upgrade_requests_panel'];
+    const customPanels = ['event_approvals_panel', 'upgrade_requests_panel', 'promo_codes_panel'];
     if (customPanels.includes(activeAdminTab)) {
       setSyncStatus('cloud');
       setLoading(false);
@@ -2456,6 +2605,8 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                 <EventApprovalsPanel API_URL={API_URL} />
               ) : activeAdminTab === 'upgrade_requests_panel' ? (
                 <UpgradeRequestsPanel API_URL={API_URL} />
+              ) : activeAdminTab === 'promo_codes_panel' ? (
+                <PromoCodesPanel supabase={adminSupabase} />
               ) : syncStatus === 'missing_table' ? (
                 <div className="missing-table-notice animate-fade-in" style={{ padding: '3rem', background: '#fff1f2', borderRadius: '24px', border: '2px dashed #f43f5e', textAlign: 'center' }}>
                   <Database size={48} color="#f43f5e" style={{ marginBottom: '1rem' }} />

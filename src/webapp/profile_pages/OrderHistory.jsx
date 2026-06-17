@@ -14,7 +14,8 @@ import {
   Download,
   Ticket,
   Calendar,
-  QrCode
+  QrCode,
+  Star
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
@@ -34,6 +35,11 @@ const OrderHistory = () => {
   const [eventBookings, setEventBookings] = useState([]);
   const [eventLoading, setEventLoading] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(null); // { booking } | null
+  const [ratingModal, setRatingModal] = useState(null);     // { order } | null
+  const [ratingValue, setRatingValue] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
+  const [ratedOrderIds, setRatedOrderIds] = useState(new Set());
 
   useEffect(() => {
     fetchOrders();
@@ -285,6 +291,33 @@ const OrderHistory = () => {
       } catch (err) {
         console.warn("Could not fetch order items on-demand for modal:", err);
       }
+    }
+  };
+
+  const submitRating = async () => {
+    if (!ratingModal || ratingValue === 0) { toast.error('Please select a star rating.'); return; }
+    setRatingSubmitting(true);
+    try {
+      const savedUser = JSON.parse(localStorage.getItem('passwala_user') || '{}');
+      const userId = ratingModal.order.user_id || window._resolvedUserId || savedUser.id;
+      const { error } = await supabase.from('order_ratings').insert([{
+        order_id: ratingModal.order.id,
+        user_id: userId || null,
+        store_id: ratingModal.order.store_id || null,
+        rating: ratingValue,
+        comment: ratingComment.trim() || null
+      }]);
+      if (error) throw error;
+      setRatedOrderIds(prev => new Set([...prev, ratingModal.order.id]));
+      toast.success('Thank you for your feedback! ⭐');
+      setRatingModal(null);
+      setRatingValue(0);
+      setRatingComment('');
+    } catch (err) {
+      if (err.code === '23505') { toast('You already rated this order.'); setRatedOrderIds(prev => new Set([...prev, ratingModal.order.id])); setRatingModal(null); }
+      else toast.error('Could not submit rating. Please try again.');
+    } finally {
+      setRatingSubmitting(false);
     }
   };
 
@@ -722,6 +755,18 @@ const OrderHistory = () => {
                     </div>
                      <div className="order-card-footer" onClick={() => handleViewDetails(order)} style={{ cursor: 'pointer' }}>
                         <button className="reorder-btn" onClick={(e) => { e.stopPropagation(); handleViewDetails(order); }}>View Details</button>
+                        {order.status?.toUpperCase() === 'DELIVERED' && !ratedOrderIds.has(order.id) && (
+                          <button
+                            className="reorder-btn"
+                            style={{ background: 'linear-gradient(135deg,#fef3c7,#fde68a)', color: '#92400e', border: '1px solid #fbbf24', marginLeft: '6px' }}
+                            onClick={(e) => { e.stopPropagation(); setRatingModal({ order }); setRatingValue(0); setRatingComment(''); }}
+                          >
+                            ⭐ Rate Order
+                          </button>
+                        )}
+                        {ratedOrderIds.has(order.id) && (
+                          <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 700, marginLeft: '8px' }}>⭐ Rated</span>
+                        )}
                         <ChevronRight size={18} />
                      </div>
                   </motion.div>
@@ -1044,6 +1089,58 @@ const OrderHistory = () => {
                   Yes, Cancel
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Rating Modal */}
+      <AnimatePresence>
+        {ratingModal && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+            onClick={() => setRatingModal(null)}
+          >
+            <motion.div
+              initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+              style={{ background: 'white', borderRadius: '28px 28px 0 0', padding: '2rem 1.5rem 2.5rem', width: '100%', maxWidth: '480px', boxShadow: '0 -8px 40px rgba(0,0,0,0.18)' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <h3 style={{ margin: 0, fontWeight: 800, fontSize: '1.1rem', color: '#0f172a' }}>Rate your order</h3>
+                <button onClick={() => setRatingModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={22} /></button>
+              </div>
+              <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0 0 1.25rem' }}>Order #{ratingModal.order.id?.slice(0,8)} from {ratingModal.order.stores?.name || 'Store'}</p>
+
+              {/* Star Picker */}
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '1.25rem' }}>
+                {[1,2,3,4,5].map(s => (
+                  <button key={s} onClick={() => setRatingValue(s)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', transition: 'transform 0.15s', transform: s <= ratingValue ? 'scale(1.2)' : 'scale(1)' }}>
+                    <Star size={36} fill={s <= ratingValue ? '#f59e0b' : 'none'} color={s <= ratingValue ? '#f59e0b' : '#d1d5db'} strokeWidth={1.5} />
+                  </button>
+                ))}
+              </div>
+              <p style={{ textAlign: 'center', fontSize: '0.85rem', fontWeight: 700, color: ratingValue > 0 ? '#f59e0b' : '#94a3b8', marginBottom: '1rem' }}>
+                {['', 'Poor', 'Fair', 'Good', 'Very Good', 'Excellent'][ratingValue]}
+              </p>
+
+              <textarea
+                placeholder="Share your experience (optional)..."
+                value={ratingComment}
+                onChange={e => setRatingComment(e.target.value)}
+                maxLength={300}
+                rows={3}
+                style={{ width: '100%', padding: '12px', borderRadius: '14px', border: '1.5px solid #e2e8f0', fontSize: '0.88rem', resize: 'none', outline: 'none', background: '#f8fafc', boxSizing: 'border-box', marginBottom: '1.25rem' }}
+              />
+              <button
+                onClick={submitRating}
+                disabled={ratingSubmitting || ratingValue === 0}
+                style={{ width: '100%', padding: '14px', background: ratingValue === 0 ? '#e2e8f0' : 'linear-gradient(135deg,#f59e0b,#d97706)', color: ratingValue === 0 ? '#94a3b8' : 'white', border: 'none', borderRadius: '16px', fontWeight: 800, fontSize: '1rem', cursor: ratingValue === 0 || ratingSubmitting ? 'not-allowed' : 'pointer', boxShadow: ratingValue > 0 ? '0 4px 14px rgba(245,158,11,0.4)' : 'none', transition: 'all 0.2s' }}
+              >
+                {ratingSubmitting ? 'Submitting...' : 'Submit Rating'}
+              </button>
             </motion.div>
           </motion.div>
         )}

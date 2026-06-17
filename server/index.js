@@ -13,6 +13,7 @@ import orderRoutes from './routes/orders.js';
 import aiRoutes from './routes/ai.js';
 import cityRidesRoutes from './routes/city_rides.js';
 import eventRoutes from './routes/events.js';
+import promoRoutes from './routes/promo.js';
 import { apiLimiter, adminLimiter } from './utils/rateLimiter.js';
 import supabase from './supabase.js';
 import morgan from 'morgan';
@@ -130,6 +131,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/city-rides', cityRidesRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/promo', promoRoutes);
 
 // Fix #13: Bounded route cache with max 500 entries to prevent memory leak
 const ROUTE_CACHE_MAX = 500;
