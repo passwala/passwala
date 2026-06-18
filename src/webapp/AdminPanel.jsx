@@ -788,7 +788,9 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
       baseDeliveryFee: 30,
       freeDeliveryThreshold: 499,
       liveSync: true,
-      ridePricePerKm: 8
+      ridePricePerKm: 8,
+      shortRidePrice: 30,
+      upgradeAccountFee: 999
     };
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -2463,6 +2465,37 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                   onChange={e => setPlatformSettings({ ...platformSettings, ridePricePerKm: parseInt(e.target.value) || 0 })}
                   style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.95rem', fontWeight: 600, color: '#0f172a' }}
                 />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>SHORT RIDE PRICE — 1–2 KM (₹)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={platformSettings.shortRidePrice !== undefined ? platformSettings.shortRidePrice : 30}
+                  onChange={e => setPlatformSettings({ ...platformSettings, shortRidePrice: parseInt(e.target.value) || 0 })}
+                  style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.95rem', fontWeight: 600, color: '#0f172a' }}
+                />
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>Flat fare charged for rides under 2 km (overrides per-km rate)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Account Upgrades */}
+          <div className="glass" style={{ padding: '2rem', borderRadius: '24px', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.02)' }}>
+            <h4 style={{ margin: '0 0 1.5rem 0', fontWeight: 800, fontSize: '1.1rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <UserPlus size={20} color="#8b5cf6" /> Account Upgrades
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>UPGRADE TO EVENT ORGANIZER — FEE (₹)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={platformSettings.upgradeAccountFee !== undefined ? platformSettings.upgradeAccountFee : 999}
+                  onChange={e => setPlatformSettings({ ...platformSettings, upgradeAccountFee: parseInt(e.target.value) || 0 })}
+                  style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.95rem', fontWeight: 600, color: '#0f172a' }}
+                />
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>One-time fee a vendor pays to unlock the Event Organizer console</span>
               </div>
             </div>
           </div>
