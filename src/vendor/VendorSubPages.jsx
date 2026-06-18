@@ -384,6 +384,9 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
   }, [eventWizardStep, showForm]);
   const [isSaving, setIsSaving] = React.useState(false);
   const [editingId, setEditingId] = React.useState(null);
+  const [showQrScanner, setShowQrScanner] = React.useState(false);
+  const [checkinResult, setCheckinResult] = React.useState(null); // { success, booking, error, status }
+  const [checkinLoading, setCheckinLoading] = React.useState(false);
   const [newItem, setNewItem] = React.useState({ 
     name: '', 
     detail: '', 
@@ -967,6 +970,48 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleQrScan = async (qrData) => {
+    setShowQrScanner(false);
+    setCheckinLoading(true);
+    setCheckinResult(null);
+    try {
+      const BASE_URL = window.location.protocol === 'https:'
+        ? ''
+        : (window._API_URL || `http://${window.location.hostname}:3004`);
+
+      // Get auth token from supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || '';
+
+      const res = await fetch(`${BASE_URL}/api/events/checkin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ qr_code_hash: qrData })
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setCheckinResult({ success: true, booking: data.booking });
+        toast.success('✅ Check-in successful!');
+      } else if (res.status === 400 && data.status === 'COMPLETED') {
+        // Already scanned — show the info but flag as duplicate
+        setCheckinResult({ success: false, alreadyUsed: true, booking: data.booking, error: data.error });
+        toast.error('⚠️ Already checked in!');
+      } else {
+        setCheckinResult({ success: false, error: data.error || 'Unknown error' });
+        toast.error(data.error || 'Check-in failed');
+      }
+    } catch (err) {
+      setCheckinResult({ success: false, error: 'Network error. Check your connection.' });
+      toast.error('Network error during check-in');
+    } finally {
+      setCheckinLoading(false);
+    }
+  };
+
   const handleDelete = (id) => {
     setConfirmDialog({
       isOpen: true,
@@ -1017,7 +1062,122 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
           <PackagePlus size={20} />
           {businessType === 'shop' ? 'Add Product' : businessType === 'event' ? 'Add Event' : 'Add Service'}
         </motion.button>
+        {businessType === 'event' && (
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => { setCheckinResult(null); setShowQrScanner(true); }}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', background: 'linear-gradient(135deg,#16a34a,#15803d)', color: 'white', border: 'none', borderRadius: '14px', fontWeight: 800, fontSize: '0.92rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(22,163,74,0.35)' }}
+          >
+            <QrCode size={18} /> Scan QR
+          </motion.button>
+        )}
       </div>
+
+      {/* QR Scanner Modal */}
+      <QRScannerModal
+        isOpen={showQrScanner}
+        onClose={() => setShowQrScanner(false)}
+        onScan={handleQrScan}
+      />
+
+      {/* Check-in Loading Overlay */}
+      {checkinLoading && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 999998, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: 'white', borderRadius: '20px', padding: '2rem 3rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
+            <div style={{ width: '40px', height: '40px', border: '4px solid #e2e8f0', borderTop: '4px solid #16a34a', borderRadius: '50%', animation: 'checkin-spin 1s linear infinite' }} />
+            <p style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>Verifying ticket...</p>
+            <style>{`@keyframes checkin-spin { to { transform: rotate(360deg); } }`}</style>
+          </div>
+        </div>
+      )}
+
+      {/* Check-in Result Modal */}
+      <AnimatePresence>
+        {checkinResult && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 999997, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', backdropFilter: 'blur(6px)' }}
+            onClick={() => setCheckinResult(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.85, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+              style={{ background: 'white', borderRadius: '28px', padding: '2rem', width: '100%', maxWidth: '400px', boxShadow: '0 30px 60px rgba(0,0,0,0.25)' }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Result Icon */}
+              <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                <div style={{
+                  width: '72px', height: '72px', borderRadius: '50%', margin: '0 auto 1rem',
+                  background: checkinResult.success ? '#dcfce7' : checkinResult.alreadyUsed ? '#fef3c7' : '#fee2e2',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: checkinResult.success ? '0 0 30px rgba(34,197,94,0.25)' : 'none'
+                }}>
+                  <span style={{ fontSize: '2.2rem' }}>
+                    {checkinResult.success ? '✅' : checkinResult.alreadyUsed ? '⚠️' : '❌'}
+                  </span>
+                </div>
+                <h2 style={{ margin: '0 0 4px', fontWeight: 900, fontSize: '1.3rem', color: '#0f172a' }}>
+                  {checkinResult.success ? 'Checked In!' : checkinResult.alreadyUsed ? 'Already Used' : 'Invalid Ticket'}
+                </h2>
+                <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>
+                  {checkinResult.success ? 'Entry approved. Attendee may enter.' : checkinResult.error}
+                </p>
+              </div>
+
+              {/* Attendee Details Card */}
+              {checkinResult.booking && (
+                <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.5rem', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Attendee</span>
+                    <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '1rem' }}>{checkinResult.booking.attendee}</span>
+                  </div>
+                  {checkinResult.booking.phone && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Phone</span>
+                      <span style={{ fontWeight: 700, color: '#475569' }}>{checkinResult.booking.phone}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Event</span>
+                    <span style={{ fontWeight: 700, color: '#475569', textAlign: 'right', maxWidth: '60%' }}>{checkinResult.booking.event}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Tier</span>
+                    <span style={{ fontWeight: 700, color: '#475569' }}>{checkinResult.booking.tier}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Tickets</span>
+                    <span style={{ fontWeight: 900, color: '#ff7622', fontSize: '1rem' }}>{checkinResult.booking.ticket_count}</span>
+                  </div>
+                  {checkinResult.booking.invoice && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Invoice</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#64748b', fontSize: '0.8rem' }}>{checkinResult.booking.invoice}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={() => { setCheckinResult(null); setShowQrScanner(true); }}
+                  style={{ flex: 1, padding: '13px', background: '#f1f5f9', border: 'none', borderRadius: '14px', fontWeight: 800, cursor: 'pointer', color: '#475569', fontSize: '0.9rem' }}
+                >
+                  Scan Next
+                </button>
+                <button
+                  onClick={() => setCheckinResult(null)}
+                  style={{ flex: 1, padding: '13px', background: checkinResult.success ? 'linear-gradient(135deg,#16a34a,#15803d)' : '#0f172a', border: 'none', borderRadius: '14px', fontWeight: 800, cursor: 'pointer', color: 'white', fontSize: '0.9rem' }}
+                >
+                  Done
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showForm && (
