@@ -750,8 +750,8 @@ router.post('/send-whatsapp-otp', authLimiter, async (req, res) => {
     return res.status(400).json({ success: false, error: 'Valid 10-digit mobile number required' });
   }
 
+  const otp = crypto.randomInt(100000, 1000000).toString();
   try {
-    const otp = crypto.randomInt(100000, 1000000).toString();
     // Fix #5: Use Supabase-backed store (falls back to in-memory with warning)
     await _otpSet(cleanPhone, otp, Date.now() + 5 * 60 * 1000); // 5 min TTL
 

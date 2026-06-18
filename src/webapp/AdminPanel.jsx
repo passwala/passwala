@@ -782,7 +782,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
     const saved = localStorage.getItem('passwala_platform_settings');
     return saved ? JSON.parse(saved) : {
       appName: 'Passwala',
-      supportEmail: 'ops@passwala.com',
+      supportEmail: 'passwalaoffcial@gmail.com',
       maintenanceMode: false,
       maxDeliveryRange: 10,
       baseDeliveryFee: 30,
@@ -790,7 +790,10 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
       liveSync: true,
       ridePricePerKm: 8,
       shortRidePrice: 30,
-      upgradeAccountFee: 999
+      upgradeEventFee: 999,
+      upgradeServiceFee: 999,
+      upgradeRentalFee: 999,
+      upgradeShopFee: 999
     };
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -819,6 +822,21 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
       onLogout();
     }
   }, [onLogout]);
+
+  // Always load settings from server on mount — server is the authoritative source
+  useEffect(() => {
+    const adminKey = sessionStorage.getItem('admin_token') || '';
+    fetch(`${API_URL}/api/admin/settings`, {
+      headers: { 'x-admin-key': adminKey }
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.settings) {
+          setPlatformSettings(prev => ({ ...prev, ...data.settings }));
+        }
+      })
+      .catch(() => { /* keep localStorage fallback */ });
+  }, []);
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -2481,24 +2499,74 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
           </div>
 
           {/* Account Upgrades */}
-          <div className="glass" style={{ padding: '2rem', borderRadius: '24px', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.02)' }}>
-            <h4 style={{ margin: '0 0 1.5rem 0', fontWeight: 800, fontSize: '1.1rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <UserPlus size={20} color="#8b5cf6" /> Account Upgrades
+          <div className="glass" style={{ padding: '2rem', borderRadius: '24px', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.02)', gridColumn: '1 / -1' }}>
+            <h4 style={{ margin: '0 0 0.5rem 0', fontWeight: 800, fontSize: '1.1rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <UserPlus size={20} color="#8b5cf6" /> Console Upgrade Fees
             </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>UPGRADE TO EVENT ORGANIZER — FEE (₹)</label>
+            <p style={{ margin: '0 0 1.5rem', fontSize: '0.82rem', color: '#64748b' }}>
+              Set the one-time fee charged to a vendor when they request each additional console type. Each console type has its own independent fee.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+
+              {/* Event Organizer */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '1rem', background: '#fff7ed', borderRadius: '14px', border: '1.5px solid #fed7aa' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#c2410c', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  🎫 EVENT ORGANIZER — FEE (₹)
+                </label>
                 <input
-                  type="number"
-                  min={0}
-                  value={platformSettings.upgradeAccountFee !== undefined ? platformSettings.upgradeAccountFee : 999}
-                  onChange={e => setPlatformSettings({ ...platformSettings, upgradeAccountFee: parseInt(e.target.value) || 0 })}
-                  style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.95rem', fontWeight: 600, color: '#0f172a' }}
+                  type="number" min={0}
+                  value={platformSettings.upgradeEventFee ?? 999}
+                  onChange={e => setPlatformSettings({ ...platformSettings, upgradeEventFee: parseInt(e.target.value) || 0 })}
+                  style={{ padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #fed7aa', outline: 'none', fontSize: '1rem', fontWeight: 700, color: '#0f172a', background: 'white' }}
                 />
-                <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>One-time fee a vendor pays to unlock the Event Organizer console</span>
+                <span style={{ fontSize: '0.7rem', color: '#9a3412', fontWeight: 600 }}>Charged when requesting Event Console</span>
               </div>
+
+              {/* Profession / Service */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '1rem', background: '#eef2ff', borderRadius: '14px', border: '1.5px solid #c7d2fe' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#4338ca', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  🔧 PROFESSION / SERVICE — FEE (₹)
+                </label>
+                <input
+                  type="number" min={0}
+                  value={platformSettings.upgradeServiceFee ?? 999}
+                  onChange={e => setPlatformSettings({ ...platformSettings, upgradeServiceFee: parseInt(e.target.value) || 0 })}
+                  style={{ padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #c7d2fe', outline: 'none', fontSize: '1rem', fontWeight: 700, color: '#0f172a', background: 'white' }}
+                />
+                <span style={{ fontSize: '0.7rem', color: '#3730a3', fontWeight: 600 }}>Charged when requesting Profession Console</span>
+              </div>
+
+              {/* Rental */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '1rem', background: '#ecfeff', borderRadius: '14px', border: '1.5px solid #a5f3fc' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0e7490', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  🚗 RENTAL / VEHICLES — FEE (₹)
+                </label>
+                <input
+                  type="number" min={0}
+                  value={platformSettings.upgradeRentalFee ?? 999}
+                  onChange={e => setPlatformSettings({ ...platformSettings, upgradeRentalFee: parseInt(e.target.value) || 0 })}
+                  style={{ padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #a5f3fc', outline: 'none', fontSize: '1rem', fontWeight: 700, color: '#0f172a', background: 'white' }}
+                />
+                <span style={{ fontSize: '0.7rem', color: '#155e75', fontWeight: 600 }}>Charged when requesting Rental Console</span>
+              </div>
+
+              {/* Shop */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '1rem', background: '#f0fdf4', borderRadius: '14px', border: '1.5px solid #bbf7d0' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  🛍️ DIGITAL SHOP — FEE (₹)
+                </label>
+                <input
+                  type="number" min={0}
+                  value={platformSettings.upgradeShopFee ?? 999}
+                  onChange={e => setPlatformSettings({ ...platformSettings, upgradeShopFee: parseInt(e.target.value) || 0 })}
+                  style={{ padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #bbf7d0', outline: 'none', fontSize: '1rem', fontWeight: 700, color: '#0f172a', background: 'white' }}
+                />
+                <span style={{ fontSize: '0.7rem', color: '#166534', fontWeight: 600 }}>Charged when requesting Store Console</span>
+              </div>
+
             </div>
           </div>
+
 
           <div className="glass" style={{ padding: '2rem', borderRadius: '24px', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.02)', gridColumn: '1 / -1' }}>
             <h4 style={{ margin: '0 0 1.5rem 0', fontWeight: 800, fontSize: '1.1rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>

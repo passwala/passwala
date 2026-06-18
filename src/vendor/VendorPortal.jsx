@@ -105,13 +105,34 @@ const VendorPortal = ({ user, onLogout }) => {
   const [hasRentalConsole, setHasRentalConsole] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeTarget, setUpgradeTarget] = useState('event'); // 'event' | 'service' | 'rental' | 'shop'
-  // Read the admin-configured upgrade fee from localStorage (set in Admin > Settings)
-  const upgradeAccountFee = (() => {
-    try {
-      const s = JSON.parse(localStorage.getItem('passwala_platform_settings') || '{}');
-      return typeof s.upgradeAccountFee === 'number' ? s.upgradeAccountFee : 999;
-    } catch { return 999; }
-  })();
+  // Per-console upgrade fees fetched from server (set by Admin in Settings)
+  const [upgradeEventFee, setUpgradeEventFee] = useState(999);
+  const [upgradeServiceFee, setUpgradeServiceFee] = useState(999);
+  const [upgradeRentalFee, setUpgradeRentalFee] = useState(999);
+  const [upgradeShopFee, setUpgradeShopFee] = useState(999);
+  const [upgradeSelectedFee, setUpgradeSelectedFee] = useState(999); // fee for the currently open modal
+  const [feesLoading, setFeesLoading] = useState(true); // true until server fees are fetched
+
+  // Fetch platform settings from server so the admin-set fees are always authoritative
+  useEffect(() => {
+    const BASE = window.location.protocol === 'https:'
+      ? ''
+      : `http://${window.location.hostname}:3004`;
+    // Use the public endpoint — /api/admin/settings is protected by admin auth
+    fetch(`${BASE}/api/platform-settings`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.settings) {
+          const s = data.settings;
+          if (s.upgradeEventFee !== undefined)   setUpgradeEventFee(s.upgradeEventFee);
+          if (s.upgradeServiceFee !== undefined) setUpgradeServiceFee(s.upgradeServiceFee);
+          if (s.upgradeRentalFee !== undefined)  setUpgradeRentalFee(s.upgradeRentalFee);
+          if (s.upgradeShopFee !== undefined)    setUpgradeShopFee(s.upgradeShopFee);
+        }
+      })
+      .catch(() => { /* keep defaults on network error */ })
+      .finally(() => setFeesLoading(false));
+  }, []);
   const [editFormData, setEditFormData] = useState({});
   const [isUpdating, setIsUpdating] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -744,7 +765,8 @@ const VendorPortal = ({ user, onLogout }) => {
             upgrades.push({
               target: 'event',
               title: "Want to organize events & sell tickets?",
-              desc: `Upgrade your vendor profile to add event tickets for a one-time setup fee of ₹${upgradeAccountFee}.`,
+              desc: `Upgrade your vendor profile to add event tickets for a one-time setup fee of ₹${upgradeEventFee}.`,
+              fee: upgradeEventFee,
               btn: "Request Event Console",
               color: '#ea580c',
               bg: '#fff7ed'
@@ -754,7 +776,8 @@ const VendorPortal = ({ user, onLogout }) => {
             upgrades.push({
               target: 'service',
               title: "Want to offer professional services?",
-              desc: `Upgrade your vendor profile to list expert services (cleaning, salon, etc.) for a setup fee of ₹${upgradeAccountFee}.`,
+              desc: `Upgrade your vendor profile to list expert services (cleaning, salon, etc.) for a setup fee of ₹${upgradeServiceFee}.`,
+              fee: upgradeServiceFee,
               btn: "Request Profession Console",
               color: '#6366f1',
               bg: '#eef2ff'
@@ -764,7 +787,8 @@ const VendorPortal = ({ user, onLogout }) => {
             upgrades.push({
               target: 'rental',
               title: "Want to rent out vehicles or equipment?",
-              desc: `Upgrade your vendor profile to list rental items and vehicles for a setup fee of ₹${upgradeAccountFee}.`,
+              desc: `Upgrade your vendor profile to list rental items and vehicles for a setup fee of ₹${upgradeRentalFee}.`,
+              fee: upgradeRentalFee,
               btn: "Request Rental Console",
               color: '#06b6d4',
               bg: '#ecfeff'
@@ -774,7 +798,8 @@ const VendorPortal = ({ user, onLogout }) => {
             upgrades.push({
               target: 'shop',
               title: "Want to open a digital retail shop?",
-              desc: `Upgrade your vendor profile to sell products to local customers for a setup fee of ₹${upgradeAccountFee}.`,
+              desc: `Upgrade your vendor profile to sell products to local customers for a setup fee of ₹${upgradeShopFee}.`,
+              fee: upgradeShopFee,
               btn: "Request Store Console",
               color: '#10b981',
               bg: '#f0fdf4'
@@ -789,12 +814,17 @@ const VendorPortal = ({ user, onLogout }) => {
                 <div key={upg.target} className="v-stat-card animate-fade-in" style={{ border: `2px dashed ${upg.color}`, background: upg.bg, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem 2rem', borderRadius: '24px' }}>
                   <div>
                     <h4 style={{ color: upg.color, fontWeight: 900, margin: 0, fontSize: '1.15rem' }}>{upg.title}</h4>
-                    <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '4px 0 0 0' }}>{upg.desc}</p>
+                    <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '4px 0 0 0' }}>
+                      {feesLoading
+                        ? <span style={{ display: 'inline-block', background: '#e2e8f0', borderRadius: '4px', width: '220px', height: '14px', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                        : upg.desc}
+                    </p>
                   </div>
                   <button 
                     className="v-btn-primary" 
                     onClick={() => {
                       setUpgradeTarget(upg.target);
+                      setUpgradeSelectedFee(upg.fee);
                       setShowUpgradeModal(true);
                     }}
                     style={{ padding: '12px 24px', borderRadius: '12px', background: upg.color, borderColor: upg.color, color: 'white', fontWeight: 800, cursor: 'pointer' }}
@@ -823,7 +853,8 @@ const VendorPortal = ({ user, onLogout }) => {
       let updatedLng = parseFloat(editFormData.lng !== undefined ? editFormData.lng : vendorData?.lng) || null;
 
       const addressChanged = editFormData.address && editFormData.address !== vendorData?.address;
-      if (addressChanged && (!editFormData.lat || !editFormData.lng)) {
+      const coordsManuallyChanged = parseFloat(editFormData.lat) !== parseFloat(vendorData?.lat) || parseFloat(editFormData.lng) !== parseFloat(vendorData?.lng);
+      if (addressChanged && !coordsManuallyChanged) {
         try {
           const searchString = editFormData.address.toLowerCase().includes('ahmedabad') 
             ? editFormData.address 
@@ -2063,7 +2094,7 @@ const VendorPortal = ({ user, onLogout }) => {
                       payment_status: 'PAID',
                       payment_id: paymentId,
                       request_status: 'SUBMITTED',
-                      amount: upgradeAccountFee,
+                      amount: upgradeSelectedFee,
                       target_console: upgradeTarget
                     }]);
 
@@ -2093,11 +2124,11 @@ const VendorPortal = ({ user, onLogout }) => {
                 <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '16px', border: '1px solid #e2e8f0', marginBottom: '2rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#475569', fontWeight: 600 }}>
                     <span>One-time Setup Fee</span>
-                    <span>₹{upgradeAccountFee}.00</span>
+                    <span>₹{upgradeSelectedFee}.00</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', color: '#0f172a', fontWeight: 900, marginTop: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '8px' }}>
                     <span>Total Amount</span>
-                    <span>₹{upgradeAccountFee}.00</span>
+                    <span>₹{upgradeSelectedFee}.00</span>
                   </div>
                 </div>
 
@@ -2106,7 +2137,7 @@ const VendorPortal = ({ user, onLogout }) => {
                   className="v-btn-primary" 
                   style={{ width: '100%', padding: '14px', borderRadius: '14px', background: modalConfig.color, borderColor: modalConfig.color, color: 'white', fontWeight: 800, cursor: 'pointer', fontSize: '1rem', boxShadow: `0 4px 12px ${modalConfig.color}33` }}
                 >
-                  Pay ₹{upgradeAccountFee} & Submit Request
+                  Pay ₹{upgradeSelectedFee} & Submit Request
                 </button>
               </form>
             </motion.div>

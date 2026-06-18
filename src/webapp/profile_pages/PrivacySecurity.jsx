@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 import React from 'react';
 import { motion } from 'framer-motion';
 import { 
@@ -16,9 +15,11 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { auth } from '../../firebase';
 import './ProfilePages.css';
+import { useTranslation } from '../LanguageContext';
 
 const PrivacySecurity = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [securityStates, setSecurityStates] = React.useState(() => {
     const saved = localStorage.getItem('passwala_security_settings');
     if (saved) {
@@ -44,19 +45,19 @@ const PrivacySecurity = () => {
 
   const getSecurityLevel = () => {
     const { '2fa': twoFA, appLock } = securityStates;
-    if (twoFA && appLock) return { level: 'High', color: '#10b981', tip: 'Your account is fully secured.' };
-    if (twoFA || appLock) return { level: 'Medium', color: '#f59e0b', tip: 'Turn on App Lock to reach high security level.' };
-    return { level: 'Low', color: '#ef4444', tip: 'Turn on 2FA and App Lock to secure your account.' };
+    if (twoFA && appLock) return { level: t('high'), color: '#10b981', tip: t('security_fully_secured') };
+    if (twoFA || appLock) return { level: t('medium'), color: '#f59e0b', tip: t('security_medium_tip') };
+    return { level: t('low'), color: '#ef4444', tip: t('security_low_tip') };
   };
 
   const securityInfo = getSecurityLevel();
 
 
   const securityItems = [
-    { id: 1, key: '2fa', title: 'Two-Factor Authentication', subtitle: 'Enable 2FA for account safety', icon: <Smartphone size={20} />, enabled: securityStates['2fa'] },
-    { id: 2, key: 'appLock', title: 'App Lock', subtitle: 'Secure app with biometric lock', icon: <Fingerprint size={20} />, enabled: securityStates.appLock },
-    { id: 3, title: 'Privacy Policy', subtitle: 'Read our data usage policy', icon: <Eye size={20} />, chevron: true },
-    { id: 4, title: 'Data Management', subtitle: 'Export or manage your data', icon: <Database size={20} />, chevron: true }
+    { id: 1, key: '2fa', title: t('two_factor'), subtitle: t('two_factor_sub'), icon: <Smartphone size={20} />, enabled: securityStates['2fa'] },
+    { id: 2, key: 'appLock', title: t('app_lock'), subtitle: t('app_lock_sub'), icon: <Fingerprint size={20} />, enabled: securityStates.appLock },
+    { id: 3, title: t('privacy_policy_title'), subtitle: t('privacy_policy_sub'), icon: <Eye size={20} />, chevron: true },
+    { id: 4, title: t('data_management'), subtitle: t('data_management_sub'), icon: <Database size={20} />, chevron: true }
   ];
 
   return (
@@ -70,10 +71,10 @@ const PrivacySecurity = () => {
         <div className="security-banner glass">
            <ShieldAlert size={32} color={securityInfo.color} />
            <div className="banner-text">
-              <strong style={{ color: securityInfo.color }}>Account Security: {securityInfo.level}</strong>
+              <strong style={{ color: securityInfo.color }}>{t('account_security')}: {securityInfo.level}</strong>
               <p>{securityInfo.tip}</p>
            </div>
-           {securityInfo.level !== 'High' && (
+           {securityInfo.level !== t('high') && (
              <button className="enhance-btn" onClick={() => {
                const next = { '2fa': true, appLock: true };
                setSecurityStates(next);
@@ -84,7 +85,7 @@ const PrivacySecurity = () => {
         </div>
 
         <div className="section-header-compact">
-           <h3>SECURITY CONTROLS</h3>
+           <h3>{t('security_controls')}</h3>
         </div>
 
         <div className="profile-menu-container glass">
@@ -124,7 +125,7 @@ const PrivacySecurity = () => {
 
         <div className="privacy-note">
            <Lock size={14} />
-           <p>Your connection to Passwala is encrypted with 256-bit SSL technology. No one, not even Passwala, can see your real-time private location except for verified orders.</p>
+           <p>{t('encryption_note')}</p>
         </div>
       </main>
     </motion.div>

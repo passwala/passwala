@@ -12,10 +12,9 @@ export const apiLimiter = rateLimit({
   }
 });
 
-// Stricter rate limiter for sensitive routes like auth and admin login (e.g. 10 requests per 15 minutes)
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP to 10 logins/registrations per `windowMs`
+  max: process.env.NODE_ENV === 'production' ? 10 : 100, // Limit each IP to 10 in prod, 100 in dev for testing
   standardHeaders: true,
   legacyHeaders: false,
   message: {

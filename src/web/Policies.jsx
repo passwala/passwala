@@ -229,7 +229,7 @@ const Policies = () => {
 
                 <h3>4. Contact Us</h3>
                 <p>
-                  If you have questions about how your personal data is handled, please contact us at <a href="mailto:privacy@passwala.com">privacy@passwala.com</a>.
+                  If you have questions about how your personal data is handled, please contact us at <a href="mailto:passwalaoffcial@gmail.com">passwalaoffcial@gmail.com</a>.
                 </p>
               </div>
             )}

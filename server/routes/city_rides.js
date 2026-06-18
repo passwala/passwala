@@ -218,20 +218,25 @@ router.get('/search', async (req, res) => {
 
 
     // Minimum ride fare is ₹15, plus dynamic rate per km (default ₹8)
+    // Short rides (≤ 2 km) use a flat fare set by admin (default ₹30)
     let ratePerKm = 8;
+    let shortRidePrice = 30; // flat fare for 1-2 km rides
     try {
       const settingsPath = process.cwd().endsWith('server')
         ? path.join(process.cwd(), 'platform_settings.json')
         : path.join(process.cwd(), 'server', 'platform_settings.json');
       const rawData = await fs.readFile(settingsPath, 'utf8');
       const settings = JSON.parse(rawData);
-      if (settings && settings.ridePricePerKm !== undefined) {
-        ratePerKm = parseFloat(settings.ridePricePerKm);
-      }
+      if (settings?.ridePricePerKm !== undefined) ratePerKm = parseFloat(settings.ridePricePerKm);
+      if (settings?.shortRidePrice !== undefined) shortRidePrice = parseFloat(settings.shortRidePrice);
     } catch (e) {
       ratePerKm = parseFloat(pricePerKm) || 8;
     }
-    const estimatedPrice = Math.max(15, Math.ceil(distanceKm * ratePerKm));
+
+    // Apply flat short-ride fare for ≤ 2 km, otherwise standard per-km pricing
+    const estimatedPrice = distanceKm <= 2
+      ? Math.max(15, shortRidePrice)
+      : Math.max(15, Math.ceil(distanceKm * ratePerKm));
 
     res.json({
       success: true,

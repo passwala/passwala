@@ -105,9 +105,12 @@ router.get('/search', async (req, res) => {
     const pageInt     = Math.max(1, parseInt(page) || 1);
     const pageSizeInt = Math.min(50, Math.max(1, parseInt(pageSize) || 12)); // cap 1–50
 
+    // BUG B2 FIX: Only show admin-approved events to buyers (exclude PENDING_APPROVAL and REJECTED)
     let supabaseQuery = supabase
       .from('events')
-      .select('*, event_ticket_tiers(*)');
+      .select('*, event_ticket_tiers(*)')
+      .neq('status', 'PENDING_APPROVAL')
+      .neq('status', 'REJECTED');
 
     if (isPast) {
       supabaseQuery = supabaseQuery
@@ -534,10 +537,14 @@ router.post('/checkin', userAuth, async (req, res) => {
       });
     }
 
-    // Mark as COMPLETED (checked in)
+    // BUG B8 FIX: Mark as COMPLETED + set checked_in=true and checked_in_at timestamp
     const { data: updated, error: updateErr } = await supabase
       .from('event_bookings')
-      .update({ status: 'COMPLETED' })
+      .update({
+        status: 'COMPLETED',
+        checked_in: true,
+        checked_in_at: new Date().toISOString()
+      })
       .eq('id', booking.id)
       .eq('status', 'CONFIRMED') // optimistic lock: only update if still CONFIRMED
       .select()

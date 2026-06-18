@@ -29,10 +29,11 @@ const ALLOWED_ADMIN_TABLES = [
   'notifications',
   'posts',
   'orders',
+  'order_items',
+  'order_ratings',
   'product_categories',
   'service_categories',
   'addresses',
-  'comments',
   'ai_recommendations',
   'wallet_transactions',
   'reports',
@@ -43,7 +44,9 @@ const ALLOWED_ADMIN_TABLES = [
   'city_routes',
   'city_vehicles',
   'ticket_bookings',
-  'event_organizer_requests'
+  'event_organizer_requests',
+  'promo_codes',
+  'promo_redemptions'
 ];
 
 function base64urlEncode(strOrBuffer) {
@@ -771,13 +774,18 @@ router.get('/settings', async (req, res) => {
         const settingsPath = getSettingsPath();
         let settings = {
             appName: 'Passwala',
-            supportEmail: 'ops@passwala.com',
+            supportEmail: 'passwalaoffcial@gmail.com',
             maintenanceMode: false,
             maxDeliveryRange: 10,
             baseDeliveryFee: 30,
             freeDeliveryThreshold: 499,
             liveSync: true,
-            ridePricePerKm: 8
+            ridePricePerKm: 8,
+            shortRidePrice: 30,
+            upgradeEventFee: 999,
+            upgradeServiceFee: 999,
+            upgradeRentalFee: 999,
+            upgradeShopFee: 999
         };
         try {
             const fileData = await fs.readFile(settingsPath, 'utf8');
@@ -799,6 +807,23 @@ router.post('/settings', async (req, res) => {
         if (!settings) {
             return res.status(400).json({ error: 'Settings payload is required' });
         }
+
+        // Validate: all fee/price fields must be >= 0
+        const feeFields = [
+            'upgradeEventFee', 'upgradeServiceFee', 'upgradeRentalFee', 'upgradeShopFee',
+            'baseDeliveryFee', 'ridePricePerKm', 'shortRidePrice', 'freeDeliveryThreshold',
+            'maxDeliveryRange'
+        ];
+        for (const field of feeFields) {
+            if (settings[field] !== undefined) {
+                const val = Number(settings[field]);
+                if (isNaN(val) || val < 0) {
+                    return res.status(400).json({ error: `${field} must be a number ≥ 0.` });
+                }
+                settings[field] = val; // normalize to number
+            }
+        }
+
         const settingsPath = getSettingsPath();
         await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
         res.status(200).json({ success: true, settings });

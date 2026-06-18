@@ -294,6 +294,19 @@ const AppContent = ({
   const locationPath = useLocation().pathname;
   const { t } = useTranslation();
 
+  // ── IMP 7: Maintenance mode enforcement ─────────────────────────────────────
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  useEffect(() => {
+    if (isAdminMode) return; // admin is always exempt
+    const base = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+    fetch(`${base}/api/platform-settings`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.settings?.maintenanceMode) setMaintenanceMode(true); })
+      .catch(() => {});
+  }, []);
+
+  // BUG B6 FIX: Move title useEffect BEFORE the maintenance return
+  // All hooks must run unconditionally — early return after hooks is fine
   useEffect(() => {
     if (isAdminMode) {
       document.title = 'Passwala | Admin Portal';
@@ -307,6 +320,20 @@ const AppContent = ({
       document.title = 'Passwala | Local Services & Community Hub';
     }
   }, []);
+
+  // BUG B6 FIX: Return maintenance UI AFTER all hooks have been declared
+  if (maintenanceMode) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#0f172a,#1e293b)', color: '#f8fafc', fontFamily: 'Inter,sans-serif', textAlign: 'center', padding: '2rem' }}>
+        <div style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>🛠️</div>
+        <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '1rem', background: 'linear-gradient(to right, #38bdf8, #818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>We&apos;ll be back soon!</h1>
+        <p style={{ color: '#94a3b8', fontSize: '1.1rem', maxWidth: '400px', lineHeight: '1.7', marginBottom: '2rem' }}>
+          Passwala is currently undergoing scheduled maintenance. We should be back online shortly. Thank you for your patience!
+        </p>
+        <a href="mailto:passwalaoffcial@gmail.com" style={{ color: '#38bdf8', fontSize: '0.9rem' }}>passwalaoffcial@gmail.com</a>
+      </div>
+    );
+  }
 
   // Global Notification Listener for Buyer (Using UNIQUE Channel IDs to clean up correctly)
   const { addNotification, fcmToken } = useNotifications();

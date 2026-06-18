@@ -231,10 +231,14 @@ const ExpertServices = ({ onBack, location, userCoords }) => {
                       </div>
                     )}
                   </div>
-                   <span className="expert-type">
-                    {t((expert.category || '').toLowerCase().replace(' & ', '_'))}
-                    {expert.experience ? ` • ${expert.experience}` : ''}
-                  </span>
+                    <span className="expert-type">
+                      {(() => {
+                        const key = (expert.category || '').toLowerCase().replace(' & ', '_');
+                        const trans = t(key);
+                        return trans === key ? (expert.category || '') : trans;
+                      })()}
+                      {expert.experience ? ` • ${expert.experience}` : ''}
+                    </span>
                    {expert.description && (
                      <p className="expert-description-snippet">{expert.description}</p>
                    )}

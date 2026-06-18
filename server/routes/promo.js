@@ -1,5 +1,6 @@
 import express from 'express';
 import supabase from '../supabase.js';
+import { userAuth } from './users.js';
 import { apiLimiter } from '../utils/rateLimiter.js';
 
 const router = express.Router();
@@ -7,8 +8,8 @@ const router = express.Router();
 // ── POST /api/promo/validate ─────────────────────────────────────────────────
 // Validates a promo code and returns the discount amount.
 // Does NOT decrement used_count here — that happens when the order is confirmed.
-// Rate-limited to prevent brute-force code enumeration.
-router.post('/validate', apiLimiter, async (req, res) => {
+// Rate-limited + auth required to prevent brute-force code enumeration.
+router.post('/validate', apiLimiter, userAuth, async (req, res) => {
   try {
     const { code, cartTotal } = req.body;
 
@@ -42,9 +43,32 @@ router.post('/validate', apiLimiter, async (req, res) => {
       return res.status(400).json({ error: 'This promo code has expired.' });
     }
 
-    // Check usage limit
+    // Check global usage limit
     if (promo.max_uses !== null && promo.used_count >= promo.max_uses) {
       return res.status(400).json({ error: 'This promo code has reached its usage limit.' });
+    }
+
+    // ── Per-user redemption check ────────────────────────────────────────────
+    // Resolve the authenticated user's DB UUID
+    if (req.user?.uid) {
+      const { data: dbUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('uid', req.user.uid)
+        .maybeSingle();
+
+      if (dbUser?.id) {
+        const { count } = await supabase
+          .from('promo_redemptions')
+          .select('id', { count: 'exact', head: true })
+          .eq('promo_code', normalizedCode)
+          .eq('user_id', dbUser.id);
+
+        const perUserLimit = promo.per_user_limit ?? 1; // default: 1 use per user
+        if (count >= perUserLimit) {
+          return res.status(400).json({ error: 'You have already used this promo code.' });
+        }
+      }
     }
 
     // Check minimum order value
@@ -86,18 +110,36 @@ router.post('/validate', apiLimiter, async (req, res) => {
 });
 
 // ── POST /api/promo/redeem ────────────────────────────────────────────────────
-// Called after a successful order placement to increment used_count.
-// This is fire-and-forget from the client — failure here won't block the order.
-router.post('/redeem', apiLimiter, async (req, res) => {
+// Called after a successful order placement to increment used_count
+// and record this user's redemption to prevent re-use.
+router.post('/redeem', apiLimiter, userAuth, async (req, res) => {
   try {
-    const { code } = req.body;
+    const { code, orderId } = req.body;
     if (!code) return res.status(400).json({ error: 'Code required.' });
 
     const normalizedCode = code.trim().toUpperCase();
 
-    const { error } = await supabase.rpc('increment_promo_usage', { p_code: normalizedCode });
+    // BUG B9 FIX: Validate orderId is a valid UUID before using as FK
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const safeOrderId = (orderId && uuidRegex.test(String(orderId).trim()))
+      ? String(orderId).trim()
+      : null;
 
-    if (error) {
+    // Resolve DB user ID from Firebase UID
+    let dbUserId = null;
+    if (req.user?.uid) {
+      const { data: dbUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('uid', req.user.uid)
+        .maybeSingle();
+      dbUserId = dbUser?.id || null;
+    }
+
+    // 1. Increment global used_count via RPC (with fallback)
+    const { error: rpcError } = await supabase.rpc('increment_promo_usage', { p_code: normalizedCode });
+
+    if (rpcError) {
       // Fallback: manual increment if RPC doesn't exist yet
       const { data: promo } = await supabase
         .from('promo_codes')
@@ -111,6 +153,16 @@ router.post('/redeem', apiLimiter, async (req, res) => {
           .update({ used_count: (promo.used_count || 0) + 1 })
           .eq('id', promo.id);
       }
+    }
+
+    // 2. Record per-user redemption to prevent reuse
+    if (dbUserId) {
+      await supabase.from('promo_redemptions').insert([{
+        user_id: dbUserId,
+        promo_code: normalizedCode,
+        order_id: safeOrderId,  // BUG B9: uses validated UUID only
+        redeemed_at: new Date().toISOString()
+      }]).select(); // ignore duplicate errors (if already inserted)
     }
 
     return res.status(200).json({ success: true });

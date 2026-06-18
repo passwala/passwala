@@ -859,7 +859,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
           },
           prefill: {
             name: userObj?.displayName || 'Passwala Customer',
-            email: userObj?.email || 'customer@passwala.com',
+            email: userObj?.email || '',
             contact: userObj?.phoneNumber || ''
           },
           theme: {

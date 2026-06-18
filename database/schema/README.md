@@ -1,53 +1,33 @@
-# Passwala — Database Schema Files
+# Passwalaa — Database Schema
 
-Run these files **in order** in Supabase SQL Editor.
+## 📁 Files & Run Order
 
----
+Run each file **in order** in the Supabase SQL Editor. All files are **safe to re-run** (idempotent).
 
-## 📁 `schema/` — Run in this order
+| # | File | Tables |
+|---|------|--------|
+| 1 | `01_users_buyers.sql` | `users`, `service_areas`, `addresses`, `wallet_transactions`, `notifications`, `carts`, `orders`, `order_items`, `invoices`, `payments`, `chats`, `chat_messages`, `posts`, `reports`, `ai_recommendations` |
+| 2a | `02a_vendor_shop.sql` | `vendors`, `stores`, `product_categories`, `products`, `inventory`, `deals` + **stock triggers** |
+| 2b | `02b_vendor_event_organizer.sql` | `events`, `event_ticket_tiers`, `event_bookings`, `event_organizer_requests` |
+| 2c | `02c_vendor_professional.sql` | `service_categories`, `service_providers`, `services`, `service_bookings` |
+| 3 | `03_riders.sql` | `riders`, `rider_locations`, `rider_earnings`, `delivery_tracking` |
+| 5 | `05_city_rides.sql` | `city_routes`, `city_vehicles`, `ticket_bookings` |
+| 7 | `07_promo_codes.sql` | `promo_codes`, `promo_redemptions`, `increment_promo_usage()` RPC |
+| 8 | `08_order_ratings.sql` | `order_ratings` + **auto-update store rating trigger** |
 
-| File | Side | What it creates |
-|---|---|---|
-| `01_users_buyers.sql` | 🟢 **Buyer** | `users`, `addresses`, `wallet_transactions`, `notifications`, `service_areas`, `carts`, `orders`, `order_items`, `invoices`, `payments`, `chats` |
-| `02a_vendor_shop.sql` | 🟠 **Vendor — Shop** | `vendors`, `stores`, `product_categories`, `products`, `inventory`, `deals` + stock triggers |
-| `02b_vendor_event_organizer.sql` | 🟡 **Vendor — Event** | `events`, `event_ticket_tiers` (with `booking_open`/`booking_close`), `event_bookings` |
-| `02c_vendor_professional.sql` | 🔵 **Vendor — Professional** | `service_categories`, `service_providers`, `services`, `service_bookings` |
-| `03_riders.sql` | 🔴 **Rider** | `riders`, `rider_locations`, `rider_earnings`, `delivery_tracking` + realtime |
-| `05_city_rides.sql` | 🟣 **City Rides** | `city_routes`, `city_vehicles`, `ticket_bookings` |
-| `07_community.sql` | 💬 **Community** | `posts` |
+## ⚡ Quick Run (all at once)
+Use `PASSWALA_COMPLETE_SCHEMA.sql` in the `/database` root for a single-shot full install.
 
----
+## 🏗️ Key Design Decisions
 
-## 📁 `migrations/` — Run when upgrading existing DB
-
-| File | What it does |
+| Decision | Reason |
 |---|---|
-| `add_booking_open_close.sql` | Adds `booking_open` / `booking_close` to `event_ticket_tiers` |
+| RLS enabled on all tables with `USING (true)` | Access control enforced in Express backend, not Supabase |
+| `uuid_generate_v4()` everywhere | Globally unique IDs, no sequential guessing |
+| Triggers for stock and rating | Derived data stays consistent without app-layer logic |
+| `promo_redemptions` table | Prevents one user from reusing a promo code (per_user_limit) |
+| `approval_status` on events | Admin must approve events before they go public |
+| `checked_in` + `checked_in_at` on event_bookings | QR scan at venue marks attendance idempotently |
 
----
-
-## ⚡ Quick Migration (if DB already exists)
-
-Paste this in Supabase SQL Editor once:
-
-```sql
-ALTER TABLE public.event_ticket_tiers
-    ADD COLUMN IF NOT EXISTS booking_open  TIMESTAMP WITH TIME ZONE,
-    ADD COLUMN IF NOT EXISTS booking_close TIMESTAMP WITH TIME ZONE;
-
-ALTER TABLE public.event_ticket_tiers
-    DROP COLUMN IF EXISTS booking_open_time,
-    DROP COLUMN IF EXISTS booking_close_time;
-
-NOTIFY pgrst, 'reload schema';
-```
-
----
-
-## 🗂️ Vendor Types (3 kinds)
-
-| Type | File | Role in `users` table |
-|---|---|---|
-| Retail / Shop | `02a_vendor_shop.sql` | `VENDOR` |
-| Event Organizer | `02b_vendor_event_organizer.sql` | `VENDOR` |
-| Professional / Tradesperson | `02c_vendor_professional.sql` | `SERVICE_PROVIDER` |
+## 📬 Support
+passwalaoffcial@gmail.com

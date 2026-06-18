@@ -7,5 +7,9 @@
   "freeDeliveryThreshold": 499,
   "liveSync": true,
   "ridePricePerKm": 10,
-  "upgradeAccountFee": 600
+  "shortRidePrice": 30,
+  "upgradeEventFee": 100,
+  "upgradeServiceFee": 0,
+  "upgradeRentalFee": 999,
+  "upgradeShopFee": 299
 }

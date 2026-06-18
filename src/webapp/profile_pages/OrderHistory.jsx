@@ -23,11 +23,13 @@ import { supabase } from '../../supabase';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import './ProfilePages.css';
+import { useTranslation } from '../LanguageContext';
 
 const _ = motion;
 
 const OrderHistory = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'events'
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,31 +39,57 @@ const OrderHistory = () => {
   const [cancelConfirm, setCancelConfirm] = useState(null); // { booking } | null
   const [ratingModal, setRatingModal] = useState(null);     // { order } | null
   const [ratingValue, setRatingValue] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);         // hover preview
   const [ratingComment, setRatingComment] = useState('');
   const [ratingSubmitting, setRatingSubmitting] = useState(false);
   const [ratedOrderIds, setRatedOrderIds] = useState(new Set());
+  // Ref to hold resolved user UUID for realtime filter — set on first fetchOrders
+  const currentUserIdRef = React.useRef(null);
+  // BUG B3 FIX: Use a React ref instead of window global to store event userId
+  // This avoids stale/race condition when user navigates quickly
+  const resolvedEventUserIdRef = React.useRef(null);
+  // BUG B10 FIX: Store channel in a ref for proper cleanup on unmount
+  const realtimeChannelRef = React.useRef(null);
 
   useEffect(() => {
     fetchOrders();
     fetchEventBookings();
+    loadRatedOrderIds(); // ← pre-load from DB so badges survive refresh
 
-    // ⚡ REAL-TIME: Listen for status updates on orders
-    const channel = supabase
-      .channel('buyer-order-updates')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'orders' 
-      }, (payload) => {
-        fetchOrders();
-        if (payload.new && payload.new.status === 'DELIVERED') {
-           toast.success("Your order has been delivered! Enjoy!", { icon: '🎁' });
-        }
-      })
-      .subscribe();
+    // ⚡ REAL-TIME: Listen for status updates on THIS user's orders only
+    // BUG B10 FIX: Store channel in ref so cleanup runs on actual unmount
+    const timer = setTimeout(() => {
+      const userId = currentUserIdRef.current;
+      const filterStr = userId ? `user_id=eq.${userId}` : undefined;
+
+      const channelOptions = {
+        event: '*',
+        schema: 'public',
+        table: 'orders',
+        ...(filterStr ? { filter: filterStr } : {})
+      };
+
+      const channel = supabase
+        .channel(`buyer-order-updates-${userId || 'anon'}`)
+        .on('postgres_changes', channelOptions, (payload) => {
+          fetchOrders();
+          if (payload.new && payload.new.status === 'DELIVERED') {
+            toast.success('Your order has been delivered! Enjoy!', { icon: '🎁' });
+          }
+        })
+        .subscribe();
+
+      // Store in ref for cleanup
+      realtimeChannelRef.current = channel;
+    }, 1500);
 
     return () => {
-      supabase.removeChannel(channel);
+      clearTimeout(timer);
+      // BUG B10 FIX: properly remove channel on unmount
+      if (realtimeChannelRef.current) {
+        supabase.removeChannel(realtimeChannelRef.current);
+        realtimeChannelRef.current = null;
+      }
     };
   }, []);
 
@@ -100,8 +128,8 @@ const OrderHistory = () => {
       if (error) console.warn('Event bookings query error:', error.message);
       if (!error && data) {
         setEventBookings(data);
-        // Store resolvedUserId for cancel use
-        window._resolvedEventUserId = resolvedUserId;
+        // BUG B3 FIX: Store in React ref, not window global
+        resolvedEventUserIdRef.current = resolvedUserId;
       }
     } catch (err) {
       console.warn('Failed to fetch event bookings:', err);
@@ -121,7 +149,8 @@ const OrderHistory = () => {
     if (!cancelConfirm) return;
     const { booking } = cancelConfirm;
     setCancelConfirm(null);
-    const userId = window._resolvedEventUserId;
+    // BUG B3 FIX: Read from React ref, not window global
+    const userId = resolvedEventUserIdRef.current;
     if (!userId) { toast.error('Could not verify your identity. Please refresh and try again.'); return; }
     try {
       const res = await fetch(`${BASE_URL}/api/events/cancel`, {
@@ -176,8 +205,24 @@ const OrderHistory = () => {
 
       let dbOrders = [];
       if (resolvedUserId && resolvedUserId.length === 36) {
+        // Store for realtime subscription filter
+        currentUserIdRef.current = resolvedUserId;
         const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
-        const res = await fetch(`${apiBase}/api/orders/user-history/${resolvedUserId}`);
+
+        // BUG B4 FIX: Attach Firebase auth token — userAuth middleware requires it
+        let authHeaders = { 'Content-Type': 'application/json' };
+        try {
+          const { getAuth } = await import('firebase/auth');
+          const fbAuth = getAuth();
+          if (fbAuth.currentUser) {
+            const token = await fbAuth.currentUser.getIdToken();
+            authHeaders['Authorization'] = `Bearer ${token}`;
+          }
+        } catch (_) { /* no firebase auth — WhatsApp users fall through */ }
+
+        const res = await fetch(`${apiBase}/api/orders/user-history/${resolvedUserId}`, {
+          headers: authHeaders
+        });
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         dbOrders = await res.json();
       } else {
@@ -294,28 +339,81 @@ const OrderHistory = () => {
     }
   };
 
+  /**
+   * Load order IDs already rated by this user from DB.
+   * So the ⭐ Rated badge shows even after page refresh.
+   */
+  const loadRatedOrderIds = async () => {
+    try {
+      const savedUser = JSON.parse(localStorage.getItem('passwala_user') || '{}');
+      let resolvedUserId = savedUser.id;
+
+      // Resolve UUID if needed
+      if (!resolvedUserId || resolvedUserId.length !== 36) {
+        const phoneNo = savedUser.phoneNumber?.replace('+91','') || savedUser.phone?.replace('+91','');
+        const orFilters = [];
+        if (savedUser.uid) orFilters.push(`uid.eq.${savedUser.uid}`);
+        if (savedUser.email) orFilters.push(`email.eq.${savedUser.email}`);
+        if (phoneNo) orFilters.push(`phone.eq.${phoneNo}`);
+        if (orFilters.length > 0) {
+          const { data: usr } = await supabase.from('users').select('id').or(orFilters.join(',')).maybeSingle();
+          resolvedUserId = usr?.id || null;
+        }
+      }
+
+      if (!resolvedUserId || resolvedUserId.length !== 36) return;
+
+      const { data: ratings } = await supabase
+        .from('order_ratings')
+        .select('order_id')
+        .eq('user_id', resolvedUserId);
+
+      if (ratings && ratings.length > 0) {
+        setRatedOrderIds(new Set(ratings.map(r => r.order_id)));
+      }
+    } catch (err) {
+      console.warn('[loadRatedOrderIds] Failed:', err);
+    }
+  };
+
   const submitRating = async () => {
     if (!ratingModal || ratingValue === 0) { toast.error('Please select a star rating.'); return; }
     setRatingSubmitting(true);
     try {
-      const savedUser = JSON.parse(localStorage.getItem('passwala_user') || '{}');
-      const userId = ratingModal.order.user_id || window._resolvedUserId || savedUser.id;
-      const { error } = await supabase.from('order_ratings').insert([{
-        order_id: ratingModal.order.id,
-        user_id: userId || null,
-        store_id: ratingModal.order.store_id || null,
-        rating: ratingValue,
-        comment: ratingComment.trim() || null
-      }]);
-      if (error) throw error;
+      const { auth } = await import('../../firebase');
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+      const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+
+      const res = await fetch(`${apiBase}/api/orders/rate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          orderId: ratingModal.order.id,
+          rating: ratingValue,
+          comment: ratingComment.trim() || null
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 409) {
+          toast('You already rated this order.');
+          setRatedOrderIds(prev => new Set([...prev, ratingModal.order.id]));
+          setRatingModal(null);
+        } else {
+          throw new Error(data.error || 'Failed to submit rating.');
+        }
+        return;
+      }
       setRatedOrderIds(prev => new Set([...prev, ratingModal.order.id]));
       toast.success('Thank you for your feedback! ⭐');
       setRatingModal(null);
       setRatingValue(0);
       setRatingComment('');
     } catch (err) {
-      if (err.code === '23505') { toast('You already rated this order.'); setRatedOrderIds(prev => new Set([...prev, ratingModal.order.id])); setRatingModal(null); }
-      else toast.error('Could not submit rating. Please try again.');
+      toast.error(err.message || 'Could not submit rating. Please try again.');
     } finally {
       setRatingSubmitting(false);
     }
@@ -684,7 +782,7 @@ const OrderHistory = () => {
                 transition: 'all 0.2s'
               }}
             >
-              🛍 Orders
+              🛍 {t('orders') || 'Orders'}
             </button>
             <button
               onClick={() => setActiveTab('events')}
@@ -698,7 +796,7 @@ const OrderHistory = () => {
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
               }}
             >
-              🎟 Event Tickets
+              🎟 {t('event_tickets') || 'Event Tickets'}
               {eventBookings.length > 0 && (
                 <span style={{ background: 'var(--primary, #ff6b00)', color: 'white', borderRadius: '20px', padding: '1px 8px', fontSize: '0.72rem', fontWeight: 800 }}>
                   {eventBookings.length}
@@ -1103,44 +1201,125 @@ const OrderHistory = () => {
             onClick={() => setRatingModal(null)}
           >
             <motion.div
-              initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 260, damping: 24 }}
-              style={{ background: 'white', borderRadius: '28px 28px 0 0', padding: '2rem 1.5rem 2.5rem', width: '100%', maxWidth: '480px', boxShadow: '0 -8px 40px rgba(0,0,0,0.18)' }}
+              initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 26 }}
+              style={{ background: 'white', borderRadius: '28px 28px 0 0', padding: '0', width: '100%', maxWidth: '480px', boxShadow: '0 -12px 50px rgba(0,0,0,0.22)', overflow: 'hidden' }}
               onClick={e => e.stopPropagation()}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                <h3 style={{ margin: 0, fontWeight: 800, fontSize: '1.1rem', color: '#0f172a' }}>Rate your order</h3>
-                <button onClick={() => setRatingModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={22} /></button>
-              </div>
-              <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0 0 1.25rem' }}>Order #{ratingModal.order.id?.slice(0,8)} from {ratingModal.order.stores?.name || 'Store'}</p>
-
-              {/* Star Picker */}
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '1.25rem' }}>
-                {[1,2,3,4,5].map(s => (
-                  <button key={s} onClick={() => setRatingValue(s)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', transition: 'transform 0.15s', transform: s <= ratingValue ? 'scale(1.2)' : 'scale(1)' }}>
-                    <Star size={36} fill={s <= ratingValue ? '#f59e0b' : 'none'} color={s <= ratingValue ? '#f59e0b' : '#d1d5db'} strokeWidth={1.5} />
+              {/* ── Header band */}
+              <div style={{ background: 'linear-gradient(135deg,#fff7ed,#fffbeb)', padding: '1.4rem 1.5rem 1rem', borderBottom: '1px solid #fde68a' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 4px', fontWeight: 900, fontSize: '1.15rem', color: '#0f172a' }}>{t('rate_order')} ⭐</h3>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#92400e', fontWeight: 600 }}>
+                      {t('order_no')} #{ratingModal.order.id?.slice(0,8).toUpperCase()}
+                      {ratingModal.order.stores?.name ? ` · ${ratingModal.order.stores.name}` : ''}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { setRatingModal(null); setRatingValue(0); setHoverRating(0); setRatingComment(''); }}
+                    style={{ background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', flexShrink: 0 }}
+                  >
+                    <X size={18} />
                   </button>
-                ))}
+                </div>
               </div>
-              <p style={{ textAlign: 'center', fontSize: '0.85rem', fontWeight: 700, color: ratingValue > 0 ? '#f59e0b' : '#94a3b8', marginBottom: '1rem' }}>
-                {['', 'Poor', 'Fair', 'Good', 'Very Good', 'Excellent'][ratingValue]}
-              </p>
 
-              <textarea
-                placeholder="Share your experience (optional)..."
-                value={ratingComment}
-                onChange={e => setRatingComment(e.target.value)}
-                maxLength={300}
-                rows={3}
-                style={{ width: '100%', padding: '12px', borderRadius: '14px', border: '1.5px solid #e2e8f0', fontSize: '0.88rem', resize: 'none', outline: 'none', background: '#f8fafc', boxSizing: 'border-box', marginBottom: '1.25rem' }}
-              />
-              <button
-                onClick={submitRating}
-                disabled={ratingSubmitting || ratingValue === 0}
-                style={{ width: '100%', padding: '14px', background: ratingValue === 0 ? '#e2e8f0' : 'linear-gradient(135deg,#f59e0b,#d97706)', color: ratingValue === 0 ? '#94a3b8' : 'white', border: 'none', borderRadius: '16px', fontWeight: 800, fontSize: '1rem', cursor: ratingValue === 0 || ratingSubmitting ? 'not-allowed' : 'pointer', boxShadow: ratingValue > 0 ? '0 4px 14px rgba(245,158,11,0.4)' : 'none', transition: 'all 0.2s' }}
-              >
-                {ratingSubmitting ? 'Submitting...' : 'Submit Rating'}
-              </button>
+              <div style={{ padding: '1.5rem' }}>
+                {/* ── Emoji display */}
+                <div style={{ textAlign: 'center', fontSize: '3rem', marginBottom: '0.5rem', lineHeight: 1, minHeight: '3.5rem', transition: 'all 0.2s' }}>
+                  {['😶', '😞', '😐', '🙂', '😊', '🤩'][hoverRating || ratingValue]}
+                </div>
+
+                {/* ── Star picker — hover + click */}
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '0.6rem' }}>
+                  {[1,2,3,4,5].map(s => {
+                    const isActive = s <= (hoverRating || ratingValue);
+                    return (
+                      <button
+                        key={s}
+                        onMouseEnter={() => setHoverRating(s)}
+                        onMouseLeave={() => setHoverRating(0)}
+                        onClick={() => setRatingValue(s)}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer', padding: '4px 2px',
+                          transform: s === ratingValue ? 'scale(1.35)' : isActive ? 'scale(1.15)' : 'scale(1)',
+                          transition: 'transform 0.18s cubic-bezier(0.34,1.56,0.64,1), filter 0.15s',
+                          filter: isActive ? 'drop-shadow(0 2px 6px rgba(245,158,11,0.5))' : 'none'
+                        }}
+                      >
+                        <Star
+                          size={38}
+                          fill={isActive ? '#f59e0b' : 'none'}
+                          color={isActive ? '#f59e0b' : '#d1d5db'}
+                          strokeWidth={1.8}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* ── Rating label */}
+                <p style={{ textAlign: 'center', fontSize: '0.9rem', fontWeight: 800, marginBottom: '1.25rem', minHeight: '1.4rem',
+                  color: (hoverRating || ratingValue) > 0 ? '#d97706' : '#94a3b8',
+                  transition: 'color 0.2s'
+                }}>
+                  {[
+                    hoverRating || ratingValue,
+                    ['', t('rate_terrible') !== 'rate_terrible' ? t('rate_terrible') : 'Terrible 😞', t('rate_not_good') !== 'rate_not_good' ? t('rate_not_good') : 'Not Good 😕', t('rate_okay') !== 'rate_okay' ? t('rate_okay') : 'Okay 🙂', t('rate_very_good') !== 'rate_very_good' ? t('rate_very_good') : 'Very Good 😊', t('rate_excellent') !== 'rate_excellent' ? t('rate_excellent') : 'Excellent! 🤩'][hoverRating || ratingValue]
+                  ][1]}
+                </p>
+
+                {/* ── Comment textarea */}
+                <div style={{ position: 'relative', marginBottom: '1.25rem' }}>
+                  <textarea
+                    placeholder={t('tell_us_more') !== 'tell_us_more' ? t('tell_us_more') : "Tell us more (optional)..."}
+                    value={ratingComment}
+                    onChange={e => setRatingComment(e.target.value)}
+                    maxLength={300}
+                    rows={3}
+                    style={{
+                      width: '100%', padding: '12px 14px', borderRadius: '14px',
+                      border: `1.5px solid ${ratingValue > 0 ? '#fde68a' : '#e2e8f0'}`,
+                      fontSize: '0.88rem', resize: 'none', outline: 'none',
+                      background: ratingValue > 0 ? '#fffbeb' : '#f8fafc',
+                      boxSizing: 'border-box', lineHeight: 1.5, color: '#0f172a',
+                      transition: 'border-color 0.2s, background 0.2s'
+                    }}
+                  />
+                  <span style={{ position: 'absolute', bottom: '8px', right: '12px', fontSize: '0.7rem', color: '#94a3b8' }}>
+                    {ratingComment.length}/300
+                  </span>
+                </div>
+
+                {/* ── Submit button */}
+                <motion.button
+                  onClick={submitRating}
+                  disabled={ratingSubmitting || ratingValue === 0}
+                  whileTap={{ scale: ratingValue > 0 ? 0.97 : 1 }}
+                  style={{
+                    width: '100%', padding: '14px',
+                    background: ratingValue === 0
+                      ? '#e2e8f0'
+                      : `linear-gradient(135deg, ${{ 1:'#ef4444', 2:'#f97316', 3:'#eab308', 4:'#22c55e', 5:'#f59e0b' }[ratingValue]}, ${{ 1:'#dc2626', 2:'#ea580c', 3:'#ca8a04', 4:'#16a34a', 5:'#d97706' }[ratingValue]})`,
+                    color: ratingValue === 0 ? '#94a3b8' : 'white',
+                    border: 'none', borderRadius: '16px', fontWeight: 900, fontSize: '1rem',
+                    cursor: ratingValue === 0 || ratingSubmitting ? 'not-allowed' : 'pointer',
+                    boxShadow: ratingValue > 0 ? '0 6px 20px rgba(245,158,11,0.35)' : 'none',
+                    transition: 'all 0.25s'
+                  }}
+                >
+                  {ratingSubmitting
+                    ? (t('submitting') !== 'submitting' ? t('submitting') : '⏳ Submitting...')
+                    : ratingValue === 0
+                      ? (t('select_rating_above') !== 'select_rating_above' ? t('select_rating_above') : 'Select a rating above')
+                      : (t('submit_n_star_rating') !== 'submit_n_star_rating' ? t('submit_n_star_rating').replace('{stars}', ['', '1 ★', '2 ★★', '3 ★★★', '4 ★★★★', '5 ★★★★★'][ratingValue]) : `Submit ${['','1 ★','2 ★★','3 ★★★','4 ★★★★','5 ★★★★★'][ratingValue]} Rating`)}
+                </motion.button>
+
+                <p style={{ textAlign: 'center', fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.75rem' }}>
+                  {t('feedback_direct_store') !== 'feedback_direct_store' ? t('feedback_direct_store') : 'Your feedback goes directly to the store'}
+                </p>
+              </div>
             </motion.div>
           </motion.div>
         )}

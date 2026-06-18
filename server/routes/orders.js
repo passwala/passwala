@@ -478,4 +478,79 @@ router.get('/user-history/:userId', userAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/orders/rate
+ * Submit a 1-5 star rating for a delivered order.
+ * Requires auth. Validates ownership. Prevents duplicate ratings.
+ */
+router.post('/rate', userAuth, async (req, res) => {
+  const { orderId, rating, comment } = req.body;
+
+  if (!orderId || !rating) {
+    return res.status(400).json({ error: 'orderId and rating are required.' });
+  }
+  const ratingNum = parseInt(rating);
+  if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+    return res.status(400).json({ error: 'Rating must be between 1 and 5.' });
+  }
+
+  try {
+    // Resolve DB user ID from Firebase UID
+    let dbUserId = null;
+    if (req.user?.uid) {
+      const { data: dbUser } = await supabase
+        .from('users').select('id').eq('uid', req.user.uid).maybeSingle();
+      dbUserId = dbUser?.id || null;
+    }
+    if (!dbUserId) {
+      return res.status(401).json({ error: 'Could not resolve your account. Please log in again.' });
+    }
+
+    // Verify the order exists and belongs to this user
+    const { data: order, error: orderErr } = await supabase
+      .from('orders')
+      .select('id, user_id, store_id, status')
+      .eq('id', orderId)
+      .maybeSingle();
+
+    if (orderErr || !order) {
+      return res.status(404).json({ error: 'Order not found.' });
+    }
+    if (order.user_id !== dbUserId) {
+      return res.status(403).json({ error: 'You can only rate your own orders.' });
+    }
+    if (!['DELIVERED', 'COMPLETED'].includes(order.status)) {
+      return res.status(400).json({ error: 'You can only rate delivered orders.' });
+    }
+
+    // Check if already rated
+    const { data: existing } = await supabase
+      .from('order_ratings')
+      .select('id')
+      .eq('order_id', orderId)
+      .eq('user_id', dbUserId)
+      .maybeSingle();
+
+    if (existing) {
+      return res.status(409).json({ error: 'You have already rated this order.' });
+    }
+
+    // Insert rating
+    const { error: insertErr } = await supabase.from('order_ratings').insert([{
+      order_id: orderId,
+      user_id: dbUserId,
+      store_id: order.store_id || null,
+      rating: ratingNum,
+      comment: comment?.trim() || null
+    }]);
+
+    if (insertErr) throw insertErr;
+
+    res.status(201).json({ success: true, message: 'Rating submitted. Thank you!' });
+  } catch (err) {
+    console.error('❌ Rating submit error:', err.message);
+    res.status(500).json({ error: 'Failed to submit rating. Please try again.' });
+  }
+});
+
 export default router;

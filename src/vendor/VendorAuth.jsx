@@ -183,6 +183,13 @@ const VendorAuth = ({ onLogin }) => {
                   )}
                 </button>
               </div>
+
+              <div className="policy-agreement-text" style={{ marginTop: '1.25rem', fontSize: '0.72rem', color: '#64748b', textAlign: 'center', lineHeight: '1.4' }}>
+                By continuing, you agree to our{' '}
+                <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#ff7622', fontWeight: '600', textDecoration: 'underline' }}>Terms of Service</a>
+                {' '}and{' '}
+                <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" style={{ color: '#ff7622', fontWeight: '600', textDecoration: 'underline' }}>Privacy Policy</a>.
+              </div>
             </form>
           ) : (
             /* OTP Verification Form */

@@ -466,7 +466,13 @@ const NearShops = ({ location, userCoords }) => {
                               )}
                             </div>
                             <div className="shop-card-meta">
-                              <span className="shop-category-near">{t((shop.category || 'general').toLowerCase().replace(' & ', '_'))}</span>
+                              <span className="shop-category-near">
+                                {(() => {
+                                  const key = (shop.category || 'general').toLowerCase().replace(' & ', '_');
+                                  const trans = t(key);
+                                  return trans === key ? (shop.category || 'General Store') : trans;
+                                })()}
+                              </span>
                               {shop.type !== 'SERVICES' && (
                                 <span className="shop-distance-near">
                                   <Navigation size={12} />

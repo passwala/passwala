@@ -16,9 +16,11 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import './ProfilePages.css';
 import { supabase } from '../../supabase';
+import { useTranslation } from '../LanguageContext';
 
 const Wallet = ({ user }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -132,7 +134,7 @@ const Wallet = ({ user }) => {
               <ShieldCheck size={24} color="rgba(255,255,255,0.7)" />
            </div>
            <div className="wallet-balance-info">
-              <span>AVAILABLE BALANCE</span>
+              <span>{t('wallet_balance_title')}</span>
               <h2>₹{balance.toFixed(2)}</h2>
            </div>
            <div className="wallet-card-bottom">
@@ -144,21 +146,21 @@ const Wallet = ({ user }) => {
         <div className="wallet-actions-row">
            <button className="wallet-action-btn" onClick={handleAddBalance}>
               <div className="action-icon add"><Plus size={24} /></div>
-              <span>Add Money</span>
+              <span>{t('add_money')}</span>
            </button>
            <button className="wallet-action-btn" onClick={() => toast('Transfer money functionality is under audit.')}>
               <div className="action-icon send"><CreditCard size={24} /></div>
-              <span>Send Money</span>
+              <span>{t('send_money')}</span>
            </button>
            <button className="wallet-action-btn" onClick={() => toast.success('50 Heroes Points Earned Today!')}>
               <div className="action-icon rewards"><Award size={24} /></div>
-              <span>Rewards</span>
+              <span>{t('rewards')}</span>
            </button>
         </div>
 
         <div className="section-header-compact">
-           <h3>RECENT TRANSACTIONS</h3>
-           <button className="view-all-link">SEE ALL</button>
+           <h3>{t('recent_transactions')}</h3>
+           <button className="view-all-link">{t('see_all')}</button>
         </div>
 
         <div className="transaction-list">
@@ -166,40 +168,40 @@ const Wallet = ({ user }) => {
              <div style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>No transactions yet</div>
            )}
            {transactions.map((tx, idx) => {
-             const typeStr = tx.type || (tx.amount < 0 ? 'DEBIT' : 'CREDIT');
-             const displayDate = tx.created_at ? new Date(tx.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : (tx.date || 'Today');
-             return (
-               <div key={tx.id || idx} className="transaction-item glass card-hover">
-                  <div className="tx-left">
-                     <div className={`tx-icon-box ${typeStr.toLowerCase()}`}>
-                        {typeStr === 'DEBIT' ? <TrendingDown size={18} /> : <TrendingUp size={18} />}
-                     </div>
-                     <div className="tx-text">
-                        <strong>{tx.title || tx.description || 'Wallet Transaction'}</strong>
-                        <span>{displayDate} • {tx.status || 'COMPLETED'}</span>
-                     </div>
-                  </div>
-                  <div className={`tx-amount ${typeStr.toLowerCase()}`}>
-                     {typeStr === 'DEBIT' ? '-' : '+'}₹{Math.abs(tx.amount || 0).toFixed(2)}
-                  </div>
-               </div>
-             );
+              const typeStr = tx.type || (tx.amount < 0 ? 'DEBIT' : 'CREDIT');
+              const displayDate = tx.created_at ? new Date(tx.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : (tx.date || 'Today');
+              return (
+                <div key={tx.id || idx} className="transaction-item glass card-hover">
+                   <div className="tx-left">
+                      <div className={`tx-icon-box ${typeStr.toLowerCase()}`}>
+                         {typeStr === 'DEBIT' ? <TrendingDown size={18} /> : <TrendingUp size={18} />}
+                      </div>
+                      <div className="tx-text">
+                         <strong>{tx.title || tx.description || 'Wallet Transaction'}</strong>
+                         <span>{displayDate} • {tx.status || 'COMPLETED'}</span>
+                      </div>
+                   </div>
+                   <div className={`tx-amount ${typeStr.toLowerCase()}`}>
+                      {typeStr === 'DEBIT' ? '-' : '+'}₹{Math.abs(tx.amount || 0).toFixed(2)}
+                   </div>
+                </div>
+              );
            })}
         </div>
 
         <div className="wallet-security-banner glass" style={{ marginBottom: '1rem', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
            <Award size={24} color="#f59e0b" />
            <div className="security-text">
-              <strong style={{ color: '#f59e0b' }}>Passwala Wallet Beta (RBI Sandbox)</strong>
-              <p>Peer wallet balances and transaction features are currently running in mock/demo mode undergoing sandbox regulatory audits.</p>
+              <strong style={{ color: '#f59e0b' }}>{t('rbi_sandbox_title')}</strong>
+              <p>{t('rbi_sandbox_desc')}</p>
            </div>
         </div>
 
         <div className="wallet-security-banner glass">
            <ShieldCheck size={24} color="var(--primary)" />
            <div className="security-text">
-              <strong>Bank-Grade Encryption</strong>
-              <p>Your transactions are 100% secure with Passwala Trust Shield.</p>
+              <strong>{t('bank_grade_encryption')}</strong>
+              <p>{t('bank_grade_encryption_sub')}</p>
            </div>
         </div>
       </main>

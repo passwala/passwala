@@ -585,6 +585,13 @@ const Auth = ({ onLogin }) => {
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
                 Login via WhatsApp
               </button>
+
+              <div className="policy-agreement-text" style={{ marginTop: '1.25rem', fontSize: '0.75rem', color: '#718096', textAlign: 'center', lineHeight: '1.4' }}>
+                By continuing, you agree to our{' '}
+                <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--auth-action-color)', fontWeight: '600', textDecoration: 'underline' }}>Terms of Service</a>
+                {' '}and{' '}
+                <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--auth-action-color)', fontWeight: '600', textDecoration: 'underline' }}>Privacy Policy</a>.
+              </div>
             </>
           ) : step === 'OTP' ? (
             <>

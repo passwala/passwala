@@ -5,6 +5,8 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import os from 'os';
+import fs from 'fs/promises';
+import path from 'path';
 import userRoutes from './routes/users.js';
 import vendorRoutes from './routes/vendor.js';
 import adminRoutes from './routes/admin.js';
@@ -121,6 +123,38 @@ app.get('/health', async (req, res) => {
 // Admin routes use a dedicated limiter (200 req/min — dashboard makes ~11 parallel fetches on mount)
 app.use('/api/admin', adminLimiter, adminRoutes);
 
+// PUBLIC: Platform settings (non-sensitive fields only — fees, delivery config, ride pricing)
+// Used by VendorPortal, ride booking, etc. — no auth required
+app.get('/api/platform-settings', async (req, res) => {
+  const settingsPath = process.cwd().endsWith('server')
+    ? path.join(process.cwd(), 'platform_settings.json')
+    : path.join(process.cwd(), 'server', 'platform_settings.json');
+
+  const defaults = {
+    maxDeliveryRange: 10,
+    baseDeliveryFee: 30,
+    freeDeliveryThreshold: 499,
+    ridePricePerKm: 8,
+    shortRidePrice: 30,
+    upgradeEventFee: 999,
+    upgradeServiceFee: 999,
+    upgradeRentalFee: 999,
+    upgradeShopFee: 999
+  };
+
+  try {
+    const fileData = await fs.readFile(settingsPath, 'utf8');
+    const saved = JSON.parse(fileData);
+    // Only expose public/non-sensitive keys
+    const publicSettings = { ...defaults };
+    const publicKeys = Object.keys(defaults);
+    publicKeys.forEach(k => { if (saved[k] !== undefined) publicSettings[k] = saved[k]; });
+    res.json({ success: true, settings: publicSettings });
+  } catch {
+    res.json({ success: true, settings: defaults });
+  }
+});
+
 // Apply Global Rate Limiting to all other /api endpoints
 app.use('/api', apiLimiter);
 
@@ -233,6 +267,116 @@ app.post('/api/log-error', (req, res) => {
     });
   }
   res.status(204).end(); // No Content — fire-and-forget
+});
+
+// ─── WhatsApp QR Connect Page ───────────────────────────────────────────────
+// Open http://localhost:3004/whatsapp-connect in your browser, scan the QR
+// with your WhatsApp (Linked Devices) ONCE — then all OTPs will work.
+app.get('/whatsapp-connect', async (req, res) => {
+  const EVOLUTION_URL = (process.env.EVOLUTION_API_URL || '').replace(/\/+$/, '');
+  const INSTANCE     = process.env.EVOLUTION_INSTANCE || 'Keval';
+  const API_KEY      = process.env.EVOLUTION_API_KEY  || '';
+
+  if (!EVOLUTION_URL || !API_KEY) {
+    return res.status(500).send('<h2>EVOLUTION_API_URL or EVOLUTION_API_KEY not set in .env</h2>');
+  }
+
+  // Get current state
+  let state = 'unknown';
+  let qrBase64 = null;
+  let statusMsg = '';
+
+  try {
+    const stateRes = await fetch(`${EVOLUTION_URL}/instance/connectionState/${INSTANCE}`, {
+      headers: { apikey: API_KEY }
+    });
+    const stateData = await stateRes.json();
+    state = stateData?.instance?.state || 'unknown';
+  } catch (e) {
+    statusMsg = `Connection state check failed: ${e.message}`;
+  }
+
+  if (state === 'open') {
+    // Already connected — show success
+    return res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>WhatsApp Connected</title>
+    <style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#f0fdf4;margin:0;}
+    .box{background:white;padding:3rem;border-radius:16px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.1);}
+    h2{color:#16a34a;} p{color:#555;}</style></head><body>
+    <div class="box"><div style="font-size:4rem">✅</div><h2>WhatsApp Connected!</h2>
+    <p>Instance <strong>${INSTANCE}</strong> is active and sending messages.</p>
+    <p style="color:#888;font-size:.85rem">State: <strong>open</strong></p></div></body></html>`);
+  }
+
+  // Get QR code
+  try {
+    const qrRes = await fetch(`${EVOLUTION_URL}/instance/connect/${INSTANCE}`, {
+      headers: { apikey: API_KEY }
+    });
+    const qrData = await qrRes.json();
+    if (qrData?.base64) {
+      qrBase64 = qrData.base64.startsWith('data:') ? qrData.base64 : `data:image/png;base64,${qrData.base64}`;
+    } else {
+      statusMsg = `QR fetch response: ${JSON.stringify(qrData)}`;
+    }
+  } catch (e) {
+    statusMsg = `QR fetch failed: ${e.message}`;
+  }
+
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="refresh" content="20">
+  <title>Passwala — WhatsApp Connect</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           background: linear-gradient(135deg,#0f172a,#1e293b); min-height: 100vh;
+           display: flex; align-items: center; justify-content: center; padding: 2rem; }
+    .card { background: white; border-radius: 20px; padding: 2.5rem;
+            max-width: 420px; width: 100%; text-align: center;
+            box-shadow: 0 25px 60px rgba(0,0,0,.4); }
+    .logo { width: 72px; height: 72px; border-radius: 16px; margin: 0 auto 1.5rem; }
+    h1 { font-size: 1.4rem; color: #0f172a; margin-bottom: .5rem; }
+    p  { color: #64748b; font-size: .9rem; line-height: 1.5; margin-bottom: 1.5rem; }
+    .qr-wrapper { background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 16px;
+                  padding: 1rem; margin-bottom: 1.5rem; }
+    .qr-wrapper img { width: 100%; max-width: 280px; border-radius: 8px; }
+    .state-badge { display: inline-block; background: #fef3c7; color: #92400e;
+                   font-size: .75rem; font-weight: 700; padding: 4px 12px;
+                   border-radius: 100px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 1.25rem; }
+    .steps { text-align: left; background: #f8fafc; border-radius: 12px;
+             padding: 1rem 1.25rem; font-size: .85rem; color: #475569; line-height: 1.8; }
+    .steps strong { color: #0f172a; }
+    .refresh-note { margin-top: 1rem; color: #94a3b8; font-size: .78rem; }
+    .err { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;
+           padding: .75rem; color: #dc2626; font-size: .8rem; margin-bottom: 1rem; word-break: break-word; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="/logo.png" alt="Passwala" class="logo" onerror="this.style.display='none'" />
+    <h1>Connect WhatsApp</h1>
+    <p>Scan this QR code once using <strong>WhatsApp → Linked Devices → Link a Device</strong>.<br>
+       After scanning, real-time OTPs will be delivered instantly.</p>
+    <span class="state-badge">Status: ${state}</span>
+    ${statusMsg ? `<div class="err">${statusMsg}</div>` : ''}
+    ${qrBase64
+      ? `<div class="qr-wrapper"><img src="${qrBase64}" alt="WhatsApp QR Code" /></div>`
+      : `<div class="err">Could not load QR code. Instance: <strong>${INSTANCE}</strong> at ${EVOLUTION_URL}</div>`
+    }
+    <div class="steps">
+      <strong>Steps to connect:</strong><br>
+      1. Open WhatsApp on your phone<br>
+      2. Tap ⋮ Menu → <strong>Linked Devices</strong><br>
+      3. Tap <strong>Link a Device</strong><br>
+      4. Point camera at QR code above<br>
+      5. This page auto-refreshes every 20s
+    </div>
+    <p class="refresh-note">⟳ Auto-refreshing every 20 seconds &nbsp;·&nbsp; Instance: <strong>${INSTANCE}</strong></p>
+  </div>
+</body>
+</html>`);
 });
 
 // 404 Handler
