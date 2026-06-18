@@ -6,5 +6,6 @@
   "baseDeliveryFee": 30,
   "freeDeliveryThreshold": 499,
   "liveSync": true,
-  "ridePricePerKm": 10
+  "ridePricePerKm": 10,
+  "upgradeAccountFee": 600
 }
