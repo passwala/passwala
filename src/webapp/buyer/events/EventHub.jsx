@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Calendar, History, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Calendar, History, Clock, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../../supabase';
 import './EventHub.css';
@@ -89,8 +89,7 @@ const EventHub = () => {
     return () => { supabase.removeChannel(channel); clearInterval(refreshRef.current); };
   }, []); // empty deps: channel created once, never torn down on filter change
 
-  const formatShortDate = (d) =>
-    new Date(d).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+
 
   // Fix #11: Pagination computed from server total, not client array length
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -194,38 +193,71 @@ const EventHub = () => {
                 >
                   {/* Poster */}
                   <div className="eh-card-img-wrap">
-                    <img
-                      src={event.banner_url || FALLBACK_IMG}
-                      alt={event.title}
-                      className="eh-card-img"
-                      onError={(e) => {
-                        e.currentTarget.onerror = null;
-                        e.currentTarget.src = FALLBACK_IMG;
-                      }}
-                    />
-                    <div className="eh-date-badge">{formatShortDate(event.event_date)}</div>
+                    {(() => {
+                      let cardImg = event.banner_url || FALLBACK_IMG;
+                      if (typeof cardImg === 'string' && cardImg.startsWith('[')) {
+                        try {
+                          const parsed = JSON.parse(cardImg);
+                          if (Array.isArray(parsed) && parsed.length > 0) {
+                            cardImg = parsed[0];
+                          }
+                        } catch (_) { /* ignore */ }
+                      }
+                      return (
+                        <img
+                          src={cardImg}
+                          alt={event.title}
+                          className="eh-card-img"
+                          loading="lazy"
+                          decoding="async"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = FALLBACK_IMG;
+                          }}
+                        />
+                      );
+                    })()}
+                    <div className="eh-date-badge">
+                      <span className="eh-date-day">{new Date(event.event_date).getDate()}</span>
+                      <span className="eh-date-month">{new Date(event.event_date).toLocaleString('en-IN', { month: 'short' }).toUpperCase()}</span>
+                    </div>
                     {isSoldOut && <div className="eh-soldout-ribbon">SOLD OUT</div>}
                     {timeFilter === 'past' && <div className="eh-past-badge"><Clock size={10} /> PAST</div>}
                   </div>
 
                   {/* Info */}
                   <div className="eh-card-info">
+                    {categoryLabel && <span className="eh-card-category">{categoryLabel}</span>}
                     <h3 className="eh-card-title">{event.title}</h3>
                     <p className="eh-card-venue">
-                      {event.venue_name}{event.city ? `, ${event.city}` : ''}
+                      <MapPin size={12} style={{ marginRight: '4px', flexShrink: 0 }} />
+                      <span>{event.venue_name}{event.city ? `, ${event.city}` : ''}</span>
                     </p>
-                    {categoryLabel && <p className="eh-card-category">{categoryLabel}</p>}
-                    {minPrice !== null && (
-                      <p className="eh-card-price">₹{minPrice} onwards</p>
-                    )}
-                    {!isSoldOut && totalCap > 0 && (
-                      <div className="eh-avail-bar">
-                        <div
-                          className="eh-avail-fill"
-                          style={{ width: `${pct}%`, background: pct < 20 ? '#f59e0b' : '#22c55e' }}
-                        />
+                    
+                    <div style={{ marginTop: 'auto', paddingTop: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        {minPrice !== null ? (
+                          <span className="eh-card-price">₹{minPrice}<span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b', marginLeft: '2px' }}>onwards</span></span>
+                        ) : (
+                          <span className="eh-card-price" style={{ color: '#16a34a' }}>Free</span>
+                        )}
+                        
+                        {!isSoldOut && totalCap > 0 && (
+                          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: pct < 20 ? '#ef4444' : '#16a34a' }}>
+                            {pct < 20 ? `Only ${totalSeats} left!` : `${totalSeats} available`}
+                          </span>
+                        )}
                       </div>
-                    )}
+                      
+                      {!isSoldOut && totalCap > 0 && (
+                        <div className="eh-avail-bar">
+                          <div
+                            className="eh-avail-fill"
+                            style={{ width: `${pct}%`, background: pct < 20 ? '#ef4444' : '#22c55e' }}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

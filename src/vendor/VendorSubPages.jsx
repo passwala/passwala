@@ -10,6 +10,51 @@ import { getOSRMRoute } from '../utils/dijkstra';
 import { AHMEDABAD_AREA_COORDS } from '../utils/constants';
 import jsQR from 'jsqr';
 
+const safeSetLocalStorage = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    console.warn(`localStorage setItem failed for key "${key}":`, e);
+    if (e.name === 'QuotaExceededError' || e.code === 22 || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+      try {
+        localStorage.removeItem('vProfileImage');
+        localStorage.setItem(key, value);
+      } catch (retryErr) {
+        console.error("Retry setItem failed after clearing profile image:", retryErr);
+      }
+    }
+  }
+};
+
+// ── Upload image to Supabase Storage and return public URL ───────────────────
+// Converts base64 dataURL → Blob → uploads to 'event-images' bucket
+// Falls back to original dataURL if upload fails (e.g. bucket not yet created)
+const uploadImageToSupabase = async (dataUrl, folder = 'events') => {
+  if (!dataUrl || !dataUrl.startsWith('data:image')) return dataUrl;
+  try {
+    // Convert base64 to Blob
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    const ext = blob.type.split('/')[1] || 'jpg';
+    const fileName = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+
+    const { data, error } = await supabase.storage
+      .from('event-images')
+      .upload(fileName, blob, { contentType: blob.type, upsert: false });
+
+    if (error) {
+      console.warn('Supabase Storage upload failed, keeping dataURL:', error.message);
+      return dataUrl; // fallback: keep original
+    }
+
+    const { data: urlData } = supabase.storage.from('event-images').getPublicUrl(data.path);
+    return urlData?.publicUrl || dataUrl;
+  } catch (err) {
+    console.warn('Image upload error:', err);
+    return dataUrl; // fallback: keep original
+  }
+};
+
 // ── QR Scanner Modal (camera-based) ─────────────────────────────────────────
 const QRScannerModal = ({ isOpen, onClose, onScan }) => {
   const videoRef = React.useRef(null);
@@ -402,6 +447,9 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
     booking_start: '',
     booking_end: '',
     show_type: 'single',
+    duration: '',
+    age_restriction: '',
+    language: '',
     schedule_slots: [
       { id: Date.now(), date: '', starts: '19:00', ends: '22:00', venue_name: '' }
     ],
@@ -419,12 +467,31 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
     type: 'danger'
   });
 
+  const eventImages = React.useMemo(() => {
+    const raw = newItem.image || '';
+    if (typeof raw === 'string' && raw.startsWith('[')) {
+      try {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) return arr;
+      } catch (_) { /* ignore */ }
+    }
+    return raw ? [raw] : [];
+  }, [newItem.image]);
+
+  const handleAddEventImage = (dataUrl) => {
+    if (!dataUrl) return;
+    const nextList = [...eventImages, dataUrl];
+    const serialized = JSON.stringify(nextList);
+    setNewItem(prev => ({ ...prev, image: serialized }));
+  };
+
+  const handleRemoveEventImage = (index) => {
+    const nextList = eventImages.filter((_, idx) => idx !== index);
+    const serialized = nextList.length > 1 ? JSON.stringify(nextList) : (nextList[0] || null);
+    setNewItem(prev => ({ ...prev, image: serialized }));
+  };
+
   // Compute minimum allowed datetime string (now, in local timezone, YYYY-MM-DDTHH:MM format)
-  const nowMin = React.useMemo(() => {
-    const d = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  }, [showForm]);
 
   React.useEffect(() => {
     const fetchCatalog = async () => {
@@ -495,7 +562,10 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                 booking_start: item.booking_start,
                 booking_end: item.booking_end,
                 venue_name: item.venue_name,
-                event_date: item.event_date ? new Date(item.event_date).toISOString().slice(0, 16) : ''
+                event_date: item.event_date ? new Date(item.event_date).toISOString().slice(0, 16) : '',
+                duration: item.duration || '',
+                age_restriction: item.age_restriction || '',
+                language: item.language || ''
               });
             }
             dbItems = mapped;
@@ -514,17 +584,50 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
         finalItems = localStored;
       }
 
-      const unique = [];
-      const seen = new Set();
-      finalItems.forEach(item => {
-        const nameKey = (item.name || '').toLowerCase().trim();
-        if (nameKey && !seen.has(nameKey)) {
-          seen.add(nameKey);
-          unique.push(item);
-        }
-      });
-
-      setItems(unique);
+      // For events: group multiple shows with the same title into one catalog card.
+      // Each group keeps the first event's id (used for editing, which loads all siblings),
+      // but stores showCount so the card can display "X shows".
+      // For non-events: deduplicate by ID only.
+      if (businessType === 'event') {
+        const grouped = [];
+        const groupMap = {}; // titleKey -> index in grouped
+        finalItems.forEach(item => {
+          if (item.show_type === 'multiple' || item.show_type === 'festival') {
+            const titleKey = (item.name || '').toLowerCase().trim();
+            if (titleKey && groupMap[titleKey] !== undefined) {
+              const existing = grouped[groupMap[titleKey]];
+              existing.showCount = (existing.showCount || 1) + 1;
+              existing.showsList = existing.showsList || [
+                { id: existing.id, event_date: existing.event_date, venue_name: existing.venue_name, available_seats: existing.available_seats, total_seats: existing.total_seats }
+              ];
+              existing.showsList.push({ id: item.id, event_date: item.event_date, venue_name: item.venue_name, available_seats: item.available_seats, total_seats: item.total_seats });
+              existing.total_seats = (existing.total_seats || 0) + (item.total_seats || 0);
+              existing.available_seats = (existing.available_seats || 0) + (item.available_seats || 0);
+              if (item.price !== undefined && (existing.price === undefined || item.price < existing.price)) {
+                existing.price = item.price;
+              }
+            } else {
+              const entry = { ...item, showCount: 1, showsList: [{ id: item.id, event_date: item.event_date, venue_name: item.venue_name, available_seats: item.available_seats, total_seats: item.total_seats }] };
+              groupMap[titleKey] = grouped.length;
+              grouped.push(entry);
+            }
+          } else {
+            grouped.push({ ...item, showCount: 1 });
+          }
+        });
+        setItems(grouped);
+      } else {
+        // For shops/services: deduplicate by ID
+        const seen = new Set();
+        const unique = [];
+        finalItems.forEach(item => {
+          if (!seen.has(item.id)) {
+            seen.add(item.id);
+            unique.push(item);
+          }
+        });
+        setItems(unique);
+      }
       loadedBusinessTypeRef.current = businessType;
     };
     
@@ -552,13 +655,16 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
       return;
     }
     const cleanItems = items.filter(i => !i.id.toString().startsWith('d') && !i.id.toString().startsWith('s'));
-    localStorage.setItem('vVendorItems_' + businessType, JSON.stringify(cleanItems));
+    safeSetLocalStorage('vVendorItems_' + businessType, JSON.stringify(cleanItems));
   }, [items, businessType]);
 
   const handleAdd = async (e) => {
     e.preventDefault();
     setIsSaving(true);
     try {
+      // Clean large base64 images to prevent Supabase database insert timeouts
+      // Images are now uploaded to Supabase Storage before this point — no base64 cleanup needed.
+      // If image is still a blob: URL (upload pending), keep it as-is.
 
     if (businessType === 'event') {
       const validTiers = (newItem.ticket_tiers || []).filter(t => t.price);
@@ -616,56 +722,156 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
               barcode_type: newItem.barcode_type || 'EAN-13',
               stock_quantity: parseInt(newItem.stock_quantity) || 0
             };
+            const { error } = await supabase.from(targetTable).update(updatePayload).eq('id', editingId);
+            if (error) throw error;
           } else if (businessType === 'event') {
-            updatePayload = {
-              title: newItem.name,
-              description: newItem.detail || 'Updated Manually',
-              category: newItem.category || 'Music & Concerts',
-              venue_name: newItem.venue_name || 'Ahmedabad Venue',
-              event_date: newItem.event_date ? new Date(newItem.event_date).toISOString() : new Date().toISOString(),
-              banner_url: newItem.image,
-              booking_start: newItem.booking_start ? new Date(newItem.booking_start).toISOString() : null,
-              booking_end: newItem.booking_end ? new Date(newItem.booking_end).toISOString() : null
-            };
-            // Also update the event_ticket_tiers dynamically matching tier_name
-            const { data: existingTiers } = await supabase.from('event_ticket_tiers').select('id, tier_name').eq('event_id', editingId);
-            const existingMap = {};
-            if (existingTiers) {
-              existingTiers.forEach(t => {
-                existingMap[t.tier_name] = t.id;
-              });
-            }
-
-            const currentTierNames = [];
-            for (const t of (newItem.ticket_tiers || [])) {
-              currentTierNames.push(t.tier_name);
-              const tierPayload = {
-                event_id: editingId,
-                tier_name: t.tier_name,
-                price: parseFloat(t.price) || 0,
-                total_seats: parseInt(t.total_seats) || 100,
-                available_seats: parseInt(t.total_seats) || 100,
-                booking_open:  t.booking_open  ? new Date(t.booking_open).toISOString()  : null,
-                booking_close: t.booking_close ? new Date(t.booking_close).toISOString() : null
-              };
-
-              const existingId = existingMap[t.tier_name];
-              if (existingId) {
-                const { data: dbTier } = await supabase.from('event_ticket_tiers').select('total_seats, available_seats').eq('id', existingId).maybeSingle();
-                if (dbTier) {
-                  const soldSeats = Math.max(0, dbTier.total_seats - dbTier.available_seats);
-                  tierPayload.available_seats = Math.max(0, parseInt(t.total_seats) - soldSeats);
+            if (newItem.show_type === 'multiple' || newItem.show_type === 'festival') {
+              const { data: originalEvent } = await supabase.from('events').select('title, category, created_by, show_type').eq('id', editingId).maybeSingle();
+              if (originalEvent) {
+                const { data: existingSiblings } = await supabase
+                  .from('events')
+                  .select('id')
+                  .eq('title', originalEvent.title)
+                  .eq('category', originalEvent.category)
+                  .eq('created_by', originalEvent.created_by);
+                
+                const existingIds = existingSiblings ? existingSiblings.map(s => s.id) : [];
+                const currentSlotIds = newItem.schedule_slots ? newItem.schedule_slots.map(s => s.id).filter(id => id && !String(id).startsWith('temp_') && !String(id).startsWith('item-')) : [];
+                
+                // 1. Delete slots that were removed by the vendor
+                const toDelete = existingIds.filter(id => !currentSlotIds.includes(id));
+                if (toDelete.length > 0) {
+                  await supabase.from('events').delete().in('id', toDelete);
                 }
-                await supabase.from('event_ticket_tiers').update(tierPayload).eq('id', existingId);
-              } else {
-                await supabase.from('event_ticket_tiers').insert([tierPayload]);
-              }
-            }
 
-            if (existingTiers) {
-              const toDelete = existingTiers.filter(t => !currentTierNames.includes(t.tier_name));
-              for (const t of toDelete) {
-                await supabase.from('event_ticket_tiers').delete().eq('id', t.id);
+                // 2. Insert or update the shows
+                for (const slot of (newItem.schedule_slots || [])) {
+                  const slotPayload = {
+                    title: newItem.name,
+                    description: newItem.detail || 'Updated Manually',
+                    category: newItem.category || 'Music & Concerts',
+                    venue_name: slot.venue_name || 'Ahmedabad Venue',
+                    venue_lat: 23.0225,
+                    venue_lng: 72.5714,
+                    event_date: slot.date ? new Date(`${slot.date}T${slot.starts || '19:00'}:00`).toISOString() : new Date().toISOString(),
+                    ends_at: slot.date ? new Date(`${slot.date}T${slot.ends || '22:00'}:00`).toISOString() : new Date().toISOString(),
+                    banner_url: newItem.image || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=400&q=80',
+                    booking_start: newItem.booking_start ? new Date(newItem.booking_start).toISOString() : null,
+                    booking_end: newItem.booking_end ? new Date(newItem.booking_end).toISOString() : null,
+                    show_type: newItem.show_type,
+                    visibility: newItem.visibility || 'public',
+                    is_online: !!newItem.is_online,
+                    created_by: originalEvent.created_by,
+                    status: 'PENDING_APPROVAL',
+                    duration: newItem.duration || null,
+                    age_restriction: newItem.age_restriction || null,
+                    language: newItem.language || null
+                  };
+
+                  let targetEventId = slot.id;
+                  if (slot.id && !String(slot.id).startsWith('temp_') && !String(slot.id).startsWith('item-')) {
+                    await supabase.from('events').update(slotPayload).eq('id', slot.id);
+                  } else {
+                    const { data: newEvt } = await supabase.from('events').insert([slotPayload]).select().single();
+                    if (newEvt) targetEventId = newEvt.id;
+                  }
+
+                  if (targetEventId) {
+                    const { data: existingTiers } = await supabase.from('event_ticket_tiers').select('id, tier_name').eq('event_id', targetEventId);
+                    const existingMap = {};
+                    if (existingTiers) {
+                      existingTiers.forEach(t => { existingMap[t.tier_name] = t.id; });
+                    }
+                    const currentTierNames = [];
+                    for (const t of (newItem.ticket_tiers || [])) {
+                      currentTierNames.push(t.tier_name);
+                      const cap = t.slot_capacities?.[slot.id] !== undefined ? (parseInt(t.slot_capacities[slot.id]) || 100) : (parseInt(t.total_seats) || 100);
+                      const tierPayload = {
+                        event_id: targetEventId,
+                        tier_name: t.tier_name,
+                        price: parseFloat(t.price) || 0,
+                        total_seats: cap,
+                        available_seats: cap,
+                        booking_open:  t.booking_open  ? new Date(t.booking_open).toISOString()  : null,
+                        booking_close: t.booking_close ? new Date(t.booking_close).toISOString() : null
+                      };
+                      const existingId = existingMap[t.tier_name];
+                      if (existingId) {
+                        const { data: bookingsData } = await supabase
+                          .from('event_bookings')
+                          .select('ticket_count')
+                          .eq('tier_id', existingId)
+                          .neq('status', 'CANCELLED');
+                        const soldSeats = bookingsData ? bookingsData.reduce((sum, b) => sum + (b.ticket_count || 0), 0) : 0;
+                        tierPayload.available_seats = Math.max(0, cap - soldSeats);
+                        await supabase.from('event_ticket_tiers').update(tierPayload).eq('id', existingId);
+                      } else {
+                        await supabase.from('event_ticket_tiers').insert([tierPayload]);
+                      }
+                    }
+                    if (existingTiers) {
+                      const toDeleteTiers = existingTiers.filter(t => !currentTierNames.includes(t.tier_name));
+                      for (const t of toDeleteTiers) {
+                        await supabase.from('event_ticket_tiers').delete().eq('id', t.id);
+                      }
+                    }
+                  }
+                }
+              }
+            } else {
+              updatePayload = {
+                title: newItem.name,
+                description: newItem.detail || 'Updated Manually',
+                category: newItem.category || 'Music & Concerts',
+                venue_name: newItem.venue_name || 'Ahmedabad Venue',
+                event_date: newItem.event_date ? new Date(newItem.event_date).toISOString() : new Date().toISOString(),
+                banner_url: newItem.image,
+                booking_start: newItem.booking_start ? new Date(newItem.booking_start).toISOString() : null,
+                booking_end: newItem.booking_end ? new Date(newItem.booking_end).toISOString() : null,
+                show_type: newItem.show_type || 'single',
+                duration: newItem.duration || null,
+                age_restriction: newItem.age_restriction || null,
+                language: newItem.language || null
+              };
+              const { error } = await supabase.from(targetTable).update(updatePayload).eq('id', editingId);
+              if (error) throw error;
+
+              const { data: existingTiers } = await supabase.from('event_ticket_tiers').select('id, tier_name').eq('event_id', editingId);
+              const existingMap = {};
+              if (existingTiers) {
+                existingTiers.forEach(t => { existingMap[t.tier_name] = t.id; });
+              }
+              const currentTierNames = [];
+              for (const t of (newItem.ticket_tiers || [])) {
+                currentTierNames.push(t.tier_name);
+                const tierPayload = {
+                  event_id: editingId,
+                  tier_name: t.tier_name,
+                  price: parseFloat(t.price) || 0,
+                  total_seats: parseInt(t.total_seats) || 100,
+                  available_seats: parseInt(t.total_seats) || 100,
+                  booking_open:  t.booking_open  ? new Date(t.booking_open).toISOString()  : null,
+                  booking_close: t.booking_close ? new Date(t.booking_close).toISOString() : null
+                };
+                const existingId = existingMap[t.tier_name];
+                if (existingId) {
+                  const { data: bookingsData } = await supabase
+                    .from('event_bookings')
+                    .select('ticket_count')
+                    .eq('tier_id', existingId)
+                    .neq('status', 'CANCELLED');
+                  const soldSeats = bookingsData ? bookingsData.reduce((sum, b) => sum + (b.ticket_count || 0), 0) : 0;
+                  tierPayload.available_seats = Math.max(0, parseInt(t.total_seats) - soldSeats);
+                  await supabase.from('event_ticket_tiers').update(tierPayload).eq('id', existingId);
+                } else {
+                  await supabase.from('event_ticket_tiers').insert([tierPayload]);
+                }
+              }
+              if (existingTiers) {
+                const toDelete = existingTiers.filter(t => !currentTierNames.includes(t.tier_name));
+                for (const t of toDelete) {
+                  await supabase.from('event_ticket_tiers').delete().eq('id', t.id);
+                }
               }
             }
           } else {
@@ -676,13 +882,8 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
               description: newItem.detail || 'Updated Manually',
               duration_minutes: 60
             };
-          }
-          
-          const { error } = await supabase.from(targetTable).update(updatePayload).eq('id', editingId);
-          if (error) {
-            console.error('Supabase update error:', error);
-            toast.error(`Failed to update database: ${error.message}`);
-            return;
+            const { error } = await supabase.from(targetTable).update(updatePayload).eq('id', editingId);
+            if (error) throw error;
           }
         } catch (err) {
           console.error(err);
@@ -709,13 +910,13 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
           booking_start: newItem.booking_start,
           booking_end: newItem.booking_end
         } : item);
-        localStorage.setItem('vVendorItems_' + businessType, JSON.stringify(updated.filter(i => !i.id.toString().startsWith('d') && !i.id.toString().startsWith('s'))));
+        safeSetLocalStorage('vVendorItems_' + businessType, JSON.stringify(updated.filter(i => !i.id.toString().startsWith('d') && !i.id.toString().startsWith('s'))));
         return updated;
       });
 
       toast.success('Listing updated successfully!');
       setEditingId(null);
-      setNewItem({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: null, category: 'Music & Concerts', venue_name: '', event_date: '', booking_start: '', booking_end: '', ticket_tiers: [{ tier_name: 'General Admission', price: '299', total_seats: '100' }] });
+      setNewItem({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: null, category: 'Music & Concerts', venue_name: '', event_date: '', booking_start: '', booking_end: '', duration: '', age_restriction: '', language: '', ticket_tiers: [{ tier_name: 'General Admission', price: '299', total_seats: '100' }] });
       setShowForm(false);
       return;
     }
@@ -744,7 +945,6 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
         const targetTable = businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : 'services';
         
         if (businessType === 'event' && (newItem.show_type === 'multiple' || newItem.show_type === 'festival') && newItem.schedule_slots && newItem.schedule_slots.length > 0) {
-          let lastInsertedEvent = null;
           for (const slot of newItem.schedule_slots) {
             const payload = {
               title: newProductObj.name,
@@ -762,7 +962,10 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
               booking_end: newItem.booking_end ? new Date(newItem.booking_end).toISOString() : null,
               show_type: newItem.show_type,
               visibility: newItem.visibility || 'public',
-              is_online: !!newItem.is_online
+              is_online: !!newItem.is_online,
+              duration: newItem.duration || null,
+              age_restriction: newItem.age_restriction || null,
+              language: newItem.language || null
             };
 
             const { data, error } = await supabase.from(targetTable).insert([payload]).select();
@@ -773,17 +976,19 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
             }
 
             if (data && data[0]) {
-              lastInsertedEvent = data[0];
               const tiersPayload = (newItem.ticket_tiers && newItem.ticket_tiers.length > 0)
-                ? newItem.ticket_tiers.map(t => ({
-                    event_id: data[0].id,
-                    tier_name: t.tier_name || 'General Admission',
-                    price: parseFloat(t.price) || 299,
-                    total_seats: parseInt(t.total_seats) || 100,
-                    available_seats: parseInt(t.total_seats) || 100,
-                    booking_open:  t.booking_open  ? new Date(t.booking_open).toISOString()  : null,
-                    booking_close: t.booking_close ? new Date(t.booking_close).toISOString() : null
-                  }))
+                ? newItem.ticket_tiers.map(t => {
+                    const cap = t.slot_capacities?.[slot.id] !== undefined ? (parseInt(t.slot_capacities[slot.id]) || 100) : (parseInt(t.total_seats) || 100);
+                    return {
+                      event_id: data[0].id,
+                      tier_name: t.tier_name || 'General Admission',
+                      price: parseFloat(t.price) || 299,
+                      total_seats: cap,
+                      available_seats: cap,
+                      booking_open:  t.booking_open  ? new Date(t.booking_open).toISOString()  : null,
+                      booking_close: t.booking_close ? new Date(t.booking_close).toISOString() : null
+                    };
+                  })
                 : [{
                     event_id: data[0].id,
                     tier_name: 'General Admission',
@@ -795,8 +1000,9 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
             }
           }
           toast.success(`Published ${newItem.schedule_slots.length} shows successfully!`);
-          setNewItem({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: null, category: 'Music & Concerts', venue_name: '', event_date: '', booking_start: '', booking_end: '', ticket_tiers: [{ tier_name: 'General Admission', price: '299', total_seats: '100' }] });
+          setNewItem({ name: '', detail: '', price: '299', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: null, category: 'Music & Concerts', venue_name: '', event_date: '', booking_start: '', booking_end: '', show_type: 'single', duration: '', age_restriction: '', language: '', schedule_slots: [{ id: Date.now(), date: '', starts: '19:00', ends: '22:00', venue_name: '' }], ticket_tiers: [{ tier_name: 'General Admission', price: '299', total_seats: '100' }] });
           setShowForm(false);
+          setEventWizardStep(1);
           return;
         }
 
@@ -831,7 +1037,10 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
             booking_end: newItem.booking_end ? new Date(newItem.booking_end).toISOString() : null,
             show_type: newItem.show_type || 'single',
             visibility: newItem.visibility || 'public',
-            is_online: !!newItem.is_online
+            is_online: !!newItem.is_online,
+            duration: newItem.duration || null,
+            age_restriction: newItem.age_restriction || null,
+            language: newItem.language || null
           };
         } else {
           payload = {
@@ -888,7 +1097,10 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
             venue_name: data[0].venue_name,
             event_date: data[0].event_date,
             booking_start: data[0].booking_start,
-            booking_end: data[0].booking_end
+            booking_end: data[0].booking_end,
+            duration: data[0].duration || '',
+            age_restriction: data[0].age_restriction || '',
+            language: data[0].language || ''
           };
           setItems(prev => [dbObj, ...prev.filter(i => i.id !== localId && !i.id.toString().startsWith('d') && !i.id.toString().startsWith('s'))]);
         }
@@ -901,13 +1113,13 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
       setItems(prev => {
         const cleanPrev = prev.filter(i => !i.id.toString().startsWith('d') && !i.id.toString().startsWith('s'));
         const updated = [newProductObj, ...cleanPrev];
-        localStorage.setItem('vVendorItems_' + businessType, JSON.stringify(updated));
+        safeSetLocalStorage('vVendorItems_' + businessType, JSON.stringify(updated));
         return updated;
       });
     }
 
     toast.success('Listing published successfully!');
-    setNewItem({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: businessType === 'shop' ? '44444444-4444-4444-4444-444444444444' : '77777777-7777-7777-7777-777777777777', category: 'Music & Concerts', venue_name: '', event_date: '', booking_start: '', booking_end: '', ticket_tiers: [{ tier_name: 'General Admission', price: '299', total_seats: '100' }] });
+    setNewItem({ name: '', detail: '', price: '', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: businessType === 'shop' ? '44444444-4444-4444-4444-444444444444' : '77777777-7777-7777-7777-777777777777', category: 'Music & Concerts', venue_name: '', event_date: '', booking_start: '', booking_end: '', duration: '', age_restriction: '', language: '', ticket_tiers: [{ tier_name: 'General Admission', price: '299', total_seats: '100' }] });
     setShowForm(false);
     } finally {
       setIsSaving(false);
@@ -928,8 +1140,40 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
     };
 
     let tiers = [{ tier_name: 'General Admission', price: item.price || '299', total_seats: '100', booking_open: '', booking_close: '' }];
+    let showType = 'single';
+    let scheduleSlots = [{ id: Date.now(), date: '', starts: '19:00', ends: '22:00', venue_name: '' }];
+
     if (businessType === 'event') {
       try {
+        const { data: dbEvt } = await supabase.from('events').select('show_type, title, category, created_by').eq('id', item.id).maybeSingle();
+        if (dbEvt) {
+          showType = dbEvt.show_type || 'single';
+          if (showType === 'multiple' || showType === 'festival') {
+            const { data: siblings } = await supabase
+              .from('events')
+              .select('id, event_date, ends_at, venue_name')
+              .eq('title', dbEvt.title)
+              .eq('category', dbEvt.category)
+              .eq('created_by', dbEvt.created_by)
+              .order('event_date', { ascending: true });
+            if (siblings && siblings.length > 0) {
+              scheduleSlots = siblings.map(s => {
+                const d = new Date(s.event_date);
+                const dateStr = d.toISOString().split('T')[0];
+                const startsStr = d.toTimeString().slice(0, 5);
+                const endsStr = s.ends_at ? new Date(s.ends_at).toTimeString().slice(0, 5) : '22:00';
+                return {
+                  id: s.id,
+                  date: dateStr,
+                  starts: startsStr,
+                  ends: endsStr,
+                  venue_name: s.venue_name
+                };
+              });
+            }
+          }
+        }
+
         const { data: dbTiers } = await supabase
           .from('event_ticket_tiers')
           .select('*')
@@ -945,7 +1189,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
           }));
         }
       } catch (err) {
-        console.warn("Failed to load ticket tiers:", err);
+        console.warn("Failed to load event details or ticket tiers for edit:", err);
       }
     }
 
@@ -963,7 +1207,12 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
       event_date: toLocal(item.event_date),
       booking_start: toLocal(item.booking_start),
       booking_end: toLocal(item.booking_end),
-      ticket_tiers: tiers
+      show_type: showType,
+      schedule_slots: scheduleSlots,
+      ticket_tiers: tiers,
+      duration: item.duration || '',
+      age_restriction: item.age_restriction || '',
+      language: item.language || ''
     });
     setEventWizardStep(2);
     setShowForm(true);
@@ -1013,6 +1262,8 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
   };
 
   const handleDelete = (id) => {
+    const item = items.find(i => i.id === id);
+    if (!item) return;
     setConfirmDialog({
       isOpen: true,
       title: 'Delete Listing',
@@ -1021,9 +1272,19 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
       cancelText: 'Cancel',
       type: 'danger',
       onConfirm: async () => {
-        setItems(prev => prev.filter(item => item.id !== id));
+        setItems(prev => prev.filter(i => i.id !== id));
         if (storeId || vendorData?.user_id) {
-          try { await supabase.from(businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : 'services').delete().eq('id', id); } catch (e) { console.error(e); }
+          try {
+            if (businessType === 'event') {
+              await supabase.from('events')
+                .delete()
+                .eq('title', item.name || item.title)
+                .eq('category', item.category)
+                .eq('created_by', vendorData?.user_id || null);
+            } else {
+              await supabase.from(businessType === 'shop' ? 'products' : 'services').delete().eq('id', id);
+            }
+          } catch (e) { console.error(e); }
         }
       }
     });
@@ -1056,7 +1317,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => { setEditingId(null); setNewItem({ name: '', detail: '', price: '299', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: null, category: 'Music & Concerts', venue_name: '', event_date: '', booking_start: '', booking_end: '', show_type: 'single', schedule_slots: [{ id: Date.now(), date: '', starts: '19:00', ends: '22:00', venue_name: '' }], ticket_tiers: [{ tier_name: 'General Admission', price: '299', total_seats: '100' }] }); setEventWizardStep(1); setShowForm(true); }}
+          onClick={() => { setEditingId(null); setNewItem({ name: '', detail: '', price: '299', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: null, category: 'Music & Concerts', venue_name: '', event_date: '', booking_start: '', booking_end: '', show_type: 'single', duration: '', age_restriction: '', language: '', schedule_slots: [{ id: Date.now(), date: '', starts: '19:00', ends: '22:00', venue_name: '' }], ticket_tiers: [{ tier_name: 'General Admission', price: '299', total_seats: '100' }] }); setEventWizardStep(1); setShowForm(true); }}
           className="v-btn-primary"
         >
           <PackagePlus size={20} />
@@ -1400,8 +1661,8 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                                       type="datetime-local" 
                                       required 
                                       className="v-input" 
-                                      value={newItem.booking_start ? new Date(newItem.booking_start).toISOString().slice(0, 16) : ''} 
-                                      onChange={(e) => setNewItem({ ...newItem, booking_start: e.target.value ? new Date(e.target.value).toISOString() : '' })} 
+                                      value={newItem.booking_start || ''} 
+                                      onChange={(e) => setNewItem({ ...newItem, booking_start: e.target.value })} 
                                     />
                                   </div>
                                   <div className="v-form-group">
@@ -1410,10 +1671,31 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                                       type="datetime-local" 
                                       required 
                                       className="v-input" 
-                                      value={newItem.booking_end ? new Date(newItem.booking_end).toISOString().slice(0, 16) : ''} 
-                                      onChange={(e) => setNewItem({ ...newItem, booking_end: e.target.value ? new Date(e.target.value).toISOString() : '' })} 
+                                      value={newItem.booking_end || ''} 
+                                      onChange={(e) => setNewItem({ ...newItem, booking_end: e.target.value })} 
                                     />
                                   </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="wizard-section-card">
+                              <div className="section-card-header">
+                                <h4>Show Details</h4>
+                              </div>
+                              <p className="section-card-desc">Provide language, duration, and age restriction details for attendees.</p>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                                <div className="v-form-group">
+                                  <label>Language</label>
+                                  <input type="text" className="v-input" placeholder="e.g. Hindi / English" value={newItem.language || ''} onChange={(e) => setNewItem({ ...newItem, language: e.target.value })} />
+                                </div>
+                                <div className="v-form-group">
+                                  <label>Duration</label>
+                                  <input type="text" className="v-input" placeholder="e.g. 2h 30m" value={newItem.duration || ''} onChange={(e) => setNewItem({ ...newItem, duration: e.target.value })} />
+                                </div>
+                                <div className="v-form-group">
+                                  <label>Entry (Age Restriction)</label>
+                                  <input type="text" className="v-input" placeholder="e.g. All Ages, 18+" value={newItem.age_restriction || ''} onChange={(e) => setNewItem({ ...newItem, age_restriction: e.target.value })} />
                                 </div>
                               </div>
                             </div>
@@ -1570,11 +1852,41 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                                       </div>
                                       <div className="v-form-group">
                                         <label>Quantity *</label>
-                                        <input type="number" className="v-input" placeholder="100" required value={tier.total_seats || ''} onChange={(e) => {
-                                          const nextTiers = [...newItem.ticket_tiers];
-                                          nextTiers[index] = { ...tier, total_seats: parseInt(e.target.value) || 0, available_seats: parseInt(e.target.value) || 0 };
-                                          setNewItem({ ...newItem, ticket_tiers: nextTiers });
-                                        }} />
+                                        {(newItem.schedule_slots && newItem.schedule_slots.length > 1) ? (
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
+                                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Seats per Show Date</span>
+                                            {(newItem.schedule_slots || []).map((slot, sIdx) => {
+                                              const dateStr = slot.date ? new Date(slot.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : `Show #${sIdx + 1}`;
+                                              const slotCap = tier.slot_capacities?.[slot.id] !== undefined ? tier.slot_capacities[slot.id] : (tier.total_seats || '100');
+                                              return (
+                                                <div key={slot.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                                                  <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>{dateStr}:</span>
+                                                  <input
+                                                    type="number"
+                                                    className="v-input"
+                                                    style={{ padding: '6px 12px', fontSize: '0.8rem', width: '90px', height: '32px' }}
+                                                    placeholder="100"
+                                                    required
+                                                    value={slotCap}
+                                                    onChange={(e) => {
+                                                      const nextTiers = [...newItem.ticket_tiers];
+                                                      const slotCaps = { ...(tier.slot_capacities || {}) };
+                                                      slotCaps[slot.id] = e.target.value;
+                                                      nextTiers[index] = { ...tier, slot_capacities: slotCaps };
+                                                      setNewItem({ ...newItem, ticket_tiers: nextTiers });
+                                                    }}
+                                                  />
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        ) : (
+                                          <input type="number" className="v-input" placeholder="100" required value={tier.total_seats || ''} onChange={(e) => {
+                                            const nextTiers = [...newItem.ticket_tiers];
+                                            nextTiers[index] = { ...tier, total_seats: parseInt(e.target.value) || 0, available_seats: parseInt(e.target.value) || 0 };
+                                            setNewItem({ ...newItem, ticket_tiers: nextTiers });
+                                          }} />
+                                        )}
                                       </div>
                                       <div className="v-form-group">
                                         <label>Entries per ticket *</label>
@@ -1621,42 +1933,87 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                             </div>
                             <div className="wizard-section-card">
                               <div className="section-card-header">
-                                <h4>Visual Cover Photo</h4>
+                                <h4>Visual Cover Photo & Gallery Images</h4>
+                                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Upload one or multiple images</span>
                               </div>
                               <div className="v-form-group">
-                                <div
-                                  className="v-input v-upload-zone"
-                                  onClick={(e) => {
-                                    if (e.target.id !== 'inventory-upload-wizard') {
-                                      document.getElementById('inventory-upload-wizard').click();
-                                    }
-                                  }}
-                                >
-                                  <input id="inventory-upload-wizard" type="file" hidden accept="image/*" onClick={(e) => e.stopPropagation()} onChange={(e) => {
-                                    const file = e.target.files[0];
-                                    if (file) {
-                                      const reader = new FileReader();
-                                      reader.onloadend = () => {
-                                        setNewItem(prev => ({ ...prev, image: reader.result }));
-                                        e.target.value = '';
-                                      };
-                                      reader.readAsDataURL(file);
-                                    } else {
-                                      e.target.value = '';
-                                    }
-                                  }} />
-                                  {newItem.image ? (
-                                    <div style={{ position: 'relative', width: '220px', height: '150px', margin: '0 auto' }}>
-                                      <img src={newItem.image} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '16px' }} />
-                                      <div style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setNewItem(prev => ({ ...prev, image: null })); }}><Trash2 size={16} color="#ef4444" /></div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
+                                  {eventImages.map((img, idx) => (
+                                    <div key={idx} style={{ position: 'relative', height: '110px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                                      <img src={img} alt={`Preview ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                      <button
+                                        type="button"
+                                        style={{
+                                          position: 'absolute',
+                                          top: '4px',
+                                          right: '4px',
+                                          background: 'white',
+                                          border: 'none',
+                                          borderRadius: '50%',
+                                          width: '24px',
+                                          height: '24px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                                          cursor: 'pointer',
+                                          zIndex: 10
+                                        }}
+                                        onClick={() => handleRemoveEventImage(idx)}
+                                      >
+                                        <Trash2 size={12} color="#ef4444" />
+                                      </button>
+                                      {idx === 0 && (
+                                        <span style={{ position: 'absolute', bottom: '4px', left: '4px', background: 'rgba(15,23,42,0.85)', color: 'white', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+                                          Cover
+                                        </span>
+                                      )}
                                     </div>
-                                  ) : (
-                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                      <Camera size={40} color="#cbd5e1" style={{ marginBottom: '1rem' }} />
-                                      <p style={{ margin: 0, fontWeight: 800, color: '#1e293b' }}>Click to upload cover photo</p>
-                                      <p style={{ margin: '4px 0 0 0', color: '#94a3b8', fontSize: '0.85rem' }}>High-res photos increase conversion by 40%</p>
-                                    </div>
-                                  )}
+                                  ))}
+                                  
+                                  <label
+                                    style={{
+                                      height: '110px',
+                                      border: '2px dashed #cbd5e1',
+                                      borderRadius: '12px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer',
+                                      background: '#f8fafc',
+                                      gap: '4px',
+                                      transition: 'border-color 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.borderColor = '#ea580c'}
+                                    onMouseLeave={(e) => e.currentTarget.style.borderColor = '#cbd5e1'}
+                                  >
+                                    <input
+                                      type="file"
+                                      hidden
+                                      accept="image/*"
+                                      onChange={async (e) => {
+                                        const file = e.target.files[0];
+                                        if (file) {
+                                          const tempUrl = URL.createObjectURL(file);
+                                          handleAddEventImage(tempUrl);
+                                          const reader = new FileReader();
+                                          reader.onloadend = async () => {
+                                            const publicUrl = await uploadImageToSupabase(reader.result, 'events');
+                                            setNewItem(prev => {
+                                              const imgs = (() => { try { const a = JSON.parse(prev.image||''); if(Array.isArray(a)) return a; } catch(_){ /* ignore */ } return prev.image ? [prev.image] : []; })();
+                                              const updated = imgs.map(u => u === tempUrl ? publicUrl : u);
+                                              return { ...prev, image: updated.length > 1 ? JSON.stringify(updated) : (updated[0] || null) };
+                                            });
+                                            e.target.value = '';
+                                          };
+                                          reader.readAsDataURL(file);
+                                        }
+                                      }}
+                                    />
+                                    <Camera size={24} color="#64748b" />
+                                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 'bold' }}>Add Image</span>
+                                  </label>
                                 </div>
                               </div>
                             </div>
@@ -1700,7 +2057,18 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                             </div>
                             <div className="wizard-section-card review-summary-card">
                               <div className="review-banner">
-                                {newItem.image && <img src={newItem.image} alt="Banner" />}
+                                {(() => {
+                                   let previewImg = newItem.image;
+                                   if (typeof previewImg === 'string' && previewImg.startsWith('[')) {
+                                     try {
+                                       const parsed = JSON.parse(previewImg);
+                                       if (Array.isArray(parsed) && parsed.length > 0) {
+                                         previewImg = parsed[0];
+                                       }
+                                     } catch (_) { /* ignore */ }
+                                   }
+                                   return previewImg ? <img src={previewImg} alt="Banner" /> : <div className="no-banner-placeholder">No Banner Provided</div>;
+                                 })()}
                                 <span className="review-status-badge">UPCOMING</span>
                               </div>
                               <div className="review-content">
@@ -1811,8 +2179,8 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                                       type="datetime-local" 
                                       required 
                                       className="v-input" 
-                                      value={newItem.booking_start ? new Date(newItem.booking_start).toISOString().slice(0, 16) : ''} 
-                                      onChange={(e) => setNewItem({ ...newItem, booking_start: e.target.value ? new Date(e.target.value).toISOString() : '' })} 
+                                      value={newItem.booking_start || ''} 
+                                      onChange={(e) => setNewItem({ ...newItem, booking_start: e.target.value })} 
                                     />
                                   </div>
                                   <div className="v-form-group">
@@ -1821,14 +2189,35 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                                       type="datetime-local" 
                                       required 
                                       className="v-input" 
-                                      value={newItem.booking_end ? new Date(newItem.booking_end).toISOString().slice(0, 16) : ''} 
-                                      onChange={(e) => setNewItem({ ...newItem, booking_end: e.target.value ? new Date(e.target.value).toISOString() : '' })} 
+                                      value={newItem.booking_end || ''} 
+                                      onChange={(e) => setNewItem({ ...newItem, booking_end: e.target.value })} 
                                     />
                                   </div>
                                 </div>
                                 <div className="v-form-group">
                                   <label>Event Description *</label>
                                   <textarea className="wizard-textarea" placeholder="Describe your event in detail. What can attendees expect?" required rows={5} value={newItem.detail || ''} onChange={(e) => setNewItem({ ...newItem, detail: e.target.value })} />
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="wizard-section-card">
+                              <div className="section-card-header">
+                                <h4>Show Details</h4>
+                              </div>
+                              <p className="section-card-desc">Provide language, duration, and age restriction details for attendees.</p>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                                <div className="v-form-group">
+                                  <label>Language</label>
+                                  <input type="text" className="v-input" placeholder="e.g. Hindi / English" value={newItem.language || ''} onChange={(e) => setNewItem({ ...newItem, language: e.target.value })} />
+                                </div>
+                                <div className="v-form-group">
+                                  <label>Duration</label>
+                                  <input type="text" className="v-input" placeholder="e.g. 2h 30m" value={newItem.duration || ''} onChange={(e) => setNewItem({ ...newItem, duration: e.target.value })} />
+                                </div>
+                                <div className="v-form-group">
+                                  <label>Entry (Age Restriction)</label>
+                                  <input type="text" className="v-input" placeholder="e.g. All Ages, 18+" value={newItem.age_restriction || ''} onChange={(e) => setNewItem({ ...newItem, age_restriction: e.target.value })} />
                                 </div>
                               </div>
                             </div>
@@ -1983,11 +2372,41 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                                       </div>
                                       <div className="v-form-group">
                                         <label>Quantity *</label>
-                                        <input type="number" className="v-input" placeholder="100" required value={tier.total_seats || ''} onChange={(e) => {
-                                          const nextTiers = [...newItem.ticket_tiers];
-                                          nextTiers[index] = { ...tier, total_seats: parseInt(e.target.value) || 0, available_seats: parseInt(e.target.value) || 0 };
-                                          setNewItem({ ...newItem, ticket_tiers: nextTiers });
-                                        }} />
+                                        {(newItem.schedule_slots && newItem.schedule_slots.length > 1) ? (
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
+                                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Seats per Show Date</span>
+                                            {(newItem.schedule_slots || []).map((slot, sIdx) => {
+                                              const dateStr = slot.date ? new Date(slot.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : `Show #${sIdx + 1}`;
+                                              const slotCap = tier.slot_capacities?.[slot.id] !== undefined ? tier.slot_capacities[slot.id] : (tier.total_seats || '100');
+                                              return (
+                                                <div key={slot.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                                                  <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>{dateStr}:</span>
+                                                  <input
+                                                    type="number"
+                                                    className="v-input"
+                                                    style={{ padding: '6px 12px', fontSize: '0.8rem', width: '90px', height: '32px' }}
+                                                    placeholder="100"
+                                                    required
+                                                    value={slotCap}
+                                                    onChange={(e) => {
+                                                      const nextTiers = [...newItem.ticket_tiers];
+                                                      const slotCaps = { ...(tier.slot_capacities || {}) };
+                                                      slotCaps[slot.id] = e.target.value;
+                                                      nextTiers[index] = { ...tier, slot_capacities: slotCaps };
+                                                      setNewItem({ ...newItem, ticket_tiers: nextTiers });
+                                                    }}
+                                                  />
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        ) : (
+                                          <input type="number" className="v-input" placeholder="100" required value={tier.total_seats || ''} onChange={(e) => {
+                                            const nextTiers = [...newItem.ticket_tiers];
+                                            nextTiers[index] = { ...tier, total_seats: parseInt(e.target.value) || 0, available_seats: parseInt(e.target.value) || 0 };
+                                            setNewItem({ ...newItem, ticket_tiers: nextTiers });
+                                          }} />
+                                        )}
                                       </div>
                                       <div className="v-form-group">
                                         <label>Entries per ticket *</label>
@@ -2037,49 +2456,91 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                                 <h4>Banner Image</h4>
                               </div>
                               <div className="v-form-group">
-                                <div
-                                  className="v-input v-upload-zone"
-                                  onClick={(e) => {
-                                    if (e.target.id !== 'inventory-upload-wizard-fest') {
-                                      document.getElementById('inventory-upload-wizard-fest').click();
-                                    }
-                                  }}
-                                >
-                                  <input id="inventory-upload-wizard-fest" type="file" hidden accept="image/*" onClick={(e) => e.stopPropagation()} onChange={(e) => {
-                                    const file = e.target.files[0];
-                                    if (file) {
-                                      const reader = new FileReader();
-                                      reader.onloadend = () => {
-                                        setNewItem(prev => ({ ...prev, image: reader.result }));
-                                        e.target.value = '';
-                                      };
-                                      reader.readAsDataURL(file);
-                                    } else {
-                                      e.target.value = '';
-                                    }
-                                  }} />
-                                  {newItem.image ? (
-                                    <div style={{ position: 'relative', width: '220px', height: '150px', margin: '0 auto' }}>
-                                      <img src={newItem.image} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '16px' }} />
-                                      <div style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setNewItem(prev => ({ ...prev, image: null })); }}><Trash2 size={16} color="#ef4444" /></div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
+                                  {eventImages.map((img, idx) => (
+                                    <div key={idx} style={{ position: 'relative', height: '110px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                                      <img src={img} alt={`Preview ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                      <button
+                                        type="button"
+                                        style={{
+                                          position: 'absolute',
+                                          top: '4px',
+                                          right: '4px',
+                                          background: 'white',
+                                          border: 'none',
+                                          borderRadius: '50%',
+                                          width: '24px',
+                                          height: '24px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                                          cursor: 'pointer',
+                                          zIndex: 10
+                                        }}
+                                        onClick={() => handleRemoveEventImage(idx)}
+                                      >
+                                        <Trash2 size={12} color="#ef4444" />
+                                      </button>
+                                      {idx === 0 && (
+                                        <span style={{ position: 'absolute', bottom: '4px', left: '4px', background: 'rgba(15,23,42,0.85)', color: 'white', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+                                          Cover
+                                        </span>
+                                      )}
                                     </div>
-                                  ) : (
-                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                      <Camera size={40} color="#cbd5e1" style={{ marginBottom: '1rem' }} />
-                                      <p style={{ margin: 0, fontWeight: 800, color: '#1e293b' }}>Click to upload cover photo</p>
-                                      <p style={{ margin: '4px 0 0 0', color: '#94a3b8', fontSize: '0.85rem' }}>High-res photos increase conversion by 40%</p>
-                                    </div>
-                                  )}
+                                  ))}
+                                  <label
+                                    style={{
+                                      height: '110px',
+                                      border: '2px dashed #cbd5e1',
+                                      borderRadius: '12px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer',
+                                      background: '#f8fafc',
+                                      gap: '4px',
+                                      transition: 'border-color 0.2s'
+                                    }}
+                                  >
+                                    <input
+                                      type="file"
+                                      hidden
+                                      accept="image/*"
+                                      onChange={async (e) => {
+                                        const file = e.target.files[0];
+                                        if (file) {
+                                          const tempUrl = URL.createObjectURL(file);
+                                          handleAddEventImage(tempUrl);
+                                          const reader = new FileReader();
+                                          reader.onloadend = async () => {
+                                            const publicUrl = await uploadImageToSupabase(reader.result, 'events');
+                                            setNewItem(prev => {
+                                              const imgs = (() => { try { const a = JSON.parse(prev.image||''); if(Array.isArray(a)) return a; } catch (_) { /* ignore */ } return prev.image ? [prev.image] : []; })();
+                                              const updated = imgs.map(u => u === tempUrl ? publicUrl : u);
+                                              return { ...prev, image: updated.length > 1 ? JSON.stringify(updated) : (updated[0] || null) };
+                                            });
+                                            e.target.value = '';
+                                          };
+                                          reader.readAsDataURL(file);
+                                        }
+                                      }}
+                                    />
+                                    <Camera size={24} color="#64748b" />
+                                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 'bold' }}>Add Image</span>
+                                  </label>
                                 </div>
                               </div>
                             </div>
                             <div className="wizard-navigation-footer">
                               <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(4)}>← Back</button>
                               <button type="button" className="wizard-next-btn" onClick={() => {
-                                if (!newItem.image) {
+                                if (eventImages.length === 0) {
                                   toast.error("Please upload a banner image!");
                                   return;
                                 }
+                                setNewItem(prev => ({ ...prev, image: JSON.stringify(eventImages) }));
                                 setEventWizardStep(6);
                               }}>Next: Review</button>
                             </div>
@@ -2104,7 +2565,18 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                             </div>
                             <div className="wizard-section-card review-summary-card">
                               <div className="review-banner">
-                                {newItem.image && <img src={newItem.image} alt="Banner" />}
+                                {(() => {
+                                   let previewImg = newItem.image;
+                                   if (typeof previewImg === 'string' && previewImg.startsWith('[')) {
+                                     try {
+                                       const parsed = JSON.parse(previewImg);
+                                       if (Array.isArray(parsed) && parsed.length > 0) {
+                                         previewImg = parsed[0];
+                                       }
+                                     } catch (_) { /* ignore */ }
+                                   }
+                                   return previewImg ? <img src={previewImg} alt="Banner" /> : <div className="no-banner-placeholder">No Banner Provided</div>;
+                                 })()}
                                 <span className="review-status-badge">UPCOMING</span>
                               </div>
                               <div className="review-content">
@@ -2253,8 +2725,8 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                                     type="datetime-local" 
                                     required 
                                     className="v-input" 
-                                    value={newItem.booking_start ? new Date(newItem.booking_start).toISOString().slice(0, 16) : ''} 
-                                    onChange={(e) => setNewItem({ ...newItem, booking_start: e.target.value ? new Date(e.target.value).toISOString() : '' })} 
+                                    value={newItem.booking_start || ''} 
+                                    onChange={(e) => setNewItem({ ...newItem, booking_start: e.target.value })} 
                                   />
                                 </div>
                                 <div className="v-form-group">
@@ -2263,14 +2735,35 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                                     type="datetime-local" 
                                     required 
                                     className="v-input" 
-                                    value={newItem.booking_end ? new Date(newItem.booking_end).toISOString().slice(0, 16) : ''} 
-                                    onChange={(e) => setNewItem({ ...newItem, booking_end: e.target.value ? new Date(e.target.value).toISOString() : '' })} 
+                                    value={newItem.booking_end || ''} 
+                                    onChange={(e) => setNewItem({ ...newItem, booking_end: e.target.value })} 
                                   />
                                 </div>
                               </div>
                               <div className="v-form-group">
                                 <label>Venue *</label>
                                 <input type="text" className="v-input" placeholder="Search venue..." required={!newItem.is_online} disabled={!!newItem.is_online} value={newItem.is_online ? 'Online Virtual Venue' : (newItem.venue_name || '')} onChange={(e) => setNewItem({ ...newItem, venue_name: e.target.value })} />
+                              </div>
+                            </div>
+
+                            <div className="wizard-section-card">
+                              <div className="section-card-header">
+                                <h4>Show Details</h4>
+                              </div>
+                              <p className="section-card-desc">Provide language, duration, and age restriction details for attendees.</p>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                                <div className="v-form-group">
+                                  <label>Language</label>
+                                  <input type="text" className="v-input" placeholder="e.g. Hindi / English" value={newItem.language || ''} onChange={(e) => setNewItem({ ...newItem, language: e.target.value })} />
+                                </div>
+                                <div className="v-form-group">
+                                  <label>Duration</label>
+                                  <input type="text" className="v-input" placeholder="e.g. 2h 30m" value={newItem.duration || ''} onChange={(e) => setNewItem({ ...newItem, duration: e.target.value })} />
+                                </div>
+                                <div className="v-form-group">
+                                  <label>Entry (Age Restriction)</label>
+                                  <input type="text" className="v-input" placeholder="e.g. All Ages, 18+" value={newItem.age_restriction || ''} onChange={(e) => setNewItem({ ...newItem, age_restriction: e.target.value })} />
+                                </div>
                               </div>
                             </div>
 
@@ -2314,11 +2807,41 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                                       </div>
                                       <div className="v-form-group">
                                         <label>Quantity *</label>
-                                        <input type="number" className="v-input" placeholder="100" required value={tier.total_seats || ''} onChange={(e) => {
-                                          const nextTiers = [...newItem.ticket_tiers];
-                                          nextTiers[index] = { ...tier, total_seats: parseInt(e.target.value) || 0, available_seats: parseInt(e.target.value) || 0 };
-                                          setNewItem({ ...newItem, ticket_tiers: nextTiers });
-                                        }} />
+                                        {(newItem.schedule_slots && newItem.schedule_slots.length > 1) ? (
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
+                                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Seats per Show Date</span>
+                                            {(newItem.schedule_slots || []).map((slot, sIdx) => {
+                                              const dateStr = slot.date ? new Date(slot.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : `Show #${sIdx + 1}`;
+                                              const slotCap = tier.slot_capacities?.[slot.id] !== undefined ? tier.slot_capacities[slot.id] : (tier.total_seats || '100');
+                                              return (
+                                                <div key={slot.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                                                  <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>{dateStr}:</span>
+                                                  <input
+                                                    type="number"
+                                                    className="v-input"
+                                                    style={{ padding: '6px 12px', fontSize: '0.8rem', width: '90px', height: '32px' }}
+                                                    placeholder="100"
+                                                    required
+                                                    value={slotCap}
+                                                    onChange={(e) => {
+                                                      const nextTiers = [...newItem.ticket_tiers];
+                                                      const slotCaps = { ...(tier.slot_capacities || {}) };
+                                                      slotCaps[slot.id] = e.target.value;
+                                                      nextTiers[index] = { ...tier, slot_capacities: slotCaps };
+                                                      setNewItem({ ...newItem, ticket_tiers: nextTiers });
+                                                    }}
+                                                  />
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        ) : (
+                                          <input type="number" className="v-input" placeholder="100" required value={tier.total_seats || ''} onChange={(e) => {
+                                            const nextTiers = [...newItem.ticket_tiers];
+                                            nextTiers[index] = { ...tier, total_seats: parseInt(e.target.value) || 0, available_seats: parseInt(e.target.value) || 0 };
+                                            setNewItem({ ...newItem, ticket_tiers: nextTiers });
+                                          }} />
+                                        )}
                                       </div>
                                       <div className="v-form-group">
                                         <label>Entries per ticket *</label>
@@ -2365,39 +2888,80 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                                 <h4>Banner Image</h4>
                               </div>
                               <div className="v-form-group">
-                                <div
-                                  className="v-input v-upload-zone"
-                                  onClick={(e) => {
-                                    if (e.target.id !== 'inventory-upload-wizard-single') {
-                                      document.getElementById('inventory-upload-wizard-single').click();
-                                    }
-                                  }}
-                                >
-                                  <input id="inventory-upload-wizard-single" type="file" hidden accept="image/*" onClick={(e) => e.stopPropagation()} onChange={(e) => {
-                                    const file = e.target.files[0];
-                                    if (file) {
-                                      const reader = new FileReader();
-                                      reader.onloadend = () => {
-                                        setNewItem(prev => ({ ...prev, image: reader.result }));
-                                        e.target.value = '';
-                                      };
-                                      reader.readAsDataURL(file);
-                                    } else {
-                                      e.target.value = '';
-                                    }
-                                  }} />
-                                  {newItem.image ? (
-                                    <div style={{ position: 'relative', width: '220px', height: '150px', margin: '0 auto' }}>
-                                      <img src={newItem.image} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '16px' }} />
-                                      <div style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setNewItem(prev => ({ ...prev, image: null })); }}><Trash2 size={16} color="#ef4444" /></div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
+                                  {eventImages.map((img, idx) => (
+                                    <div key={idx} style={{ position: 'relative', height: '110px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                                      <img src={img} alt={`Preview ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                      <button
+                                        type="button"
+                                        style={{
+                                          position: 'absolute',
+                                          top: '4px',
+                                          right: '4px',
+                                          background: 'white',
+                                          border: 'none',
+                                          borderRadius: '50%',
+                                          width: '24px',
+                                          height: '24px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                                          cursor: 'pointer',
+                                          zIndex: 10
+                                        }}
+                                        onClick={() => handleRemoveEventImage(idx)}
+                                      >
+                                        <Trash2 size={12} color="#ef4444" />
+                                      </button>
+                                      {idx === 0 && (
+                                        <span style={{ position: 'absolute', bottom: '4px', left: '4px', background: 'rgba(15,23,42,0.85)', color: 'white', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+                                          Cover
+                                        </span>
+                                      )}
                                     </div>
-                                  ) : (
-                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                      <Camera size={40} color="#cbd5e1" style={{ marginBottom: '1rem' }} />
-                                      <p style={{ margin: 0, fontWeight: 800, color: '#1e293b' }}>Click to upload cover photo</p>
-                                      <p style={{ margin: '4px 0 0 0', color: '#94a3b8', fontSize: '0.85rem' }}>High-res photos increase conversion by 40%</p>
-                                    </div>
-                                  )}
+                                  ))}
+                                  <label
+                                    style={{
+                                      height: '110px',
+                                      border: '2px dashed #cbd5e1',
+                                      borderRadius: '12px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer',
+                                      background: '#f8fafc',
+                                      gap: '4px',
+                                      transition: 'border-color 0.2s'
+                                    }}
+                                  >
+                                    <input
+                                      type="file"
+                                      hidden
+                                      accept="image/*"
+                                      onChange={async (e) => {
+                                        const file = e.target.files[0];
+                                        if (file) {
+                                          const tempUrl = URL.createObjectURL(file);
+                                          handleAddEventImage(tempUrl);
+                                          const reader = new FileReader();
+                                          reader.onloadend = async () => {
+                                            const publicUrl = await uploadImageToSupabase(reader.result, 'events');
+                                            setNewItem(prev => {
+                                              const imgs = (() => { try { const a = JSON.parse(prev.image||''); if(Array.isArray(a)) return a; } catch (_) { /* ignore */ } return prev.image ? [prev.image] : []; })();
+                                              const updated = imgs.map(u => u === tempUrl ? publicUrl : u);
+                                              return { ...prev, image: updated.length > 1 ? JSON.stringify(updated) : (updated[0] || null) };
+                                            });
+                                            e.target.value = '';
+                                          };
+                                          reader.readAsDataURL(file);
+                                        }
+                                      }}
+                                    />
+                                    <Camera size={24} color="#64748b" />
+                                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 'bold' }}>Add Image</span>
+                                  </label>
                                 </div>
                               </div>
                             </div>
@@ -2411,12 +2975,13 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                               </div>
                             </div>
                             <div className="wizard-navigation-footer">
-                              <button type="button" className="wizard-back-btn" onClick={() => setNewItem({ ...newItem, eventWizardStep: 2 })}>← Back</button>
+                              <button type="button" className="wizard-back-btn" onClick={() => setEventWizardStep(2)}>← Back</button>
                               <button type="button" className="wizard-next-btn" onClick={() => {
-                                if (!newItem.image || !newItem.detail) {
+                                if (eventImages.length === 0 || !newItem.detail) {
                                   toast.error("Please add banner image and description details!");
                                   return;
                                 }
+                                setNewItem(prev => ({ ...prev, image: JSON.stringify(eventImages) }));
                                 setEventWizardStep(4);
                               }}>Next: Review</button>
                             </div>
@@ -2437,7 +3002,18 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                             </div>
                             <div className="wizard-section-card review-summary-card">
                               <div className="review-banner">
-                                {newItem.image ? <img src={newItem.image} alt={newItem.name} /> : <div className="no-banner-placeholder">No Banner Provided</div>}
+                                {(() => {
+                                   let previewImg = newItem.image;
+                                   if (typeof previewImg === 'string' && previewImg.startsWith('[')) {
+                                     try {
+                                       const parsed = JSON.parse(previewImg);
+                                       if (Array.isArray(parsed) && parsed.length > 0) {
+                                         previewImg = parsed[0];
+                                       }
+                                     } catch (_) { /* ignore */ }
+                                   }
+                                   return previewImg ? <img src={previewImg} alt={newItem.name} /> : <div className="no-banner-placeholder">No Banner Provided</div>;
+                                 })()}
                                 <span className="review-status-badge">UPCOMING</span>
                               </div>
                               <div className="review-content">
@@ -2572,9 +3148,12 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                             <input id="inventory-upload" type="file" hidden accept="image/*" onClick={(e) => e.stopPropagation()} onChange={(e) => {
                               const file = e.target.files[0];
                               if (file) {
+                                const tempUrl = URL.createObjectURL(file);
+                                setNewItem(prev => ({ ...prev, image: tempUrl }));
                                 const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  setNewItem(prev => ({ ...prev, image: reader.result }));
+                                reader.onloadend = async () => {
+                                  const publicUrl = await uploadImageToSupabase(reader.result, 'inventory');
+                                  setNewItem(prev => ({ ...prev, image: prev.image === tempUrl ? publicUrl : prev.image }));
                                   e.target.value = '';
                                 };
                                 reader.readAsDataURL(file);
@@ -2650,8 +3229,16 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
 
           const getCleanImage = (imgSrc, name = '') => {
             if (!imgSrc || typeof imgSrc !== 'string') return getFallbackByName(name);
-            const clean = imgSrc.trim();
-            if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:') || clean.startsWith('/')) {
+            let clean = imgSrc.trim();
+            if (clean.startsWith('[')) {
+              try {
+                const parsed = JSON.parse(clean);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  clean = parsed[0].trim();
+                }
+              } catch (_) { /* ignore */ }
+            }
+            if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:') || clean.startsWith('/') || clean.startsWith('blob:')) {
               return clean;
             }
             return getFallbackByName(name);
@@ -2664,14 +3251,16 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
               key={item.id}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: idx * 0.08, duration: 0.4, ease: "easeOut" }}
+              transition={{ delay: idx * 0.04, duration: 0.3, ease: "easeOut" }}
               className="v-data-card"
             >
               <div className="v-card-image-wrap">
                 <img 
                   src={cleanImage} 
                   alt={item.name} 
-                  className="v-card-img" 
+                  className="v-card-img"
+                  loading="lazy"
+                  decoding="async"
                   onError={(e) => { e.target.onerror = null; e.target.src = getFallbackByName(item.name); }} 
                 />
                 <div className="v-card-overlay" />
@@ -2717,36 +3306,103 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                     );
                   })()}
                 </div>
+                {/* Multi-show badge on the image overlay */}
+                {businessType === 'event' && item.showCount > 1 && (
+                  <div style={{ position: 'absolute', top: '12px', right: '12px' }}>
+                    <span style={{
+                      background: 'linear-gradient(135deg,#7c3aed,#4f46e5)',
+                      color: '#fff',
+                      borderRadius: '20px',
+                      padding: '3px 10px',
+                      fontSize: '0.7rem',
+                      fontWeight: 800,
+                      letterSpacing: '0.02em',
+                      boxShadow: '0 2px 8px rgba(124,58,237,0.35)'
+                    }}>🎭 {item.showCount} Shows</span>
+                  </div>
+                )}
               </div>
 
               <div className="v-card-content">
                 <h4 className="v-card-title">{item.name}</h4>
+                {businessType === 'event' && item.showCount > 1 && (
+                  <p style={{ margin: '0 0 4px', fontSize: '0.72rem', fontWeight: 700, color: '#7c3aed' }}>
+                    {item.showCount} scheduled shows
+                  </p>
+                )}
                 <p className="v-card-detail">{item.detail || (businessType === 'event' ? item.category || 'Upcoming event' : 'High quality listing with professional support.')}</p>
-
-                {businessType === 'event' && item.total_seats > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                    <div style={{
-                      flex: 1, height: '5px', borderRadius: '10px',
-                      background: '#e2e8f0', overflow: 'hidden'
-                    }}>
-                      <div style={{
-                        height: '100%', borderRadius: '10px',
-                        width: `${Math.max(0, Math.min(100, (item.available_seats / item.total_seats) * 100))}%`,
-                        background: item.available_seats === 0 ? '#ef4444'
-                          : item.available_seats / item.total_seats < 0.2 ? '#f59e0b'
-                          : '#22c55e',
-                        transition: 'width 0.4s ease'
-                      }} />
-                    </div>
-                    <span style={{
-                      fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap',
-                      color: item.available_seats === 0 ? '#ef4444'
-                        : item.available_seats / item.total_seats < 0.2 ? '#f59e0b'
-                        : '#22c55e'
-                    }}>
-                      {item.available_seats === 0 ? 'Sold Out' : `${item.available_seats} seats left`}
-                    </span>
+                {businessType === 'event' && item.showsList && item.showsList.length > 1 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '8px 0', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                    {item.showsList.map((show, idx) => {
+                      const showDateStr = show.event_date ? new Date(show.event_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Unknown Date';
+                      const pct = show.total_seats > 0 ? (show.available_seats / show.total_seats) * 100 : 0;
+                      return (
+                        <div key={show.id || idx} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: '#475569' }}>
+                            <span style={{ fontWeight: 600 }}>📅 {showDateStr}</span>
+                            <span style={{
+                              fontWeight: 700,
+                              color: show.available_seats === 0 ? '#ef4444'
+                                : show.available_seats / show.total_seats < 0.2 ? '#f59e0b'
+                                : '#22c55e'
+                            }}>
+                              {show.available_seats === 0 ? 'Sold Out' : `${show.available_seats}/${show.total_seats} left`}
+                            </span>
+                          </div>
+                          {show.total_seats > 0 && (
+                            <div style={{
+                              width: '100%', height: '4px', borderRadius: '10px',
+                              background: '#e2e8f0', overflow: 'hidden'
+                            }}>
+                              <div style={{
+                                height: '100%', borderRadius: '10px',
+                                width: `${Math.max(0, Math.min(100, pct))}%`,
+                                background: show.available_seats === 0 ? '#ef4444'
+                                  : show.available_seats / show.total_seats < 0.2 ? '#f59e0b'
+                                  : '#22c55e',
+                                transition: 'width 0.4s ease'
+                              }} />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
+                ) : (
+                  <>
+                    {businessType === 'event' && item.event_date && (
+                      <p style={{ margin: '4px 0 6px 0', fontSize: '0.75rem', color: '#64748b', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        <span>📅 {new Date(item.event_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                        {item.venue_name && <span>📍 {item.venue_name}</span>}
+                      </p>
+                    )}
+
+                    {businessType === 'event' && item.total_seats > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                        <div style={{
+                          flex: 1, height: '5px', borderRadius: '10px',
+                          background: '#e2e8f0', overflow: 'hidden'
+                        }}>
+                          <div style={{
+                            height: '100%', borderRadius: '10px',
+                            width: `${Math.max(0, Math.min(100, (item.available_seats / item.total_seats) * 100))}%`,
+                            background: item.available_seats === 0 ? '#ef4444'
+                              : item.available_seats / item.total_seats < 0.2 ? '#f59e0b'
+                              : '#22c55e',
+                            transition: 'width 0.4s ease'
+                          }} />
+                        </div>
+                        <span style={{
+                          fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap',
+                          color: item.available_seats === 0 ? '#ef4444'
+                            : item.available_seats / item.total_seats < 0.2 ? '#f59e0b'
+                            : '#22c55e'
+                        }}>
+                          {item.available_seats === 0 ? 'Sold Out' : `${item.available_seats} seats left`}
+                        </span>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 <div className="v-card-footer">

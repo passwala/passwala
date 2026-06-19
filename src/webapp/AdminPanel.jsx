@@ -57,6 +57,69 @@ const adminSupabase = (supabaseUrl && supabaseKey)
 const API_URL = window.location.protocol === 'https:' 
   ? '' 
   : (import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3004`);
+
+const safeSetItem = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (err) {
+    console.warn(`[Storage] Failed to save '${key}' to localStorage:`, err);
+  }
+};
+
+const fetchWithTimeout = async (url, options = {}, timeout = 15000) => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    throw error;
+  }
+};
+
+
+// Helpers for local date/datetime-local strings to prevent selecting past dates
+const getLocalTodayDate = () => {
+  return new Date().toLocaleDateString('en-CA');
+};
+
+const getLocalTodayDateTime = () => {
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
+
+const getMinDateTimeForEnd = (startVal) => {
+  if (startVal && typeof startVal === 'string') {
+    const d = new Date(startVal);
+    if (!isNaN(d.getTime())) {
+      return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    }
+  }
+  return getLocalTodayDateTime();
+};
+
+const toLocalISOString = (val) => {
+  if (!val) return '';
+  if (typeof val === 'string') {
+    const hasTimezone = val.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(val);
+    if (!hasTimezone && val.includes('T')) {
+      return val.slice(0, 16);
+    }
+  }
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return '';
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  } catch (e) {
+    return '';
+  }
+};
+
 const ActivityFeed = ({ onLogout }) => {
   const [recent, setRecent] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -146,7 +209,7 @@ const TABLE_SCHEMAS = {
   stores: { vendor_id: '', name: '', description: '', address: '', is_open: true, rating: 0 },
   service_categories: { name: '', icon_url: '' },
   orders: { user_id: '', store_id: '', address_id: '', status: 'PENDING', subtotal: 0, delivery_fee: 0, total_amount: 0, payment_status: 'PENDING' },
-  events: { title: '', category: '', venue_name: '', venue_lat: 23.0225, venue_lng: 72.5714, event_date: '', ends_at: '', status: 'UPCOMING', banner_url: '', starting_price: 0, show_type: 'single', visibility: 'public', is_online: false, booking_start: '', booking_end: '' },
+  events: { title: '', show_type: 'single', category: '', venue_name: '', venue_lat: 23.0225, venue_lng: 72.5714, event_date: '', ends_at: '', status: 'UPCOMING', banner_url: '', starting_price: 0, visibility: 'public', is_online: false, booking_start: '', booking_end: '', created_by: '' },
   event_bookings: { user_id: '', event_id: '', tier_id: '', ticket_count: 0, total_amount: 0, status: 'CONFIRMED' },
   city_routes: { start_area: '', end_area: '', distance_km: 0, base_price: 0, is_active: true },
   city_vehicles: { driver_id: '', vehicle_type: '', license_plate: '', total_seats: 0, available_seats: 0, is_active: true },
@@ -168,7 +231,7 @@ const DATABASE_SCHEMAS = {
   admins: ['username', 'role'],
   stores: ['vendor_id', 'name', 'description', 'logo_url', 'banner_url', 'address', 'lat', 'lng', 'is_open', 'rating'],
   orders: ['user_id', 'store_id', 'address_id', 'status', 'subtotal', 'delivery_fee', 'total_amount', 'payment_status'],
-  events: ['title', 'category', 'venue_name', 'venue_lat', 'venue_lng', 'event_date', 'ends_at', 'status', 'banner_url', 'starting_price', 'show_type', 'visibility', 'is_online', 'booking_start', 'booking_end'],
+  events: ['title', 'show_type', 'category', 'venue_name', 'venue_lat', 'venue_lng', 'event_date', 'ends_at', 'status', 'banner_url', 'starting_price', 'visibility', 'is_online', 'booking_start', 'booking_end'],
   event_bookings: ['user_id', 'event_id', 'tier_id', 'ticket_count', 'total_amount', 'status'],
   city_routes: ['start_area', 'end_area', 'distance_km', 'base_price', 'is_active'],
   city_vehicles: ['driver_id', 'vehicle_type', 'license_plate', 'total_seats', 'available_seats', 'is_active'],
@@ -280,7 +343,43 @@ const EventApprovalsPanel = ({ API_URL }) => {
         headers: { 'x-admin-key': adminKey }
       });
       const data = await res.json();
-      setEvents(data.events || []);
+      
+      const rawEvents = data.events || [];
+      const grouped = [];
+      const groupMap = {}; // groupKey -> index in grouped
+      
+      rawEvents.forEach(evt => {
+        const showType = evt.show_type || 'single';
+        if (showType === 'multiple' || showType === 'festival') {
+          const groupKey = `${(evt.title || '').toLowerCase().trim()}-${(evt.category || '').toLowerCase().trim()}-${evt.created_by}`;
+          if (groupMap[groupKey] !== undefined) {
+            const existing = grouped[groupMap[groupKey]];
+            existing.showsList.push(evt);
+            existing.ids.push(evt.id);
+            // Combine ticket tiers
+            existing.event_ticket_tiers = [
+              ...(existing.event_ticket_tiers || []),
+              ...(evt.event_ticket_tiers || [])
+            ];
+          } else {
+            const entry = {
+              ...evt,
+              ids: [evt.id],
+              showsList: [evt]
+            };
+            groupMap[groupKey] = grouped.length;
+            grouped.push(entry);
+          }
+        } else {
+          grouped.push({
+            ...evt,
+            ids: [evt.id],
+            showsList: [evt]
+          });
+        }
+      });
+      
+      setEvents(grouped);
     } catch (err) {
       toast.error('Failed to load pending events');
     } finally {
@@ -290,18 +389,19 @@ const EventApprovalsPanel = ({ API_URL }) => {
 
   useEffect(() => { fetchPending(); }, []);
 
-  const handleAction = async (id, action) => {
-    setActionLoading(id + action);
+  const handleAction = async (ids, action) => {
+    const actionKey = ids[0] + action;
+    setActionLoading(actionKey);
     try {
       const res = await fetch(`${API_URL}/api/admin/events/${action}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
-        body: JSON.stringify({ id })
+        body: JSON.stringify({ id: ids })
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(action === 'approve' ? '✅ Event approved! Visible to buyers.' : '❌ Event rejected.');
-        setEvents(prev => prev.filter(e => e.id !== id));
+        toast.success(action === 'approve' ? '✅ Events approved! Visible to buyers.' : '❌ Events rejected.');
+        setEvents(prev => prev.filter(e => !ids.includes(e.id)));
       } else {
         toast.error(data.error || 'Action failed');
       }
@@ -349,9 +449,18 @@ const EventApprovalsPanel = ({ API_URL }) => {
               <div key={event.id} style={{ background: '#fff', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.07)', border: '1px solid #e2e8f0', display: 'flex', gap: 0 }}>
                 {/* Banner */}
                 <div style={{ width: '200px', minWidth: '200px', height: '160px', background: '#1e293b', flexShrink: 0, position: 'relative' }}>
-                  {event.banner_url && (
-                    <img src={event.banner_url} alt={event.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  )}
+                  {event.banner_url && (() => {
+                    let url = event.banner_url;
+                    if (typeof url === 'string' && url.startsWith('[')) {
+                      try {
+                        const parsed = JSON.parse(url);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                          url = parsed[0];
+                        }
+                      } catch (_) { /* ignore */ }
+                    }
+                    return <img src={url} alt={event.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />;
+                  })()}
                   <span style={{ position: 'absolute', top: 10, left: 10, background: '#f59e0b', color: '#fff', borderRadius: '10px', padding: '3px 10px', fontSize: '0.7rem', fontWeight: 700 }}>
                     ⏳ PENDING
                   </span>
@@ -360,9 +469,21 @@ const EventApprovalsPanel = ({ API_URL }) => {
                 {/* Details */}
                 <div style={{ flex: 1, padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
+                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                       <h3 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{event.title}</h3>
                       <span style={{ background: '#f1f5f9', color: '#475569', borderRadius: '8px', padding: '2px 10px', fontSize: '0.75rem', fontWeight: 600 }}>{event.category}</span>
+                      <span style={{ 
+                        background: event.show_type === 'festival' ? 'linear-gradient(135deg,#db2777,#ec4899)'
+                          : event.show_type === 'multiple' ? 'linear-gradient(135deg,#7c3aed,#4f46e5)'
+                          : '#f1f5f9',
+                        color: (event.show_type === 'festival' || event.show_type === 'multiple') ? '#fff' : '#475569', 
+                        borderRadius: '8px', 
+                        padding: '2px 10px', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 700
+                      }}>
+                        {event.show_type === 'festival' ? '🎪 Tour / Festival' : event.show_type === 'multiple' ? '🎭 Multiple Shows' : '🎫 Single Show'}
+                      </span>
                     </div>
                     <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#ff6b00' }}>from ₹{minPrice}</span>
                   </div>
@@ -371,27 +492,40 @@ const EventApprovalsPanel = ({ API_URL }) => {
                     {event.description?.slice(0, 120)}{event.description?.length > 120 ? '...' : ''}
                   </p>
 
-                  <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
-                    <span>📅 {formatDate(event.event_date)}</span>
-                    <span>📍 {event.venue_name}</span>
-                    <span>🎟 {event.event_ticket_tiers?.length || 0} tier(s)</span>
-                  </div>
+                  {event.showsList && event.showsList.length > 1 ? (
+                    <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '10px 14px', margin: '4px 0', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>📅 Scheduled Slots ({event.showsList.length}):</span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {event.showsList.map((slot, idx) => (
+                          <div key={slot.id || idx} style={{ fontSize: '0.72rem', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '4px 8px', color: '#1e293b' }}>
+                            <strong>Slot {idx + 1}:</strong> {formatDate(slot.event_date)} at 📍 {slot.venue_name || 'Venue'}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
+                      <span>📅 {formatDate(event.event_date)}</span>
+                      <span>📍 {event.venue_name}</span>
+                      <span>🎟 {event.event_ticket_tiers?.length || 0} tier(s)</span>
+                    </div>
+                  )}
 
                   {/* Actions */}
                   <div style={{ display: 'flex', gap: '0.75rem', marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px dashed #e2e8f0' }}>
                     <button
-                      onClick={() => handleAction(event.id, 'approve')}
-                      disabled={actionLoading === event.id + 'approve'}
-                      style={{ background: '#22c55e', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem', opacity: actionLoading === event.id + 'approve' ? 0.6 : 1 }}
+                      onClick={() => handleAction(event.ids, 'approve')}
+                      disabled={actionLoading === event.ids[0] + 'approve'}
+                      style={{ background: '#22c55e', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem', opacity: actionLoading === event.ids[0] + 'approve' ? 0.6 : 1 }}
                     >
-                      {actionLoading === event.id + 'approve' ? 'Approving...' : '✅ Approve'}
+                      {actionLoading === event.ids[0] + 'approve' ? 'Approving...' : '✅ Approve'}
                     </button>
                     <button
-                      onClick={() => handleAction(event.id, 'reject')}
-                      disabled={actionLoading === event.id + 'reject'}
-                      style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem', opacity: actionLoading === event.id + 'reject' ? 0.6 : 1 }}
+                      onClick={() => handleAction(event.ids, 'reject')}
+                      disabled={actionLoading === event.ids[0] + 'reject'}
+                      style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem', opacity: actionLoading === event.ids[0] + 'reject' ? 0.6 : 1 }}
                     >
-                      {actionLoading === event.id + 'reject' ? 'Rejecting...' : '❌ Reject'}
+                      {actionLoading === event.ids[0] + 'reject' ? 'Rejecting...' : '❌ Reject'}
                     </button>
                     <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#94a3b8', alignSelf: 'center' }}>
                       Submitted {formatDate(event.created_at)}
@@ -583,7 +717,7 @@ const PromoCodesPanel = ({ supabase: sb }) => {
     try {
       const { data, error } = await sb.from('promo_codes').select('*').order('created_at', { ascending: false });
       if (!error) setCodes(data || []);
-    } catch (_) {}
+    } catch (_) { /* ignore */ }
     setLoading(false);
   };
 
@@ -673,7 +807,7 @@ const PromoCodesPanel = ({ supabase: sb }) => {
           </div>
           <div>
             <label style={labelStyle}>Expires At</label>
-            <input style={inputStyle} type="datetime-local" value={form.expires_at} onChange={e => setForm(p => ({ ...p, expires_at: e.target.value }))} />
+            <input style={inputStyle} type="datetime-local" min={getLocalTodayDateTime()} value={form.expires_at} onChange={e => setForm(p => ({ ...p, expires_at: e.target.value }))} />
           </div>
         </div>
         <button type="submit" disabled={saving} style={{ marginTop: '1.25rem', padding: '10px 24px', background: saving ? '#94a3b8' : '#ff7622', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', fontSize: '0.9rem' }}>
@@ -773,6 +907,8 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
 
   const [activeAdminTab, setActiveAdminTab] = useState(() => localStorage.getItem('admin_active_tab') || 'dashboard_panel');
   const [eventWizardStep, setEventWizardStep] = useState(1);
+
+
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -845,7 +981,39 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [showPurgeConfirm, setShowPurgeConfirm] = useState(false);
   const [isSaving, setSaving] = useState(false);
-  const [syncStatus, setSyncStatus] = useState('cloud'); // 'cloud' or 'offline'
+  const [syncStatus, setSyncStatus] = useState('cloud'); // 'cloud', 'cached', 'offline', 'missing_table'
+
+  const bannerUrls = useMemo(() => {
+    const raw = formData.banner_url || '';
+    if (typeof raw === 'string' && raw.startsWith('[')) {
+      try {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) return arr;
+      } catch (_) { /* ignore */ }
+    }
+    return raw ? [raw] : [''];
+  }, [formData.banner_url]);
+
+  const handleUpdateBannerUrl = (index, value) => {
+    const nextUrls = [...bannerUrls];
+    nextUrls[index] = value;
+    const filtered = nextUrls.filter(Boolean);
+    const serialized = filtered.length > 1 ? JSON.stringify(filtered) : (filtered[0] || '');
+    setFormData(prev => ({ ...prev, banner_url: serialized }));
+  };
+
+  const handleAddBannerUrl = () => {
+    const nextUrls = [...bannerUrls, ''];
+    const serialized = JSON.stringify(nextUrls.filter(Boolean));
+    setFormData(prev => ({ ...prev, banner_url: serialized }));
+  };
+
+  const handleRemoveBannerUrl = (index) => {
+    const nextUrls = bannerUrls.filter((_, idx) => idx !== index);
+    const filtered = nextUrls.filter(Boolean);
+    const serialized = filtered.length > 1 ? JSON.stringify(filtered) : (filtered[0] || '');
+    setFormData(prev => ({ ...prev, banner_url: serialized }));
+  };
 
   const downloadAdminSalesReport = async () => {
     if (!adminSupabase) {
@@ -1028,21 +1196,28 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
   const [serviceCategoriesList, setServiceCategoriesList] = useState([]);
   const [servicesList, setServicesList] = useState([]);
   const [addressesList, setAddressesList] = useState([]);
-  const [pendingEvents, setPendingEvents] = useState([]);
-  const [pendingEventsLoading, setPendingEventsLoading] = useState(false);
 
-  const fetchReferences = useCallback(async () => {
+  const refsLoaded = useRef(false);
+
+  const fetchReferences = useCallback(async (force = false) => {
+    if (refsLoaded.current && !force) return;
     try {
       const fetchTable = async (table) => {
         const adminKey = sessionStorage.getItem('admin_token') || '';
-        const res = await fetch(`${API_URL}/api/admin/fetch?table=${table}`, { headers: { 'x-admin-key': adminKey } });
-        if (res.status === 401) {
-          toast.error('Session expired. Please login again.');
-          onLogout();
+        try {
+          const res = await fetchWithTimeout(`${API_URL}/api/admin/fetch?table=${table}`, { headers: { 'x-admin-key': adminKey } });
+          if (res.status === 401) {
+            toast.error('Session expired. Please login again.');
+            onLogout();
+            return [];
+          }
+          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+          const json = await res.json();
+          return json.success ? json.data : [];
+        } catch (e) {
+          console.warn(`Failed to fetch lookup table '${table}':`, e);
           return [];
         }
-        const json = await res.json();
-        return json.success ? json.data : [];
       };
 
       const [u, v, s, p, pc, sc, sv, addr] = await Promise.all([
@@ -1064,6 +1239,8 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
       if (sc) setServiceCategoriesList(sc);
       if (sv) setServicesList(sv);
       if (addr) setAddressesList(addr);
+      
+      refsLoaded.current = true;
     } catch (err) {
       console.error('Failed to fetch references:', err);
     }
@@ -1124,7 +1301,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
   const executePurge = async () => {
     setShowPurgeConfirm(false);
     try {
-      toast.loading('Performing deep purge of platform residue...', { id: 'purge' });
+      toast.loading('Purging rejected events and restoring stuck ones...', { id: 'purge' });
       
       const adminKey = sessionStorage.getItem('admin_token') || '';
       const res = await fetch(`${API_URL}/api/admin/purge`, { 
@@ -1140,13 +1317,16 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to purge data');
 
-      toast.success('Platform is now clean and production-pure!', { id: 'purge' });
+      const logMsg = json.log ? json.log.join(' | ') : 'Clean-up complete!';
+      toast.success(`✅ ${logMsg}`, { id: 'purge', duration: 6000 });
       fetchStats();
+      fetchData(); // Refresh current tab data to reflect purged events
     } catch (err) {
       console.error('Purge error:', err);
       toast.error('Purge failed: ' + err.message, { id: 'purge' });
     }
   };
+
 
   const fetchPeopleMapData = useCallback(async () => {
     try {
@@ -1303,63 +1483,123 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
     setLoading(true);
     const currentTable = TABS.find(t => t.id === activeAdminTab)?.table || activeAdminTab;
 
+    // ── Try backend API (up to 2 attempts) ──────────────────────────────────
+    const tryBackendFetch = async () => {
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const adminKey = sessionStorage.getItem('admin_token') || '';
+          if (!adminKey) return null; // No token — skip backend
+          const res = await fetchWithTimeout(`${API_URL}/api/admin/fetch?table=${currentTable}`, {
+            headers: { 'x-admin-key': adminKey }
+          });
+          if (res.status === 401) {
+            toast.error('Session expired. Please login again.');
+            onLogout();
+            return 'logout';
+          }
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const json = await res.json();
+          if (!json.success) throw new Error(json.error || 'API error');
+          return json.data || [];
+        } catch (err) {
+          console.warn(`Backend fetch attempt ${attempt} failed:`, err.message);
+          if (attempt < 2) await new Promise(r => setTimeout(r, 1500)); // wait before retry
+        }
+      }
+      return null; // Both attempts failed
+    };
+
+    // ── Try Supabase direct (anon key, works for public/no-RLS tables) ──────
+    const trySupabaseFetch = async () => {
+      if (!adminSupabase) return null;
+      try {
+        const { data, error } = await adminSupabase
+          .from(currentTable)
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(500);
+        if (error) {
+          console.warn('Supabase direct fetch failed:', error.message);
+          return null;
+        }
+        return data || [];
+      } catch (e) {
+        console.warn('Supabase direct fetch error:', e);
+        return null;
+      }
+    };
+
     try {
-      const adminKey = sessionStorage.getItem('admin_token') || '';
-      const res = await fetch(`${API_URL}/api/admin/fetch?table=${currentTable}`, { headers: { 'x-admin-key': adminKey } });
-      if (res.status === 401) {
-        toast.error('Session expired. Please login again.');
-        onLogout();
+      // 1. Try backend API first (has service-role access, no RLS)
+      const backendData = await tryBackendFetch();
+      if (backendData === 'logout') return;
+
+      if (backendData !== null) {
+        // Backend succeeded
+        let filteredData = backendData;
+        if (currentTable === 'products') {
+          filteredData = filteredData.filter(p => p.description !== 'Service item auto-registered');
+        }
+        const localKey = `admin_local_${currentTable}`;
+        const localAdded = JSON.parse(localStorage.getItem(localKey) || '[]');
+        if (localAdded.length > 0) {
+          const serverIds = new Set(filteredData.map(item => item.id));
+          const unsyncedLocal = localAdded.filter(item => !serverIds.has(item.id));
+          filteredData = [...unsyncedLocal, ...filteredData];
+        }
+        setData(filteredData);
+        safeSetItem(`admin_cache_${currentTable}`, JSON.stringify(filteredData));
+        setSyncStatus('cloud');
+        toast.dismiss('offline-toast');
         return;
       }
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error || 'Failed to fetch cloud data');
-      const suData = json.data;
 
-      // Update State & Cache
-      let filteredData = suData || [];
-      if (currentTable === 'products') {
-        filteredData = filteredData.filter(p => p.description !== 'Service item auto-registered');
+      // 2. Backend failed — try Supabase direct
+      console.warn('Backend API unavailable, trying Supabase direct...');
+      const supabaseData = await trySupabaseFetch();
+
+      if (supabaseData !== null && supabaseData.length >= 0) {
+        // Supabase direct succeeded
+        let filteredData = supabaseData;
+        if (currentTable === 'products') {
+          filteredData = filteredData.filter(p => p.description !== 'Service item auto-registered');
+        }
+        setData(filteredData);
+        safeSetItem(`admin_cache_${currentTable}`, JSON.stringify(filteredData));
+        setSyncStatus('cloud'); // Supabase direct = still cloud sync
+        toast.dismiss('offline-toast');
+        return;
       }
 
-      // Merge local untracked offline records so they show in the table
-      const localKey = `admin_local_${currentTable}`;
-      const localAdded = JSON.parse(localStorage.getItem(localKey) || '[]');
-      if (localAdded.length > 0) {
-        const serverIds = new Set(filteredData.map(item => item.id));
-        const unsyncedLocal = localAdded.filter(item => !serverIds.has(item.id));
-        filteredData = [...unsyncedLocal, ...filteredData];
-      }
+      // 3. Both failed — use cache
+      throw new Error('All data sources unavailable');
 
-      setData(filteredData);
-      localStorage.setItem(`admin_cache_${currentTable}`, JSON.stringify(filteredData));
-      setSyncStatus('cloud');
-      toast.dismiss('offline-toast'); // Clear any previous offline warnings
     } catch (err) {
-      console.error('Fetch Error:', err);
+      console.error('All fetch attempts failed:', err.message);
 
-      // Check for missing table error
       if (err.message && (err.message.includes('Could not find the table') || err.message.includes('does not exist'))) {
         toast.error(`Table '${currentTable}' is missing in Supabase!`, { duration: 6000, id: 'missing-table-toast' });
         setSyncStatus('missing_table');
-      } else {
-        setSyncStatus('offline');
-      }
-
-      // Fallback to cache
-      const cached = localStorage.getItem(`admin_cache_${currentTable}`);
-      if (cached) {
-        setData(JSON.parse(cached));
-        toast('Showing local cache (Offline)', {
-          id: 'offline-toast',
-          icon: '📦',
-          duration: 4000,
-          action: {
-            label: 'Retry Sync',
-            onClick: () => fetchData()
-          }
-        });
-      } else {
         setData([]);
+      } else {
+        const cached = localStorage.getItem(`admin_cache_${currentTable}`);
+        if (cached) {
+          const cachedData = JSON.parse(cached);
+          setData(cachedData);
+          setSyncStatus('cached'); // Has data but from cache
+          toast('Showing cached data — reconnecting...', {
+            id: 'offline-toast',
+            icon: '⚡',
+            duration: 3000
+          });
+        } else {
+          setData([]);
+          setSyncStatus('offline'); // Truly offline with no data
+          toast.error('Cannot connect to server. Please check your connection.', {
+            id: 'offline-toast',
+            duration: 5000
+          });
+        }
       }
     } finally {
       setLoading(false);
@@ -1369,9 +1609,10 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
   // Load static system settings and statistics once on mount
   useEffect(() => {
     fetchStats();
-    fetchReferences();
     fetchPlatformSettings();
-  }, [fetchStats, fetchReferences, fetchPlatformSettings]);
+    // Pre-fetch reference data in the background so modal opens instantly
+    fetchReferences();
+  }, [fetchStats, fetchPlatformSettings, fetchReferences]);
 
   // Sync active tab data instantly when switching tabs
   useEffect(() => {
@@ -1387,6 +1628,15 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
     }
     localStorage.setItem('admin_active_tab', activeAdminTab);
   }, [activeAdminTab, fetchData, fetchPeopleMapData]);
+
+  // Auto-retry when in cached state (every 30s)
+  useEffect(() => {
+    if (syncStatus !== 'cached') return;
+    const retryTimer = setInterval(() => {
+      fetchData();
+    }, 30000);
+    return () => clearInterval(retryTimer);
+  }, [syncStatus, fetchData]);
 
   // Refresh dashboard analytics specifically when visiting the dashboard tab
   useEffect(() => {
@@ -1431,7 +1681,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
         (item.uid && item.uid !== deleteConfirmId) &&
         (item.phone && item.phone !== deleteConfirmId)
       );
-      localStorage.setItem(localKey, JSON.stringify(newLocal));
+      safeSetItem(localKey, JSON.stringify(newLocal));
 
       const cacheKey = `admin_cache_${currentTab.table}`;
       const cached = JSON.parse(localStorage.getItem(cacheKey) || '[]');
@@ -1440,7 +1690,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
         (item.uid && item.uid !== deleteConfirmId) &&
         (item.phone && item.phone !== deleteConfirmId)
       );
-      localStorage.setItem(cacheKey, JSON.stringify(newCached));
+      safeSetItem(cacheKey, JSON.stringify(newCached));
 
       setData(prev => prev.filter(item =>
         (item.id && item.id !== deleteConfirmId) &&
@@ -1479,6 +1729,35 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
         payload.id_proof = payload.id_proof.replace(/\s/g, '');
       }
 
+      // Convert event datetime fields from local strings to UTC ISO strings
+      // (event_date / ends_at are stored as "YYYY-MM-DDTHH:MM" local strings by the date+time inputs)
+      if (currentTab.table === 'events') {
+        const toUTCISO = (val) => {
+          if (!val) return val;
+          if (typeof val === 'string' && val.includes('T') && !val.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(val)) {
+            // Local string — parse as local time and convert to UTC
+            const d = new Date(val);
+            return isNaN(d.getTime()) ? val : d.toISOString();
+          }
+          return val;
+        };
+        if (payload.event_date) payload.event_date = toUTCISO(payload.event_date);
+        if (payload.ends_at) payload.ends_at = toUTCISO(payload.ends_at);
+        if (payload.booking_start) payload.booking_start = toUTCISO(payload.booking_start);
+        if (payload.booking_end) payload.booking_end = toUTCISO(payload.booking_end);
+        // Validate required fields for events
+        if (!payload.event_date) {
+          toast.error('Please set the event date and start time.');
+          setSaving(false);
+          return;
+        }
+        if (!payload.title) {
+          toast.error('Please enter a title for the event.');
+          setSaving(false);
+          return;
+        }
+      }
+
       // Temporary local ID if missing
       if (!editingItem && !payload.id) {
         payload.id = 'temp_' + Date.now();
@@ -1505,13 +1784,23 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
         
         if (currentTab.table === 'events' && (payload.show_type === 'multiple' || payload.show_type === 'festival') && payload.schedule_slots && payload.schedule_slots.length > 0) {
           for (const slot of payload.schedule_slots) {
+            // Build local datetime strings then convert to UTC ISO
+            const startLocalStr = slot.date ? `${slot.date}T${slot.starts || '19:00'}:00` : null;
+            const endLocalStr = slot.date ? `${slot.date}T${slot.ends || '22:00'}:00` : null;
+            const toUTCISOSafe = (localStr) => {
+              if (!localStr) return new Date().toISOString();
+              const d = new Date(localStr);
+              return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+            };
             const slotPayload = {
               ...payload,
-              event_date: slot.date ? `${slot.date}T${slot.starts || '19:00'}:00` : new Date().toISOString(),
-              ends_at: slot.date ? `${slot.date}T${slot.ends || '22:00'}:00` : new Date().toISOString(),
-              venue_name: slot.venue_name || 'Venue TBA'
+              event_date: toUTCISOSafe(startLocalStr),
+              ends_at: toUTCISOSafe(endLocalStr),
+              venue_name: (slot.venue_name && slot.venue_name.trim()) ? slot.venue_name.trim() : (payload.venue_name || 'Venue TBA'),
+              status: 'UPCOMING', // Ensure each slot is immediately visible to buyers
             };
             delete slotPayload.schedule_slots; // clean up client-only field
+            delete slotPayload.id; // Each slot must be a new record
             
             const response = await fetch(`${API_URL}/api/admin/upsert`, {
               method: 'POST',
@@ -1540,7 +1829,12 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
         } else {
           let finalPayload = { ...payload };
           delete finalPayload.schedule_slots; // clean up client-only field
+          // Admin-created events should be immediately visible to buyers (UPCOMING)
+          if (currentTab.table === 'events' && !editingItem && !finalPayload.status) {
+            finalPayload.status = 'UPCOMING';
+          }
           const response = await fetch(`${API_URL}/api/admin/upsert`, {
+
             method: 'POST',
             headers: { 
               'Content-Type': 'application/json',
@@ -1566,11 +1860,11 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
             setData(prev => prev.map(item => item.id === payload.id ? returnedItem : item));
             const localAddedCurrent = JSON.parse(localStorage.getItem(localKey) || '[]');
             const newLocal = localAddedCurrent.map(item => item.id === payload.id ? returnedItem : item);
-            localStorage.setItem(localKey, JSON.stringify(newLocal));
+             safeSetItem(localKey, JSON.stringify(newLocal));
 
             const cachedListCurrent = JSON.parse(localStorage.getItem(cacheKey) || '[]');
             const newCached = cachedListCurrent.map(item => item.id === payload.id ? returnedItem : item);
-            localStorage.setItem(cacheKey, JSON.stringify(newCached));
+             safeSetItem(cacheKey, JSON.stringify(newCached));
           }
 
           toast.success('Synced with Cloud! ☁️', { id: 'offline-toast' });
@@ -1626,7 +1920,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
       // Update cache
       const cacheKey = `admin_cache_${currentTab.table}`;
       const cached = JSON.parse(localStorage.getItem(cacheKey) || '[]');
-      localStorage.setItem(cacheKey, JSON.stringify(cached.map(d => d.id === item.id ? { ...d, is_verified: nextVerified } : d)));
+      safeSetItem(cacheKey, JSON.stringify(cached.map(d => d.id === item.id ? { ...d, is_verified: nextVerified } : d)));
     } catch (err) {
       console.error(err);
       toast.error('Verification failed: ' + err.message);
@@ -1666,7 +1960,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
       // Update cache
       const cacheKey = `admin_cache_${currentTab.table}`;
       const cached = JSON.parse(localStorage.getItem(cacheKey) || '[]');
-      localStorage.setItem(cacheKey, JSON.stringify(cached.map(d => d.id === item.id ? { ...d, is_suspended: nextSuspended } : d)));
+      safeSetItem(cacheKey, JSON.stringify(cached.map(d => d.id === item.id ? { ...d, is_suspended: nextSuspended } : d)));
     } catch (err) {
       console.error(err);
       toast.error('Suspension update failed: ' + err.message);
@@ -1701,6 +1995,22 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                 setFormData(prev => ({ ...prev, ticket_tiers: eventTiers.length > 0 ? eventTiers : [{ id: 'temp_' + Date.now(), tier_name: 'General Admission', price: 0, total_seats: 100, available_seats: 100 }] }));
               }
             });
+
+          if (item.showsList && item.showsList.length > 0) {
+            cleanData.schedule_slots = item.showsList.map(s => {
+              const d = new Date(s.event_date);
+              const dateStr = d.toISOString().split('T')[0];
+              const startsStr = d.toTimeString().slice(0, 5);
+              const endsStr = s.ends_at ? new Date(s.ends_at).toTimeString().slice(0, 5) : '22:00';
+              return {
+                id: s.id,
+                date: dateStr,
+                starts: startsStr,
+                ends: endsStr,
+                venue_name: s.venue_name
+              };
+            });
+          }
         }
         
         setFormData(cleanData);
@@ -1779,7 +2089,39 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
       }
     });
 
-    const displayData = uniqueEntries;
+    let displayData = uniqueEntries;
+    if (currentTab.table === 'events') {
+      const grouped = [];
+      const groupMap = {}; // groupKey -> index in grouped
+      uniqueEntries.forEach(item => {
+        const showType = item.show_type || 'single';
+        if (showType === 'multiple' || showType === 'festival') {
+          const groupKey = `${(item.title || '').toLowerCase().trim()}-${(item.category || '').toLowerCase().trim()}-${item.created_by}`;
+          if (groupMap[groupKey] !== undefined) {
+            const existing = grouped[groupMap[groupKey]];
+            existing.showsList.push(item);
+            if (!existing.ids.includes(item.id)) {
+              existing.ids.push(item.id);
+            }
+          } else {
+            const entry = {
+              ...item,
+              ids: [item.id],
+              showsList: [item]
+            };
+            groupMap[groupKey] = grouped.length;
+            grouped.push(entry);
+          }
+        } else {
+          grouped.push({
+            ...item,
+            ids: [item.id],
+            showsList: [item]
+          });
+        }
+      });
+      displayData = grouped;
+    }
 
     return (
       <div className="admin-table-container">
@@ -1917,6 +2259,11 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                         }
                       } else if (['price', 'discount_price', 'total_amount', 'amount', 'subtotal', 'delivery_fee'].includes(k) && v !== null && v !== undefined) {
                         displayVal = `₹${parseFloat(v).toLocaleString()}`;
+                      } else if (k === 'event_date' && item.showsList && item.showsList.length > 1) {
+                        displayVal = `Multiple Dates (${item.showsList.length} shows)`;
+                      } else if (k === 'venue_name' && item.showsList && item.showsList.length > 1) {
+                        const uniqueVenues = Array.from(new Set(item.showsList.map(s => s.venue_name).filter(Boolean)));
+                        displayVal = uniqueVenues.length > 1 ? `Multiple Venues (${uniqueVenues.length})` : (uniqueVenues[0] || 'N/A');
                       } else if ((k === 'id_proof' || k === 'aadhar_no') && displayVal.length === 12 && /^\d+$/.test(displayVal)) {
                         const parts = [];
                         for (let i = 0; i < displayVal.length; i += 4) {
@@ -1933,6 +2280,20 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                             ) : (
                               <span className="status-badge" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600 }}>Active</span>
                             )
+                          ) : k === 'show_type' ? (
+                            <span className="status-badge" style={{ 
+                              background: v === 'festival' ? 'linear-gradient(135deg,#db2777,#ec4899)'
+                                : v === 'multiple' ? 'linear-gradient(135deg,#7c3aed,#4f46e5)'
+                                : '#f1f5f9',
+                              color: (v === 'festival' || v === 'multiple') ? '#fff' : '#475569',
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.8rem',
+                              fontWeight: 700,
+                              display: 'inline-block'
+                            }}>
+                              {v === 'festival' ? 'Tour / Festival' : v === 'multiple' ? 'Multiple Shows' : 'Single Show'}
+                            </span>
                           ) : k === 'status' || k === 'role' ? (
                             <span className={`status-badge ${v}`}>{v}</span>
                           ) : typeof v === 'boolean' ? (
@@ -2241,7 +2602,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
             cursor: 'pointer',
             boxShadow: '0 4px 15px rgba(239, 68, 68, 0.3)'
           }}>
-            <Trash2 size={20} /> Purge Production Mock Residue
+            <Trash2 size={20} /> Fix & Purge Fake/Rejected Events
           </button>
         </div>
       </div>
@@ -2536,19 +2897,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                 <span style={{ fontSize: '0.7rem', color: '#3730a3', fontWeight: 600 }}>Charged when requesting Profession Console</span>
               </div>
 
-              {/* Rental */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '1rem', background: '#ecfeff', borderRadius: '14px', border: '1.5px solid #a5f3fc' }}>
-                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0e7490', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  🚗 RENTAL / VEHICLES — FEE (₹)
-                </label>
-                <input
-                  type="number" min={0}
-                  value={platformSettings.upgradeRentalFee ?? 999}
-                  onChange={e => setPlatformSettings({ ...platformSettings, upgradeRentalFee: parseInt(e.target.value) || 0 })}
-                  style={{ padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #a5f3fc', outline: 'none', fontSize: '1rem', fontWeight: 700, color: '#0f172a', background: 'white' }}
-                />
-                <span style={{ fontSize: '0.7rem', color: '#155e75', fontWeight: 600 }}>Charged when requesting Rental Console</span>
-              </div>
+
 
               {/* Shop */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '1rem', background: '#f0fdf4', borderRadius: '14px', border: '1.5px solid #bbf7d0' }}>
@@ -2676,7 +3025,10 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
           </div>
           <div className="admin-profile-pill">
             <span className={`sync-indicator ${syncStatus}`}>
-              {syncStatus === 'cloud' ? '☁️ Cloud Sync Active' : '🏠 Offline Mode'}
+              {syncStatus === 'cloud' ? '☁️ Cloud Sync Active' :
+               syncStatus === 'cached' ? '⚡ Cached Data' :
+               syncStatus === 'missing_table' ? '⚠️ Table Missing' :
+               '🔴 No Connection'}
             </span>
           </div>
         </header>
@@ -2741,7 +3093,51 @@ CREATE TABLE IF NOT EXISTS service_areas (
                       <h2 className="table-title">{currentTab.label}</h2>
                       <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Manage and monitor entries in real-time.</p>
                     </div>
-                    <span className="count-chip">{data.length} Total Records</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span className="count-chip">{data.length} Total Records</span>
+                      {syncStatus === 'offline' && (
+                        <button
+                          onClick={() => { localStorage.removeItem(`admin_cache_${currentTab.table}`); fetchData(); }}
+                          style={{
+                            background: 'linear-gradient(135deg,#f97316,#ea580c)',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '20px',
+                            padding: '6px 16px',
+                            fontWeight: 700,
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            boxShadow: '0 2px 8px rgba(249,115,22,0.3)'
+                          }}
+                        >
+                          ↻ Retry Sync
+                        </button>
+                      )}
+                      {syncStatus === 'cached' && (
+                        <button
+                          onClick={() => fetchData()}
+                          style={{
+                            background: 'linear-gradient(135deg,#f59e0b,#d97706)',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '20px',
+                            padding: '6px 16px',
+                            fontWeight: 700,
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            boxShadow: '0 2px 8px rgba(245,158,11,0.3)'
+                          }}
+                        >
+                          ↻ Reconnect
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {renderTable()}
                 </>
@@ -2976,7 +3372,8 @@ CREATE TABLE IF NOT EXISTS service_areas (
                               <input 
                                 type="datetime-local" 
                                 required
-                                value={formData.booking_start ? new Date(formData.booking_start).toISOString().slice(0, 16) : ''}
+                                min={getLocalTodayDateTime()}
+                                value={toLocalISOString(formData.booking_start)}
                                 onChange={(e) => {
                                   setFormData({ ...formData, booking_start: e.target.value ? new Date(e.target.value).toISOString() : '' });
                                 }}
@@ -2987,7 +3384,8 @@ CREATE TABLE IF NOT EXISTS service_areas (
                               <input 
                                 type="datetime-local" 
                                 required
-                                value={formData.booking_end ? new Date(formData.booking_end).toISOString().slice(0, 16) : ''}
+                                min={getMinDateTimeForEnd(formData.booking_start)}
+                                value={toLocalISOString(formData.booking_end)}
                                 onChange={(e) => {
                                   setFormData({ ...formData, booking_end: e.target.value ? new Date(e.target.value).toISOString() : '' });
                                 }}
@@ -3070,7 +3468,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
                               <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
                                 <div className="form-field">
                                   <label>Date *</label>
-                                  <input type="date" required value={slot.date || ''} onChange={(e) => {
+                                  <input type="date" required min={getLocalTodayDate()} value={slot.date || ''} onChange={(e) => {
                                     const slots = [...formData.schedule_slots];
                                     slots[index] = { ...slot, date: e.target.value };
                                     setFormData({ ...formData, schedule_slots: slots });
@@ -3272,15 +3670,47 @@ CREATE TABLE IF NOT EXISTS service_areas (
 
                       <div className="wizard-section-card">
                         <div className="section-card-header">
-                          <h4>Banner Image</h4>
+                          <h4>Event Images (Multiple Banners)</h4>
                         </div>
-                        <div className="form-field">
-                          <label>Banner URL *</label>
-                          <input type="text" placeholder="https://example.com/banner.jpg" required value={formData.banner_url || ''} onChange={(e) => setFormData({ ...formData, banner_url: e.target.value })} />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                          {bannerUrls.map((url, idx) => (
+                            <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <div style={{ flex: 1 }}>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>Image URL #{idx + 1}</label>
+                                <input 
+                                  type="text" 
+                                  placeholder="https://example.com/image.jpg" 
+                                  value={url} 
+                                  onChange={(e) => handleUpdateBannerUrl(idx, e.target.value)}
+                                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1.5px solid #e2e8f0', marginTop: '4px' }}
+                                />
+                              </div>
+                              {bannerUrls.length > 1 && (
+                                <button 
+                                  type="button" 
+                                  onClick={() => handleRemoveBannerUrl(idx)}
+                                  style={{ padding: '10px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', alignSelf: 'flex-end', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                          <button 
+                            type="button" 
+                            onClick={handleAddBannerUrl}
+                            style={{ padding: '10px 16px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', width: 'fit-content' }}
+                          >
+                            + Add Another Image URL
+                          </button>
                         </div>
-                        {formData.banner_url && (
-                          <div className="banner-preview-box">
-                            <img src={formData.banner_url} alt="Event Preview" />
+                        {bannerUrls.filter(Boolean).length > 0 && (
+                          <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', padding: '10px 0', marginTop: '1rem' }}>
+                            {bannerUrls.filter(Boolean).map((url, idx) => (
+                              <div key={idx} style={{ width: '120px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0', flexShrink: 0 }}>
+                                <img src={url} alt={`Preview ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=120&q=80'; }} />
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -3345,7 +3775,18 @@ CREATE TABLE IF NOT EXISTS service_areas (
 
                       <div className="wizard-section-card review-summary-card">
                         <div className="review-banner">
-                          {formData.banner_url && <img src={formData.banner_url} alt="Banner" />}
+                          {formData.banner_url && (() => {
+                            let url = formData.banner_url;
+                            if (typeof url === 'string' && url.startsWith('[')) {
+                              try {
+                                const parsed = JSON.parse(url);
+                                if (Array.isArray(parsed) && parsed.length > 0) {
+                                  url = parsed[0];
+                                }
+                              } catch (_) { /* ignore */ }
+                            }
+                            return <img src={url} alt="Banner" />;
+                          })()}
                           <span className="review-status-badge">UPCOMING</span>
                         </div>
                         <div className="review-content">
@@ -3473,7 +3914,8 @@ CREATE TABLE IF NOT EXISTS service_areas (
                               <input 
                                 type="datetime-local" 
                                 required
-                                value={formData.booking_start ? new Date(formData.booking_start).toISOString().slice(0, 16) : ''}
+                                min={getLocalTodayDateTime()}
+                                value={toLocalISOString(formData.booking_start)}
                                 onChange={(e) => {
                                   setFormData({ ...formData, booking_start: e.target.value ? new Date(e.target.value).toISOString() : '' });
                                 }}
@@ -3484,7 +3926,8 @@ CREATE TABLE IF NOT EXISTS service_areas (
                               <input 
                                 type="datetime-local" 
                                 required
-                                value={formData.booking_end ? new Date(formData.booking_end).toISOString().slice(0, 16) : ''}
+                                min={getMinDateTimeForEnd(formData.booking_start)}
+                                value={toLocalISOString(formData.booking_end)}
                                 onChange={(e) => {
                                   setFormData({ ...formData, booking_end: e.target.value ? new Date(e.target.value).toISOString() : '' });
                                 }}
@@ -3581,7 +4024,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
                                 </div>
                                 <div className="form-field">
                                   <label>Date *</label>
-                                  <input type="date" required value={slot.date || ''} onChange={(e) => {
+                                  <input type="date" required min={getLocalTodayDate()} value={slot.date || ''} onChange={(e) => {
                                     const slots = [...formData.schedule_slots];
                                     slots[index] = { ...slot, date: e.target.value };
                                     setFormData({ ...formData, schedule_slots: slots });
@@ -3768,15 +4211,47 @@ CREATE TABLE IF NOT EXISTS service_areas (
 
                       <div className="wizard-section-card">
                         <div className="section-card-header">
-                          <h4>Banner Image</h4>
+                          <h4>Event Images (Multiple Banners)</h4>
                         </div>
-                        <div className="form-field">
-                          <label>Banner URL *</label>
-                          <input type="text" placeholder="https://example.com/banner.jpg" required value={formData.banner_url || ''} onChange={(e) => setFormData({ ...formData, banner_url: e.target.value })} />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                          {bannerUrls.map((url, idx) => (
+                            <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <div style={{ flex: 1 }}>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>Image URL #{idx + 1}</label>
+                                <input 
+                                  type="text" 
+                                  placeholder="https://example.com/image.jpg" 
+                                  value={url} 
+                                  onChange={(e) => handleUpdateBannerUrl(idx, e.target.value)}
+                                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1.5px solid #e2e8f0', marginTop: '4px' }}
+                                />
+                              </div>
+                              {bannerUrls.length > 1 && (
+                                <button 
+                                  type="button" 
+                                  onClick={() => handleRemoveBannerUrl(idx)}
+                                  style={{ padding: '10px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', alignSelf: 'flex-end', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                          <button 
+                            type="button" 
+                            onClick={handleAddBannerUrl}
+                            style={{ padding: '10px 16px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', width: 'fit-content' }}
+                          >
+                            + Add Another Image URL
+                          </button>
                         </div>
-                        {formData.banner_url && (
-                          <div className="banner-preview-box">
-                            <img src={formData.banner_url} alt="Event Preview" />
+                        {bannerUrls.filter(Boolean).length > 0 && (
+                          <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', padding: '10px 0', marginTop: '1rem' }}>
+                            {bannerUrls.filter(Boolean).map((url, idx) => (
+                              <div key={idx} style={{ width: '120px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0', flexShrink: 0 }}>
+                                <img src={url} alt={`Preview ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=120&q=80'; }} />
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -3831,7 +4306,18 @@ CREATE TABLE IF NOT EXISTS service_areas (
 
                       <div className="wizard-section-card review-summary-card">
                         <div className="review-banner">
-                          {formData.banner_url && <img src={formData.banner_url} alt="Banner" />}
+                          {formData.banner_url && (() => {
+                            let url = formData.banner_url;
+                            if (typeof url === 'string' && url.startsWith('[')) {
+                              try {
+                                const parsed = JSON.parse(url);
+                                if (Array.isArray(parsed) && parsed.length > 0) {
+                                  url = parsed[0];
+                                }
+                              } catch (_) { /* ignore */ }
+                            }
+                            return <img src={url} alt="Banner" />;
+                          })()}
                           <span className="review-status-badge">UPCOMING</span>
                         </div>
                         <div className="review-content">
@@ -4014,6 +4500,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
                             <input 
                               type="date" 
                               required
+                              min={getLocalTodayDate()}
                               value={formData.event_date ? formData.event_date.split('T')[0] : ''}
                               onChange={(e) => {
                                 const timePart = formData.event_date && formData.event_date.includes('T') ? formData.event_date.split('T')[1] : '19:00';
@@ -4053,7 +4540,8 @@ CREATE TABLE IF NOT EXISTS service_areas (
                             <input 
                               type="datetime-local" 
                               required
-                              value={formData.booking_start ? new Date(formData.booking_start).toISOString().slice(0, 16) : ''}
+                              min={getLocalTodayDateTime()}
+                              value={toLocalISOString(formData.booking_start)}
                               onChange={(e) => {
                                 setFormData({ ...formData, booking_start: e.target.value ? new Date(e.target.value).toISOString() : '' });
                               }}
@@ -4064,7 +4552,8 @@ CREATE TABLE IF NOT EXISTS service_areas (
                             <input 
                               type="datetime-local" 
                               required
-                              value={formData.booking_end ? new Date(formData.booking_end).toISOString().slice(0, 16) : ''}
+                              min={getMinDateTimeForEnd(formData.booking_start)}
+                              value={toLocalISOString(formData.booking_end)}
                               onChange={(e) => {
                                 setFormData({ ...formData, booking_end: e.target.value ? new Date(e.target.value).toISOString() : '' });
                               }}
@@ -4216,6 +4705,22 @@ CREATE TABLE IF NOT EXISTS service_areas (
                                 toast.error("Please fill in the required basic fields!");
                                 return;
                               }
+                              if (!formData.event_date || !formData.event_date.split('T')[0]) {
+                                toast.error("Please set the event date and start time.");
+                                return;
+                              }
+                              if (!formData.is_online && !formData.venue_name) {
+                                toast.error("Please enter a venue name (or mark as Online event).");
+                                return;
+                              }
+                              if (!formData.booking_start) {
+                                toast.error("Please set when booking opens.");
+                                return;
+                              }
+                              if (!formData.booking_end) {
+                                toast.error("Please set when booking closes.");
+                                return;
+                              }
                               setEventWizardStep(3);
                             }}
                           >
@@ -4252,21 +4757,47 @@ CREATE TABLE IF NOT EXISTS service_areas (
 
                       <div className="wizard-section-card">
                         <div className="section-card-header">
-                          <h4>Banner Image</h4>
+                          <h4>Event Images (Multiple Banners)</h4>
                         </div>
-                        <div className="form-field">
-                          <label>Banner URL *</label>
-                          <input 
-                            type="text" 
-                            placeholder="https://example.com/banner.jpg" 
-                            required
-                            value={formData.banner_url || ''} 
-                            onChange={(e) => setFormData({ ...formData, banner_url: e.target.value })}
-                          />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                          {bannerUrls.map((url, idx) => (
+                            <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <div style={{ flex: 1 }}>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>Image URL #{idx + 1}</label>
+                                <input 
+                                  type="text" 
+                                  placeholder="https://example.com/image.jpg" 
+                                  value={url} 
+                                  onChange={(e) => handleUpdateBannerUrl(idx, e.target.value)}
+                                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1.5px solid #e2e8f0', marginTop: '4px' }}
+                                />
+                              </div>
+                              {bannerUrls.length > 1 && (
+                                <button 
+                                  type="button" 
+                                  onClick={() => handleRemoveBannerUrl(idx)}
+                                  style={{ padding: '10px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', alignSelf: 'flex-end', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                          <button 
+                            type="button" 
+                            onClick={handleAddBannerUrl}
+                            style={{ padding: '10px 16px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', width: 'fit-content' }}
+                          >
+                            + Add Another Image URL
+                          </button>
                         </div>
-                        {formData.banner_url && (
-                          <div className="banner-preview-box">
-                            <img src={formData.banner_url} alt="Event Preview" />
+                        {bannerUrls.filter(Boolean).length > 0 && (
+                          <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', padding: '10px 0', marginTop: '1rem' }}>
+                            {bannerUrls.filter(Boolean).map((url, idx) => (
+                              <div key={idx} style={{ width: '120px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0', flexShrink: 0 }}>
+                                <img src={url} alt={`Preview ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=120&q=80'; }} />
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -4367,9 +4898,18 @@ CREATE TABLE IF NOT EXISTS service_areas (
 
                       <div className="wizard-section-card review-summary-card">
                         <div className="review-banner">
-                          {formData.banner_url ? (
-                            <img src={formData.banner_url} alt={formData.title} />
-                          ) : (
+                          {formData.banner_url ? (() => {
+                            let url = formData.banner_url;
+                            if (typeof url === 'string' && url.startsWith('[')) {
+                              try {
+                                const parsed = JSON.parse(url);
+                                if (Array.isArray(parsed) && parsed.length > 0) {
+                                  url = parsed[0];
+                                }
+                              } catch (_) { /* ignore */ }
+                            }
+                            return <img src={url} alt={formData.title} />;
+                          })() : (
                             <div className="no-banner-placeholder">No Banner URL Provided</div>
                           )}
                           <span className="review-status-badge">{formData.status || 'UPCOMING'}</span>
@@ -4673,8 +5213,10 @@ CREATE TABLE IF NOT EXISTS service_areas (
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Trash2 color="#ef4444" size={24} /> Confirm Deep Purge</h3>
             </div>
             <div style={{ padding: '1.5rem', color: '#64748b', fontSize: '0.9rem', lineHeight: '1.5' }}>
-              This will permanently delete ALL mock data, test entries, and gibberish names (Super Plumber, nnknn, Test Vendor, etc.) from the platform database. <br /><br />
-              <strong style={{ color: '#ef4444' }}>Warning: This action cannot be undone and affects production state.</strong>
+              This will:<br /><br />
+              • <strong style={{ color: '#ef4444' }}>Permanently delete</strong> all REJECTED events (and their bookings/tiers).<br />
+              • <strong style={{ color: '#22c55e' }}>Restore</strong> any events stuck in PENDING_APPROVAL back to UPCOMING so buyers can see them.<br /><br />
+              <strong style={{ color: '#ef4444' }}>Note: Deletion of rejected events is permanent.</strong>
             </div>
             <div style={{ padding: '1.5rem', paddingTop: 0, display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
               <button

@@ -12,7 +12,7 @@ export function useGoogleMaps() {
   useEffect(() => {
     // Skip if already loaded
     if (isScriptLoaded || (typeof window !== 'undefined' && !!window.google?.maps)) {
-      if (!loaded) setLoaded(true);
+      if (!loaded) { setTimeout(() => setLoaded(true), 0); }
       return;
     }
 

@@ -23,7 +23,7 @@ const smtpTransporter = (process.env.SMTP_USER && process.env.SMTP_USER !== 'you
   : null;
 
 // ── Email Helper ─────────────────────────────────────────────────────────────
-const sendBookingEmail = async ({ toEmail, toName, event, tier, booking }) => {
+const sendBookingEmail = async ({ toEmail, event, tier, booking }) => {
   if (!smtpTransporter) return; // SMTP not configured
   try {
     const transporter = smtpTransporter; // Fix #16: reuse shared transporter
@@ -76,13 +76,28 @@ const sendBookingEmail = async ({ toEmail, toName, event, tier, booking }) => {
  *
  * Returns { open: boolean, reason: string|null }
  */
-function checkBookingWindow(tier) {
+function checkBookingWindow(tier, event) {
   const { booking_open, booking_close } = tier || {};
+  const { booking_start, booking_end } = event || {};
+
+  const now = new Date();
+
+  // First check event-level booking window if event is provided
+  if (booking_start) {
+    const eventOpen = new Date(booking_start);
+    if (!isNaN(eventOpen) && now < eventOpen) {
+      return { open: false, reason: 'Booking has not opened yet' };
+    }
+  }
+  if (booking_end) {
+    const eventClose = new Date(booking_end);
+    if (!isNaN(eventClose) && now > eventClose) {
+      return { open: false, reason: 'Booking window has closed' };
+    }
+  }
 
   // If neither field is set, booking is always open
   if (!booking_open && !booking_close) return { open: true, reason: null };
-
-  const now = new Date();
 
   const openTime  = booking_open  ? new Date(booking_open)  : null;
   const closeTime = booking_close ? new Date(booking_close) : null;
@@ -110,7 +125,8 @@ router.get('/search', async (req, res) => {
       .from('events')
       .select('*, event_ticket_tiers(*)')
       .neq('status', 'PENDING_APPROVAL')
-      .neq('status', 'REJECTED');
+      .neq('status', 'REJECTED')
+      .or('visibility.is.null,visibility.eq.public'); // Only show public events in listings
 
     if (isPast) {
       supabaseQuery = supabaseQuery
@@ -163,11 +179,30 @@ router.get('/search', async (req, res) => {
         });
       });
     }
+    // Group multiple shows by title + category + created_by to show only one parent event on buyer listings
+    const seenMultiples = new Set();
+    visibleEvents = visibleEvents.filter(event => {
+      if (event.show_type === 'multiple' || event.show_type === 'festival') {
+        const key = `${event.title}_${event.category}_${event.created_by}`.toLowerCase().trim();
+        if (seenMultiples.has(key)) {
+          return false; // Skip duplicate slot listings
+        }
+        seenMultiples.add(key);
+      }
+      return true;
+    });
 
-    visibleEvents = visibleEvents.map(event => ({
-      ...event,
-      organizer_name: vendorMap[event.created_by] || null
-    }));
+    visibleEvents = visibleEvents.map(event => {
+      let banner = event.banner_url;
+      if (banner && banner.startsWith('data:image') && banner.length > 100000) {
+        banner = 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=400&q=80';
+      }
+      return {
+        ...event,
+        banner_url: banner,
+        organizer_name: vendorMap[event.created_by] || null
+      };
+    });
 
     // Fix #11: Server-side pagination — slice after filtering so count is accurate
     const total = visibleEvents.length;
@@ -305,7 +340,13 @@ router.post('/book', apiLimiter, async (req, res) => {
     if (tierErr) throw tierErr;
 
     // ── Booking window validation ──
-    const windowCheck = checkBookingWindow(tier);
+    const { data: eventData } = await supabase
+      .from('events')
+      .select('booking_start, booking_end')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    const windowCheck = checkBookingWindow(tier, eventData);
     if (!windowCheck.open) {
       return res.status(400).json({ error: windowCheck.reason || 'Booking window is closed for this tier.' });
     }

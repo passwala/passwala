@@ -162,20 +162,16 @@ export async function sendWhatsAppOTP(phone, otp) {
     const apiKey = process.env.EVOLUTION_API_KEY;
 
     // ── 1. Check connection state before attempting to send ──────────────────
-    try {
-      const stateRes = await fetch(`${baseUrl}/instance/connectionState/${instance}`, {
-        headers: { apikey: apiKey }
-      });
-      const stateData = await stateRes.json();
-      const state = stateData?.instance?.state;
-      if (state !== 'open') {
-        throw new Error(
-          `Evolution WhatsApp instance "${instance}" is not connected (state: "${state}"). ` +
-          `Please scan the QR code at ${baseUrl} to reconnect, or switch to a different WHATSAPP_PROVIDER.`
-        );
-      }
-    } catch (stateErr) {
-      throw stateErr;
+    const stateRes = await fetch(`${baseUrl}/instance/connectionState/${instance}`, {
+      headers: { apikey: apiKey }
+    });
+    const stateData = await stateRes.json();
+    const state = stateData?.instance?.state;
+    if (state !== 'open') {
+      throw new Error(
+        `Evolution WhatsApp instance "${instance}" is not connected (state: "${state}"). ` +
+        `Please scan the QR code at ${baseUrl} to reconnect, or switch to a different WHATSAPP_PROVIDER.`
+      );
     }
 
     // ── 2. Send message ──────────────────────────────────────────────────────

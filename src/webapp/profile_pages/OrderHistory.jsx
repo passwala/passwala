@@ -893,7 +893,6 @@ const OrderHistory = () => {
                 {eventBookings.map((booking, i) => {
                   const event = booking.events;
                   const tier = booking.event_ticket_tiers;
-                  const isConfirmed = booking.status === 'CONFIRMED';
                   return (
                     <motion.div
                       key={booking.id}

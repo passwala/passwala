@@ -32,7 +32,7 @@ const readAllLocalSources = () => {
         const ids = extractIds(parsed);
         if (ids.id || ids.uid || ids.phone || ids.email) return ids;
       }
-    } catch (_) {}
+    } catch (_) { /* ignore */ }
   }
   return {};
 };
@@ -82,7 +82,7 @@ const EventCheckout = ({ user: routeUser }) => {
               stored.id = data.id;
               localStorage.setItem('passwala_user', JSON.stringify(stored));
             }
-          } catch (_) {}
+          } catch (_) { /* ignore */ }
         }
       })
       .catch(() => {})
@@ -113,7 +113,7 @@ const EventCheckout = ({ user: routeUser }) => {
   const totalAmount = baseAmount + cgstAmount + sgstAmount;
 
   // Booking window check for selected tier
-  const bookingWindow = checkBookingWindow(selectedTier);
+  const bookingWindow = checkBookingWindow(selectedTier, event);
   const bookingClosed = !bookingWindow.open;
 
   const handleBookTicket = async () => {
@@ -164,7 +164,7 @@ const EventCheckout = ({ user: routeUser }) => {
           const stored = JSON.parse(localStorage.getItem('passwala_user') || '{}');
           stored.id = data.booking.user_id;
           localStorage.setItem('passwala_user', JSON.stringify(stored));
-        } catch (_) {}
+        } catch (_) { /* ignore */ }
       }
 
       toast.success('Event Tickets Booked Successfully!');
@@ -229,7 +229,7 @@ const EventCheckout = ({ user: routeUser }) => {
           <h4 style={{ margin: '0 0 1rem 0', color: 'var(--text-secondary)' }}>Select Category</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {event.event_ticket_tiers?.map(tier => {
-              const tierWindow = checkBookingWindow(tier);
+              const tierWindow = checkBookingWindow(tier, event);
               const tierClosed = !tierWindow.open;
               return (
               <div 

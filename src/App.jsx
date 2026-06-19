@@ -15,10 +15,12 @@ import RiderAuth from './rider/RiderAuth'
 import Footer from './web/Footer'
 import Policies from './web/Policies'
 import { Toaster, toast } from 'react-hot-toast'
+import { Cpu } from 'lucide-react'
 import './App.css'
 
 import { supabase } from './supabase'
 import AIAssistant from './webapp/AIAssistant'
+import DeveloperModal from './webapp/DeveloperModal'
 import CustomerDetails from './webapp/CustomerDetails'
 import { CartProvider, useCart } from './context/CartContext'
 import CartDrawer from './webapp/buyer/CartDrawer'
@@ -114,7 +116,7 @@ export class ErrorBoundary extends React.Component {
             component: errorInfo?.componentStack?.split('\n')?.[1]?.trim()
           })
         }).catch(() => {}); // non-blocking, best-effort
-      } catch (_) {}
+      } catch (_) { /* ignore */ }
     }
   }
   render() {
@@ -321,20 +323,6 @@ const AppContent = ({
     }
   }, []);
 
-  // BUG B6 FIX: Return maintenance UI AFTER all hooks have been declared
-  if (maintenanceMode) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#0f172a,#1e293b)', color: '#f8fafc', fontFamily: 'Inter,sans-serif', textAlign: 'center', padding: '2rem' }}>
-        <div style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>🛠️</div>
-        <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '1rem', background: 'linear-gradient(to right, #38bdf8, #818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>We&apos;ll be back soon!</h1>
-        <p style={{ color: '#94a3b8', fontSize: '1.1rem', maxWidth: '400px', lineHeight: '1.7', marginBottom: '2rem' }}>
-          Passwala is currently undergoing scheduled maintenance. We should be back online shortly. Thank you for your patience!
-        </p>
-        <a href="mailto:passwalaoffcial@gmail.com" style={{ color: '#38bdf8', fontSize: '0.9rem' }}>passwalaoffcial@gmail.com</a>
-      </div>
-    );
-  }
-
   // Global Notification Listener for Buyer (Using UNIQUE Channel IDs to clean up correctly)
   const { addNotification, fcmToken } = useNotifications();
   useEffect(() => {
@@ -392,7 +380,20 @@ const AppContent = ({
 
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [showComingSoon, setShowComingSoon] = useState(false);
+  const [isDevModalOpen, setIsDevModalOpen] = useState(false);
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const { addToCart } = useCart();
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        setIsDevModalOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     const handleOpenChat = () => setIsAiChatOpen(true);
@@ -423,6 +424,21 @@ const AppContent = ({
       navigate('/complete-profile');
     }
   }, [effectiveUser, isProfileComplete, locationPath, navigate]);
+
+  // BUG B6 FIX: Return maintenance UI AFTER all hooks have been declared
+  if (maintenanceMode) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#0f172a,#1e293b)', color: '#f8fafc', fontFamily: 'Inter,sans-serif', textAlign: 'center', padding: '2rem' }}>
+        <div style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>🛠️</div>
+        <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '1rem', background: 'linear-gradient(to right, #38bdf8, #818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>We&apos;ll be back soon!</h1>
+        <p style={{ color: '#94a3b8', fontSize: '1.1rem', maxWidth: '400px', lineHeight: '1.7', marginBottom: '2rem' }}>
+          Passwala is currently undergoing scheduled maintenance. We should be back online shortly. Thank you for your patience!
+        </p>
+        <a href="mailto:passwalaoffcial@gmail.com" style={{ color: '#38bdf8', fontSize: '0.9rem' }}>passwalaoffcial@gmail.com</a>
+      </div>
+    );
+  }
+
 
   const currentView =
     locationPath === '/near-shops' ? 'NEAR_SHOPS' :
@@ -727,6 +743,34 @@ const AppContent = ({
             {/* 5. Drawers / Modals */}
             <CartDrawer location={location} isProfileComplete={isProfileComplete} userAddress={userAddress} />
             <AIAssistant isOpen={isAiChatOpen} onClose={() => setIsAiChatOpen(false)} user={effectiveUser} />
+            <DeveloperModal isOpen={isDevModalOpen} onClose={() => setIsDevModalOpen(false)} user={effectiveUser} />
+
+            {/* Floating Developer Console Trigger (Localhost only) */}
+            {isLocalhost && (
+              <button
+                onClick={() => setIsDevModalOpen(true)}
+                style={{
+                  position: 'fixed',
+                  bottom: '80px',
+                  right: '20px',
+                  zIndex: 9999,
+                  background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+                  border: '1.5px solid #ff7622',
+                  borderRadius: '50%',
+                  width: '45px',
+                  height: '45px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 8px 24px rgba(255, 118, 34, 0.25)',
+                  cursor: 'pointer',
+                  color: '#ff7622'
+                }}
+                title="Open Developer Console (Ctrl+Alt+D)"
+              >
+                <Cpu size={20} />
+              </button>
+            )}
           </>
         )}
     </div>

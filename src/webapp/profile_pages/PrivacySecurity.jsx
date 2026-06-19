@@ -1,4 +1,5 @@
 import React from 'react';
+// eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
 import { 
   ShieldCheck, 
@@ -13,7 +14,6 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { auth } from '../../firebase';
 import './ProfilePages.css';
 import { useTranslation } from '../LanguageContext';
 

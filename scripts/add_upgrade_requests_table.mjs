@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS public.event_organizer_requests (
     payment_status VARCHAR(50) DEFAULT 'PENDING',
     payment_id VARCHAR(100),
     request_status VARCHAR(50) DEFAULT 'SUBMITTED',
-    amount DECIMAL(10,2) DEFAULT 499.00,
+    amount DECIMAL(10,2) DEFAULT 999.00,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

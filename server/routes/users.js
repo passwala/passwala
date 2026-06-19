@@ -725,7 +725,7 @@ const _otpSet = async (phone, otp, expiresAt) => {
     const { error } = await supabase.from('whatsapp_otps')
       .upsert({ phone, otp, expires_at: new Date(expiresAt).toISOString() }, { onConflict: 'phone' });
     if (!error) return;
-  } catch (_) {}
+  } catch (_) { /* ignore */ }
   console.warn('[OTP] Supabase "whatsapp_otps" table missing — using in-memory store (OTPs lost on restart)');
   global.whatsappOtpStore.set(phone, { otp, expiresAt });
 };
@@ -734,11 +734,11 @@ const _otpGet = async (phone) => {
     const { data } = await supabase.from('whatsapp_otps')
       .select('otp, expires_at').eq('phone', phone).maybeSingle();
     if (data) return { otp: data.otp, expiresAt: new Date(data.expires_at).getTime() };
-  } catch (_) {}
+  } catch (_) { /* ignore */ }
   return global.whatsappOtpStore.get(phone) || null;
 };
 const _otpDelete = async (phone) => {
-  try { await supabase.from('whatsapp_otps').delete().eq('phone', phone); } catch (_) {}
+  try { await supabase.from('whatsapp_otps').delete().eq('phone', phone); } catch (_) { /* ignore */ }
   global.whatsappOtpStore.delete(phone);
 };
 
@@ -750,17 +750,41 @@ router.post('/send-whatsapp-otp', authLimiter, async (req, res) => {
     return res.status(400).json({ success: false, error: 'Valid 10-digit mobile number required' });
   }
 
-  const otp = crypto.randomInt(100000, 1000000).toString();
+  const isMockMode = process.env.MOCK_OTP_ENABLED === 'true' && process.env.NODE_ENV !== 'production';
+  const otp = isMockMode ? '123456' : crypto.randomInt(100000, 1000000).toString();
+
+  // ── Mock mode: always succeed regardless of WhatsApp connectivity ──────────
+  if (isMockMode) {
+    try { await _otpSet(cleanPhone, otp, Date.now() + 5 * 60 * 1000); } catch (_) { /* ignore */ }
+
+    // Best-effort WhatsApp delivery — silently ignore any connection errors
+    try {
+      const { sendWhatsAppOTP } = await import('../utils/whatsapp.js');
+      await sendWhatsAppOTP(cleanPhone, otp);
+      console.log(`✅ [MOCK MODE] WhatsApp OTP also dispatched to ${cleanPhone}`);
+    } catch (wpErr) {
+      console.warn(`⚠️  [MOCK MODE] WhatsApp delivery skipped (${wpErr.message}). Bypass OTP: ${otp}`);
+    }
+
+    console.log(`🧪 [MOCK OTP] Phone: ${cleanPhone} → OTP: ${otp}`);
+    return res.status(200).json({
+      success: true,
+      message: 'Mock OTP ready (dev mode)',
+      provider: 'mock',
+      otp // always returned in mock mode
+    });
+  }
+
+  // ── Real mode: send via configured WhatsApp provider ────────────────────────
   try {
-    // Fix #5: Use Supabase-backed store (falls back to in-memory with warning)
     await _otpSet(cleanPhone, otp, Date.now() + 5 * 60 * 1000); // 5 min TTL
 
     const { sendWhatsAppOTP } = await import('../utils/whatsapp.js');
     const result = await sendWhatsAppOTP(cleanPhone, otp);
 
-    res.status(200).json({ 
-      success: true, 
-      message: 'WhatsApp OTP sent successfully', 
+    res.status(200).json({
+      success: true,
+      message: 'WhatsApp OTP sent successfully',
       provider: result.provider,
       otp: result.provider === 'mock' ? otp : undefined
     });
@@ -769,6 +793,7 @@ router.post('/send-whatsapp-otp', authLimiter, async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to send WhatsApp OTP: ' + err.message });
   }
 });
+
 
 // POST /api/users/verify-whatsapp-otp — Verify WhatsApp OTP & login
 // Fix #4: authLimiter applied — previously no rate limit allowed brute-forcing all 900k OTP combinations

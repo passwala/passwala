@@ -69,6 +69,7 @@ const EventTicket = () => {
 
       // ── Core data
       const invoiceNo      = booking.invoice_number || `EV-${booking.id.substring(0, 8).toUpperCase()}-INV`;
+      // eslint-disable-next-line react-hooks/purity
       const invoiceDate    = new Date(booking.created_at || Date.now()).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
       const eventTitle     = event.title || 'Event';
       const ticketCount    = booking.ticket_count || 1;

@@ -177,7 +177,9 @@ const Auth = ({ onLogin }) => {
         setTimer(60);
         if (data.provider === 'mock' && data.otp) {
           setWhatsappOtp(data.otp);
-          toast.success(`[MOCK WHATSAPP] OTP sent: ${data.otp}`, { duration: 8000 });
+          // Auto-fill the 6 OTP boxes so the user can verify in one click
+          setOtp(data.otp.split(''));
+          toast.success(`🧪 Dev Mode: OTP auto-filled → ${data.otp}`, { duration: 10000 });
         } else {
           toast.success('OTP sent successfully via WhatsApp!');
         }
@@ -190,6 +192,7 @@ const Auth = ({ onLogin }) => {
       setLoading(false);
     }
   };
+
 
   const handleVerifyOtp = async () => {
     const otpValue = otp.join('');
@@ -465,7 +468,7 @@ const Auth = ({ onLogin }) => {
     localStorage.setItem('passwala_user_address', JSON.stringify(defaultAddr));
     const storedUser = localStorage.getItem('passwala_user');
     let storedParsed = null;
-    try { storedParsed = storedUser ? JSON.parse(storedUser) : null; } catch (_) {}
+    try { storedParsed = storedUser ? JSON.parse(storedUser) : null; } catch (_) { /* ignore */ }
 
     // Pick the best user: prefer whichever has more identifiers (id/uid/phoneNumber)
     const hasCredentials = (u) => u && (u.id || u.uid || u.phoneNumber || u.phone);
@@ -600,6 +603,33 @@ const Auth = ({ onLogin }) => {
                 We sent a 6-digit code to +91 {phoneNumber} {loginMethod === 'WHATSAPP' ? 'via WhatsApp' : ''}
               </p>
 
+              {/* Dev-mode mock OTP banner */}
+              {whatsappOtp && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+                  border: '1px solid #f59e0b',
+                  borderRadius: '12px',
+                  padding: '10px 14px',
+                  marginBottom: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  boxShadow: '0 0 18px rgba(245,158,11,0.25)'
+                }}>
+                  <span style={{ fontSize: '1.1rem' }}>🧪</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.68rem', fontWeight: '700', color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Dev Mode — Mock OTP</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#ffffff', letterSpacing: '0.18em', fontFamily: 'monospace' }}>{whatsappOtp}</div>
+                  </div>
+                  <button
+                    onClick={() => setOtp(whatsappOtp.split(''))}
+                    style={{ background: '#f59e0b', color: '#1a1a2e', border: 'none', borderRadius: '8px', padding: '5px 10px', fontSize: '0.72rem', fontWeight: '700', cursor: 'pointer' }}
+                  >
+                    Auto-fill
+                  </button>
+                </div>
+              )}
+
               <div className="otp-nebula-group" onPaste={handlePaste}>
                 {otp.map((digit, idx) => (
                   <input
@@ -628,6 +658,7 @@ const Auth = ({ onLogin }) => {
                 </button>
               </div>
             </>
+
           ) : null}
         </div>
       </div>

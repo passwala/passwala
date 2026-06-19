@@ -451,13 +451,51 @@ router.get('/stats', async (req, res) => {
     }
 });
 
-// POST /api/admin/purge — Perform deep purge of mock residue securely (DISABLED)
+// POST /api/admin/purge — Purge rejected events and restore stuck PENDING_APPROVAL events
 router.post('/purge', async (req, res) => {
-    return res.status(403).json({ 
-        success: false, 
-        error: 'Database purge is disabled on this platform to protect data safety.' 
-    });
+    try {
+        let purgeLog = [];
+
+        // 1. Delete all REJECTED events (cascade tiers and bookings)
+        const { data: rejectedEvents } = await supabase
+            .from('events')
+            .select('id')
+            .eq('status', 'REJECTED');
+
+        if (rejectedEvents && rejectedEvents.length > 0) {
+            const rejectedIds = rejectedEvents.map(e => e.id);
+            await supabase.from('event_bookings').delete().in('event_id', rejectedIds);
+            await supabase.from('event_ticket_tiers').delete().in('event_id', rejectedIds);
+            const { error: delErr } = await supabase.from('events').delete().in('id', rejectedIds);
+            if (delErr) throw delErr;
+            purgeLog.push(`Deleted ${rejectedEvents.length} REJECTED events.`);
+        } else {
+            purgeLog.push('No REJECTED events to delete.');
+        }
+
+        // 2. Restore any remaining PENDING_APPROVAL events back to UPCOMING
+        //    (Events stuck in pending state from the migration should be visible to buyers)
+        const { data: pendingEvents, error: pendErr } = await supabase
+            .from('events')
+            .update({ status: 'UPCOMING' })
+            .eq('status', 'PENDING_APPROVAL')
+            .select('id');
+
+        if (pendErr) throw pendErr;
+        const restoredCount = pendingEvents ? pendingEvents.length : 0;
+        if (restoredCount > 0) {
+            purgeLog.push(`Restored ${restoredCount} PENDING_APPROVAL events to UPCOMING.`);
+        } else {
+            purgeLog.push('No stuck PENDING_APPROVAL events found.');
+        }
+
+        res.status(200).json({ success: true, log: purgeLog });
+    } catch (error) {
+        console.error('❌ Admin Purge Error:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
+
 
 // GET /api/admin/people_map — Fetch coordinates for all community roles
 router.get('/people_map', async (req, res) => {
@@ -637,6 +675,18 @@ router.post('/upsert', async (req, res) => {
             return res.status(500).json({ success: false, error: error.message });
         }
 
+        // If table is events and status is updated, sync it to all sibling events
+        if (table === 'events' && cleanedPayload.status && cleanedPayload.id && !String(cleanedPayload.id).startsWith('temp_')) {
+            const { data: targetEvent } = await supabase.from('events').select('title, category, created_by').eq('id', cleanedPayload.id).maybeSingle();
+            if (targetEvent) {
+                await supabase.from('events')
+                    .update({ status: cleanedPayload.status })
+                    .eq('title', targetEvent.title)
+                    .eq('category', targetEvent.category)
+                    .eq('created_by', targetEvent.created_by);
+            }
+        }
+
         // Save intercepted starting_price to event_ticket_tiers
         let ticketTiers = null;
         if (table === 'events' && payload.ticket_tiers) {
@@ -746,9 +796,26 @@ router.delete('/delete', async (req, res) => {
                 await supabase.from('stores').delete().in('id', storeIds);
             }
         } else if (table === 'events') {
-            // Cascade: remove all bookings and tiers before the event itself
-            await supabase.from('event_bookings').delete().eq('event_id', id);
-            await supabase.from('event_ticket_tiers').delete().eq('event_id', id);
+            const { data: targetEvent } = await supabase.from('events').select('title, category, created_by').eq('id', id).maybeSingle();
+            if (targetEvent) {
+                const { data: siblings } = await supabase.from('events')
+                    .select('id')
+                    .eq('title', targetEvent.title)
+                    .eq('category', targetEvent.category)
+                    .eq('created_by', targetEvent.created_by);
+                if (siblings && siblings.length > 0) {
+                    const siblingIds = siblings.map(s => s.id);
+                    await supabase.from('event_bookings').delete().in('event_id', siblingIds);
+                    await supabase.from('event_ticket_tiers').delete().in('event_id', siblingIds);
+                    const otherSiblingIds = siblingIds.filter(sid => sid !== id);
+                    if (otherSiblingIds.length > 0) {
+                        await supabase.from('events').delete().in('id', otherSiblingIds);
+                    }
+                }
+            } else {
+                await supabase.from('event_bookings').delete().eq('event_id', id);
+                await supabase.from('event_ticket_tiers').delete().eq('event_id', id);
+            }
         }
 
         const { data, error } = await supabase.from(table).delete().eq('id', id).select();
@@ -861,6 +928,16 @@ router.post('/events/approve', async (req, res) => {
         const { id } = req.body;
         if (!id) return res.status(400).json({ error: 'Event ID is required' });
 
+        if (Array.isArray(id)) {
+            const { data, error } = await supabase
+                .from('events')
+                .update({ status: 'UPCOMING' })
+                .in('id', id)
+                .select();
+            if (error) throw error;
+            return res.status(200).json({ success: true, events: data });
+        }
+
         const { data, error } = await supabase
             .from('events')
             .update({ status: 'UPCOMING' })
@@ -881,6 +958,16 @@ router.post('/events/reject', async (req, res) => {
     try {
         const { id, reason } = req.body;
         if (!id) return res.status(400).json({ error: 'Event ID is required' });
+
+        if (Array.isArray(id)) {
+            const { data, error } = await supabase
+                .from('events')
+                .update({ status: 'REJECTED' })
+                .in('id', id)
+                .select();
+            if (error) throw error;
+            return res.status(200).json({ success: true, events: data, reason });
+        }
 
         const { data, error } = await supabase
             .from('events')

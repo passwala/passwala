@@ -61,6 +61,7 @@
 /* ── Body ────────────────────────────────────────── */
 .cart-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px 22px;
   display: flex;
@@ -240,6 +241,8 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  background: #ffffff;
+  z-index: 10;
 }
 .cart-total {
   display: flex;
@@ -537,7 +540,7 @@
 .dark .cart-header     { border-color: #2a2a3e; }
 .dark .cart-item       { background: #2a2a3e; }
 .dark .cart-item-name  { color: #f0f0f0; }
-.dark .cart-footer     { border-color: #2a2a3e; }
+.dark .cart-footer     { border-color: #2a2a3e; background: #1e1e2e; }
 .dark .cart-total      { color: #aaa; }
 .dark .cart-total strong { color: #f0f0f0; }
 .dark .cart-qty-controls { background: #1e1e2e; }

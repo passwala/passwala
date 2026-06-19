@@ -9,7 +9,6 @@ const VendorAuth = ({ onLogin }) => {
   const [rememberMe, setRememberMe] = useState(true);
   const [step, setStep] = useState('PHONE'); // 'PHONE' or 'OTP'
   const [loginMethod, setLoginMethod] = useState('SMS'); // 'SMS' or 'WHATSAPP'
-  const [whatsappOtp, setWhatsappOtp] = useState('');
   const [otpVal, setOtpVal] = useState('');
 
   const handleSubmit = async (e) => {
@@ -48,7 +47,6 @@ const VendorAuth = ({ onLogin }) => {
         setLoginMethod('WHATSAPP');
         setStep('OTP');
         if (data.provider === 'mock' && data.otp) {
-          setWhatsappOtp(data.otp);
           toast.success(`[MOCK WHATSAPP] OTP sent: ${data.otp}`, { duration: 8000 });
         } else {
           toast.success('OTP sent successfully via WhatsApp!');

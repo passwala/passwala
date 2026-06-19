@@ -28,6 +28,7 @@ import {
   HelpCircle,
   Menu,
   ChevronRight,
+  ChevronDown,
   TrendingUp,
   Settings,
   Layers,
@@ -47,6 +48,22 @@ import {
   VendorSupport 
 } from './VendorSubPages';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
+
+const safeSetLocalStorage = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    console.warn(`localStorage setItem failed for key "${key}":`, e);
+    if (e.name === 'QuotaExceededError' || e.code === 22 || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+      try {
+        localStorage.removeItem('vProfileImage');
+        localStorage.setItem(key, value);
+      } catch (retryErr) {
+        console.error("Retry setItem failed after clearing profile image:", retryErr);
+      }
+    }
+  }
+};
 
 const formatAadhar = (val) => {
   const cleanVal = val.replace(/\D/g, '').slice(0, 12);
@@ -93,12 +110,13 @@ const VendorPortal = ({ user, onLogout }) => {
   });
   
   useEffect(() => {
-    localStorage.setItem('vOnboardingStep', onboardingSubStep);
-    localStorage.setItem('vBusinessType', businessType);
-    localStorage.setItem('vFormData', JSON.stringify(formData));
+    safeSetLocalStorage('vOnboardingStep', onboardingSubStep);
+    safeSetLocalStorage('vBusinessType', businessType);
+    safeSetLocalStorage('vFormData', JSON.stringify(formData));
   }, [onboardingSubStep, businessType, formData]);
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [showConsoleDrop, setShowConsoleDrop] = useState(false);
   const [hasShopConsole, setHasShopConsole] = useState(false);
   const [hasEventConsole, setHasEventConsole] = useState(false);
   const [hasServiceConsole, setHasServiceConsole] = useState(false);
@@ -359,7 +377,7 @@ const VendorPortal = ({ user, onLogout }) => {
   }, [appStatus, vendorData?.id, businessType]);
 
   useEffect(() => {
-    localStorage.setItem('vendorActiveTab', activeTab);
+    safeSetLocalStorage('vendorActiveTab', activeTab);
   }, [activeTab]);
 
 
@@ -508,7 +526,7 @@ const VendorPortal = ({ user, onLogout }) => {
                 .maybeSingle();
               if (userData?.photo_url) {
                 setProfileImage(userData.photo_url);
-                localStorage.setItem('vProfileImage', userData.photo_url);
+                safeSetLocalStorage('vProfileImage', userData.photo_url);
               }
             } catch (pErr) {
               console.warn("Error fetching user photo:", pErr);
@@ -783,17 +801,7 @@ const VendorPortal = ({ user, onLogout }) => {
               bg: '#eef2ff'
             });
           }
-          if (!hasRentalConsole) {
-            upgrades.push({
-              target: 'rental',
-              title: "Want to rent out vehicles or equipment?",
-              desc: `Upgrade your vendor profile to list rental items and vehicles for a setup fee of ₹${upgradeRentalFee}.`,
-              fee: upgradeRentalFee,
-              btn: "Request Rental Console",
-              color: '#06b6d4',
-              bg: '#ecfeff'
-            });
-          }
+
           if (!hasShopConsole) {
             upgrades.push({
               target: 'shop',
@@ -882,12 +890,12 @@ const VendorPortal = ({ user, onLogout }) => {
       
       setVendorData(prev => ({ ...prev, ...editFormData, lat: updatedLat, lng: updatedLng, phone: phone }));
       setFormData(prev => ({ ...prev, ...editFormData, lat: updatedLat, lng: updatedLng }));
-      if (updatedBusinessName) localStorage.setItem('vBusinessName', updatedBusinessName);
-      if (updatedName) localStorage.setItem('vOwnerName', updatedName);
-      if (updatedAddress) localStorage.setItem('vAddress', updatedAddress);
+      if (updatedBusinessName) safeSetLocalStorage('vBusinessName', updatedBusinessName);
+      if (updatedName) safeSetLocalStorage('vOwnerName', updatedName);
+      if (updatedAddress) safeSetLocalStorage('vAddress', updatedAddress);
       
       const savedForm = JSON.parse(localStorage.getItem('vFormData') || '{}');
-      localStorage.setItem('vFormData', JSON.stringify({ ...savedForm, ...editFormData, lat: updatedLat, lng: updatedLng }));
+      safeSetLocalStorage('vFormData', JSON.stringify({ ...savedForm, ...editFormData, lat: updatedLat, lng: updatedLng }));
 
       if (supabase && vendorData?.id && vendorData.id.length > 20) {
          try {
@@ -931,6 +939,120 @@ const VendorPortal = ({ user, onLogout }) => {
     } catch (e) {
       console.error(e);
       toast.error('Failed to update profile.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDeleteCurrentConsole = async () => {
+    setShowDeleteModal(false);
+    try {
+      setIsUpdating(true);
+      const phone = vendorData?.phone || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : null);
+      if (!phone) {
+        toast.error("Identity verification failed.");
+        return;
+      }
+
+      if (supabase && vendorData?.id) {
+        const targetId = vendorData.id;
+
+        if (businessType === 'shop') {
+          const { data: vendorOrders } = await supabase
+            .from('orders')
+            .select('id')
+            .eq('store_id', targetId);
+
+          const orderIds = vendorOrders && vendorOrders.length > 0 
+            ? vendorOrders.map(o => o.id) 
+            : [];
+
+          if (orderIds.length > 0) {
+            await supabase.from('rider_earnings').delete().in('order_id', orderIds);
+            await supabase.from('order_items').delete().in('order_id', orderIds);
+            await supabase.from('orders').delete().in('id', orderIds);
+          }
+
+          await supabase.from('carts').delete().eq('store_id', targetId);
+          await supabase.from('products').delete().eq('store_id', targetId);
+          await supabase.from('deals').delete().eq('store_id', targetId);
+          await supabase.from('stores').delete().eq('vendor_id', targetId);
+          await supabase.from('vendors').delete().eq('id', targetId);
+          await supabase.from('event_organizer_requests').delete().eq('phone', phone).eq('target_console', 'shop');
+        } 
+        else if (businessType === 'event') {
+          await supabase.from('events').delete().eq('created_by', vendorData.user_id || user?.uid);
+          await supabase.from('event_organizer_requests').delete().eq('phone', phone).eq('target_console', 'event');
+
+          const hasOtherSP = hasServiceConsole || hasRentalConsole;
+          if (!hasOtherSP) {
+            await supabase.from('service_providers').delete().eq('id', targetId);
+          }
+        } 
+        else if (businessType === 'service') {
+          const { data: services } = await supabase
+            .from('services')
+            .select('id')
+            .eq('provider_id', targetId)
+            .neq('category', 'Rental');
+
+          const svcIds = services && services.length > 0 ? services.map(s => s.id) : [];
+          if (svcIds.length > 0) {
+            await supabase.from('service_bookings').delete().in('service_id', svcIds);
+            await supabase.from('services').delete().in('id', svcIds);
+          }
+          await supabase.from('event_organizer_requests').delete().eq('phone', phone).eq('target_console', 'service');
+
+          const hasOtherSP = hasEventConsole || hasRentalConsole;
+          if (!hasOtherSP) {
+            await supabase.from('service_providers').delete().eq('id', targetId);
+          }
+        } 
+        else if (businessType === 'rental') {
+          const { data: services } = await supabase
+            .from('services')
+            .select('id')
+            .eq('provider_id', targetId)
+            .eq('category', 'Rental');
+
+          const svcIds = services && services.length > 0 ? services.map(s => s.id) : [];
+          if (svcIds.length > 0) {
+            await supabase.from('service_bookings').delete().in('service_id', svcIds);
+            await supabase.from('services').delete().in('id', svcIds);
+          }
+          await supabase.from('event_organizer_requests').delete().eq('phone', phone).eq('target_console', 'rental');
+
+          const hasOtherSP = hasEventConsole || hasServiceConsole;
+          if (!hasOtherSP) {
+            await supabase.from('service_providers').delete().eq('id', targetId);
+          }
+        }
+      }
+
+      toast.success(`Deleted ${businessType === 'shop' ? 'Store' : businessType === 'event' ? 'Events' : businessType === 'rental' ? 'Rentals' : 'Profession'} Console.`, { icon: '🗑️' });
+
+      const remainingConsoles = [];
+      if (hasShopConsole && businessType !== 'shop') remainingConsoles.push('shop');
+      if (hasEventConsole && businessType !== 'event') remainingConsoles.push('event');
+      if (hasServiceConsole && businessType !== 'service') remainingConsoles.push('service');
+      if (hasRentalConsole && businessType !== 'rental') remainingConsoles.push('rental');
+
+      if (remainingConsoles.length > 0) {
+        safeSetLocalStorage('vBusinessType', remainingConsoles[0]);
+        window.location.reload();
+      } else {
+        localStorage.removeItem('vProfileCompleted');
+        localStorage.removeItem('vendorActiveTab');
+        localStorage.removeItem('vBusinessType');
+        if (onLogout) {
+          onLogout(true);
+        } else {
+          window.location.href = '/';
+        }
+      }
+    } catch (e) {
+      console.error("Delete Console Error:", e);
+      toast.error(`Delete Failed: ${e.message}`);
     } finally {
       setIsUpdating(false);
     }
@@ -1049,7 +1171,7 @@ const VendorPortal = ({ user, onLogout }) => {
         reader.onloadend = async () => {
           const base64Data = reader.result;
           setProfileImage(base64Data);
-          localStorage.setItem('vProfileImage', base64Data);
+          safeSetLocalStorage('vProfileImage', base64Data);
           
           try {
             const id = user?.id || user?.phoneNumber || user?.email || user?.uid || resolvedVendor.user_id;
@@ -1068,7 +1190,7 @@ const VendorPortal = ({ user, onLogout }) => {
                 const resJson = await res.json();
                 if (resJson?.photoURL) {
                   setProfileImage(resJson.photoURL);
-                  localStorage.setItem('vProfileImage', resJson.photoURL);
+                  safeSetLocalStorage('vProfileImage', resJson.photoURL);
                 }
               }
             }
@@ -1929,40 +2051,123 @@ const VendorPortal = ({ user, onLogout }) => {
 
                if (activeConsoles.length <= 1) return null;
 
+               const consoleIcons = { shop: Store, event: Calendar, service: Wrench, rental: Package };
+               const consoleColors = { shop: '#10b981', event: '#f97316', service: '#6366f1', rental: '#06b6d4' };
+               const currentConsole = activeConsoles.find(c => c.id === businessType) || activeConsoles[0];
+               const CurrentIcon = consoleIcons[businessType] || Store;
+               const currentColor = consoleColors[businessType] || '#f97316';
+
                return (
                  <div style={{ position: 'relative', marginRight: '1rem' }}>
-                   <select
-                     value={businessType}
-                     onChange={(e) => {
-                       const targetType = e.target.value;
-                       setBusinessType(targetType);
-                       localStorage.setItem('vBusinessType', targetType);
-                       toast.success(`Switched to ${targetType === 'shop' ? 'Store' : targetType === 'event' ? 'Event' : targetType === 'rental' ? 'Rentals' : 'Profession'} Console!`);
-                       checkVendorStatus();
-                     }}
+                   {/* Trigger button */}
+                   <button
+                     onClick={() => setShowConsoleDrop(prev => !prev)}
                      style={{
-                       background: '#ea580c',
+                       display: 'flex',
+                       alignItems: 'center',
+                       gap: '8px',
+                       background: `linear-gradient(135deg, ${currentColor} 0%, ${currentColor}cc 100%)`,
                        color: 'white',
                        border: 'none',
-                       padding: '10px 18px',
-                       borderRadius: '12px',
+                       padding: '9px 14px 9px 12px',
+                       borderRadius: '14px',
                        fontWeight: 800,
-                       fontSize: '0.85rem',
+                       fontSize: '0.82rem',
                        cursor: 'pointer',
-                       boxShadow: '0 4px 12px rgba(249, 115, 22, 0.2)',
+                       boxShadow: `0 4px 16px ${currentColor}44`,
                        outline: 'none',
-                       appearance: 'none',
-                       paddingRight: '30px',
-                       backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
-                       backgroundRepeat: 'no-repeat',
-                       backgroundPosition: 'right 8px center',
-                       backgroundSize: '16px'
+                       letterSpacing: '0.01em',
+                       transition: 'all 0.2s ease',
+                       whiteSpace: 'nowrap'
                      }}
                    >
-                     {activeConsoles.map(c => (
-                       <option key={c.id} value={c.id} style={{ color: '#0f172a' }}>{c.label} Console</option>
-                     ))}
-                   </select>
+                     <CurrentIcon size={15} strokeWidth={2.5} />
+                     <span>{currentConsole?.label} Console</span>
+                     <span style={{ display: 'flex', alignItems: 'center', transition: 'transform 0.25s ease', transform: showConsoleDrop ? 'rotate(180deg)' : 'rotate(0deg)', marginLeft: '2px' }}>
+                       <ChevronDown size={14} strokeWidth={3} />
+                     </span>
+                   </button>
+
+                   {/* Dropdown panel */}
+                   {showConsoleDrop && (
+                     <>
+                       {/* Backdrop to close */}
+                       <div
+                         onClick={() => setShowConsoleDrop(false)}
+                         style={{ position: 'fixed', inset: 0, zIndex: 998 }}
+                       />
+                       <div style={{
+                         position: 'absolute',
+                         top: 'calc(100% + 10px)',
+                         right: 0,
+                         background: 'white',
+                         borderRadius: '18px',
+                         boxShadow: '0 20px 50px rgba(0,0,0,0.18), 0 4px 12px rgba(0,0,0,0.06)',
+                         border: '1px solid rgba(0,0,0,0.06)',
+                         overflow: 'hidden',
+                         zIndex: 999,
+                         minWidth: '200px',
+                         animation: 'fadeInDown 0.18s ease'
+                       }}>
+                         <div style={{ padding: '6px' }}>
+                           {activeConsoles.map(c => {
+                             const Icon = consoleIcons[c.id] || Store;
+                             const color = consoleColors[c.id] || '#f97316';
+                             const isActive = c.id === businessType;
+                             return (
+                               <button
+                                 key={c.id}
+                                 onClick={() => {
+                                   setShowConsoleDrop(false);
+                                   if (c.id === businessType) return;
+                                   setBusinessType(c.id);
+                                   localStorage.setItem('vBusinessType', c.id);
+                                   toast.success(`Switched to ${c.label} Console!`);
+                                   checkVendorStatus();
+                                 }}
+                                 style={{
+                                   display: 'flex',
+                                   alignItems: 'center',
+                                   gap: '12px',
+                                   width: '100%',
+                                   padding: '11px 14px',
+                                   borderRadius: '12px',
+                                   border: 'none',
+                                   background: isActive ? `${color}15` : 'transparent',
+                                   cursor: 'pointer',
+                                   textAlign: 'left',
+                                   transition: 'background 0.15s ease',
+                                   fontFamily: 'inherit'
+                                 }}
+                               >
+                                 <span style={{
+                                   width: '32px',
+                                   height: '32px',
+                                   borderRadius: '10px',
+                                   background: `${color}20`,
+                                   display: 'flex',
+                                   alignItems: 'center',
+                                   justifyContent: 'center',
+                                   flexShrink: 0
+                                 }}>
+                                   <Icon size={16} color={color} strokeWidth={2.5} />
+                                 </span>
+                                 <span style={{ flex: 1 }}>
+                                   <span style={{ display: 'block', fontWeight: 800, fontSize: '0.85rem', color: '#0f172a' }}>{c.label} Console</span>
+                                   <span style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', fontWeight: 500, marginTop: '1px' }}>
+                                     {c.id === 'shop' ? 'Products & Orders' : c.id === 'event' ? 'Events & Tickets' : c.id === 'service' ? 'Services & Bookings' : 'Rentals & Availability'}
+                                   </span>
+                                 </span>
+                                 {isActive && (
+                                   <CheckCircle size={16} color={color} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                                 )}
+                               </button>
+                             );
+                           })}
+                         </div>
+                       </div>
+                     </>
+                   )}
                  </div>
                );
              })()}
@@ -2003,57 +2208,82 @@ const VendorPortal = ({ user, onLogout }) => {
         </div>
       </main>
 
-      {showDeleteModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem', backdropFilter: 'blur(4px)' }} onClick={() => setShowDeleteModal(false)}>
-          <motion.div 
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            style={{ background: 'white', borderRadius: '16px', padding: '2rem', maxWidth: '400px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', textAlign: 'center' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#fee2e2', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto' }}>
-              <Trash2 size={32} />
-            </div>
-            <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>Delete Account?</h3>
-            <p style={{ margin: '0 0 2rem 0', color: '#64748b', fontSize: '0.95rem', lineHeight: 1.5 }}>This will permanently remove your business profile, products, and order history. This action cannot be undone.</p>
-            
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <button 
-                style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', background: '#f1f5f9', color: '#64748b', fontWeight: 700, border: 'none', cursor: 'pointer' }}
-                onClick={() => setShowDeleteModal(false)}
-              >
-                Cancel
-              </button>
-              <button 
-                style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', background: '#ef4444', color: 'white', fontWeight: 700, border: 'none', cursor: 'pointer' }}
-                onClick={handleDeleteAccount}
-              >
-                Yes, Delete
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
+      {showDeleteModal && (() => {
+        const activeCount = (hasShopConsole ? 1 : 0) + (hasEventConsole ? 1 : 0) + (hasServiceConsole ? 1 : 0) + (hasRentalConsole ? 1 : 0);
+        const currentConsoleName = businessType === 'shop' ? 'Store' : businessType === 'event' ? 'Events' : businessType === 'rental' ? 'Rentals' : 'Profession';
+
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem', backdropFilter: 'blur(4px)' }} onClick={() => setShowDeleteModal(false)}>
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              style={{ background: 'white', borderRadius: '24px', padding: '2.5rem', maxWidth: '440px', width: '100%', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', textAlign: 'center' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ background: '#fee2e2', color: '#ef4444', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+                <Trash2 size={32} />
+              </div>
+              <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>
+                {activeCount > 1 ? 'Delete Console or Account?' : 'Delete Account?'}
+              </h3>
+              <p style={{ margin: '0 0 2rem 0', color: '#64748b', fontSize: '0.95rem', lineHeight: 1.5 }}>
+                {activeCount > 1 
+                  ? `You have multiple business consoles active. You can choose to permanently delete only your ${currentConsoleName} console, or close the entire account.`
+                  : "This will permanently remove your business profile, products, and order history. This action cannot be undone."}
+              </p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {activeCount > 1 && (
+                  <button 
+                    style={{ width: '100%', padding: '0.85rem', borderRadius: '12px', background: '#ef4444', color: 'white', fontWeight: 800, border: 'none', cursor: 'pointer', fontSize: '0.95rem', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)' }}
+                    onClick={handleDeleteCurrentConsole}
+                  >
+                    Delete Only {currentConsoleName} Console
+                  </button>
+                )}
+                
+                <button 
+                  style={activeCount > 1 ? {
+                    width: '100%', padding: '0.85rem', borderRadius: '12px', background: 'none', border: '1.5px solid #ef4444', color: '#ef4444', fontWeight: 800, cursor: 'pointer', fontSize: '0.95rem'
+                  } : {
+                    width: '100%', padding: '0.85rem', borderRadius: '12px', background: '#ef4444', color: 'white', fontWeight: 800, border: 'none', cursor: 'pointer', fontSize: '0.95rem'
+                  }}
+                  onClick={handleDeleteAccount}
+                >
+                  {activeCount > 1 ? 'Delete Entire Account (All Consoles)' : 'Yes, Delete Account'}
+                </button>
+
+                <button 
+                  style={{ width: '100%', padding: '0.85rem', borderRadius: '12px', background: '#f1f5f9', color: '#64748b', fontWeight: 700, border: 'none', cursor: 'pointer', fontSize: '0.95rem', marginTop: '0.25rem' }}
+                  onClick={() => setShowDeleteModal(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        );
+      })()}
       {showUpgradeModal && (() => {
         const modalConfig = {
           event: {
             title: "Upgrade to Event Organizer",
-            desc: "Organize live events, workshops, music shows, and sell digital entry tickets directly on Passwalaa. A one-time activation fee of ₹499.00 applies.",
+            desc: `Organize live events, workshops, music shows, and sell digital entry tickets directly on Passwalaa. A one-time activation fee of ₹${upgradeEventFee}.00 applies.`,
             color: '#ea580c'
           },
           service: {
             title: "Upgrade to Profession Console",
-            desc: "Offer professional services (cleaning, home services, salon, repairs) and accept appointments. A one-time activation fee of ₹499.00 applies.",
+            desc: `Offer professional services (cleaning, home services, salon, repairs) and accept appointments. A one-time activation fee of ₹${upgradeServiceFee}.00 applies.`,
             color: '#6366f1'
           },
           rental: {
             title: "Upgrade to Rental Console",
-            desc: "Rent out vehicles, bikes, party equipment, or properties, manage availability and rental logs. A one-time activation fee of ₹499.00 applies.",
+            desc: `Rent out vehicles, bikes, party equipment, or properties, manage availability and rental logs. A one-time activation fee of ₹${upgradeRentalFee}.00 applies.`,
             color: '#06b6d4'
           },
           shop: {
             title: "Upgrade to Store Console",
-            desc: "Open a digital retail store, list products, keep track of inventory and fulfill local delivery orders. A one-time activation fee of ₹499.00 applies.",
+            desc: `Open a digital retail store, list products, keep track of inventory and fulfill local delivery orders. A one-time activation fee of ₹${upgradeShopFee}.00 applies.`,
             color: '#10b981'
           }
         }[upgradeTarget || 'event'];

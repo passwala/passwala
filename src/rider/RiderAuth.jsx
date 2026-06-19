@@ -160,7 +160,6 @@ function RiderAuth({ onLogin }) {
   });
   const [cameraConfig, setCameraConfig] = useState({ isOpen: false, field: '', mode: 'user' });
   const [loginMethod, setLoginMethod] = useState('SMS'); // 'SMS' or 'WHATSAPP'
-  const [whatsappOtp, setWhatsappOtp] = useState('');
 
   const openCamera = (field, mode) => {
     setCameraConfig({ isOpen: true, field, mode });
@@ -254,7 +253,6 @@ function RiderAuth({ onLogin }) {
         setLoginMethod('WHATSAPP');
         setStep('OTP');
         if (data.provider === 'mock' && data.otp) {
-          setWhatsappOtp(data.otp);
           toast.success(`[MOCK WHATSAPP] OTP sent: ${data.otp}`, { duration: 8000 });
         } else {
           toast.success('OTP sent successfully via WhatsApp!');

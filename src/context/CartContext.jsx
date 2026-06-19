@@ -1,8 +1,24 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../supabase';
-import { toast } from 'react-hot-toast';
+
 
 const isValidUUID = (str) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+const sanitizeCartItems = (items) => {
+  if (!Array.isArray(items)) return [];
+  const merged = [];
+  items.forEach(item => {
+    if (!item || !item.id) return;
+    const type = item.type || 'product';
+    const existing = merged.find(i => i.id === item.id && i.type === type);
+    if (existing) {
+      existing.qty = (existing.qty || 0) + (item.qty || 1);
+    } else {
+      merged.push({ ...item, type, qty: item.qty || 1 });
+    }
+  });
+  return merged;
+};
 
 const CartContext = createContext();
 
@@ -23,7 +39,7 @@ export const CartProvider = ({ children, user }) => {
     const localCart = localStorage.getItem(localKey);
     let parsedLocal = [];
     try {
-      if (localCart) parsedLocal = JSON.parse(localCart);
+      if (localCart) parsedLocal = sanitizeCartItems(JSON.parse(localCart));
     } catch (e) {
       console.warn('Failed to parse local cart:', e);
     }
@@ -65,7 +81,7 @@ export const CartProvider = ({ children, user }) => {
               setError('Failed to sync your cart with cloud, using local backup.');
             }
           } else if (data?.items) {
-            setCartItems(data.items);
+            setCartItems(sanitizeCartItems(data.items));
           } else {
             setCartItems(parsedLocal);
           }
@@ -132,15 +148,16 @@ export const CartProvider = ({ children, user }) => {
 
   const addToCart = (item) => {
     setCartItems(prev => {
-      const existing = prev.find(i => i.id === item.id && i.type === item.type);
+      const type = item.type || 'product';
+      const existing = prev.find(i => i.id === item.id && i.type === type);
       if (existing) {
         return prev.map(i =>
-          i.id === item.id && i.type === item.type
+          i.id === item.id && i.type === type
             ? { ...i, qty: i.qty + 1 }
             : i
         );
       }
-      return [...prev, { ...item, qty: 1 }];
+      return [...prev, { ...item, type, qty: 1 }];
     });
     setCartOpen(true);
   };
@@ -174,4 +191,22 @@ export const CartProvider = ({ children, user }) => {
 };
 
 // eslint-disable-next-line react-refresh/only-export-components
-export const useCart = () => useContext(CartContext);
+export const useCart = () => {
+  const context = useContext(CartContext);
+  if (!context) {
+    return {
+      cartItems: [],
+      cartOpen: false,
+      setCartOpen: () => {},
+      addToCart: () => {},
+      removeFromCart: () => {},
+      updateQty: () => {},
+      clearCart: () => {},
+      totalItems: 0,
+      totalPrice: 0,
+      error: null,
+      setError: () => {}
+    };
+  }
+  return context;
+};

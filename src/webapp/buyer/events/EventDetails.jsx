@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Calendar, MapPin, Share2, Clock, Navigation, ChevronDown, ChevronUp, Globe, Users, Timer, Eye, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Calendar, MapPin, Share2, Clock, Navigation, ChevronDown, ChevronUp, Globe, Users, Timer, Eye, ChevronRight, ChevronLeft, Ticket } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../../supabase';
 import { checkBookingWindow } from '../../../utils/checkBookingWindow';
@@ -12,6 +12,8 @@ const EventDetails = ({ user }) => {
   const navigate = useNavigate();
   const [event, setEvent] = useState(null);
   const [similarEvents, setSimilarEvents] = useState([]);
+  const [siblingSlots, setSiblingSlots] = useState([]);
+  const [activeImgIndex, setActiveImgIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showFullDesc, setShowFullDesc] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
@@ -27,6 +29,23 @@ const EventDetails = ({ user }) => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       setEvent(data.event);
+
+      // Fetch other slots of the same multiple show event
+      if (data.event && (data.event.show_type === 'multiple' || data.event.show_type === 'festival')) {
+        const { data: siblings } = await supabase
+          .from('events')
+          .select('id, event_date, venue_name')
+          .eq('title', data.event.title)
+          .eq('category', data.event.category)
+          .eq('created_by', data.event.created_by)
+          .neq('status', 'PENDING_APPROVAL')
+          .neq('status', 'REJECTED')
+          .order('event_date', { ascending: true });
+        setSiblingSlots(siblings || []);
+      } else {
+        setSiblingSlots([]);
+      }
+      setActiveImgIndex(0);
     } catch (err) {
       if (!silent) { toast.error('Failed to load event details'); navigate('/events'); }
     } finally {
@@ -45,7 +64,7 @@ const EventDetails = ({ user }) => {
         .in('status', ['UPCOMING', 'ONGOING', 'SOLD_OUT'])
         .limit(8);
       setSimilarEvents(data || []);
-    } catch (_) {}
+    } catch (_) { /* ignore */ }
   }, [id]);
 
   useEffect(() => { fetchEvent(false); }, [fetchEvent]);
@@ -87,7 +106,8 @@ const EventDetails = ({ user }) => {
   const tiers = event.event_ticket_tiers || [];
   const eventDateObj = new Date(event.event_date);
   const hasEnded = event.event_date && eventDateObj < new Date();
-  const anyTierOpen = !hasEnded && tiers.length > 0 && tiers.some(t => checkBookingWindow(t).open);
+  const anyTierOpen = !hasEnded && tiers.length > 0 && tiers.some(t => checkBookingWindow(t, event).open);
+  const bookingNotOpenedYet = !anyTierOpen && !hasEnded && tiers.some(t => new Date(t.booking_open || event.booking_start) > new Date());
   const isSoldOut = event.status === 'SOLD_OUT';
   // Fix #9: isDisabled also covers events with no tiers (no tiers = can't book)
   const isDisabled = hasEnded || isSoldOut || !anyTierOpen || tiers.length === 0;
@@ -105,21 +125,47 @@ const EventDetails = ({ user }) => {
     : (event.category ? [event.category] : []);
   const uniqueTags = [...new Set(tags)].filter(t => t && t !== 'Other Events');
 
+  // Parse multiple banner images
+  const bannerImages = (() => {
+    if (!event?.banner_url) return ['https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200&q=80'];
+    if (typeof event.banner_url === 'string' && event.banner_url.startsWith('[')) {
+      try {
+        const arr = JSON.parse(event.banner_url);
+        if (Array.isArray(arr) && arr.length > 0) return arr;
+      } catch (_) { /* ignore */ }
+    }
+    return [event.banner_url];
+  })();
+
   return (
     <div className="ed2-root">
-      {/* ── BANNER ── */}
-      <div className="ed2-banner">
+      {/* ── BANNER CAROUSEL ── */}
+      <div className="ed2-banner" style={{ position: 'relative', overflow: 'hidden' }}>
         <img
-          src={event.banner_url || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200&q=80'}
+          src={bannerImages[activeImgIndex]}
           alt={event.title}
           className="ed2-banner-img"
           loading="lazy"
           onError={(e) => {
-            // Fix #8: show fallback if banner URL is broken
             e.currentTarget.onerror = null;
             e.currentTarget.src = 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200&q=80';
           }}
         />
+        {bannerImages.length > 1 && (
+          <>
+            <button className="carousel-control-btn prev" onClick={() => setActiveImgIndex(prev => (prev === 0 ? bannerImages.length - 1 : prev - 1))} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 10 }}>
+              <ChevronLeft size={24} />
+            </button>
+            <button className="carousel-control-btn next" onClick={() => setActiveImgIndex(prev => (prev === bannerImages.length - 1 ? 0 : prev + 1))} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 10 }}>
+              <ChevronRight size={24} />
+            </button>
+            <div className="carousel-indicators" style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '8px', zIndex: 10 }}>
+              {bannerImages.map((_, idx) => (
+                <span key={idx} onClick={() => setActiveImgIndex(idx)} style={{ width: '8px', height: '8px', borderRadius: '50%', background: activeImgIndex === idx ? '#ff6b00' : 'rgba(255,255,255,0.5)', cursor: 'pointer', transition: 'all 0.2s' }} />
+              ))}
+            </div>
+          </>
+        )}
         <div className="ed2-banner-overlay" />
         {event.status === 'SOLD_OUT' && <div className="ed2-soldout-badge">SOLD OUT</div>}
         <button className="ed2-share-btn" onClick={handleShare} title="Share">
@@ -147,6 +193,47 @@ const EventDetails = ({ user }) => {
         {/* LEFT COLUMN */}
         <div className="ed2-main">
 
+          {/* Sibling Slots (Dates/Times) for Multiple Shows */}
+          {siblingSlots.length > 1 && (
+            <section className="ed2-section" style={{ background: '#fff7ed', border: '1px solid #ffedd5', borderRadius: '16px', padding: '1.25rem', marginBottom: '1.5rem' }}>
+              <h3 style={{ margin: '0 0 0.5rem', fontSize: '1rem', fontWeight: 800, color: '#c2410c', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Calendar size={18} /> Multiple Show Times / Dates Available
+              </h3>
+              <p style={{ margin: '0 0 1rem', fontSize: '0.82rem', color: '#7c2d12' }}>Choose a different date/venue stop for this event:</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {siblingSlots.map(slot => {
+                  const isActive = slot.id === event.id;
+                  const dateStr = new Date(slot.event_date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+                  return (
+                    <button
+                      key={slot.id}
+                      type="button"
+                      onClick={() => { if (!isActive) navigate(`/events/${slot.id}`); }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        border: isActive ? '2px solid #ff6b00' : '1px solid #e2e8f0',
+                        background: isActive ? '#fff' : '#fafafa',
+                        color: isActive ? '#ff6b00' : '#475569',
+                        fontWeight: isActive ? 800 : 600,
+                        textAlign: 'left',
+                        cursor: isActive ? 'default' : 'pointer',
+                        fontSize: '0.85rem',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <span>📅 {dateStr}</span>
+                      <span style={{ fontSize: '0.78rem', opacity: 0.8 }}>📍 {slot.venue_name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
           {/* About the Event */}
           <section className="ed2-section">
             <h2 className="ed2-section-title"><span className="ed2-title-bar" />About the Event</h2>
@@ -171,48 +258,56 @@ const EventDetails = ({ user }) => {
             <div className="ed2-section-header">
               <h2 className="ed2-section-title"><span className="ed2-title-bar" />Event Guide</h2>
             </div>
-            <div className="ed2-guide-grid">
-              {event.language && (
-                <div className="ed2-guide-pill">
-                  <Globe size={22} className="ed2-guide-icon" />
-                  <span className="ed2-guide-label">LANGUAGE</span>
-                  <span className="ed2-guide-value">{event.language}</span>
-                </div>
-              )}
-              {event.duration && (
-                <div className="ed2-guide-pill">
-                  <Timer size={22} className="ed2-guide-icon" />
-                  <span className="ed2-guide-label">DURATION</span>
-                  <span className="ed2-guide-value">{event.duration}</span>
-                </div>
-              )}
-              {event.age_restriction && (
-                <div className="ed2-guide-pill">
-                  <Users size={22} className="ed2-guide-icon" />
-                  <span className="ed2-guide-label">ENTRY ALLOWED FOR</span>
-                  <span className="ed2-guide-value">{event.age_restriction}</span>
-                </div>
-              )}
-              {!event.language && !event.duration && !event.age_restriction && (
-                <>
+            {(() => {
+              const displayDuration = (() => {
+                if (event.duration) return event.duration;
+                if (event.event_date && event.ends_at) {
+                  const start = new Date(event.event_date);
+                  const end = new Date(event.ends_at);
+                  const diffMs = end.getTime() - start.getTime();
+                  if (diffMs > 0) {
+                    const diffHrs = diffMs / (1000 * 60 * 60);
+                    if (diffHrs < 24) {
+                      const hrs = Math.floor(diffHrs);
+                      const mins = Math.round((diffHrs - hrs) * 60);
+                      if (mins > 0) {
+                        return `${hrs}h ${mins}m`;
+                      }
+                      return `${hrs} hrs`;
+                    }
+                    return 'Multi-day';
+                  }
+                }
+                return '2-3 hrs';
+              })();
+
+              return (
+                <div className="ed2-guide-grid">
+                  <div className="ed2-guide-pill">
+                    <Ticket size={22} className="ed2-guide-icon" />
+                    <span className="ed2-guide-label">SHOW TYPE</span>
+                    <span className="ed2-guide-value">
+                      {event.show_type === 'festival' ? 'Tour / Festival' : event.show_type === 'multiple' ? 'Multiple Shows' : 'Single Show'}
+                    </span>
+                  </div>
                   <div className="ed2-guide-pill">
                     <Globe size={22} className="ed2-guide-icon" />
                     <span className="ed2-guide-label">LANGUAGE</span>
-                    <span className="ed2-guide-value">Multi</span>
+                    <span className="ed2-guide-value">{event.language || 'Hindi / English'}</span>
                   </div>
                   <div className="ed2-guide-pill">
                     <Timer size={22} className="ed2-guide-icon" />
                     <span className="ed2-guide-label">DURATION</span>
-                    <span className="ed2-guide-value">Varies</span>
+                    <span className="ed2-guide-value">{displayDuration}</span>
                   </div>
                   <div className="ed2-guide-pill">
                     <Users size={22} className="ed2-guide-icon" />
                     <span className="ed2-guide-label">ENTRY</span>
-                    <span className="ed2-guide-value">All Ages</span>
+                    <span className="ed2-guide-value">{event.age_restriction || 'All Ages'}</span>
                   </div>
-                </>
-              )}
-            </div>
+                </div>
+              );
+            })()}
           </section>
 
           {/* Ticket Tiers */}
@@ -221,7 +316,7 @@ const EventDetails = ({ user }) => {
               <h2 className="ed2-section-title"><span className="ed2-title-bar" />Ticket Tiers</h2>
               <div className="ed2-tiers-list">
                 {tiers.map(tier => {
-                  const wc = checkBookingWindow(tier);
+                  const wc = checkBookingWindow(tier, event);
                   return (
                     <div key={tier.id} className="ed2-tier-card">
                       <div>
@@ -320,14 +415,6 @@ const EventDetails = ({ user }) => {
             <section className="ed2-section">
               <div className="ed2-section-header">
                 <h2 className="ed2-section-title"><span className="ed2-title-bar" />Events You May Enjoy</h2>
-                <div className="ed2-carousel-btns">
-                  <button className="ed2-carousel-btn" onClick={() => {
-                    similarRowRef.current?.scrollBy({ left: -320, behavior: 'smooth' });
-                  }}><ChevronLeft size={15} /></button>
-                  <button className="ed2-carousel-btn" onClick={() => {
-                    similarRowRef.current?.scrollBy({ left: 320, behavior: 'smooth' });
-                  }}><ChevronRight size={15} /></button>
-                </div>
               </div>
               <div className="ed2-similar-row" ref={similarRowRef}>
                 {similarEvents.map(ev => {
@@ -335,10 +422,19 @@ const EventDetails = ({ user }) => {
                   const evMin = ev.event_ticket_tiers?.length > 0
                     ? Math.min(...ev.event_ticket_tiers.map(t => t.price))
                     : null;
+                  let evImg = ev.banner_url || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=400&q=70';
+                  if (typeof evImg === 'string' && evImg.startsWith('[')) {
+                    try {
+                      const arr = JSON.parse(evImg);
+                      if (Array.isArray(arr) && arr.length > 0) {
+                        evImg = arr[0];
+                      }
+                    } catch (_) { /* ignore */ }
+                  }
                   return (
                     <div key={ev.id} className="ed2-similar-card" onClick={() => navigate(`/events/${ev.id}`)}>
                       <div className="ed2-similar-img-wrap">
-                        <img src={ev.banner_url || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=400&q=70'} alt={ev.title} />
+                        <img src={evImg} alt={ev.title} />
                       </div>
                       <div className="ed2-similar-info">
                         <p className="ed2-similar-title">{ev.title}</p>
@@ -394,7 +490,7 @@ const EventDetails = ({ user }) => {
               navigate('/events/checkout', { state: { event, user } });
             }}
           >
-            {hasEnded ? 'Event Ended' : isSoldOut ? 'Sold Out' : tiers.length === 0 ? 'No Tickets' : (!anyTierOpen ? 'Booking Closed' : 'Book Tickets')}
+            {hasEnded ? 'Event Ended' : isSoldOut ? 'Sold Out' : tiers.length === 0 ? 'No Tickets' : (bookingNotOpenedYet ? 'Booking Not Opened' : (!anyTierOpen ? 'Booking Closed' : 'Book Tickets'))}
           </button>
         </aside>
       </div>
@@ -411,7 +507,7 @@ const EventDetails = ({ user }) => {
             navigate('/events/checkout', { state: { event, user } });
           }}
         >
-          {hasEnded ? 'Event Ended' : isSoldOut ? 'Sold Out' : tiers.length === 0 ? 'No Tickets' : (!anyTierOpen ? 'Booking Closed' : 'Book Tickets')}
+          {hasEnded ? 'Event Ended' : isSoldOut ? 'Sold Out' : tiers.length === 0 ? 'No Tickets' : (bookingNotOpenedYet ? 'Booking Not Opened' : (!anyTierOpen ? 'Booking Closed' : 'Book Tickets'))}
         </button>
       </div>
     </div>
