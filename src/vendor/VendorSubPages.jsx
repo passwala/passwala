@@ -493,145 +493,146 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
 
   // Compute minimum allowed datetime string (now, in local timezone, YYYY-MM-DDTHH:MM format)
 
-  React.useEffect(() => {
-    const fetchCatalog = async () => {
-      if (!storeId && !vendorData?.user_id) {
-        setItems([]);
-        loadedBusinessTypeRef.current = businessType;
-        return;
-      }
-
-      let dbItems = [];
-      const isValidUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(storeId || vendorData?.user_id);
-      if (supabase && (isValidUuid || businessType === 'event')) {
-        try {
-          const targetTable = businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : 'services';
-          let query = supabase.from(targetTable).select('*');
-          if (businessType === 'event') {
-            const userId = vendorData?.user_id;
-            if (userId) {
-              query = query.eq('created_by', userId);
-            } else {
-              query = query.eq('created_by', storeId);
-            }
-          } else {
-            const idCol = businessType === 'shop' ? 'store_id' : 'provider_id';
-            query = query.eq(idCol, storeId);
-          }
-
-          const { data, error } = await query;
-          if (!error && data) {
-            let filteredData = data;
-            if (businessType === 'shop') {
-              filteredData = data.filter(item => item.description !== 'Service item auto-registered');
-            }
-
-            const mapped = [];
-            for (const item of filteredData) {
-              let eventPrice = 299;
-              let totalSeats = 0;
-              let availableSeats = 0;
-              if (businessType === 'event') {
-                try {
-                  const { data: tiers } = await supabase.from('event_ticket_tiers').select('price, total_seats, available_seats').eq('event_id', item.id);
-                  if (tiers && tiers.length > 0) {
-                    eventPrice = Math.min(...tiers.map(t => t.price));
-                    totalSeats = tiers.reduce((s, t) => s + (t.total_seats || 0), 0);
-                    availableSeats = tiers.reduce((s, t) => s + (t.available_seats || 0), 0);
-                  }
-                } catch (e) { console.warn(e); }
-              } else {
-                eventPrice = item.price;
-              }
-
-              mapped.push({
-                id: item.id,
-                name: item.name || item.title,
-                detail: item.description || item.category,
-                price: eventPrice,
-                total_seats: totalSeats,
-                available_seats: availableSeats,
-                image: item.image_url || item.banner_url || item.image,
-                barcode: item.barcode || '',
-                barcode_type: item.barcode_type || 'EAN-13',
-                stock_quantity: 9999,
-                type: businessType || 'shop',
-                category_id: item.category_id,
-                category: item.category,
-                status: item.status,
-                booking_start: item.booking_start,
-                booking_end: item.booking_end,
-                venue_name: item.venue_name,
-                event_date: item.event_date ? new Date(item.event_date).toISOString().slice(0, 16) : '',
-                duration: item.duration || '',
-                age_restriction: item.age_restriction || '',
-                language: item.language || '',
-                show_type: item.show_type || 'single'
-              });
-            }
-            dbItems = mapped;
-          }
-        } catch (e) { console.error(e); }
-      }
-
-      const localStored = JSON.parse(localStorage.getItem('vVendorItems_' + businessType) || '[]');
-
-      // Prioritize Database items. If DB has data, use it.
-      // Fallback to local storage ONLY if DB is empty to allow offline dev.
-      let finalItems = [];
-      if (dbItems.length > 0) {
-        finalItems = dbItems;
-      } else {
-        finalItems = localStored;
-      }
-
-      // For events: group multiple shows with the same title into one catalog card.
-      // Each group keeps the first event's id (used for editing, which loads all siblings),
-      // but stores showCount so the card can display "X shows".
-      // For non-events: deduplicate by ID only.
-      if (businessType === 'event') {
-        const grouped = [];
-        const groupMap = {}; // titleKey -> index in grouped
-        finalItems.forEach(item => {
-          if (item.show_type === 'multiple' || item.show_type === 'festival') {
-            const titleKey = (item.name || '').toLowerCase().trim();
-            if (titleKey && groupMap[titleKey] !== undefined) {
-              const existing = grouped[groupMap[titleKey]];
-              existing.showCount = (existing.showCount || 1) + 1;
-              existing.showsList = existing.showsList || [
-                { id: existing.id, event_date: existing.event_date, venue_name: existing.venue_name, available_seats: existing.available_seats, total_seats: existing.total_seats }
-              ];
-              existing.showsList.push({ id: item.id, event_date: item.event_date, venue_name: item.venue_name, available_seats: item.available_seats, total_seats: item.total_seats });
-              existing.total_seats = (existing.total_seats || 0) + (item.total_seats || 0);
-              existing.available_seats = (existing.available_seats || 0) + (item.available_seats || 0);
-              if (item.price !== undefined && (existing.price === undefined || item.price < existing.price)) {
-                existing.price = item.price;
-              }
-            } else {
-              const entry = { ...item, showCount: 1, showsList: [{ id: item.id, event_date: item.event_date, venue_name: item.venue_name, available_seats: item.available_seats, total_seats: item.total_seats }] };
-              groupMap[titleKey] = grouped.length;
-              grouped.push(entry);
-            }
-          } else {
-            grouped.push({ ...item, showCount: 1 });
-          }
-        });
-        setItems(grouped);
-      } else {
-        // For shops/services: deduplicate by ID
-        const seen = new Set();
-        const unique = [];
-        finalItems.forEach(item => {
-          if (!seen.has(item.id)) {
-            seen.add(item.id);
-            unique.push(item);
-          }
-        });
-        setItems(unique);
-      }
+  const fetchCatalog = React.useCallback(async () => {
+    if (!storeId && !vendorData?.user_id) {
+      setItems([]);
       loadedBusinessTypeRef.current = businessType;
-    };
-    
+      return;
+    }
+
+    let dbItems = [];
+    const isValidUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(storeId || vendorData?.user_id);
+    if (supabase && (isValidUuid || businessType === 'event')) {
+      try {
+        const targetTable = businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : 'services';
+        let query = supabase.from(targetTable).select('*');
+        if (businessType === 'event') {
+          const userId = vendorData?.user_id || storeId;
+          if (userId) {
+            query = query.or(`created_by.eq.${userId},allowed_scanner_id.eq.${userId}`);
+          }
+        } else {
+          const idCol = businessType === 'shop' ? 'store_id' : 'provider_id';
+          query = query.eq(idCol, storeId);
+        }
+
+        const { data, error } = await query;
+        if (!error && data) {
+          let filteredData = data;
+          if (businessType === 'shop') {
+            filteredData = data.filter(item => item.description !== 'Service item auto-registered');
+          }
+
+          const mapped = [];
+          for (const item of filteredData) {
+            let eventPrice = 299;
+            let totalSeats = 0;
+            let availableSeats = 0;
+            if (businessType === 'event') {
+              try {
+                const { data: tiers } = await supabase.from('event_ticket_tiers').select('price, total_seats, available_seats').eq('event_id', item.id);
+                if (tiers && tiers.length > 0) {
+                  eventPrice = Math.min(...tiers.map(t => t.price));
+                  totalSeats = tiers.reduce((s, t) => s + (t.total_seats || 0), 0);
+                  availableSeats = tiers.reduce((s, t) => s + (t.available_seats || 0), 0);
+                }
+              } catch (e) { console.warn(e); }
+            } else {
+              eventPrice = item.price;
+            }
+
+            mapped.push({
+              id: item.id,
+              name: item.name || item.title,
+              detail: item.description || item.category,
+              price: eventPrice,
+              total_seats: totalSeats,
+              available_seats: availableSeats,
+              image: item.image_url || item.banner_url || item.image,
+              barcode: item.barcode || '',
+              barcode_type: item.barcode_type || 'EAN-13',
+              stock_quantity: item.stock_quantity !== null && item.stock_quantity !== undefined ? item.stock_quantity : 9999,
+              type: businessType || 'shop',
+              category_id: item.category_id,
+              category: item.category,
+              status: item.status,
+              booking_start: item.booking_start,
+              booking_end: item.booking_end,
+              venue_name: item.venue_name,
+              event_date: item.event_date || '',
+              duration: item.duration || '',
+              age_restriction: item.age_restriction || '',
+              language: item.language || '',
+              show_type: item.show_type || 'single',
+              is_admin_organized: item.is_admin_organized || false
+            });
+          }
+          dbItems = mapped;
+        }
+      } catch (e) { console.error(e); }
+    }
+
+    const localStored = JSON.parse(localStorage.getItem('vVendorItems_' + businessType) || '[]');
+
+    let finalItems = [];
+    if (dbItems.length > 0) {
+      finalItems = dbItems;
+    } else {
+      finalItems = localStored;
+    }
+
+    if (businessType === 'event') {
+      const grouped = [];
+      const groupMap = {};
+      const titleCounts = {};
+      finalItems.forEach(item => {
+        const titleKey = (item.name || '').toLowerCase().trim();
+        if (titleKey) {
+          titleCounts[titleKey] = (titleCounts[titleKey] || 0) + 1;
+        }
+      });
+
+      finalItems.forEach(item => {
+        const titleKey = (item.name || '').toLowerCase().trim();
+        const isMultiShow = item.show_type === 'multiple' || item.show_type === 'festival' || item.show_type === 'tour' || (titleCounts[titleKey] > 1);
+        if (isMultiShow) {
+          if (titleKey && groupMap[titleKey] !== undefined) {
+            const existing = grouped[groupMap[titleKey]];
+            existing.showCount = (existing.showCount || 1) + 1;
+            existing.showsList = existing.showsList || [
+              { id: existing.id, event_date: existing.event_date, venue_name: existing.venue_name, available_seats: existing.available_seats, total_seats: existing.total_seats }
+            ];
+            existing.showsList.push({ id: item.id, event_date: item.event_date, venue_name: item.venue_name, available_seats: item.available_seats, total_seats: item.total_seats });
+            existing.total_seats = (existing.total_seats || 0) + (item.total_seats || 0);
+            existing.available_seats = (existing.available_seats || 0) + (item.available_seats || 0);
+            if (item.price !== undefined && (existing.price === undefined || item.price < existing.price)) {
+              existing.price = item.price;
+            }
+          } else {
+            const entry = { ...item, showCount: 1, showsList: [{ id: item.id, event_date: item.event_date, venue_name: item.venue_name, available_seats: item.available_seats, total_seats: item.total_seats }] };
+            groupMap[titleKey] = grouped.length;
+            grouped.push(entry);
+          }
+        } else {
+          grouped.push({ ...item, showCount: 1 });
+        }
+      });
+      setItems(grouped);
+    } else {
+      const seen = new Set();
+      const unique = [];
+      finalItems.forEach(item => {
+        if (!seen.has(item.id)) {
+          seen.add(item.id);
+          unique.push(item);
+        }
+      });
+      setItems(unique);
+    }
+    loadedBusinessTypeRef.current = businessType;
+  }, [storeId, businessType, vendorData]);
+
+  React.useEffect(() => {
     fetchCatalog();
 
     if (storeId && supabase) {
@@ -649,7 +650,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
         supabase.removeChannel(sub);
       };
     }
-  }, [storeId, businessType, vendorData]);
+  }, [storeId, businessType, vendorData, fetchCatalog]);
 
   React.useEffect(() => {
     if (loadedBusinessTypeRef.current !== businessType) {
@@ -726,7 +727,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
             const { error } = await supabase.from(targetTable).update(updatePayload).eq('id', editingId);
             if (error) throw error;
           } else if (businessType === 'event') {
-            if (newItem.show_type === 'multiple' || newItem.show_type === 'festival') {
+            if (newItem.show_type === 'multiple' || newItem.show_type === 'festival' || newItem.show_type === 'tour') {
               const { data: originalEvent } = await supabase.from('events').select('title, category, created_by, show_type').eq('id', editingId).maybeSingle();
               if (originalEvent) {
                 const { data: existingSiblings } = await supabase
@@ -909,7 +910,8 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
           venue_name: newItem.venue_name,
           event_date: newItem.event_date,
           booking_start: newItem.booking_start,
-          booking_end: newItem.booking_end
+          booking_end: newItem.booking_end,
+          show_type: newItem.show_type
         } : item);
         safeSetLocalStorage('vVendorItems_' + businessType, JSON.stringify(updated.filter(i => !i.id.toString().startsWith('d') && !i.id.toString().startsWith('s'))));
         return updated;
@@ -945,7 +947,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
       try {
         const targetTable = businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : 'services';
         
-        if (businessType === 'event' && (newItem.show_type === 'multiple' || newItem.show_type === 'festival') && newItem.schedule_slots && newItem.schedule_slots.length > 0) {
+        if (businessType === 'event' && (newItem.show_type === 'multiple' || newItem.show_type === 'festival' || newItem.show_type === 'tour') && newItem.schedule_slots && newItem.schedule_slots.length > 0) {
           for (const slot of newItem.schedule_slots) {
             const payload = {
               title: newProductObj.name,
@@ -1000,6 +1002,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
               await supabase.from('event_ticket_tiers').insert(tiersPayload);
             }
           }
+          await fetchCatalog();
           toast.success(`Published ${newItem.schedule_slots.length} shows successfully!`);
           setNewItem({ name: '', detail: '', price: '299', image: null, barcode: '', barcode_type: 'EAN-13', stock_quantity: '', category_id: null, category: 'Music & Concerts', venue_name: '', event_date: '', booking_start: '', booking_end: '', show_type: 'single', duration: '', age_restriction: '', language: '', schedule_slots: [{ id: Date.now(), date: '', starts: '19:00', ends: '22:00', venue_name: '' }], ticket_tiers: [{ tier_name: 'General Admission', price: '299', total_seats: '100' }] });
           setShowForm(false);
@@ -1101,9 +1104,11 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
             booking_end: data[0].booking_end,
             duration: data[0].duration || '',
             age_restriction: data[0].age_restriction || '',
-            language: data[0].language || ''
+            language: data[0].language || '',
+            show_type: data[0].show_type || 'single'
           };
           setItems(prev => [dbObj, ...prev.filter(i => i.id !== localId && !i.id.toString().startsWith('d') && !i.id.toString().startsWith('s'))]);
+          await fetchCatalog();
         }
       } catch (err) {
         console.error(err);
@@ -1128,6 +1133,10 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
   };
 
   const handleEditClick = async (item) => {
+    if (item.is_admin_organized) {
+      toast.error('You cannot edit an admin-organized event.');
+      return;
+    }
     setEditingId(item.id);
 
     // Helper: convert ISO timestamp to datetime-local input format (YYYY-MM-DDTHH:MM)
@@ -1149,7 +1158,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
         const { data: dbEvt } = await supabase.from('events').select('show_type, title, category, created_by').eq('id', item.id).maybeSingle();
         if (dbEvt) {
           showType = dbEvt.show_type || 'single';
-          if (showType === 'multiple' || showType === 'festival') {
+          if (showType === 'multiple' || showType === 'festival' || showType === 'tour') {
             const { data: siblings } = await supabase
               .from('events')
               .select('id, event_date, ends_at, venue_name')
@@ -1265,6 +1274,10 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
   const handleDelete = (id) => {
     const item = items.find(i => i.id === id);
     if (!item) return;
+    if (item.is_admin_organized) {
+      toast.error('You cannot delete an admin-organized event.');
+      return;
+    }
     setConfirmDialog({
       isOpen: true,
       title: 'Delete Listing',
@@ -1554,8 +1567,8 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
 
                           {/* Festival or Tour Card */}
                           <div 
-                            className={`event-type-card ${newItem.show_type === 'festival' ? 'selected' : ''}`}
-                            onClick={() => setNewItem({ ...newItem, show_type: 'festival' })}
+                            className={`event-type-card ${newItem.show_type === 'tour' ? 'selected' : ''}`}
+                            onClick={() => setNewItem({ ...newItem, show_type: 'tour' })}
                           >
                             <div className="card-top-row">
                               <div className="card-icon-box orange-tint">
@@ -1563,8 +1576,8 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                               </div>
                               <div className="card-badge-container">
                                 <span className="card-badge-advanced">Advanced</span>
-                                <div className={`card-check-circle ${newItem.show_type === 'festival' ? 'checked' : ''}`}>
-                                  {newItem.show_type === 'festival' && (
+                                <div className={`card-check-circle ${newItem.show_type === 'tour' ? 'checked' : ''}`}>
+                                  {newItem.show_type === 'tour' && (
                                     <div className="card-checkmark-fill">✓</div>
                                   )}
                                 </div>
@@ -1578,7 +1591,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
 
                         <div className="event-type-footer">
                           <span className="event-type-selected-text">
-                            Selected: <strong>{newItem.show_type === 'festival' ? 'Festival or tour' : newItem.show_type === 'multiple' ? 'Multiple shows' : 'Single show'}</strong>
+                            Selected: <strong>{newItem.show_type === 'tour' ? 'Festival or tour' : newItem.show_type === 'multiple' ? 'Multiple shows' : 'Single show'}</strong>
                           </span>
                           <button 
                             type="button" 
@@ -2092,15 +2105,20 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                                 <div className="review-tickets-section">
                                   <strong>Ticket Tiers ({newItem.ticket_tiers?.length || 0})</strong>
                                   <div className="review-tiers-list">
-                                    {(newItem.ticket_tiers || []).map((t, idx) => (
-                                      <div className="review-tier-item" key={t.id || idx}>
-                                        <div className="tier-left">
-                                          <strong>{t.tier_name}</strong>
-                                          <span>Capacity: {t.total_seats} seats</span>
+                                    {(newItem.ticket_tiers || []).map((t, idx) => {
+                                      const capacity = (newItem.schedule_slots && newItem.schedule_slots.length > 1)
+                                        ? newItem.schedule_slots.reduce((sum, slot) => sum + (t.slot_capacities?.[slot.id] !== undefined ? (parseInt(t.slot_capacities[slot.id]) || 0) : (parseInt(t.total_seats) || 100)), 0)
+                                        : (t.total_seats || 100);
+                                      return (
+                                        <div className="review-tier-item" key={t.id || idx}>
+                                          <div className="tier-left">
+                                            <strong>{t.tier_name}</strong>
+                                            <span>Capacity: {capacity} seats</span>
+                                          </div>
+                                          <span className="tier-price-tag">₹{t.price}</span>
                                         </div>
-                                        <span className="tier-price-tag">₹{t.price}</span>
-                                      </div>
-                                    ))}
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               </div>
@@ -2114,9 +2132,9 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                           </div>
                         )
                       )
-                    ) : newItem.show_type === 'festival' ? (
+                    ) : (newItem.show_type === 'festival' || newItem.show_type === 'tour') ? (
                       // FESTIVAL OR TOUR WIZARD STEPS
-                      newItem.show_type === 'festival' && (
+                      (newItem.show_type === 'festival' || newItem.show_type === 'tour') && (
                         eventWizardStep === 2 ? (
                           // Step 2: Basics
                           <div className="single-event-wizard-step animate-fade-in">
@@ -2600,15 +2618,20 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                                 <div className="review-tickets-section">
                                   <strong>Ticket Tiers ({newItem.ticket_tiers?.length || 0})</strong>
                                   <div className="review-tiers-list">
-                                    {(newItem.ticket_tiers || []).map((t, idx) => (
-                                      <div className="review-tier-item" key={t.id || idx}>
-                                        <div className="tier-left">
-                                          <strong>{t.tier_name}</strong>
-                                          <span>Capacity: {t.total_seats} seats</span>
+                                    {(newItem.ticket_tiers || []).map((t, idx) => {
+                                      const capacity = (newItem.schedule_slots && newItem.schedule_slots.length > 1)
+                                        ? newItem.schedule_slots.reduce((sum, slot) => sum + (t.slot_capacities?.[slot.id] !== undefined ? (parseInt(t.slot_capacities[slot.id]) || 0) : (parseInt(t.total_seats) || 100)), 0)
+                                        : (t.total_seats || 100);
+                                      return (
+                                        <div className="review-tier-item" key={t.id || idx}>
+                                          <div className="tier-left">
+                                            <strong>{t.tier_name}</strong>
+                                            <span>Capacity: {capacity} seats</span>
+                                          </div>
+                                          <span className="tier-price-tag">₹{t.price}</span>
                                         </div>
-                                        <span className="tier-price-tag">₹{t.price}</span>
-                                      </div>
-                                    ))}
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               </div>
@@ -3040,15 +3063,20 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                                 <div className="review-tickets-section">
                                   <strong>Ticket Tiers ({newItem.ticket_tiers?.length || 0})</strong>
                                   <div className="review-tiers-list">
-                                    {(newItem.ticket_tiers || []).map((t, idx) => (
-                                      <div className="review-tier-item" key={t.id || idx}>
-                                        <div className="tier-left">
-                                          <strong>{t.tier_name || 'General Admission'}</strong>
-                                          <span>Capacity: {t.total_seats || 100} seats</span>
+                                    {(newItem.ticket_tiers || []).map((t, idx) => {
+                                      const capacity = (newItem.schedule_slots && newItem.schedule_slots.length > 1)
+                                        ? newItem.schedule_slots.reduce((sum, slot) => sum + (t.slot_capacities?.[slot.id] !== undefined ? (parseInt(t.slot_capacities[slot.id]) || 0) : (parseInt(t.total_seats) || 100)), 0)
+                                        : (t.total_seats || 100);
+                                      return (
+                                        <div className="review-tier-item" key={t.id || idx}>
+                                          <div className="tier-left">
+                                            <strong>{t.tier_name || 'General Admission'}</strong>
+                                            <span>Capacity: {capacity} seats</span>
+                                          </div>
+                                          <span className="tier-price-tag">₹{t.price}</span>
                                         </div>
-                                        <span className="tier-price-tag">₹{t.price}</span>
-                                      </div>
-                                    ))}
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               </div>
@@ -3267,7 +3295,9 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                 <div className="v-card-overlay" />
 
                 <div className="v-card-actions">
-                  <button onClick={() => handleDelete(item.id)} className="v-action-btn delete"><Trash2 size={16} /></button>
+                  {!item.is_admin_organized && (
+                    <button onClick={() => handleDelete(item.id)} className="v-action-btn delete"><Trash2 size={16} /></button>
+                  )}
                 </div>
 
                 <div style={{ position: 'absolute', bottom: '16px', left: '16px' }}>
@@ -3279,10 +3309,11 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                     );
                     return (
                       <span className={`v-badge-premium ${
-                        businessType === 'shop' ? 'v-badge-info' :
-                        businessType === 'event'
-                          ? (item.status === 'PENDING_APPROVAL' ? '' : item.status === 'REJECTED' ? '' : isClosed ? '' : 'v-badge-warning')
-                          : 'v-badge-success'
+                        businessType === 'shop'
+                          ? (item.stock_quantity <= 0 ? 'v-badge-error' : 'v-badge-info')
+                          : businessType === 'event'
+                            ? (item.status === 'PENDING_APPROVAL' ? '' : item.status === 'REJECTED' ? '' : isClosed ? '' : 'v-badge-warning')
+                            : 'v-badge-success'
                       }`} style={
                         businessType === 'event' && item.status === 'PENDING_APPROVAL'
                           ? { background: '#f59e0b', color: '#fff' }
@@ -3293,7 +3324,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                           : {}
                       }>
                         {businessType === 'shop'
-                          ? 'In Stock'
+                          ? (item.stock_quantity <= 0 ? 'Out of Stock' : 'In Stock')
                           : businessType === 'event'
                             ? (item.status === 'PENDING_APPROVAL'
                                 ? '⏳ Pending Approval'
@@ -3325,58 +3356,85 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
               </div>
 
               <div className="v-card-content">
-                <h4 className="v-card-title">{item.name}</h4>
+                <h4 className="v-card-title">
+                  {item.name}
+                  {item.is_admin_organized && (
+                    <span style={{ marginLeft: '8px', background: '#3b82f6', color: '#fff', borderRadius: '6px', padding: '2px 8px', fontSize: '0.62rem', verticalAlign: 'middle', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.02em', display: 'inline-block' }}>
+                      🛡️ Admin Organized
+                    </span>
+                  )}
+                </h4>
                 {businessType === 'event' && item.showCount > 1 && (
                   <p style={{ margin: '0 0 4px', fontSize: '0.72rem', fontWeight: 700, color: '#7c3aed' }}>
                     {item.showCount} scheduled shows
                   </p>
                 )}
                 <p className="v-card-detail">{item.detail || (businessType === 'event' ? item.category || 'Upcoming event' : 'High quality listing with professional support.')}</p>
-                {businessType === 'event' && item.showsList && item.showsList.length > 1 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '8px 0', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                    {item.showsList.map((show, idx) => {
-                      const showDateStr = show.event_date ? new Date(show.event_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Unknown Date';
-                      const pct = show.total_seats > 0 ? (show.available_seats / show.total_seats) * 100 : 0;
-                      return (
-                        <div key={show.id || idx} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: '#475569' }}>
-                            <span style={{ fontWeight: 600 }}>📅 {showDateStr}</span>
-                            <span style={{
-                              fontWeight: 700,
-                              color: show.available_seats === 0 ? '#ef4444'
-                                : show.available_seats / show.total_seats < 0.2 ? '#f59e0b'
-                                : '#22c55e'
-                            }}>
-                              {show.available_seats === 0 ? 'Sold Out' : `${show.available_seats}/${show.total_seats} left`}
-                            </span>
-                          </div>
-                          {show.total_seats > 0 && (
-                            <div style={{
-                              width: '100%', height: '4px', borderRadius: '10px',
-                              background: '#e2e8f0', overflow: 'hidden'
-                            }}>
-                              <div style={{
-                                height: '100%', borderRadius: '10px',
-                                width: `${Math.max(0, Math.min(100, pct))}%`,
-                                background: show.available_seats === 0 ? '#ef4444'
-                                  : show.available_seats / show.total_seats < 0.2 ? '#f59e0b'
-                                  : '#22c55e',
-                                transition: 'width 0.4s ease'
-                              }} />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <>
-                    {businessType === 'event' && item.event_date && (
-                      <p style={{ margin: '4px 0 6px 0', fontSize: '0.75rem', color: '#64748b', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                        <span>📅 {new Date(item.event_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                        {item.venue_name && <span>📍 {item.venue_name}</span>}
-                      </p>
-                    )}
+                 {businessType === 'event' && item.showsList && item.showsList.length > 1 ? (
+                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '8px 0', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                     {item.showsList.map((show, idx) => {
+                       let showDateStr = 'Unknown Date';
+                       if (show.event_date) {
+                         try {
+                           const formattedStr = typeof show.event_date === 'string' ? show.event_date.replace(' ', 'T') : show.event_date;
+                           const d = new Date(formattedStr);
+                           if (!isNaN(d.getTime())) {
+                             showDateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+                           }
+                         } catch (e) {
+                           console.warn('Error formatting show date:', e);
+                         }
+                       }
+                       const pct = show.total_seats > 0 ? (show.available_seats / show.total_seats) * 100 : 0;
+                       return (
+                         <div key={show.id || idx} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: '#475569' }}>
+                             <span style={{ fontWeight: 600 }}>📅 {showDateStr}</span>
+                             <span style={{
+                               fontWeight: 700,
+                               color: show.available_seats === 0 ? '#ef4444'
+                                 : show.available_seats / show.total_seats < 0.2 ? '#f59e0b'
+                                 : '#22c55e'
+                             }}>
+                               {show.available_seats === 0 ? 'Sold Out' : `${show.available_seats}/${show.total_seats} left`}
+                             </span>
+                           </div>
+                           {show.total_seats > 0 && (
+                             <div style={{
+                               width: '100%', height: '4px', borderRadius: '10px',
+                               background: '#e2e8f0', overflow: 'hidden'
+                             }}>
+                               <div style={{
+                                 height: '100%', borderRadius: '10px',
+                                 width: `${Math.max(0, Math.min(100, pct))}%`,
+                                 background: show.available_seats === 0 ? '#ef4444'
+                                   : show.available_seats / show.total_seats < 0.2 ? '#f59e0b'
+                                   : '#22c55e',
+                                 transition: 'width 0.4s ease'
+                               }} />
+                             </div>
+                           )}
+                         </div>
+                       );
+                     })}
+                   </div>
+                 ) : (
+                   <>
+                     {businessType === 'event' && item.event_date && (
+                       <p style={{ margin: '4px 0 6px 0', fontSize: '0.75rem', color: '#64748b', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                         <span>📅 {(() => {
+                           try {
+                             const formattedStr = typeof item.event_date === 'string' ? item.event_date.replace(' ', 'T') : item.event_date;
+                             const d = new Date(formattedStr);
+                             if (!isNaN(d.getTime())) {
+                               return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                             }
+                           } catch (e) {}
+                           return 'Unknown Date';
+                         })()}</span>
+                         {item.venue_name && <span>📍 {item.venue_name}</span>}
+                       </p>
+                     )}
 
                     {businessType === 'event' && item.total_seats > 0 && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
@@ -3412,9 +3470,15 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                     <span className="v-price-currency">₹</span>
                     <span className="v-price-amount">{item.price}</span>
                   </div>
-                  <button onClick={() => handleEditClick(item)} className="v-card-edit-btn">
-                    {businessType === 'event' ? 'Edit Event' : 'Edit Listing'}
-                  </button>
+                  {item.is_admin_organized ? (
+                    <button disabled style={{ background: '#cbd5e1', color: '#64748b', cursor: 'not-allowed', boxShadow: 'none' }} className="v-card-edit-btn">
+                      Admin Event
+                    </button>
+                  ) : (
+                    <button onClick={() => handleEditClick(item)} className="v-card-edit-btn">
+                      {businessType === 'event' ? 'Edit Event' : 'Edit Listing'}
+                    </button>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -4159,6 +4223,11 @@ export const VendorOrders = ({ storeId, businessType, vendorData }) => {
       } else {
         const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
         if (error) throw error;
+
+        // NOTE: Stock restoration is handled atomically by the database trigger
+        // 'trigger_restore_stock' which fires AFTER UPDATE OF status ON orders.
+        // DO NOT manually restore stock here — that would cause a double-restoration.
+        // If the trigger is not deployed, run: database/create_stock_triggers.sql
       }
 
       // Background fetch to ensure consistency after optimistic update
@@ -4797,14 +4866,19 @@ export const VendorReviews = ({ storeId, businessType }) => {
     const fetchReviews = async () => {
       if (!storeId) { setReviews([]); return; }
       try {
-        const { data, error } = await supabase.from('orders').select('id, users(full_name), created_at').eq('store_id', storeId).eq('status', 'DELIVERED').order('created_at', { ascending: false }).limit(5);
+        const { data, error } = await supabase
+          .from('order_ratings')
+          .select('rating, comment, created_at, order_id, users(full_name)')
+          .eq('store_id', storeId)
+          .order('created_at', { ascending: false });
+        
         if (!error && data) {
-          const revs = data.map(o => ({
-            user: o.users?.full_name || 'Valued Partner',
-            rating: 5,
-            comment: `Professional service on Order #${o.id.substring(0, 6).toUpperCase()}. The packaging was excellent and delivery was prompt.`,
-            date: new Date(o.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-            avatar: (o.users?.full_name || 'V').charAt(0)
+          const revs = data.map(r => ({
+            user: r.users?.full_name || 'Passwala User',
+            rating: r.rating || 5,
+            comment: r.comment || `Great service! (Order #${r.order_id ? String(r.order_id).substring(0, 6).toUpperCase() : ''})`,
+            date: new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+            avatar: (r.users?.full_name || 'P').charAt(0)
           }));
           setReviews(revs);
         }
@@ -4884,7 +4958,6 @@ export const VendorReviews = ({ storeId, businessType }) => {
 
             <div style={{ marginTop: 'auto', paddingTop: '1.5rem', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 700 }}>{rev.date}</span>
-              <button style={{ background: 'none', border: 'none', color: 'var(--v-primary)', fontWeight: 900, fontSize: '0.85rem', cursor: 'pointer' }}>Reply to Review</button>
             </div>
           </motion.div>
         ))}

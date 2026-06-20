@@ -229,6 +229,13 @@ router.post('/payment/verify', userAuth, async (req, res) => {
     }
 
     if (finalOrderStatus === 'PLACED') {
+      // NOTE: Stock decrement is handled atomically by the database trigger
+      // 'trigger_decrement_stock' which fires AFTER INSERT on order_items.
+      // DO NOT manually decrement stock here — that would cause a double-deduction
+      // (DB trigger already ran when order_items were inserted in the checkout flow).
+      // If the trigger is not deployed, run: database/create_stock_triggers.sql
+
+      // 2. Setup delivery tracking records
       try {
         for (const id of orderIds) {
           const { data: existing } = await supabase

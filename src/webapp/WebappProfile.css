@@ -6,6 +6,17 @@
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
+  transition: all 0.3s ease;
+}
+@media (min-width: 768px) {
+  .webapp-profile-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
 }
 
 .dark-mode .webapp-profile-page {

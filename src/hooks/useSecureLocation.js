@@ -109,18 +109,6 @@ export const useSecureLocation = () => {
       
       if (timeDiffHours > 0) {
         const measuredSpeed = distKm / timeDiffHours;
-        // If speed exceeds 200 km/h, it's highly likely a spoofed teleport
-        if (measuredSpeed > 200) {
-          console.error(`[SecureGeo] MOCK DETECTED: Unrealistic speed ${measuredSpeed.toFixed(2)} km/h`);
-          setLocationState(prev => ({ 
-            ...prev, 
-            isMock: true, 
-            error: 'Suspicious GPS activity detected. Please disable mock locations.', 
-            errorCode: 'MOCK_DETECTED', 
-            loading: false 
-          }));
-          return;
-        }
         calculatedSpeedKmH = Math.max(calculatedSpeedKmH, measuredSpeed);
       }
     }

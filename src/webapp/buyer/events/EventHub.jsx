@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Calendar, History, Clock, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../../supabase';
+import { useTranslation } from '../../LanguageContext';
 import './EventHub.css';
 
 const CATEGORIES = [
@@ -22,16 +23,46 @@ const FALLBACK_IMG = 'https://images.unsplash.com/photo-1492684223066-81342ee5ff
 
 const EventHub = () => {
   const navigate = useNavigate();
+  const { t, currentLanguage } = useTranslation();
   const [events, setEvents]             = useState([]);
   const [total, setTotal]               = useState(0);
   const [loading, setLoading]           = useState(true);
   const [activeCategory, setActiveCategory] = useState('All');
+  const [activeShowType, setActiveShowType] = useState('all'); // 'all' | 'single' | 'multiple' | 'tour'
   const [searchQuery, setSearchQuery]   = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [timeFilter, setTimeFilter]     = useState('upcoming');
   const [page, setPage]                 = useState(1);
   const abortRef   = useRef(null);
   const refreshRef = useRef(null);
+
+  // Translate categories for display
+  const translateCategory = (catName) => {
+    switch (catName) {
+      case 'All': return t('cat_all');
+      case 'Music & Concerts': return t('cat_music_concerts');
+      case 'Comedy & Theatre': return t('cat_comedy_theatre');
+      case 'Workshops & Classes': return t('cat_workshops_classes');
+      case 'Parties & Nightlife': return t('cat_parties_nightlife');
+      case 'Festivals & Fairs': return t('cat_festivals_fairs');
+      case 'Sports & Fitness': return t('cat_sports_fitness');
+      case 'Corporate & Business': return t('cat_corporate_business');
+      default: return catName;
+    }
+  };
+
+  // Translate show types for display
+  const translateShowType = (type) => {
+    switch (type) {
+      case 'all': return t('all_show_types');
+      case 'single': return t('single_show');
+      case 'multiple': return t('multiple_shows');
+      case 'tour':
+      case 'festival':
+        return t('tour_festival');
+      default: return type;
+    }
+  };
 
   // Debounce search input by 400ms
   useEffect(() => {
@@ -40,7 +71,7 @@ const EventHub = () => {
   }, [searchQuery]);
 
   // Reset page when filters change
-  useEffect(() => { setPage(1); }, [activeCategory, debouncedQuery, timeFilter]);
+  useEffect(() => { setPage(1); }, [activeCategory, debouncedQuery, timeFilter, activeShowType]);
 
   // Fix #11: Pass page/pageSize to server — only fetch 12 events per request
   const fetchEvents = useCallback(async (silent = false) => {
@@ -54,6 +85,7 @@ const EventHub = () => {
         query: debouncedQuery,
         page: String(page),
         pageSize: String(PAGE_SIZE),
+        showType: activeShowType,
         ...(timeFilter === 'past' ? { filter: 'past' } : {})
       });
       const res = await fetch(`${BASE_URL}/api/events/search?${params}`, {
@@ -70,7 +102,7 @@ const EventHub = () => {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [activeCategory, debouncedQuery, timeFilter, page]);
+  }, [activeCategory, debouncedQuery, timeFilter, page, activeShowType]);
 
   // Fetch on filter or page change
   useEffect(() => { fetchEvents(false); }, [fetchEvents]);
@@ -89,8 +121,6 @@ const EventHub = () => {
     return () => { supabase.removeChannel(channel); clearInterval(refreshRef.current); };
   }, []); // empty deps: channel created once, never torn down on filter change
 
-
-
   // Fix #11: Pagination computed from server total, not client array length
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -98,60 +128,87 @@ const EventHub = () => {
     <div className="eh-root">
       {/* ── Top Header ── */}
       <div className="eh-topbar">
-        <h2 className="eh-heading">Events Near You</h2>
-        <div className="eh-time-toggle">
-          <button
-            className={`eh-toggle-btn ${timeFilter === 'upcoming' ? 'active' : ''}`}
-            onClick={() => setTimeFilter('upcoming')}
-          >
-            <Calendar size={14} /> Upcoming
-          </button>
-          <button
-            className={`eh-toggle-btn ${timeFilter === 'past' ? 'active-past' : ''}`}
-            onClick={() => setTimeFilter('past')}
-          >
-            <History size={14} /> Past
-          </button>
+        <div className="eh-topbar-inner">
+          <h2 className="eh-heading">{t('events_near_you')}</h2>
+          <div className="eh-time-toggle">
+            <button
+              className={`eh-toggle-btn ${timeFilter === 'upcoming' ? 'active' : ''}`}
+              onClick={() => setTimeFilter('upcoming')}
+            >
+              <Calendar size={14} /> {t('upcoming')}
+            </button>
+            <button
+              className={`eh-toggle-btn ${timeFilter === 'past' ? 'active-past' : ''}`}
+              onClick={() => setTimeFilter('past')}
+            >
+              <History size={14} /> {t('past')}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* ── Search ── */}
       <div className="eh-search-wrap">
-        <div className="eh-search-bar">
-          <Search size={18} className="eh-search-icon" />
-          <input
-            id="event-search-input"
-            type="text"
-            placeholder="Search events, concerts, workshops..."
-            aria-label="Search events"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <button className="eh-search-clear" onClick={() => setSearchQuery('')}>✕</button>
-          )}
+        <div className="eh-search-inner">
+          <div className="eh-search-bar">
+            <Search size={18} className="eh-search-icon" />
+            <input
+              id="event-search-input"
+              type="text"
+              placeholder={t('search_events_placeholder')}
+              aria-label="Search events"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button className="eh-search-clear" onClick={() => setSearchQuery('')}>✕</button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* ── Category Chips ── */}
       <div className="eh-cats">
-        {CATEGORIES.map(cat => (
-          <button
-            key={cat}
-            className={`eh-cat-chip ${activeCategory === cat ? 'active' : ''}`}
-            onClick={() => setActiveCategory(cat)}
-          >
-            {cat}
-          </button>
-        ))}
+        <div className="eh-cats-inner">
+          {CATEGORIES.map(cat => (
+            <button
+              key={cat}
+              className={`eh-cat-chip ${activeCategory === cat ? 'active' : ''}`}
+              onClick={() => setActiveCategory(cat)}
+            >
+              {translateCategory(cat)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Show Type Chips ── */}
+      <div className="eh-show-types-bar">
+        <div className="eh-show-types-inner">
+          {[
+            { id: 'all', label: t('all_show_types') },
+            { id: 'single', label: t('single_show') },
+            { id: 'multiple', label: t('multiple_shows') },
+            { id: 'tour', label: t('tour_festival') }
+          ].map(typeOpt => (
+            <button
+              key={typeOpt.id}
+              className={`eh-show-type-chip ${activeShowType === typeOpt.id ? 'active' : ''}`}
+              onClick={() => setActiveShowType(typeOpt.id)}
+            >
+              {typeOpt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── Result count ── */}
       {!loading && total > 0 && (
         <p className="eh-result-count">
-          {total} event{total !== 1 ? 's' : ''} found
-          {activeCategory !== 'All' ? ` in "${activeCategory}"` : ''}
-          {totalPages > 1 ? ` — page ${page} of ${totalPages}` : ''}
+          {total} {total !== 1 ? t('events_found') : t('event_found')}
+          {activeCategory !== 'All' ? ` ${t('in_category', 'in')} "${translateCategory(activeCategory)}"` : ''}
+          {activeShowType !== 'all' ? ` (Type: ${translateShowType(activeShowType)})` : ''}
+          {totalPages > 1 ? ` — ${t('page_of', 'page {page} of {total}').replace('{page}', String(page)).replace('{total}', String(totalPages))}` : ''}
         </p>
       )}
 
@@ -159,14 +216,14 @@ const EventHub = () => {
       {loading ? (
         <div className="eh-loader">
           <div className="eh-spinner" />
-          <p>Loading events...</p>
+          <p>{t('loading_events')}</p>
         </div>
       ) : events.length === 0 ? (
         <div className="eh-empty">
           <Calendar size={52} color="#ffe4cc" />
-          <p>No {timeFilter === 'past' ? 'past' : 'upcoming'} events found{activeCategory !== 'All' ? ` in "${activeCategory}"` : ''}.</p>
+          <p>{t('no_events_found').replace('{filter}', timeFilter === 'past' ? t('past').toLowerCase() : t('upcoming').toLowerCase())}{activeCategory !== 'All' ? ` ${t('in_category', 'in')} "${translateCategory(activeCategory)}"` : ''}.</p>
           {activeCategory !== 'All' && (
-            <button className="eh-reset-btn" onClick={() => setActiveCategory('All')}>Show all events</button>
+            <button className="eh-reset-btn" onClick={() => setActiveCategory('All')}>{t('show_all_events')}</button>
           )}
         </div>
       ) : (
@@ -181,6 +238,13 @@ const EventHub = () => {
               const isSoldOut  = event.status === 'SOLD_OUT' || totalSeats === 0;
               // Filter out "Other Events" category label
               const categoryLabel = (event.category && event.category !== 'Other Events') ? event.category : null;
+
+              // Format date month in localized language format
+              const eventDateObj = new Date(event.event_date);
+              const formattedMonth = eventDateObj.toLocaleString(
+                currentLanguage === 'en' ? 'en-IN' : `${currentLanguage}-IN`, 
+                { month: 'short' }
+              ).toUpperCase();
 
               return (
                 <div
@@ -218,16 +282,21 @@ const EventHub = () => {
                       );
                     })()}
                     <div className="eh-date-badge">
-                      <span className="eh-date-day">{new Date(event.event_date).getDate()}</span>
-                      <span className="eh-date-month">{new Date(event.event_date).toLocaleString('en-IN', { month: 'short' }).toUpperCase()}</span>
+                      <span className="eh-date-day">{eventDateObj.getDate()}</span>
+                      <span className="eh-date-month">{formattedMonth}</span>
                     </div>
-                    {isSoldOut && <div className="eh-soldout-ribbon">SOLD OUT</div>}
-                    {timeFilter === 'past' && <div className="eh-past-badge"><Clock size={10} /> PAST</div>}
+                    {isSoldOut && <div className="eh-soldout-ribbon">{t('sold_out')}</div>}
+                    {timeFilter === 'past' && <div className="eh-past-badge"><Clock size={10} /> {t('past')}</div>}
                   </div>
 
                   {/* Info */}
                   <div className="eh-card-info">
-                    {categoryLabel && <span className="eh-card-category">{categoryLabel}</span>}
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                      {categoryLabel && <span className="eh-card-category" style={{ marginBottom: 0 }}>{translateCategory(categoryLabel)}</span>}
+                      <span className={`eh-card-show-type ${event.show_type || 'single'}`}>
+                        {translateShowType(event.show_type || 'single')}
+                      </span>
+                    </div>
                     <h3 className="eh-card-title">{event.title}</h3>
                     <p className="eh-card-venue">
                       <MapPin size={12} style={{ marginRight: '4px', flexShrink: 0 }} />
@@ -237,14 +306,17 @@ const EventHub = () => {
                     <div style={{ marginTop: 'auto', paddingTop: '10px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                         {minPrice !== null ? (
-                          <span className="eh-card-price">₹{minPrice}<span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b', marginLeft: '2px' }}>onwards</span></span>
+                          <span className="eh-card-price">₹{minPrice}<span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b', marginLeft: '2px' }}>{t('onwards')}</span></span>
                         ) : (
-                          <span className="eh-card-price" style={{ color: '#16a34a' }}>Free</span>
+                          <span className="eh-card-price" style={{ color: '#16a34a' }}>{t('free')}</span>
                         )}
                         
                         {!isSoldOut && totalCap > 0 && (
                           <span style={{ fontSize: '0.7rem', fontWeight: 700, color: pct < 20 ? '#ef4444' : '#16a34a' }}>
-                            {pct < 20 ? `Only ${totalSeats} left!` : `${totalSeats} available`}
+                            {pct < 20 
+                              ? t('only_n_left').replace('{n}', String(totalSeats)) 
+                              : t('n_available').replace('{n}', String(totalSeats))
+                            }
                           </span>
                         )}
                       </div>
@@ -272,11 +344,10 @@ const EventHub = () => {
                 disabled={page === 1}
                 onClick={() => {
                   setPage(p => p - 1);
-                  // Fix #10: Use .webapp-main scroll container, not window (PWA/WebView)
                   document.querySelector('.webapp-main')?.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
               >
-                <ChevronLeft size={16} /> Prev
+                <ChevronLeft size={16} /> {t('prev')}
               </button>
               <div className="eh-page-nums">
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
@@ -300,7 +371,7 @@ const EventHub = () => {
                   document.querySelector('.webapp-main')?.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
               >
-                Next <ChevronRight size={16} />
+                {t('next')} <ChevronRight size={16} />
               </button>
             </div>
           )}

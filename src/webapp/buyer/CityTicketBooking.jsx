@@ -151,18 +151,54 @@ const CityTicketBooking = ({ user, userCoords }) => {
 
     setSearchResults(localMatches);
 
-
-    // 2. Debounce external Nominatim calls by 500ms to avoid keypress rate-limit blocks
+    // 2. Debounce external autocomplete/geocoding calls by 500ms
     if (searchDebounceRef.current) {
       clearTimeout(searchDebounceRef.current);
     }
 
-    if (query.trim().length >= 3) {
+    if (query.trim().length >= 2) {
       searchDebounceRef.current = setTimeout(async () => {
+        // Use Google Places Autocomplete if available
+        if (window.google && window.google.maps && window.google.maps.places) {
+          try {
+            const autocompleteService = new window.google.maps.places.AutocompleteService();
+            autocompleteService.getPlacePredictions({
+              input: query,
+              locationBias: new window.google.maps.LatLngBounds(
+                new window.google.maps.LatLng(22.9, 72.4),
+                new window.google.maps.LatLng(23.25, 72.7)
+              ),
+              componentRestrictions: { country: 'in' }
+            }, (predictions, status) => {
+              if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+                const googleResults = predictions.map(p => ({
+                  display_name: p.description,
+                  place_id: p.place_id,
+                  is_google: true
+                }));
+                setSearchResults(prev => {
+                  const merged = [...prev];
+                  googleResults.forEach(g => {
+                    const gName = g.display_name.split(',')[0].toLowerCase();
+                    const exists = merged.some(local => local.display_name.split(',')[0].toLowerCase() === gName);
+                    if (!exists) {
+                      merged.push(g);
+                    }
+                  });
+                  return merged;
+                });
+              }
+            });
+          } catch (e) {
+            console.error('Google Autocomplete error:', e);
+          }
+          return;
+        }
+
+        // Fallback: OpenStreetMap Nominatim
         try {
-          const suffix = query.toLowerCase().includes('ahmedabad') ? '' : ', Ahmedabad, Gujarat';
           const res = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + suffix)}&countrycodes=in&limit=20`,
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=72.4,23.25,72.7,22.9&bounded=1&countrycodes=in&limit=20`,
             { 
               headers: { 
                 'Accept-Language': 'en',
@@ -202,10 +238,40 @@ const CityTicketBooking = ({ user, userCoords }) => {
 
   const triggerSearch = async (query, type) => {
     if (!query) return;
+    
+    // Use Google Places Autocomplete if available
+    if (window.google && window.google.maps && window.google.maps.places) {
+      try {
+        const autocompleteService = new window.google.maps.places.AutocompleteService();
+        autocompleteService.getPlacePredictions({
+          input: query,
+          locationBias: new window.google.maps.LatLngBounds(
+            new window.google.maps.LatLng(22.9, 72.4),
+            new window.google.maps.LatLng(23.25, 72.7)
+          ),
+          componentRestrictions: { country: 'in' }
+        }, (predictions, status) => {
+          if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions && predictions.length > 0) {
+            const first = predictions[0];
+            handleSearchResultSelect({
+              display_name: first.description,
+              place_id: first.place_id,
+              is_google: true
+            }, type);
+          } else {
+            toast.error('No locations found matching search term');
+          }
+        });
+      } catch (e) {
+        console.error('Google Autocomplete trigger error:', e);
+      }
+      return;
+    }
+
+    // Fallback: OpenStreetMap Nominatim
     try {
-      const suffix = query.toLowerCase().includes('ahmedabad') ? '' : ', Ahmedabad, Gujarat';
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + suffix)}&countrycodes=in&limit=10`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=72.4,23.25,72.7,22.9&bounded=1&countrycodes=in&limit=10`,
         { 
           headers: { 
             'Accept-Language': 'en',
@@ -229,9 +295,53 @@ const CityTicketBooking = ({ user, userCoords }) => {
     }
   };
 
-
-
   const handleSearchResultSelect = (result, type) => {
+    // If it's Google Places result, fetch details (lat, lng) first
+    if (result.is_google) {
+      if (window.google && window.google.maps && window.google.maps.places) {
+        try {
+          const placesService = new window.google.maps.places.PlacesService(document.createElement('div'));
+          placesService.getDetails({
+            placeId: result.place_id,
+            fields: ['geometry', 'formatted_address', 'name']
+          }, (place, status) => {
+            if (status === window.google.maps.places.PlacesServiceStatus.OK && place && place.geometry) {
+              const lat = place.geometry.location.lat();
+              const lng = place.geometry.location.lng();
+              
+              if (!isWithinAhmedabad(lat, lng)) {
+                toast.error('Passwala City Rides are strictly available within Ahmedabad city limits only.');
+                return;
+              }
+              
+              const name = place.name || place.formatted_address;
+              const loc = { lat, lng, name };
+              
+              if (type === 'pickup') {
+                setPickup(loc);
+                setPickupSearchQuery(name);
+                setMapCenter([lat, lng]);
+                setActiveInput('dropoff');
+                toast.success(`Pickup set: ${name}`, { icon: '🟢' });
+              } else {
+                setDropoff(loc);
+                setDropoffSearchQuery(name);
+                setMapCenter([lat, lng]);
+                toast.success(`Drop-off set: ${name}`, { icon: '🔴' });
+              }
+              setSearchResults([]);
+            } else {
+              toast.error('Failed to get location details from Google Maps.');
+            }
+          });
+        } catch (e) {
+          console.error('Google Places Details error:', e);
+          toast.error('Failed to get location details.');
+        }
+      }
+      return;
+    }
+
     const lat = parseFloat(result.lat);
     const lng = parseFloat(result.lon);
     
@@ -247,11 +357,13 @@ const CityTicketBooking = ({ user, userCoords }) => {
     if (type === 'pickup') {
       setPickup(loc);
       setPickupSearchQuery(name);
+      setMapCenter([lat, lng]);
       setActiveInput('dropoff');
       toast.success(`Pickup set: ${name}`, { icon: '🟢' });
     } else {
       setDropoff(loc);
       setDropoffSearchQuery(name);
+      setMapCenter([lat, lng]);
       toast.success(`Drop-off set: ${name}`, { icon: '🔴' });
     }
     setSearchResults([]);
@@ -381,11 +493,13 @@ const CityTicketBooking = ({ user, userCoords }) => {
     if (activeInput === 'pickup') {
       setPickup(loc);
       setPickupSearchQuery(loc.name);
+      setMapCenter([loc.lat, loc.lng]);
       setActiveInput('dropoff');
       toast.success(`Pickup: ${loc.name}`, { icon: '🟢', duration: 2000 });
     } else {
       setDropoff(loc);
       setDropoffSearchQuery(loc.name);
+      setMapCenter([loc.lat, loc.lng]);
       toast.success(`Drop-off: ${loc.name}`, { icon: '🔴', duration: 2000 });
     }
   };

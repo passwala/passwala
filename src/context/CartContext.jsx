@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../supabase';
+import { toast } from 'react-hot-toast';
 
 
 const isValidUUID = (str) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
@@ -147,19 +148,49 @@ export const CartProvider = ({ children, user }) => {
   }, [cartItems, user, isLoaded]);
 
   const addToCart = (item) => {
+    const type = item.type || 'product';
+    const hasService = cartItems.some(i => i.type === 'service');
+    const hasProduct = cartItems.some(i => i.type !== 'service');
+
+    if (type === 'service' && hasProduct) {
+      toast.error("You cannot mix services and products in the same order. Please complete or clear your current cart first.", { id: 'mix_cart_err' });
+      return false;
+    }
+    if (type !== 'service' && hasService) {
+      toast.error("You cannot mix products and services in the same booking. Please complete or clear your current cart first.", { id: 'mix_cart_err' });
+      return false;
+    }
+
+    let addSuccess = true;
     setCartItems(prev => {
-      const type = item.type || 'product';
       const existing = prev.find(i => i.id === item.id && i.type === type);
       if (existing) {
+        const availableStock = existing.stock !== undefined && existing.stock !== null ? existing.stock : 9999;
+        if (existing.qty >= availableStock) {
+          toast.error(`Only ${availableStock} units of "${item.name}" are available in stock.`, { id: `stock_limit_${item.id}` });
+          addSuccess = false;
+          return prev;
+        }
         return prev.map(i =>
           i.id === item.id && i.type === type
             ? { ...i, qty: i.qty + 1 }
             : i
         );
       }
+      const availableStock = item.stock !== undefined && item.stock !== null ? item.stock : 9999;
+      if (availableStock <= 0) {
+        toast.error(`"${item.name}" is out of stock.`, { id: `out_of_stock_${item.id}` });
+        addSuccess = false;
+        return prev;
+      }
       return [...prev, { ...item, type, qty: 1 }];
     });
-    setCartOpen(true);
+    
+    if (addSuccess) {
+      setCartOpen(true);
+      return true;
+    }
+    return false;
   };
 
   const removeFromCart = (id, type) => {
@@ -168,9 +199,21 @@ export const CartProvider = ({ children, user }) => {
 
   const updateQty = (id, type, delta) => {
     setCartItems(prev => {
-      return prev
-        .map(i => i.id === id && i.type === type ? { ...i, qty: i.qty + delta } : i)
-        .filter(i => i.qty > 0);
+      let limitHit = false;
+      const updated = prev.map(i => {
+        if (i.id === id && i.type === type) {
+          const availableStock = i.stock !== undefined && i.stock !== null ? i.stock : 9999;
+          const newQty = i.qty + delta;
+          if (newQty > availableStock) {
+            limitHit = true;
+            toast.error(`Only ${availableStock} units of "${i.name}" are available in stock.`, { id: `stock_limit_${id}` });
+            return i;
+          }
+          return { ...i, qty: newQty };
+        }
+        return i;
+      });
+      return limitHit ? prev : updated.filter(i => i.qty > 0);
     });
   };
 

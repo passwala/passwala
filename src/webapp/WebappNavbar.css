@@ -210,14 +210,16 @@
   color: white;
   font-size: 0.65rem;
   font-weight: 800;
-  min-width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  display: flex;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 99px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 1.5px solid var(--bg-soft);
-  padding: 1px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  white-space: nowrap;
 }
 
 .nav-profile-trigger img {

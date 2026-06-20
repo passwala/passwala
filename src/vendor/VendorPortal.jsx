@@ -545,6 +545,7 @@ const VendorPortal = ({ user, onLogout }) => {
             name: localStorage.getItem('vOwnerName') || savedForm?.name || 'Partner',
             address: localStorage.getItem('vAddress') || savedForm?.address || 'Local Area',
             license_no: savedForm?.license_no || 'Pending Verification',
+            category: localStorage.getItem('vCategory') || savedForm?.category || '',
             phone: phone,
             profile_completed: true
           });
@@ -561,6 +562,7 @@ const VendorPortal = ({ user, onLogout }) => {
           name: localStorage.getItem('vOwnerName') || savedForm?.name || 'Partner',
           address: localStorage.getItem('vAddress') || savedForm?.address || 'Local Area',
           license_no: savedForm?.license_no || 'Pending Verification',
+          category: localStorage.getItem('vCategory') || savedForm?.category || '',
           phone: phone,
           profile_completed: true
         });
@@ -580,6 +582,7 @@ const VendorPortal = ({ user, onLogout }) => {
           name: localStorage.getItem('vOwnerName') || savedForm?.name || 'Partner',
           address: localStorage.getItem('vAddress') || savedForm?.address || 'Local Area',
           license_no: savedForm?.license_no || 'Pending Verification',
+          category: localStorage.getItem('vCategory') || savedForm?.category || '',
           phone: user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : '9999999999',
           profile_completed: true
         });
@@ -893,44 +896,75 @@ const VendorPortal = ({ user, onLogout }) => {
       if (updatedBusinessName) safeSetLocalStorage('vBusinessName', updatedBusinessName);
       if (updatedName) safeSetLocalStorage('vOwnerName', updatedName);
       if (updatedAddress) safeSetLocalStorage('vAddress', updatedAddress);
+      if (editFormData.category) safeSetLocalStorage('vCategory', editFormData.category);
       
       const savedForm = JSON.parse(localStorage.getItem('vFormData') || '{}');
       safeSetLocalStorage('vFormData', JSON.stringify({ ...savedForm, ...editFormData, lat: updatedLat, lng: updatedLng }));
 
       if (supabase && vendorData?.id && vendorData.id.length > 20) {
          try {
-           const targetTable = businessType === 'shop' ? 'vendors' : 'service_providers';
-           const updatePayload = {
-              business_name: editFormData.business_name,
-              address: editFormData.address,
-              license_no: editFormData.license_no,
-              category: editFormData.category,
-              aadhar_no: editFormData.aadhar_no ? editFormData.aadhar_no.replace(/\s/g, '') : null,
+            const targetTable = businessType === 'shop' ? 'vendors' : 'service_providers';
+            let updatePayload = {
+               business_name: editFormData.business_name,
+               address: editFormData.address,
+               license_no: editFormData.license_no,
+               category: editFormData.category,
+               aadhar_no: editFormData.aadhar_no ? editFormData.aadhar_no.replace(/\s/g, '') : null,
+               lat: updatedLat,
+               lng: updatedLng
+            };
+            if (targetTable === 'vendors') {
+              updatePayload.name = editFormData.name;
+            } else {
+              updatePayload.full_name = editFormData.name;
+              updatePayload.name = editFormData.name;
+            }
+            
+            const cleanPayload = (payload, msg) => {
+              const cleaned = { ...payload };
+              if (msg.includes('lat')) delete cleaned.lat;
+              if (msg.includes('lng')) delete cleaned.lng;
+              if (msg.includes('aadhar_no')) delete cleaned.aadhar_no;
+              return cleaned;
+            };
+
+            let { error: updateErr } = await supabase
+              .from(targetTable)
+              .update(updatePayload)
+              .eq('id', vendorData.id);
+              
+            if (updateErr && (updateErr.message.includes('lat') || updateErr.message.includes('lng') || updateErr.message.includes('aadhar_no') || updateErr.message.includes('column'))) {
+              const retryPayload = cleanPayload(updatePayload, updateErr.message);
+              let { error: retryErr } = await supabase
+                .from(targetTable)
+                .update(retryPayload)
+                .eq('id', vendorData.id);
+                
+              if (retryErr && (retryErr.message.includes('lat') || retryErr.message.includes('lng') || retryErr.message.includes('aadhar_no') || retryErr.message.includes('column'))) {
+                const finalPayload = cleanPayload(retryPayload, retryErr.message);
+                const { error: finalErr } = await supabase
+                  .from(targetTable)
+                  .update(finalPayload)
+                  .eq('id', vendorData.id);
+                if (finalErr) throw finalErr;
+              } else if (retryErr) {
+                throw retryErr;
+              }
+            } else if (updateErr) {
+              throw updateErr;
+            }
+
+            const { error: storeErr } = await supabase.from('stores').upsert({
+              id: vendorData.id,
+              vendor_id: vendorData.id,
+              name: editFormData.business_name || vendorData.business_name,
+              address: editFormData.address || vendorData.address,
               lat: updatedLat,
               lng: updatedLng
-           };
-           if (targetTable === 'vendors') {
-             updatePayload.name = editFormData.name;
-           } else {
-             updatePayload.full_name = editFormData.name;
-             updatePayload.name = editFormData.name;
-           }
-           
-           await supabase
-             .from(targetTable)
-             .update(updatePayload)
-             .eq('id', vendorData.id);
-
-           await supabase.from('stores').upsert({
-             id: vendorData.id,
-             vendor_id: vendorData.id,
-             name: editFormData.business_name || vendorData.business_name,
-             address: editFormData.address || vendorData.address,
-             lat: updatedLat,
-             lng: updatedLng
-           }, { onConflict: 'id' });
+            }, { onConflict: 'id' });
+            if (storeErr) throw storeErr;
          } catch (dbErr) {
-           console.warn("Supabase profile sync skipped:", dbErr);
+            console.warn("Supabase profile sync skipped:", dbErr);
          }
       }
       

@@ -162,7 +162,7 @@ router.get('/fetch', async (req, res) => {
     try {
         let selectStr = '*';
         if (table === 'riders' || table === 'vendors' || table === 'service_providers') {
-            selectStr = '*, users(phone, full_name)';
+            selectStr = '*, users(phone, full_name, role)';
         } else if (table === 'service_bookings') {
             selectStr = '*, users(phone, full_name), services(title, price), service_providers(business_name), addresses(address_line_1, city)';
         } else if (table === 'services') {
@@ -213,7 +213,19 @@ router.get('/fetch', async (req, res) => {
                             .eq('phone', row.phone)
                             .maybeSingle();
 
-                        const targetRole = table === 'vendors' ? 'VENDOR' : (table === 'riders' ? 'RIDER' : 'SERVICE_PROVIDER');
+                        // Determine the target role, but don't demote EVENT_ORGANIZER back to SERVICE_PROVIDER
+                        let targetRole;
+                        if (table === 'vendors') targetRole = 'VENDOR';
+                        else if (table === 'riders') targetRole = 'RIDER';
+                        else {
+                            // For service_providers: EVENT_ORGANIZERs are stored here too — preserve their role
+                            const EVENT_CATEGORIES = [
+                              "Music & Concerts", "Comedy & Theatre", "Workshops & Classes",
+                              "Parties & Nightlife", "Festivals & Fairs", "Sports & Fitness",
+                              "Corporate & Business", "Other Events"
+                            ];
+                            targetRole = EVENT_CATEGORIES.includes(row.category) ? 'EVENT_ORGANIZER' : 'SERVICE_PROVIDER';
+                        }
 
                         if (!existingUser) {
                             const userPayload = {
@@ -230,11 +242,13 @@ router.get('/fetch', async (req, res) => {
                             if (!insErr && newUser) {
                                 existingUser = newUser;
                             }
-                        } else if (existingUser.role !== targetRole) {
+                        } else if (existingUser.role !== targetRole && existingUser.role !== 'EVENT_ORGANIZER') {
+                            // Don't downgrade EVENT_ORGANIZER — only update if role is truly wrong
                             await supabase
                                 .from('users')
                                 .update({ role: targetRole })
                                 .eq('id', existingUser.id);
+                            existingUser.role = targetRole;
                         }
 
                         if (existingUser) {
@@ -248,7 +262,8 @@ router.get('/fetch', async (req, res) => {
                                 row.users = {
                                     id: existingUser.id,
                                     phone: row.phone,
-                                    full_name: existingUser.full_name
+                                    full_name: existingUser.full_name,
+                                    role: existingUser.role
                                 };
                             }
                         }
@@ -583,7 +598,23 @@ router.post('/upsert', async (req, res) => {
             let userRole = 'BUYER';
             if (table === 'vendors') userRole = 'VENDOR';
             else if (table === 'riders') userRole = 'RIDER';
-            else if (table === 'service_providers') userRole = 'SERVICE_PROVIDER';
+            else if (table === 'service_providers') {
+                const EVENT_CATEGORIES = [
+                  "Music & Concerts",
+                  "Comedy & Theatre",
+                  "Workshops & Classes",
+                  "Parties & Nightlife",
+                  "Festivals & Fairs",
+                  "Sports & Fitness",
+                  "Corporate & Business",
+                  "Other Events"
+                ];
+                if (EVENT_CATEGORIES.includes(payload.category) || (existingUser && existingUser.role === 'EVENT_ORGANIZER')) {
+                    userRole = 'EVENT_ORGANIZER';
+                } else {
+                    userRole = 'SERVICE_PROVIDER';
+                }
+            }
 
             const userPayload = {
                 phone: payload.phone,

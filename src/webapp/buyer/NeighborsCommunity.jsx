@@ -19,8 +19,10 @@ import {
 import './NeighborsCommunity.css';
 import { supabase } from '../../supabase';
 import { DEFAULT_LOCATION } from '../../utils/constants';
+import { useTranslation } from '../LanguageContext';
 
 const NeighborsCommunity = ({ onBack, location }) => {
+  const { t } = useTranslation();
   const currentArea = location?.split(',')[0] || 'Greenwood Hills';
   const currentFull = location || DEFAULT_LOCATION;
   const [activeTab, setActiveTab] = useState('Feed');
@@ -50,7 +52,12 @@ const NeighborsCommunity = ({ onBack, location }) => {
   ]);
   const [selectedGroupId, setSelectedGroupId] = useState(null);
 
-  const tabs = ['Feed', 'Groups', 'Safety', 'For Sale'];
+  const tabs = [
+    { key: 'Feed', label: t('feed') },
+    { key: 'Groups', label: t('groups') },
+    { key: 'Safety', label: t('safety') },
+    { key: 'For Sale', label: t('for_sale') }
+  ];
 
   useEffect(() => {
     fetchPosts();
@@ -262,7 +269,7 @@ const NeighborsCommunity = ({ onBack, location }) => {
               >
                 {group.isAction ? group.icon : group.initial}
               </motion.div>
-              <span>{group.name}</span>
+              <span>{group.isAction ? t('join') : group.name === 'Local Safety' ? t('safety') : group.name === 'Market' ? t('for_sale') : group.name}</span>
             </div>
           ))}
         </div>
@@ -271,14 +278,14 @@ const NeighborsCommunity = ({ onBack, location }) => {
         <div className="community-tabs">
           {tabs.map((tab) => (
             <button 
-              key={tab} 
-              className={`comm-tab-btn ${activeTab === tab ? 'active' : ''}`}
+              key={tab.key} 
+              className={`comm-tab-btn ${activeTab === tab.key ? 'active' : ''}`}
               onClick={() => {
-                setActiveTab(tab);
+                setActiveTab(tab.key);
                 setSelectedGroupId(null); // Clear group filter when changing main tab
               }}
             >
-              {tab}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -288,7 +295,7 @@ const NeighborsCommunity = ({ onBack, location }) => {
         {loading ? (
           <div className="discovery-loading">
             <div className="spinner"></div>
-            <p>Gathering neighborhood updates...</p>
+            <p>{t('gathering_updates')}</p>
           </div>
         ) : (
           <>
@@ -299,7 +306,7 @@ const NeighborsCommunity = ({ onBack, location }) => {
                 <div className="input-wrapper-comm" style={{ flex: 1 }}>
                   <input 
                     type="text" 
-                    placeholder="What's on your mind?" 
+                    placeholder={t('whats_on_mind')} 
                     value={newPostContent}
                     onChange={(e) => setNewPostContent(e.target.value)}
                     style={{ width: '85%' }}
@@ -310,7 +317,7 @@ const NeighborsCommunity = ({ onBack, location }) => {
                   </div>
                 </div>
                 <button type="submit" disabled={submitting} className="comm-tab-btn active" style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}>
-                  {submitting ? '...' : 'Post'}
+                  {submitting ? '...' : t('post')}
                 </button>
               </div>
               
@@ -318,7 +325,7 @@ const NeighborsCommunity = ({ onBack, location }) => {
                 <div style={{ display: 'flex', gap: '0.5rem', padding: '0.25rem 1rem' }}>
                   <input 
                     type="text" 
-                    placeholder="Paste image URL here..." 
+                    placeholder={t('paste_image_url')} 
                     value={newPostImage}
                     onChange={(e) => setNewPostImage(e.target.value)}
                     style={{ flex: 1, padding: '0.4rem 0.75rem', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
@@ -329,7 +336,7 @@ const NeighborsCommunity = ({ onBack, location }) => {
 
             {/* Posts List */}
             <div className="posts-list">
-              {filteredPosts.length === 0 && <p className="empty-state">No real updates yet. Be the first!</p>}
+              {filteredPosts.length === 0 && <p className="empty-state">{t('no_updates_yet')}</p>}
               {filteredPosts.map((post, i) => (
                 <motion.div 
                   key={post.id}
@@ -346,7 +353,7 @@ const NeighborsCommunity = ({ onBack, location }) => {
                         <div className="name-time">
                            <div className="name-badge-row">
                               <h3>{post.user_name}</h3>
-                              <div className="neighbor-verified-tag">VERIFIED</div>
+                              <div className="neighbor-verified-tag">{t('verified')}</div>
                            </div>
                            <p>Satellite, Ahmedabad • <span>{new Date(post.created_at).toLocaleDateString()}</span></p>
                         </div>
@@ -368,7 +375,7 @@ const NeighborsCommunity = ({ onBack, location }) => {
                         <button className="post-action-item" onClick={() => handleLikePost(post.id, post.likes_count)}><Heart size={18} /> {post.likes_count || 0}</button>
                         <button className="post-action-item" onClick={() => toast('Opening comments...')}><MessageSquare size={18} /> 0</button>
                         <button className="post-action-item second-btn" onClick={() => toast.success('You seconded this recommendation! ⭐')}>
-                           <Sparkles size={16} color="var(--primary)" /> <span>Second</span>
+                           <Sparkles size={16} color="var(--primary)" /> <span>{t('second_btn')}</span>
                         </button>
                      </div>
                      <button className="post-action-item" onClick={() => toast.success('Share link copied!')}><Share2 size={18} /></button>

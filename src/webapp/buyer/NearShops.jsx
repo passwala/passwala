@@ -43,8 +43,8 @@ const NearShops = ({ location, userCoords }) => {
   const [shopCatalog, setShopCatalog] = useState([]);
   const [selectedShop, setSelectedShop] = useState(null);
 
-  const handleOpenShop = async (shop) => {
-    setSelectedShop(shop);
+  const loadCatalog = useCallback(async (shop) => {
+    if (!shop) return;
     try {
         if (shop.type === 'SERVICES') {
             const { data, error } = await supabase
@@ -104,7 +104,7 @@ const NearShops = ({ location, userCoords }) => {
             if (!error && data) {
                 const filteredData = data.filter(item => item.description !== 'Service item auto-registered');
                 const getCleanProductImage = (imgSrc) => {
-                  if (!imgSrc || typeof imgSrc !== 'string') return '/essentials.png'; // Default Premium Grocery
+                  if (!imgSrc || typeof imgSrc !== 'string') return '/essentials.png';
                   const clean = imgSrc.trim();
                   if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:') || clean.startsWith('/')) {
                     return clean;
@@ -118,7 +118,7 @@ const NearShops = ({ location, userCoords }) => {
                    detail: p.description,
                    price: p.price,
                    image: getCleanProductImage(p.image_url || p.image),
-                   stock: 9999
+                   stock: p.stock_quantity !== null && p.stock_quantity !== undefined ? p.stock_quantity : 9999
                 })));
             } else {
                 setShopCatalog([]);
@@ -128,11 +128,40 @@ const NearShops = ({ location, userCoords }) => {
         console.error("Failed to load catalog:", err);
         setShopCatalog([]);
     }
-  };
+  }, []);
+
+  const handleOpenShop = useCallback(async (shop) => {
+    setSelectedShop(shop);
+    await loadCatalog(shop);
+  }, [loadCatalog]);
+
+  // Realtime subscription: auto-refresh catalog when products/services change for selected shop
+  // This ensures stock quantities update immediately after an order is placed
+  useEffect(() => {
+    if (!selectedShop || !supabase) return;
+
+    const table = selectedShop.type === 'SERVICES' ? 'services' : 'products';
+    const filterCol = selectedShop.type === 'SERVICES' ? 'provider_id' : 'store_id';
+
+    const channel = supabase
+      .channel(`shop_catalog_${selectedShop.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table,
+        filter: `${filterCol}=eq.${selectedShop.id}`
+      }, () => {
+        loadCatalog(selectedShop);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [selectedShop, loadCatalog]);
+
 
   const handleAddToCart = (e, product) => {
     e.stopPropagation();
-    addToCart({
+    const success = addToCart({
       id: product.id,
       name: product.name,
       price: product.price,
@@ -140,9 +169,11 @@ const NearShops = ({ location, userCoords }) => {
       type: selectedShop.type === 'SERVICES' ? 'service' : 'product',
       store: selectedShop.name,
       shop_id: selectedShop.id,
-      stock: 9999
+      stock: product.stock !== null && product.stock !== undefined ? product.stock : 9999
     });
-    toast.success(`${product.name} added to cart`);
+    if (success) {
+      toast.success(`${product.name} added to cart`);
+    }
   };
 
 
@@ -468,15 +499,15 @@ const NearShops = ({ location, userCoords }) => {
                             <div className="shop-card-meta">
                               <span className="shop-category-near">
                                 {(() => {
-                                  const key = (shop.category || 'general').toLowerCase().replace(' & ', '_');
+                                  const key = (shop.category || 'general').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
                                   const trans = t(key);
                                   return trans === key ? (shop.category || 'General Store') : trans;
                                 })()}
                               </span>
-                              {shop.type !== 'SERVICES' && (
+                              {shop.type !== 'SERVICES' && shop.distance !== 'N/A' && (
                                 <span className="shop-distance-near">
                                   <Navigation size={12} />
-                                  {shop.distance === 'N/A' ? t('distance_unknown') : t('km_from_you').replace('{dist}', shop.distance)}
+                                  {t('km_from_you').replace('{dist}', shop.distance)}
                                 </span>
                               )}
                               {shop.address && (
@@ -532,7 +563,9 @@ const NearShops = ({ location, userCoords }) => {
                   <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
                     {selectedShop.type === 'SERVICES' 
                       ? t('service_portfolio') 
-                      : `${selectedShop.distance} km • ${t('digital_catalog')}`}
+                      : selectedShop.distance === 'N/A'
+                        ? t('digital_catalog')
+                        : `${selectedShop.distance} km • ${t('digital_catalog')}`}
                   </p>
                </div>
                
@@ -563,12 +596,15 @@ const NearShops = ({ location, userCoords }) => {
                      fontWeight: 800,
                      minWidth: '18px',
                      height: '18px',
-                     borderRadius: '10px',
-                     display: 'flex',
+                     borderRadius: '99px',
+                     display: 'inline-flex',
                      alignItems: 'center',
                      justifyContent: 'center',
                      border: '2px solid white',
-                     boxShadow: '0 2px 5px rgba(255,118,34,0.3)'
+                     boxShadow: '0 2px 5px rgba(255,118,34,0.3)',
+                     padding: '0 5px',
+                     boxSizing: 'border-box',
+                     whiteSpace: 'nowrap'
                    }}>
                      {totalItems}
                    </span>
@@ -627,29 +663,50 @@ const NearShops = ({ location, userCoords }) => {
                                      >
                                        +
                                      </button>
-                                  </div>
+                                   </div>
                                 ) : (
-                                   <button 
-                                     onClick={(e) => handleAddToCart(e, product)} 
-                                     style={{ 
-                                       background: 'var(--primary)', 
-                                       color: 'white', 
-                                       border: 'none', 
-                                       padding: '6px 14px', 
-                                       borderRadius: '10px', 
-                                       display: 'flex', 
-                                       alignItems: 'center', 
-                                       gap: '6px',
-                                       cursor: 'pointer',
-                                       fontWeight: 700,
-                                       fontSize: '0.8rem',
-                                       transition: 'transform 0.2s active'
-                                     }}
-                                     onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
-                                     onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                                   >
-                                     <Plus size={16} /> {t('add_to_cart')}
-                                   </button>
+                                  selectedShop.type !== 'SERVICES' && product.stock <= 0 ? (
+                                    <button 
+                                      disabled
+                                      style={{ 
+                                        background: '#e2e8f0', 
+                                        color: '#94a3b8', 
+                                        border: 'none', 
+                                        padding: '6px 14px', 
+                                        borderRadius: '10px', 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: '6px',
+                                        cursor: 'not-allowed',
+                                        fontWeight: 700,
+                                        fontSize: '0.8rem'
+                                      }}
+                                    >
+                                      {t('out_of_stock') || 'Out of Stock'}
+                                    </button>
+                                  ) : (
+                                    <button 
+                                      onClick={(e) => handleAddToCart(e, product)} 
+                                      style={{ 
+                                        background: 'var(--primary)', 
+                                        color: 'white', 
+                                        border: 'none', 
+                                        padding: '6px 14px', 
+                                        borderRadius: '10px', 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: '6px',
+                                        cursor: 'pointer',
+                                        fontWeight: 700,
+                                        fontSize: '0.8rem',
+                                        transition: 'transform 0.2s active'
+                                      }}
+                                      onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
+                                      onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                                    >
+                                      <Plus size={16} /> {t('add_to_cart')}
+                                    </button>
+                                  )
                                 );
                               })()}
                           </div>

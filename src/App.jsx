@@ -332,11 +332,15 @@ const AppContent = ({
     const sub = supabase.channel(channelName)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `user_id=eq.${effectiveUser.id}` }, (payload) => {
         const shortId = payload.new.id.substring(0, 6).toUpperCase();
-        toast.success(`Order #${shortId} is now ${payload.new.status}`, {
-          icon: '🛵',
-          duration: 4000,
-          id: `order-update-${payload.new.id}`
-        });
+        
+        // Skip toast for PLACED / PENDING status as CartDrawer already shows a successful placement toast
+        if (payload.new.status !== 'PLACED' && payload.new.status !== 'PENDING') {
+          toast.success(`Order #${shortId} is now ${payload.new.status}`, {
+            icon: '🛵',
+            duration: 4000,
+            id: `order-update-${payload.new.id}`
+          });
+        }
 
         addNotification({
           title: 'Order Status Update',

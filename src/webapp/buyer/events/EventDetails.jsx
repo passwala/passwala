@@ -31,7 +31,7 @@ const EventDetails = ({ user }) => {
       setEvent(data.event);
 
       // Fetch other slots of the same multiple show event
-      if (data.event && (data.event.show_type === 'multiple' || data.event.show_type === 'festival')) {
+      if (data.event && (data.event.show_type === 'multiple' || data.event.show_type === 'festival' || data.event.show_type === 'tour')) {
         const { data: siblings } = await supabase
           .from('events')
           .select('id, event_date, venue_name')
@@ -178,12 +178,14 @@ const EventDetails = ({ user }) => {
         if (uniqueTags.length === 0 && !event.views) return null;
         return (
           <div className="ed2-tags-row">
-            {uniqueTags.map((tag, i) => (
-              <span key={i} className="ed2-tag">{tag}</span>
-            ))}
-            {event.views && (
-              <span className="ed2-views"><Eye size={13} /> {event.views.toLocaleString('en-IN')} views</span>
-            )}
+            <div className="ed2-tags-inner">
+              {uniqueTags.map((tag, i) => (
+                <span key={i} className="ed2-tag">{tag}</span>
+              ))}
+              {event.views && (
+                <span className="ed2-views"><Eye size={13} /> {event.views.toLocaleString('en-IN')} views</span>
+              )}
+            </div>
           </div>
         );
       })()}
@@ -287,7 +289,7 @@ const EventDetails = ({ user }) => {
                     <Ticket size={22} className="ed2-guide-icon" />
                     <span className="ed2-guide-label">SHOW TYPE</span>
                     <span className="ed2-guide-value">
-                      {event.show_type === 'festival' ? 'Tour / Festival' : event.show_type === 'multiple' ? 'Multiple Shows' : 'Single Show'}
+                      {(event.show_type === 'festival' || event.show_type === 'tour') ? 'Tour / Festival' : event.show_type === 'multiple' ? 'Multiple Shows' : 'Single Show'}
                     </span>
                   </div>
                   <div className="ed2-guide-pill">

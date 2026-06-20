@@ -174,6 +174,104 @@ export default function DeveloperModal({ isOpen, onClose, user }) {
     }
   };
 
+  const runMockWalletTopup = async () => {
+    setMockLog(prev => [...prev, '⏳ Starting mock wallet top-up...']);
+    if (!user?.id) {
+      setMockLog(prev => [...prev, '❌ Error: No logged-in user session found.']);
+      return;
+    }
+    try {
+      const { data: userData, error: getErr } = await supabase
+        .from('users')
+        .select('wallet_balance')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (getErr) throw getErr;
+
+      const currentBalance = userData?.wallet_balance || 0;
+      const newBalance = currentBalance + 500;
+
+      const { error: updateErr } = await supabase
+        .from('users')
+        .update({ wallet_balance: newBalance })
+        .eq('id', user.id);
+
+      if (updateErr) throw updateErr;
+
+      await supabase.from('wallet_transactions').insert({
+        user_id: user.id,
+        title: 'Developer Wallet Top-up',
+        description: 'Credited ₹500.00 via Developer Console Sandbox',
+        amount: 500.00,
+        type: 'CREDIT',
+        status: 'COMPLETED'
+      });
+
+      setMockLog(prev => [
+        ...prev,
+        `🎉 Success! Credited ₹500.00 to wallet.`,
+        `New Balance: ₹${newBalance.toFixed(2)}`
+      ]);
+    } catch (err) {
+      setMockLog(prev => [...prev, `❌ Error: ${err.message}`]);
+    }
+  };
+
+  const runMockCityRide = async () => {
+    setMockLog(prev => [...prev, '⏳ Simulating City Ride Booking search...']);
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      const res = await fetch(`${baseUrl}/api/city-rides/search?pickupLat=23.0225&pickupLng=72.5714&dropLat=23.0416&dropLng=72.4922&pricePerKm=8`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Search failed');
+      setMockLog(prev => [
+        ...prev,
+        `🚗 City Ride Search successful!`,
+        `Vehicles available: ${data.vehicles?.length || 0}`,
+        `Price per KM: ₹8.00`,
+        `Found route distance: ${data.distanceKm || 'Unknown'} km`
+      ]);
+    } catch (err) {
+      setMockLog(prev => [...prev, `❌ Error: ${err.message}`]);
+    }
+  };
+
+  const runSupabaseFlooder = async () => {
+    setMockLog(prev => [...prev, '⚡ Initiating Supabase load/flood test (30 real-time requests)...']);
+    try {
+      let succeeded = 0;
+      let failed = 0;
+
+      for (let i = 0; i < 30; i++) {
+        // Stagger requests by 50ms to simulate real-time traffic
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        const { error } = await supabase
+          .from('events')
+          .select('id, title')
+          .range(i, i)
+          .maybeSingle();
+
+        if (error) {
+          failed++;
+        } else {
+          succeeded++;
+        }
+      }
+
+      setMockLog(prev => [
+        ...prev,
+        `📊 Flood Test Results:`,
+        `Succeeded: ${succeeded}/30 requests`,
+        `Failed: ${failed}/30 requests`,
+        `Check request counter at the top of the console!`
+      ]);
+    } catch (err) {
+      setMockLog(prev => [...prev, `❌ Flood test encountered error: ${err.message}`]);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -505,26 +603,94 @@ export default function DeveloperModal({ isOpen, onClose, user }) {
           {/* TAB 3: QUICK SIMULATIONS / MOCKS */}
           {activeTab === 'mocks' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div style={{ background: '#1e1b4b', padding: '16px', borderRadius: '16px', border: '1px solid #312e81' }}>
-                <h4 style={{ margin: '0 0 6px', fontSize: '0.95rem', fontWeight: 800 }}>Simulate Event Booking</h4>
-                <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: '#cbd5e1' }}>
-                  Auto-dispatches a POST request to book a seat for the first upcoming event in the database for the active user session.
-                </p>
-                <button
-                  onClick={runMockBooking}
-                  style={{
-                    background: '#ff7622',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '10px',
-                    padding: '10px 20px',
-                    fontWeight: 800,
-                    fontSize: '0.85rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Run Mock Booking Flow
-                </button>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div style={{ background: '#1e1b4b', padding: '16px', borderRadius: '16px', border: '1px solid #312e81' }}>
+                  <h4 style={{ margin: '0 0 6px', fontSize: '0.95rem', fontWeight: 800 }}>Simulate Event Booking</h4>
+                  <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: '#cbd5e1' }}>
+                    Auto-dispatches a POST request to book a seat for the first upcoming event in the database for the active user session.
+                  </p>
+                  <button
+                    onClick={runMockBooking}
+                    style={{
+                      background: '#ff7622',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '10px 20px',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Run Mock Booking Flow
+                  </button>
+                </div>
+
+                <div style={{ background: '#111827', padding: '16px', borderRadius: '16px', border: '1px solid #374151' }}>
+                  <h4 style={{ margin: '0 0 6px', fontSize: '0.95rem', fontWeight: 800 }}>Simulate Wallet Top-up</h4>
+                  <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: '#cbd5e1' }}>
+                    Adds ₹500.00 directly to the current user's wallet balance and records a premium credit transaction in the database.
+                  </p>
+                  <button
+                    onClick={runMockWalletTopup}
+                    style={{
+                      background: '#10b981',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '10px 20px',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Credit ₹500.00
+                  </button>
+                </div>
+
+                <div style={{ background: '#111827', padding: '16px', borderRadius: '16px', border: '1px solid #374151' }}>
+                  <h4 style={{ margin: '0 0 6px', fontSize: '0.95rem', fontWeight: 800 }}>Simulate City Ride Search</h4>
+                  <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: '#cbd5e1' }}>
+                    Triggers a developer city-ride route matching and searching query for available vehicles inside Ahmedabad.
+                  </p>
+                  <button
+                    onClick={runMockCityRide}
+                    style={{
+                      background: '#3b82f6',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '10px 20px',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Search City Ride
+                  </button>
+                </div>
+
+                <div style={{ background: '#1e1b4b', padding: '16px', borderRadius: '16px', border: '1px solid #312e81' }}>
+                  <h4 style={{ margin: '0 0 6px', fontSize: '0.95rem', fontWeight: 800 }}>Supabase Flood Test</h4>
+                  <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: '#cbd5e1' }}>
+                    Dispatches 30 parallel fetch requests rapidly to test the request monitor counter and API rate limiting threshold.
+                  </p>
+                  <button
+                    onClick={runSupabaseFlooder}
+                    style={{
+                      background: '#ef4444',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '10px 20px',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Launch 30 Requests
+                  </button>
+                </div>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

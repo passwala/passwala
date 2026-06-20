@@ -582,6 +582,12 @@
   .city-rides-container {
     flex-direction: row;
     height: calc(100vh - 64px);
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+    border-left: 1px solid var(--border-light);
+    border-right: 1px solid var(--border-light);
+    box-sizing: border-box;
   }
 
   .cr-header {

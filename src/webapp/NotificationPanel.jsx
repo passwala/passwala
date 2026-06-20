@@ -1,10 +1,12 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, Check, X } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
 import './NotificationPanel.css';
 
 const NotificationPanel = ({ onClose }) => {
-  const { notifications, unreadCount, markAllRead, dismiss } = useNotifications();
+  const navigate = useNavigate();
+  const { notifications, unreadCount, markAsRead, markAllRead, dismiss } = useNotifications();
 
   return (
     <>
@@ -27,7 +29,29 @@ const NotificationPanel = ({ onClose }) => {
             </div>
           ) : (
             notifications.map(n => (
-              <div key={n.id} className={`notif-item ${!n.read ? 'notif-item--unread' : ''}`}>
+              <div 
+                key={n.id} 
+                className={`notif-item ${!n.read ? 'notif-item--unread' : ''}`}
+                style={{ cursor: 'pointer' }}
+                onClick={() => {
+                  markAsRead(n.id);
+                  const isOrderRelated = 
+                    n.type?.includes('order') || 
+                    n.type?.includes('ride') || 
+                    n.type?.includes('booking') || 
+                    n.title?.toLowerCase().includes('order') ||
+                    n.title?.toLowerCase().includes('ride') ||
+                    n.title?.toLowerCase().includes('booking') ||
+                    n.text?.toLowerCase().includes('order') ||
+                    n.text?.toLowerCase().includes('ride') ||
+                    n.text?.toLowerCase().includes('booking');
+                  
+                  if (isOrderRelated) {
+                    navigate('/track-orders');
+                  }
+                  onClose();
+                }}
+              >
                 <div className="notif-icon-wrap" style={{ position: 'relative', background: n.read ? '#f1f5f9' : '#fff0eb', color: n.read ? '#64748b' : '#ff6b35' }}>
                   <Bell size={18} />
                   {!n.read && <div className="notif-dot"></div>}

@@ -39,6 +39,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { cartItems, cartOpen, setCartOpen, removeFromCart, updateQty, clearCart, totalItems, totalPrice, error } = useCart();
+  const isService = React.useMemo(() => cartItems.some(item => item.type === 'service'), [cartItems]);
   const { addNotification } = useNotifications();
   const [showConfirm, setShowConfirm] = React.useState(false);
   const [supportedAreas, setSupportedAreas] = React.useState([]);
@@ -101,9 +102,13 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
     setCouponLoading(true);
     try {
       const BASE_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      const token = await getAuthToken();
       const res = await fetch(`${BASE_URL}/api/promo/validate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ code: trimmed, cartTotal: parseFloat((totalPrice * 1.05).toFixed(2)) })
       });
       const data = await res.json();
@@ -126,9 +131,13 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
   const redeemPromoCode = async (code) => {
     try {
       const BASE_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      const token = await getAuthToken();
       await fetch(`${BASE_URL}/api/promo/redeem`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ code })
       });
     } catch (_) { /* fire-and-forget */ }
@@ -167,6 +176,29 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
     let resolvedAddressId = userAddress?.id;
 
     try {
+      // Validate stock first to prevent db constraint violation
+      const productItems = cartItems.filter(item => item.type !== 'service' && typeof item.id === 'string' && item.id.length === 36);
+      if (productItems.length > 0) {
+        const productIds = productItems.map(item => item.id);
+        const { data: dbProducts, error: stockErr } = await supabase
+          .from('products')
+          .select('id, name, stock_quantity')
+          .in('id', productIds);
+          
+        if (stockErr) {
+          console.warn("Stock pre-check warning:", stockErr);
+        } else if (dbProducts) {
+          for (const item of productItems) {
+            const dbProduct = dbProducts.find(p => p.id === item.id);
+            if (dbProduct) {
+              const available = dbProduct.stock_quantity !== null && dbProduct.stock_quantity !== undefined ? dbProduct.stock_quantity : 9999;
+              if ((item.qty || 1) > available) {
+                throw new Error(`Insufficient stock for "${item.name}". Only ${available} left in stock.`);
+              }
+            }
+          }
+        }
+      }
 
       // 1. Resolve User ID (UUID) from Supabase if not a valid UUID
       if (!resolvedUserId && userObj) {
@@ -758,6 +790,26 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
         toast.dismiss("payment_verify_loader");
 
           if (verifySuccess) {
+          // Fire backend notifications for each split order (same as real Razorpay path)
+          const notifToken = await getAuthToken();
+          for (const co of createdOrders) {
+            try {
+              await fetch('/api/orders/notify-new-order', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${notifToken}`
+                },
+                body: JSON.stringify({
+                  orderId: co.order.id,
+                  storeId: co.storeId
+                })
+              });
+            } catch (notifErr) {
+              console.warn("⚠️ Notification dispatch failed for order:", co.order.id, notifErr);
+            }
+          }
+
           addNotification({
             type: 'ORDER_PLACED',
             title: 'Order Placed!',
@@ -823,7 +875,8 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
                     await fetch('/api/orders/notify-new-order', {
                       method: 'POST',
                       headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
                       },
                       body: JSON.stringify({
                         orderId: co.order.id,
@@ -879,7 +932,11 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
       }
     } catch (err) {
       console.error('Supabase checkout/payment failed:', err);
-      toast.error(`Checkout failed: ${err.message || 'Please try again later'}`, { icon: '❌' });
+      let errorMsg = err.message || 'Please try again later';
+      if (errorMsg.includes('stock_non_negative')) {
+        errorMsg = 'Insufficient stock for one or more items in your cart. Please reduce the quantity and try again.';
+      }
+      toast.error(`Checkout failed: ${errorMsg}`, { icon: '❌' });
       setShowConfirm(false);
       setIsPlacingOrder(false);
     }
@@ -1042,6 +1099,107 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
                   )}
                 </div>
               </div>
+
+              {/* Delivery Address & Alerts */}
+              {isProfileComplete && userAddress && (
+                <div className="delivery-address-v3">
+                  <div className="addr-dot-v3"></div>
+                  <div className="addr-content-v3" style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="addr-title-v3">Delivering to</span>
+                      <button 
+                        onClick={() => { setCartOpen(false); navigate('/complete-profile'); }}
+                        className="addr-change-btn-link"
+                      >
+                        Change
+                      </button>
+                    </div>
+                    <p className="addr-text-v3">
+                      {userAddress.house_no || 'Home'}, {userAddress.floor ? `Floor ${userAddress.floor}` : 'Ground'}, {userAddress.society || 'Neighborhood'}
+                      <span className="addr-sub-v3"> • {location || 'Detecting...'}</span>
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {!isSupportedArea && isProfileComplete && (
+                <div className="coming-soon-alert">
+                  <Sparkles size={16} color="#ef4444" />
+                  <p>Coming soon to <strong>{userAddress.society}</strong>. We are currently serving only selected neighborhoods.</p>
+                </div>
+              )}
+
+              {/* Promo / Coupon Code Input */}
+              <div style={{ margin: '10px 0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {appliedCoupon ? (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    background: 'linear-gradient(135deg,#dcfce7,#f0fdf4)', border: '1px solid #86efac',
+                    borderRadius: '12px', padding: '10px 14px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Tag size={15} color="#16a34a" />
+                      <div>
+                        <span style={{ fontWeight: 800, color: '#15803d', fontSize: '0.82rem' }}>{appliedCoupon.code}</span>
+                        <span style={{ fontSize: '0.75rem', color: '#166534', marginLeft: '8px' }}>−₹{appliedCoupon.discount.toFixed(0)} off applied!</span>
+                      </div>
+                    </div>
+                    <button onClick={removeCoupon} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px' }}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      value={couponCode}
+                      onChange={e => setCouponCode(e.target.value.toUpperCase())}
+                      onKeyDown={e => e.key === 'Enter' && applyCoupon()}
+                      placeholder="Promo code"
+                      maxLength={30}
+                      style={{
+                        flex: 1, padding: '9px 12px', borderRadius: '10px', border: '1.5px solid #e2e8f0',
+                        fontSize: '0.85rem', fontWeight: 600, letterSpacing: '0.05em',
+                        outline: 'none', background: '#f8fafc', textTransform: 'uppercase'
+                      }}
+                    />
+                    <button
+                      onClick={applyCoupon}
+                      disabled={couponLoading || !couponCode.trim()}
+                      style={{
+                        padding: '9px 16px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                        background: couponLoading || !couponCode.trim() ? '#e2e8f0' : '#ff7622',
+                        color: couponLoading || !couponCode.trim() ? '#94a3b8' : 'white',
+                        fontWeight: 700, fontSize: '0.82rem', transition: 'all 0.2s', whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {couponLoading ? '...' : 'Apply'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Price Breakdown */}
+              <div className="price-breakdown-v3" style={{ borderTop: '1px dashed #e2e8f0', borderBottom: '1px dashed #e2e8f0', padding: '12px 0', margin: '12px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748b' }}>
+                  <span>Item Subtotal</span>
+                  <span>₹{totalPrice.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748b' }}>
+                  <span>Delivery Partner Fee</span>
+                  <span style={{ color: '#10b981', fontWeight: 600 }}>FREE</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#94a3b8' }}>
+                  <span>Taxes & Charges (CGST 2.5% + SGST 2.5%)</span>
+                  <span>₹{(totalPrice * 0.05).toFixed(2)}</span>
+                </div>
+                {appliedCoupon && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#16a34a', fontWeight: 700 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Tag size={13} /> Promo ({appliedCoupon.code})</span>
+                    <span>−₹{appliedCoupon.discount.toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -1049,107 +1207,6 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
         {/* Footer */}
         {cartItems.length > 0 && (
           <div className="cart-footer">
-
-            
-            {isProfileComplete && userAddress && (
-              <div className="delivery-address-v3">
-                <div className="addr-dot-v3"></div>
-                <div className="addr-content-v3" style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className="addr-title-v3">Delivering to</span>
-                    <button 
-                      onClick={() => { setCartOpen(false); navigate('/complete-profile'); }}
-                      className="addr-change-btn-link"
-                    >
-                      Change
-                    </button>
-                  </div>
-                  <p className="addr-text-v3">
-                    {userAddress.house_no || 'Home'}, {userAddress.floor ? `Floor ${userAddress.floor}` : 'Ground'}, {userAddress.society || 'Neighborhood'}
-                    <span className="addr-sub-v3"> • {location || 'Detecting...'}</span>
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {!isSupportedArea && isProfileComplete && (
-              <div className="coming-soon-alert">
-                <Sparkles size={16} color="#ef4444" />
-                <p>Coming soon to <strong>{userAddress.society}</strong>. We are currently serving only selected neighborhoods.</p>
-              </div>
-            )}
-
-            {/* Promo / Coupon Code Input */}
-            <div style={{ margin: '10px 0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {appliedCoupon ? (
-                <div style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  background: 'linear-gradient(135deg,#dcfce7,#f0fdf4)', border: '1px solid #86efac',
-                  borderRadius: '12px', padding: '10px 14px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Tag size={15} color="#16a34a" />
-                    <div>
-                      <span style={{ fontWeight: 800, color: '#15803d', fontSize: '0.82rem' }}>{appliedCoupon.code}</span>
-                      <span style={{ fontSize: '0.75rem', color: '#166534', marginLeft: '8px' }}>−₹{appliedCoupon.discount.toFixed(0)} off applied!</span>
-                    </div>
-                  </div>
-                  <button onClick={removeCoupon} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px' }}>
-                    <X size={14} />
-                  </button>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input
-                    type="text"
-                    value={couponCode}
-                    onChange={e => setCouponCode(e.target.value.toUpperCase())}
-                    onKeyDown={e => e.key === 'Enter' && applyCoupon()}
-                    placeholder="Promo code"
-                    maxLength={30}
-                    style={{
-                      flex: 1, padding: '9px 12px', borderRadius: '10px', border: '1.5px solid #e2e8f0',
-                      fontSize: '0.85rem', fontWeight: 600, letterSpacing: '0.05em',
-                      outline: 'none', background: '#f8fafc', textTransform: 'uppercase'
-                    }}
-                  />
-                  <button
-                    onClick={applyCoupon}
-                    disabled={couponLoading || !couponCode.trim()}
-                    style={{
-                      padding: '9px 16px', borderRadius: '10px', border: 'none', cursor: 'pointer',
-                      background: couponLoading || !couponCode.trim() ? '#e2e8f0' : '#ff7622',
-                      color: couponLoading || !couponCode.trim() ? '#94a3b8' : 'white',
-                      fontWeight: 700, fontSize: '0.82rem', transition: 'all 0.2s', whiteSpace: 'nowrap'
-                    }}
-                  >
-                    {couponLoading ? '...' : 'Apply'}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="price-breakdown-v3" style={{ borderTop: '1px dashed #e2e8f0', borderBottom: '1px dashed #e2e8f0', padding: '12px 0', margin: '12px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748b' }}>
-                <span>Item Subtotal</span>
-                <span>₹{totalPrice.toFixed(2)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748b' }}>
-                <span>Delivery Partner Fee</span>
-                <span style={{ color: '#10b981', fontWeight: 600 }}>FREE</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#94a3b8' }}>
-                <span>Taxes & Charges (CGST 2.5% + SGST 2.5%)</span>
-                <span>₹{(totalPrice * 0.05).toFixed(2)}</span>
-              </div>
-              {appliedCoupon && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#16a34a', fontWeight: 700 }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Tag size={13} /> Promo ({appliedCoupon.code})</span>
-                  <span>−₹{appliedCoupon.discount.toFixed(2)}</span>
-                </div>
-              )}
-            </div>
-
             <div className="cart-total">
               <div className="total-label">
                 <span>{t('total')} ({totalItems} items)</span>
@@ -1199,8 +1256,8 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
              <div className="confirm-icon-v4">
                 <CheckCircle size={40} color="#ff7622" />
              </div>
-             <h2>Confirm Delivery</h2>
-             <p className="confirm-desc-v4">Your neighborhood order will be delivered to:</p>
+             <h2>{isService ? 'Confirm Service' : 'Confirm Delivery'}</h2>
+             <p className="confirm-desc-v4">{isService ? 'Your service expert will visit you at:' : 'Your neighborhood order will be delivered to:'}</p>
              
              <div className="confirm-address-card-v4">
                 <MapPin size={20} color="#ff7622" />
@@ -1228,9 +1285,9 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
                   {isPlacingOrder ? (
                     <>
                       <svg className="animate-spin" style={{ width: '16px', height: '16px', border: '2px solid transparent', borderTopColor: 'white', borderRadius: '50%' }} viewBox="0 0 24 24"></svg>
-                      Placing Order...
+                      {isService ? 'Booking Service...' : 'Placing Order...'}
                     </>
-                  ) : 'Confirm & Deliver'}
+                  ) : (isService ? 'Confirm & Book' : 'Confirm & Deliver')}
                 </button>
              </div>
           </div>

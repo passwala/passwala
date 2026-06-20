@@ -35,20 +35,41 @@ CREATE TABLE IF NOT EXISTS public.events (
                     CHECK (status IN ('UPCOMING','ONGOING','COMPLETED','CANCELLED','SOLD_OUT')),
     approval_status VARCHAR(50)  DEFAULT 'PENDING'
                     CHECK (approval_status IN ('PENDING','APPROVED','REJECTED')),
+    show_type       VARCHAR(20)  DEFAULT 'single'
+                    CHECK (show_type IN ('single','multiple','tour')),
     created_by      UUID         REFERENCES public.users(id) ON DELETE SET NULL,
     booking_start   TIMESTAMP WITH TIME ZONE,
     booking_end     TIMESTAMP WITH TIME ZONE,
+    visibility      VARCHAR(50)  DEFAULT 'public',
+    is_online       BOOLEAN      DEFAULT FALSE,
+    ends_at         TIMESTAMP WITH TIME ZONE,
+    duration        VARCHAR(100),
+    age_restriction VARCHAR(100),
+    language        VARCHAR(100),
+    is_admin_organized BOOLEAN      DEFAULT FALSE,
+    allowed_scanner_id UUID         REFERENCES public.users(id) ON DELETE SET NULL,
     created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+-- Add columns if upgrading existing DB before index creation
+ALTER TABLE public.events
+    ADD COLUMN IF NOT EXISTS approval_status VARCHAR(50) DEFAULT 'PENDING';
+ALTER TABLE public.events
+    ADD COLUMN IF NOT EXISTS show_type VARCHAR(20) DEFAULT 'single' CHECK (show_type IN ('single','multiple','tour'));
+ALTER TABLE public.events
+    ADD COLUMN IF NOT EXISTS visibility VARCHAR(50) DEFAULT 'public',
+    ADD COLUMN IF NOT EXISTS is_online BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS ends_at TIMESTAMP WITH TIME ZONE,
+    ADD COLUMN IF NOT EXISTS duration VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS age_restriction VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS language VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS is_admin_organized BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS allowed_scanner_id UUID REFERENCES public.users(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_events_status          ON public.events(status);
 CREATE INDEX IF NOT EXISTS idx_events_approval_status ON public.events(approval_status);
 CREATE INDEX IF NOT EXISTS idx_events_created_by      ON public.events(created_by);
 CREATE INDEX IF NOT EXISTS idx_events_event_date      ON public.events(event_date);
-
--- Add approval_status if upgrading existing DB
-ALTER TABLE public.events
-    ADD COLUMN IF NOT EXISTS approval_status VARCHAR(50) DEFAULT 'PENDING';
+CREATE INDEX IF NOT EXISTS idx_events_show_type        ON public.events(show_type);
 
 GRANT SELECT ON public.events TO anon, authenticated;
 
@@ -166,4 +187,28 @@ CREATE POLICY "event_bookings_all"   ON public.event_bookings           FOR ALL 
 CREATE POLICY "upgrade_requests_all" ON public.event_organizer_requests FOR ALL USING (true) WITH CHECK (true);
 
 NOTIFY pgrst, 'reload schema';
+
+-- Enable Realtime
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_publication_tables 
+            WHERE pubname = 'supabase_realtime' AND tablename = 'events'
+        ) THEN
+            ALTER PUBLICATION supabase_realtime ADD TABLE public.events;
+        END IF;
+
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_publication_tables 
+            WHERE pubname = 'supabase_realtime' AND tablename = 'event_ticket_tiers'
+        ) THEN
+            ALTER PUBLICATION supabase_realtime ADD TABLE public.event_ticket_tiers;
+        END IF;
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'supabase_realtime not configured — skipping';
+END $$;
+
 -- ✅ Done: 02b_vendor_event_organizer.sql

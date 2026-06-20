@@ -9,8 +9,7 @@
 .policies-hero {
   position: relative;
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-  padding: 5rem 2rem;
-  text-align: center;
+  padding: 5rem 0;
   color: white;
   overflow: hidden;
 }
@@ -27,9 +26,12 @@
 
 .policies-hero-content {
   position: relative;
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
+  padding: 0 1.5rem;
   z-index: 2;
+  text-align: left;
+  box-sizing: border-box;
 }
 
 .policy-badge {

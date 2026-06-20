@@ -209,7 +209,7 @@ const TABLE_SCHEMAS = {
   stores: { vendor_id: '', name: '', description: '', address: '', is_open: true, rating: 0 },
   service_categories: { name: '', icon_url: '' },
   orders: { user_id: '', store_id: '', address_id: '', status: 'PENDING', subtotal: 0, delivery_fee: 0, total_amount: 0, payment_status: 'PENDING' },
-  events: { title: '', show_type: 'single', category: '', venue_name: '', venue_lat: 23.0225, venue_lng: 72.5714, event_date: '', ends_at: '', status: 'UPCOMING', banner_url: '', starting_price: 0, visibility: 'public', is_online: false, booking_start: '', booking_end: '', created_by: '' },
+  events: { title: '', show_type: 'single', category: '', venue_name: '', venue_lat: 23.0225, venue_lng: 72.5714, event_date: '', ends_at: '', status: 'UPCOMING', banner_url: '', starting_price: 0, visibility: 'public', is_online: false, booking_start: '', booking_end: '', created_by: '', is_admin_organized: false, allowed_scanner_id: null },
   event_bookings: { user_id: '', event_id: '', tier_id: '', ticket_count: 0, total_amount: 0, status: 'CONFIRMED' },
   city_routes: { start_area: '', end_area: '', distance_km: 0, base_price: 0, is_active: true },
   city_vehicles: { driver_id: '', vehicle_type: '', license_plate: '', total_seats: 0, available_seats: 0, is_active: true },
@@ -231,7 +231,7 @@ const DATABASE_SCHEMAS = {
   admins: ['username', 'role'],
   stores: ['vendor_id', 'name', 'description', 'logo_url', 'banner_url', 'address', 'lat', 'lng', 'is_open', 'rating'],
   orders: ['user_id', 'store_id', 'address_id', 'status', 'subtotal', 'delivery_fee', 'total_amount', 'payment_status'],
-  events: ['title', 'show_type', 'category', 'venue_name', 'venue_lat', 'venue_lng', 'event_date', 'ends_at', 'status', 'banner_url', 'starting_price', 'visibility', 'is_online', 'booking_start', 'booking_end'],
+  events: ['title', 'show_type', 'category', 'venue_name', 'venue_lat', 'venue_lng', 'event_date', 'ends_at', 'status', 'banner_url', 'starting_price', 'visibility', 'is_online', 'booking_start', 'booking_end', 'is_admin_organized', 'allowed_scanner_id'],
   event_bookings: ['user_id', 'event_id', 'tier_id', 'ticket_count', 'total_amount', 'status'],
   city_routes: ['start_area', 'end_area', 'distance_km', 'base_price', 'is_active'],
   city_vehicles: ['driver_id', 'vehicle_type', 'license_plate', 'total_seats', 'available_seats', 'is_active'],
@@ -284,6 +284,7 @@ const tabSections = [
       { id: 'events_panel', label: 'Events', icon: Sparkles, table: 'events' },
       { id: 'event_bookings_panel', label: 'Event Bookings', icon: Calendar, table: 'event_bookings' },
       { id: 'event_approvals_panel', label: 'Event Approvals', icon: ShieldCheck },
+      { id: 'event_organizers_panel', label: 'Event Organizers', icon: Users, table: 'service_providers' },
       { id: 'upgrade_requests_panel', label: 'Upgrade Requests', icon: ShieldCheck },
     ]
   },
@@ -350,7 +351,7 @@ const EventApprovalsPanel = ({ API_URL }) => {
       
       rawEvents.forEach(evt => {
         const showType = evt.show_type || 'single';
-        if (showType === 'multiple' || showType === 'festival') {
+        if (showType === 'multiple' || showType === 'festival' || showType === 'tour') {
           const groupKey = `${(evt.title || '').toLowerCase().trim()}-${(evt.category || '').toLowerCase().trim()}-${evt.created_by}`;
           if (groupMap[groupKey] !== undefined) {
             const existing = grouped[groupMap[groupKey]];
@@ -473,16 +474,16 @@ const EventApprovalsPanel = ({ API_URL }) => {
                       <h3 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{event.title}</h3>
                       <span style={{ background: '#f1f5f9', color: '#475569', borderRadius: '8px', padding: '2px 10px', fontSize: '0.75rem', fontWeight: 600 }}>{event.category}</span>
                       <span style={{ 
-                        background: event.show_type === 'festival' ? 'linear-gradient(135deg,#db2777,#ec4899)'
+                        background: (event.show_type === 'festival' || event.show_type === 'tour') ? 'linear-gradient(135deg,#db2777,#ec4899)'
                           : event.show_type === 'multiple' ? 'linear-gradient(135deg,#7c3aed,#4f46e5)'
                           : '#f1f5f9',
-                        color: (event.show_type === 'festival' || event.show_type === 'multiple') ? '#fff' : '#475569', 
+                        color: (event.show_type === 'festival' || event.show_type === 'tour' || event.show_type === 'multiple') ? '#fff' : '#475569', 
                         borderRadius: '8px', 
                         padding: '2px 10px', 
                         fontSize: '0.75rem', 
                         fontWeight: 700
                       }}>
-                        {event.show_type === 'festival' ? '🎪 Tour / Festival' : event.show_type === 'multiple' ? '🎭 Multiple Shows' : '🎫 Single Show'}
+                        {(event.show_type === 'festival' || event.show_type === 'tour') ? '🎪 Tour / Festival' : event.show_type === 'multiple' ? '🎭 Multiple Shows' : '🎫 Single Show'}
                       </span>
                     </div>
                     <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#ff6b00' }}>from ₹{minPrice}</span>
@@ -1782,7 +1783,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
       try {
         const adminKey = sessionStorage.getItem('admin_token') || '';
         
-        if (currentTab.table === 'events' && (payload.show_type === 'multiple' || payload.show_type === 'festival') && payload.schedule_slots && payload.schedule_slots.length > 0) {
+        if (currentTab.table === 'events' && (payload.show_type === 'multiple' || payload.show_type === 'festival' || payload.show_type === 'tour') && payload.schedule_slots && payload.schedule_slots.length > 0) {
           for (const slot of payload.schedule_slots) {
             // Build local datetime strings then convert to UTC ISO
             const startLocalStr = slot.date ? `${slot.date}T${slot.starts || '19:00'}:00` : null;
@@ -2051,6 +2052,62 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
     setShowModal(true);
   };
 
+  const getFilteredDataLength = () => {
+    if (!data) return 0;
+    const filtered = data.filter(item =>
+      Object.values(item).some(val =>
+        String(val).toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    );
+
+    const uniqueEntries = [];
+    const seenSignatures = new Set();
+    filtered.forEach(item => {
+      if (currentTab.table === 'users') {
+        const role = item.role ? item.role.toUpperCase() : 'BUYER';
+        if (userRoleFilter === 'BUYER' && role !== 'BUYER' && role !== 'USER') {
+          return;
+        }
+        if (userRoleFilter === 'RIDER' && role !== 'RIDER') {
+          return;
+        }
+        if (userRoleFilter === 'VENDOR' && role !== 'VENDOR' && role !== 'SERVICE_PROVIDER') {
+          return;
+        }
+      }
+
+      if (activeAdminTab === 'event_organizers_panel') {
+        const userRole = item.users?.role ? item.users.role.toUpperCase() : '';
+        if (userRole !== 'EVENT_ORGANIZER') {
+          return;
+        }
+      }
+      if (activeAdminTab === 'providers_panel') {
+        const userRole = item.users?.role ? item.users.role.toUpperCase() : '';
+        if (userRole !== 'SERVICE_PROVIDER' || item.category === 'Rental') {
+          return;
+        }
+      }
+      if (activeAdminTab === 'vendors_panel') {
+        const userRole = item.users?.role ? item.users.role.toUpperCase() : '';
+        if (userRole !== 'VENDOR' && userRole !== '') {
+          return;
+        }
+      }
+
+      const isPeopleTable = ['users', 'vendors', 'riders', 'service_providers'].includes(currentTab.table);
+      const signature = isPeopleTable
+        ? `${item.phone || ''}_${item.full_name || item.business_name || item.name || ''}`.toLowerCase().trim()
+        : item.id;
+      if (!seenSignatures.has(signature)) {
+        uniqueEntries.push(item);
+        seenSignatures.add(signature);
+      }
+    });
+
+    return uniqueEntries.length;
+  };
+
   const renderTable = () => {
     const currentTabLabel = currentTab.label;
     if (loading) return <div className="admin-loading"><History className="animate-spin" /> Syncing Cloud Data...</div>;
@@ -2079,6 +2136,25 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
         }
       }
 
+      if (activeAdminTab === 'event_organizers_panel') {
+        const userRole = item.users?.role ? item.users.role.toUpperCase() : '';
+        if (userRole !== 'EVENT_ORGANIZER') {
+          return;
+        }
+      }
+      if (activeAdminTab === 'providers_panel') {
+        const userRole = item.users?.role ? item.users.role.toUpperCase() : '';
+        if (userRole !== 'SERVICE_PROVIDER' || item.category === 'Rental') {
+          return;
+        }
+      }
+      if (activeAdminTab === 'vendors_panel') {
+        const userRole = item.users?.role ? item.users.role.toUpperCase() : '';
+        if (userRole !== 'VENDOR' && userRole !== '') {
+          return;
+        }
+      }
+
       const isPeopleTable = ['users', 'vendors', 'riders', 'service_providers'].includes(currentTab.table);
       const signature = isPeopleTable
         ? `${item.phone || ''}_${item.full_name || item.business_name || item.name || ''}`.toLowerCase().trim()
@@ -2095,7 +2171,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
       const groupMap = {}; // groupKey -> index in grouped
       uniqueEntries.forEach(item => {
         const showType = item.show_type || 'single';
-        if (showType === 'multiple' || showType === 'festival') {
+        if (showType === 'multiple' || showType === 'festival' || showType === 'tour') {
           const groupKey = `${(item.title || '').toLowerCase().trim()}-${(item.category || '').toLowerCase().trim()}-${item.created_by}`;
           if (groupMap[groupKey] !== undefined) {
             const existing = grouped[groupMap[groupKey]];
@@ -2282,17 +2358,17 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                             )
                           ) : k === 'show_type' ? (
                             <span className="status-badge" style={{ 
-                              background: v === 'festival' ? 'linear-gradient(135deg,#db2777,#ec4899)'
+                              background: (v === 'festival' || v === 'tour') ? 'linear-gradient(135deg,#db2777,#ec4899)'
                                 : v === 'multiple' ? 'linear-gradient(135deg,#7c3aed,#4f46e5)'
                                 : '#f1f5f9',
-                              color: (v === 'festival' || v === 'multiple') ? '#fff' : '#475569',
+                              color: (v === 'festival' || v === 'tour' || v === 'multiple') ? '#fff' : '#475569',
                               padding: '4px 8px',
                               borderRadius: '6px',
                               fontSize: '0.8rem',
                               fontWeight: 700,
                               display: 'inline-block'
                             }}>
-                              {v === 'festival' ? 'Tour / Festival' : v === 'multiple' ? 'Multiple Shows' : 'Single Show'}
+                              {(v === 'festival' || v === 'tour') ? 'Tour / Festival' : v === 'multiple' ? 'Multiple Shows' : 'Single Show'}
                             </span>
                           ) : k === 'status' || k === 'role' ? (
                             <span className={`status-badge ${v}`}>{v}</span>
@@ -3094,7 +3170,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
                       <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Manage and monitor entries in real-time.</p>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span className="count-chip">{data.length} Total Records</span>
+                      <span className="count-chip">{getFilteredDataLength()} Total Records</span>
                       {syncStatus === 'offline' && (
                         <button
                           onClick={() => { localStorage.removeItem(`admin_cache_${currentTab.table}`); fetchData(); }}
@@ -3345,6 +3421,38 @@ CREATE TABLE IF NOT EXISTS service_areas (
                               <span>Online events use listing cities for each show instead of physical venues.</span>
                             </label>
                           </div>
+
+                          <div className="online-checkbox-card">
+                            <input 
+                              type="checkbox" 
+                              id="is_admin_organized_evt_mult"
+                              checked={!!formData.is_admin_organized}
+                              onChange={(e) => setFormData({ ...formData, is_admin_organized: e.target.checked })}
+                            />
+                            <label htmlFor="is_admin_organized_evt_mult">
+                              <strong>Admin Organized Event</strong>
+                              <span>Mark this event as organized by Passwala Admin. Standard organizers will see it but won't be able to edit/delete it.</span>
+                            </label>
+                          </div>
+
+                          {formData.is_admin_organized && (
+                            <div className="form-field">
+                              <label>Allowed Ticket Scanner (Organizer) *</label>
+                              <select 
+                                required 
+                                value={formData.allowed_scanner_id || ''} 
+                                onChange={(e) => setFormData({ ...formData, allowed_scanner_id: e.target.value })}
+                                className="admin-select"
+                              >
+                                <option value="">Select scanner user</option>
+                                {usersList.filter(u => u.role === 'EVENT_ORGANIZER' || u.role === 'VENDOR').map(u => (
+                                  <option key={u.id} value={u.id}>
+                                    {u.full_name || u.phone || 'User'}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
 
                           <div className="form-field">
                             <label>Category *</label>
@@ -3947,6 +4055,38 @@ CREATE TABLE IF NOT EXISTS service_areas (
                               <span>Virtual events use video conferencing platforms instead of physical venues.</span>
                             </label>
                           </div>
+
+                          <div className="online-checkbox-card">
+                            <input 
+                              type="checkbox" 
+                              id="is_admin_organized_evt_fest"
+                              checked={!!formData.is_admin_organized}
+                              onChange={(e) => setFormData({ ...formData, is_admin_organized: e.target.checked })}
+                            />
+                            <label htmlFor="is_admin_organized_evt_fest">
+                              <strong>Admin Organized Event</strong>
+                              <span>Mark this event as organized by Passwala Admin. Standard organizers will see it but won't be able to edit/delete it.</span>
+                            </label>
+                          </div>
+
+                          {formData.is_admin_organized && (
+                            <div className="form-field">
+                              <label>Allowed Ticket Scanner (Organizer) *</label>
+                              <select 
+                                required 
+                                value={formData.allowed_scanner_id || ''} 
+                                onChange={(e) => setFormData({ ...formData, allowed_scanner_id: e.target.value })}
+                                className="admin-select"
+                              >
+                                <option value="">Select scanner user</option>
+                                {usersList.filter(u => u.role === 'EVENT_ORGANIZER' || u.role === 'VENDOR').map(u => (
+                                  <option key={u.id} value={u.id}>
+                                    {u.full_name || u.phone || 'User'}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -4459,6 +4599,38 @@ CREATE TABLE IF NOT EXISTS service_areas (
                               <span>Virtual events use video conferencing details instead of a physical venue.</span>
                             </label>
                           </div>
+
+                          <div className="online-checkbox-card">
+                            <input 
+                              type="checkbox" 
+                              id="is_admin_organized_evt"
+                              checked={!!formData.is_admin_organized}
+                              onChange={(e) => setFormData({ ...formData, is_admin_organized: e.target.checked })}
+                            />
+                            <label htmlFor="is_admin_organized_evt">
+                              <strong>Admin Organized Event</strong>
+                              <span>Mark this event as organized by Passwala Admin. Standard organizers will see it but won't be able to edit/delete it.</span>
+                            </label>
+                          </div>
+
+                          {formData.is_admin_organized && (
+                            <div className="form-field">
+                              <label>Allowed Ticket Scanner (Organizer) *</label>
+                              <select 
+                                required 
+                                value={formData.allowed_scanner_id || ''} 
+                                onChange={(e) => setFormData({ ...formData, allowed_scanner_id: e.target.value })}
+                                className="admin-select"
+                              >
+                                <option value="">Select scanner user</option>
+                                {usersList.filter(u => u.role === 'EVENT_ORGANIZER' || u.role === 'VENDOR').map(u => (
+                                  <option key={u.id} value={u.id}>
+                                    {u.full_name || u.phone || 'User'}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
 
                           <div className="form-field">
                             <label>Category *</label>

@@ -1,8 +1,8 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Package, Truck, CheckCircle, Clock, MapPin, ChevronRight, MessageCircle, X, Store, CreditCard, Wrench, Download, Bike, Navigation } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Package, Truck, CheckCircle, Clock, MapPin, ChevronRight, MessageCircle, X, Store, CreditCard, Wrench, Download, Bike, Navigation, Star } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useGoogleMaps } from '../../hooks/useGoogleMaps';
 import './TrackOrders.css';
@@ -11,6 +11,7 @@ import { supabase } from '../../supabase';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useNotifications } from '../../context/NotificationContext';
+import { useTranslation } from '../LanguageContext';
 import { AHMEDABAD_AREA_COORDS } from '../../utils/constants';
 
 // ── Google Maps Order Tracking Map ───────────────────────────────────────────
@@ -308,6 +309,7 @@ function OrderTrackingMap({ order, riderCoords, userCoords, isService }) {
 }
 const TrackOrders = ({ onBack, user, userCoords }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [activeOrders, setActiveOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
@@ -316,6 +318,104 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
   const [rideLoading, setRideLoading] = useState(true);
   const [eventBookings, setEventBookings] = useState([]);
   const { addNotification } = useNotifications();
+  const currentUserIdRef = useRef(null);
+
+  // Rating States
+  const [ratingModal, setRatingModal] = useState(null);     // { order } | null
+  const [ratingValue, setRatingValue] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);         // hover preview
+  const [ratingComment, setRatingComment] = useState('');
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
+  const [ratedOrderIds, setRatedOrderIds] = useState(new Set());
+
+  const loadRatedOrderIds = async () => {
+    try {
+      if (!user) return;
+      let resolvedUserId = user.id || user.uid;
+      const isUUID = resolvedUserId && resolvedUserId.length === 36;
+      if (!isUUID && resolvedUserId) {
+        const phoneNo = user.phoneNumber?.replace('+91', '') || user.phone?.replace('+91', '');
+        const orFilters = [];
+        if (user.uid) orFilters.push(`uid.eq.${user.uid}`);
+        if (user.email) orFilters.push(`email.eq.${user.email}`);
+        if (phoneNo) orFilters.push(`phone.eq.${phoneNo}`);
+        if (orFilters.length > 0) {
+          const { data: usr } = await supabase.from('users').select('id').or(orFilters.join(',')).maybeSingle();
+          resolvedUserId = usr?.id || null;
+        }
+      }
+      if (!resolvedUserId || resolvedUserId.length !== 36) return;
+
+      const { data: ratings } = await supabase
+        .from('order_ratings')
+        .select('order_id')
+        .eq('user_id', resolvedUserId);
+
+      if (ratings && ratings.length > 0) {
+        setRatedOrderIds(new Set(ratings.map(r => r.order_id)));
+      }
+    } catch (err) {
+      console.warn('[loadRatedOrderIds] Failed:', err);
+    }
+  };
+
+  const getAuthToken = async () => {
+    try {
+      const { auth: authObj } = await import('../../firebase');
+      const currentUser = authObj?.currentUser;
+      if (currentUser) {
+        return await currentUser.getIdToken();
+      }
+    } catch (e) {
+      console.warn("Failed to get Firebase ID token:", e);
+    }
+    const userJson = localStorage.getItem('passwala_user');
+    const userObj = userJson ? JSON.parse(userJson) : null;
+    const uid = userObj?.uid || userObj?.id || 'mock_user_123';
+    return `mock_session_token_${uid}`;
+  };
+
+  const submitRating = async () => {
+    if (!ratingModal || ratingValue === 0) { toast.error('Please select a star rating.'); return; }
+    setRatingSubmitting(true);
+    try {
+      const token = await getAuthToken();
+      const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+
+      const res = await fetch(`${apiBase}/api/orders/rate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          orderId: ratingModal.order.id,
+          rating: ratingValue,
+          comment: ratingComment.trim() || null
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 409) {
+          toast('You already rated this order.');
+          setRatedOrderIds(prev => new Set([...prev, ratingModal.order.id]));
+          setRatingModal(null);
+        } else {
+          throw new Error(data.error || 'Failed to submit rating.');
+        }
+        return;
+      }
+      setRatedOrderIds(prev => new Set([...prev, ratingModal.order.id]));
+      toast.success('Thank you for your feedback! ⭐');
+      setRatingModal(null);
+      setRatingValue(0);
+      setRatingComment('');
+    } catch (err) {
+      toast.error(err.message || 'Could not submit rating. Please try again.');
+    } finally {
+      setRatingSubmitting(false);
+    }
+  };
 
   // ── Fetch event bookings (event_bookings table) ─────────────────────────
   const fetchEventBookings = useCallback(async () => {
@@ -408,6 +508,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
 
   useEffect(() => {
     fetchOrders();
+    loadRatedOrderIds();
 
     // Polling fallback — only fires if real-time channel drops (Supabase realtime handles live updates above)
     // 30s is sufficient; 5s caused 12 req/min per user and could trigger rate limits
@@ -418,6 +519,9 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
     // REAL-TIME: Listen for order status updates
     const sub = supabase.channel('order_updates')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, async (payload) => {
+        if (payload.new.user_id && currentUserIdRef.current && payload.new.user_id !== currentUserIdRef.current) {
+          return;
+        }
         let isService = false;
         
         let freshTracking = [];
@@ -453,7 +557,9 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
           });
         });
         const shortId = payload.new.id.substring(0, 6).toUpperCase();
-        toast.info(isService ? `Booking #${shortId} is now: ${payload.new.status}` : `Order #${shortId} is now: ${payload.new.status}`, { icon: isService ? '🛠️' : '🛵' });
+        if (payload.new.status !== 'PLACED' && payload.new.status !== 'PENDING') {
+          toast.info(isService ? `Booking #${shortId} is now: ${payload.new.status}` : `Order #${shortId} is now: ${payload.new.status}`, { icon: isService ? '🛠️' : '🛵' });
+        }
         
         // Push Real-Time Notification to Context
         addNotification({
@@ -522,6 +628,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
       // 1. Fetch orders from Supabase using resolved UUID
       let dbOrders = [];
       if (resolvedUserId && resolvedUserId.length === 36) {
+        currentUserIdRef.current = resolvedUserId;
         try {
           const { data, error } = await supabase
             .from('orders')
@@ -1040,6 +1147,12 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
       
       if (error) throw new Error(error.message || 'Failed to cancel order');
 
+      // NOTE: Stock restoration is handled atomically by the database trigger
+      // 'trigger_restore_stock' which fires AFTER UPDATE OF status ON orders.
+      // DO NOT manually restore stock here — that would cause a double-restoration
+      // (DB trigger already ran when order status was set to CANCELLED above).
+      // If the trigger is not deployed, run: database/create_stock_triggers.sql
+
       // Also update any matching service_bookings status to 'CANCELLED'
       try {
         const { data: orderItems } = await supabase
@@ -1082,13 +1195,13 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
          <div className="live-status">
            <div className="live-pulse"></div> 
            <span>
-             {activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status)).length + rideBookings.filter(b => b.status === 'CONFIRMED').length + eventBookings.filter(b => b.status === 'CONFIRMED').length} ACTIVE ORDERS
+             {activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status)).length + rideBookings.filter(b => b.status === 'CONFIRMED').length + eventBookings.filter(b => b.status === 'CONFIRMED').length} {t('active_orders')}
            </span>
          </div>
       </div>
 
       <div className="orders-list-v2" style={{ paddingBottom: '120px' }}>
-        {loading ? <p>Syncing neighborhood cloud...</p> : activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status)).map((order, i) => {
+        {loading ? <p>{t('syncing_cloud')}</p> : activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status)).map((order, i) => {
           const progress = getProgress(order.status);
           const firstItem = order.items?.[0] || { name: 'Order' };
           const itemCount = order.items?.length || 0;
@@ -1108,11 +1221,11 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                        {isService ? <Truck size={20} /> : <Package size={20} />}
                     </div>
                      <div>
-                        <h4>{isService ? (firstItem.provider || firstItem.store || 'Service Expert') : (order.stores?.name || firstItem.store || 'Partner')}</h4>
-                        <p>{firstItem.name} {itemCount > 1 ? `+ ${itemCount - 1} more` : ''}</p>
+                        <h4>{isService ? (firstItem.provider || firstItem.store || t('service_expert')) : (order.stores?.name || firstItem.store || t('partner'))}</h4>
+                        <p>{firstItem.name} {itemCount > 1 ? `+ ${itemCount - 1} ${t('more')}` : ''}</p>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
                           <MapPin size={12} color="#94a3b8" />
-                          <span>{isService ? 'Service Location' : 'Delivery Location'}: <strong style={{ color: '#475569' }}>{order.addresses?.society || 'Thaltej'}</strong></span>
+                          <span>{isService ? t('service_location') : t('delivery_location')}: <strong style={{ color: '#475569' }}>{order.addresses?.society || 'Thaltej'}</strong></span>
                         </div>
                      </div>
                  </div>
@@ -1129,9 +1242,9 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                     ></motion.div>
                  </div>
                  <div className="timeline-labels">
-                    <div className="label-item active"><CheckCircle size={14} /> {isService ? 'Booked' : 'Ordered'}</div>
-                    <div className={`label-item ${progress >= 50 ? 'active' : ''}`}><Clock size={14} /> {isService ? 'En Route' : 'Shipped'}</div>
-                    <div className={`label-item ${progress >= 90 ? 'active' : ''}`}><MapPin size={14} /> {isService ? 'Service' : 'Delivery'}</div>
+                    <div className="label-item active"><CheckCircle size={14} /> {isService ? t('booked') : t('ordered')}</div>
+                    <div className={`label-item ${progress >= 50 ? 'active' : ''}`}><Clock size={14} /> {isService ? t('en_route') : t('shipped')}</div>
+                    <div className={`label-item ${progress >= 90 ? 'active' : ''}`}><MapPin size={14} /> {isService ? t('service') : t('delivery')}</div>
                  </div>
               </div>
 
@@ -1144,10 +1257,10 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                 <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'white', padding: '8px 12px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 10 }}>
                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: riderCoords ? '#22c55e' : '#94a3b8', animation: riderCoords ? 'pulse 2s infinite' : 'none' }}></div>
                    <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>
-                     {['DELIVERED', 'COMPLETED'].includes(order.status) ? (isService ? 'Service Completed' : 'Delivered') :
-                      riderCoords || ['SHIPPED', 'DISPATCHED'].includes(order.status) ? (isService ? 'Expert on the way' : 'Live Tracking Active') : 
-                      ['ACCEPTED', 'PREPARING'].includes(order.status) ? (isService ? 'Preparing Kit...' : 'Preparing Order...') :
-                      (isService ? 'Waiting for Expert...' : 'Waiting for Rider...')}
+                     {['DELIVERED', 'COMPLETED'].includes(order.status) ? (isService ? t('service_completed') : t('delivered')) :
+                      riderCoords || ['SHIPPED', 'DISPATCHED'].includes(order.status) ? (isService ? t('expert_on_way') : t('live_tracking_active')) : 
+                      ['ACCEPTED', 'PREPARING'].includes(order.status) ? (isService ? t('preparing_kit') : t('preparing_order')) :
+                      (isService ? t('waiting_expert') : t('waiting_rider'))}
                    </span>
                 </div>
               </div>
@@ -1157,27 +1270,27 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                   <div className="eta-timer">
                     <Clock size={20} className="pulse-text" />
                     <span>
-                      {order.status === 'PLACED' || order.status === 'PENDING' ? (isService ? 'Waiting for confirmation...' : 'Confirming order...') : 
-                       ['DELIVERED', 'COMPLETED'].includes(order.status) ? (isService ? 'Completed!' : 'Arrived!') : 
-                       <>Arriving in <strong>{order.eta || '10 mins'}</strong></>}
+                      {order.status === 'PLACED' || order.status === 'PENDING' ? (isService ? t('waiting_confirmation') : t('confirming_order')) : 
+                       ['DELIVERED', 'COMPLETED'].includes(order.status) ? (isService ? t('service_completed') : t('arrived_excl')) : 
+                       <>{t('arriving_in').replace('{time}', order.eta || '10 mins')}</>}
                     </span>
                   </div>
                   <p className="eta-status">
-                    {order.status === 'PLACED' || order.status === 'PENDING' ? (isService ? 'Waiting for service provider to confirm booking...' : 'Confirming order with nearby riders...') : 
-                     order.status === 'ACCEPTED' ? (isService ? 'Booking Confirmed, preparing service kit' : 'Rider Assigned, heading to the store') :
-                     order.status === 'PREPARING' ? (isService ? 'Expert is preparing for service visit' : 'Rider is at the store picking up') :
-                     order.status === 'SHIPPED' || order.status === 'DISPATCHED' ? (isService ? 'Expert is on the way to you' : 'Rider is on the way to you') : (isService ? 'Completed' : 'Delivered')}
+                    {order.status === 'PLACED' || order.status === 'PENDING' ? (isService ? t('waiting_confirm_sub') : t('confirming_order_sub')) : 
+                     order.status === 'ACCEPTED' ? (isService ? t('booking_confirmed_sub') : t('rider_assigned_sub')) :
+                     order.status === 'PREPARING' ? (isService ? t('expert_preparing_sub') : t('rider_picking_sub')) :
+                     order.status === 'SHIPPED' || order.status === 'DISPATCHED' ? (isService ? t('expert_on_way_sub') : t('rider_on_way_sub')) : (isService ? t('service_completed') : t('delivered'))}
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', position: 'relative', zIndex: 20 }}>
                   {['PENDING', 'PLACED', 'ORDERED', 'ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED'].includes(order.status) && (
                     <button className="rider-contact-btn" style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', padding: '0 12px' }} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCancelPromptId(order.id); }}>
-                      Cancel
+                      {t('cancel')}
                     </button>
                   )}
                   
                   <button className="rider-contact-btn" style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedOrderDetails(order); }}>
-                    Details
+                    {t('details')}
                   </button>
                 </div>
               </div>
@@ -1185,7 +1298,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
               {((order.rider_id) || String(order.id).startsWith('local_')) && ['PREPARING', 'SHIPPED', 'DISPATCHED', 'DELIVERED', 'COMPLETED'].includes(order.status) && (
                 <div className="agent-small-info">
                    <img src={`https://i.pravatar.cc/150?u=${order.rider_id || order.id}`} alt="Agent" />
-                   <p>{order.delivery_agent_name || 'Verified Partner'} • {isService ? 'Verified Expert' : 'Verified Agent'}</p>
+                   <p>{order.delivery_agent_name || t('verified_partner')} • {isService ? t('verified_expert') : t('verified_agent')}</p>
                 </div>
               )}
             </motion.div>
@@ -1194,8 +1307,8 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
         {!loading && activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status)).length === 0 && rideBookings.filter(b => b.status === 'CONFIRMED').length === 0 && (
           <div className="empty-orders-placeholder-card" style={{ border: 'none', background: 'transparent', boxShadow: 'none' }}>
             <div className="placeholder-icon" style={{ background: '#f1f5f9', color: '#94a3b8' }}>📦</div>
-            <h3 style={{ color: '#64748b' }}>No Active Orders</h3>
-            <p style={{ color: '#94a3b8' }}>You don't have any ongoing deliveries at the moment.</p>
+            <h3 style={{ color: '#64748b' }}>{t('no_active_orders')}</h3>
+            <p style={{ color: '#94a3b8' }}>{t('no_active_orders_sub')}</p>
           </div>
         )}
 
@@ -1206,9 +1319,9 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
               <div style={{ width: 28, height: 28, background: 'linear-gradient(135deg,#f97316,#ea580c)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Bike size={16} color="white" />
               </div>
-              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>Active Ride Bookings</h3>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>{t('active_ride_bookings')}</h3>
               <span style={{ marginLeft: 'auto', background: '#fff7ed', color: '#f97316', fontSize: '0.72rem', fontWeight: 800, padding: '3px 10px', borderRadius: 20, border: '1px solid #fed7aa' }}>
-                {rideBookings.filter(b => b.status === 'CONFIRMED').length} CONFIRMED
+                {rideBookings.filter(b => b.status === 'CONFIRMED').length} {t('confirmed')}
               </span>
             </div>
             {rideBookings.filter(b => b.status === 'CONFIRMED').map((booking, i) => (
@@ -1229,7 +1342,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                     <div>
                       <h4 style={{ margin: 0, fontWeight: 800 }}>{booking.city_vehicles?.vehicle_type || 'City Ride'}</h4>
                       <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                        {booking.seat_count} seat{booking.seat_count > 1 ? 's' : ''} • ₹{booking.total_price}
+                        {booking.seat_count} {t('seats')} • ₹{booking.total_price}
                       </p>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
                         <MapPin size={12} color="#f97316" />
@@ -1246,7 +1359,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                     <Navigation size={14} color="#f97316" />
                     <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Vehicle: {booking.city_vehicles.license_plate}</span>
                     <span style={{ marginLeft: 'auto', fontSize: '0.75rem', background: booking.driverLocation ? '#dcfce7' : '#f1f5f9', color: booking.driverLocation ? '#16a34a' : '#94a3b8', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}>
-                      {booking.driverLocation ? '🟢 Driver Live' : '⚪ Awaiting driver'}
+                      {booking.driverLocation ? `🟢 ${t('driver_live')}` : `⚪ ${t('awaiting_driver')}`}
                     </span>
                   </div>
                 )}
@@ -1259,7 +1372,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                   <div style={{ position: 'absolute', top: 10, right: 10, background: 'white', padding: '6px 12px', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: 6, zIndex: 10 }}>
                     <div style={{ width: 8, height: 8, borderRadius: '50%', background: booking.driverLocation ? '#22c55e' : '#f97316', animation: 'pulse 2s infinite' }} />
                     <span style={{ fontSize: '0.72rem', fontWeight: 700 }}>
-                      {booking.driverLocation ? 'Driver En Route' : 'Preparing Ride'}
+                      {booking.driverLocation ? t('driver_en_route') : t('preparing_ride')}
                     </span>
                   </div>
                 </div>
@@ -1269,9 +1382,9 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                   <div className="eta-main">
                     <div className="eta-timer">
                       <Clock size={18} className="pulse-text" />
-                      <span>Ride <strong>Confirmed</strong> — Board at pickup point</span>
+                      <span>{t('ride_confirmed_board')}</span>
                     </div>
-                    <p className="eta-status">Show QR code to driver. Seat{booking.seat_count > 1 ? 's' : ''} reserved.</p>
+                    <p className="eta-status">{t('show_qr_code_driver')}</p>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
@@ -1285,12 +1398,12 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                           body: JSON.stringify({ bookingId: booking.id, userId: user?.id || user?.uid })
                         }).then(() => { fetchRideBookings(); toast.success('Ride booking cancelled'); }).catch(() => toast.error('Cancel failed'));
                       }}
-                    >Cancel</button>
+                    >{t('cancel')}</button>
                     <button
                       className="rider-contact-btn"
                       style={{ background: 'var(--primary)', color: 'white', border: 'none' }}
                       onClick={() => navigate('/ride-ticket', { state: { booking, vehicle: booking.city_vehicles } })}
-                    >🎟️ View Ticket</button>
+                    >🎟️ {t('view_ticket')}</button>
                   </div>
                 </div>
               </motion.div>
@@ -1305,10 +1418,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
               <div style={{ width: 28, height: 28, background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ fontSize: 16 }}>🎫</span>
               </div>
-              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>My Event Tickets</h3>
-              <span style={{ marginLeft: 'auto', background: '#f5f3ff', color: '#7c3aed', fontSize: '0.72rem', fontWeight: 800, padding: '3px 10px', borderRadius: 20, border: '1px solid #ddd6fe' }}>
-                {eventBookings.filter(b => b.status !== 'CANCELLED').length} TICKET{eventBookings.filter(b => b.status !== 'CANCELLED').length !== 1 ? 'S' : ''}
-              </span>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>{t('my_event_tickets')}</h3>
             </div>
             {eventBookings.filter(b => b.status !== 'CANCELLED').map((booking, i) => {
               const ev = booking.events;
@@ -1351,7 +1461,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                       className="rider-contact-btn"
                       style={{ background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: 'white', border: 'none' }}
                       onClick={() => navigate('/events/ticket', { state: { booking, event: ev, tier } })}
-                    >🎫 View Ticket</button>
+                    >🎫 {t('view_ticket')}</button>
                   </div>
                 </motion.div>
               );
@@ -1361,22 +1471,55 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
       </div>
 
       <div className="past-orders-shortcut">
-         <h4>Previous Orders ({activeOrders.filter(o => ['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status)).length})</h4>
+         <h4>{t('previous_orders')} ({activeOrders.filter(o => ['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status)).length})</h4>
           {activeOrders.filter(o => ['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status)).map(order => (
             <div key={order.id} className="past-item-row" onClick={() => setSelectedOrderDetails(order)} style={{ cursor: 'pointer' }}>
                <div className="past-meta">
                   <span>{new Date(order.created_at).toLocaleDateString()}</span>
                   <p>{order.items?.[0]?.name || 'Order'} • ₹{order.total_price || order.total_amount}</p>
                </div>
-               <div className={order.status === 'CANCELLED' ? "cancelled-pill-small" : "fulfilled-pill-small"} style={order.status === 'CANCELLED' ? {background: '#fee2e2', color: '#ef4444', textTransform: 'uppercase', fontSize: '0.65rem', padding: '2px 10px', borderRadius: '6px', fontWeight: 800, marginLeft: 'auto', marginRight: '12px'} : {}}>
-                 {order.status === 'CANCELLED' ? 'Cancelled' : 'Fulfilled'}
+               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', marginRight: '12px' }}>
+                 {['DELIVERED', 'COMPLETED'].includes(order.status?.toUpperCase()) && !ratedOrderIds.has(order.id) && (
+                   <button
+                     style={{
+                       background: 'linear-gradient(135deg,#fef3c7,#fde68a)',
+                       color: '#92400e',
+                       border: '1px solid #fbbf24',
+                       borderRadius: '8px',
+                       padding: '4px 10px',
+                       fontSize: '0.7rem',
+                       fontWeight: 800,
+                       cursor: 'pointer',
+                       display: 'flex',
+                       alignItems: 'center',
+                       gap: '2px',
+                       boxShadow: '0 2px 5px rgba(251,191,36,0.15)'
+                     }}
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       setRatingModal({ order });
+                       setRatingValue(0);
+                       setRatingComment('');
+                     }}
+                   >
+                     ⭐ {t('rate')}
+                   </button>
+                 )}
+                 {ratedOrderIds.has(order.id) && (
+                   <span style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                     ⭐ {t('rated')}
+                   </span>
+                 )}
+                 <div className={order.status === 'CANCELLED' ? "cancelled-pill-small" : "fulfilled-pill-small"} style={order.status === 'CANCELLED' ? {background: '#fee2e2', color: '#ef4444', textTransform: 'uppercase', fontSize: '0.65rem', padding: '2px 10px', borderRadius: '6px', fontWeight: 800} : {}}>
+                   {order.status === 'CANCELLED' ? t('cancelled') : t('fulfilled')}
+                 </div>
                </div>
                <ChevronRight size={16} color="#888" />
             </div>
-         ))}
-         {activeOrders.filter(o => ['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status)).length === 0 && (
-           <p className="no-past-p">No history available yet.</p>
-         )}
+          ))}
+          {activeOrders.filter(o => ['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status)).length === 0 && (
+            <p className="no-past-p">{t('no_history_available')}</p>
+          )}
       </div>
 
       {/* Custom Cancel Confirmation Modal */}
@@ -1393,22 +1536,22 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
             <div style={{ background: '#fef2f2', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: '#ef4444' }}>
               <X size={32} />
             </div>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '1.25rem', color: '#0f172a' }}>Cancel Order?</h3>
+            <h3 style={{ margin: '0 0 12px 0', fontSize: '1.25rem', color: '#0f172a' }}>{t('cancel_order_confirm_title')}</h3>
             <p style={{ margin: '0 0 24px 0', color: '#64748b', fontSize: '0.95rem', lineHeight: 1.5 }}>
-              Are you sure you want to cancel this order? This action cannot be undone.
+              {t('cancel_order_confirm_desc')}
             </p>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
               <button 
                 onClick={() => setCancelPromptId(null)}
                 style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '12px', fontWeight: 600, cursor: 'pointer' }}
               >
-                No, Keep It
+                {t('no_keep_it')}
               </button>
               <button 
                 onClick={() => confirmCancelOrder(cancelPromptId)}
                 style={{ flex: 1, padding: '12px', background: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '12px', fontWeight: 600, cursor: 'pointer' }}
               >
-                Yes, Cancel
+                {t('yes_cancel')}
               </button>
             </div>
           </motion.div>
@@ -1427,7 +1570,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
             onClick={e => e.stopPropagation()}
           >
             <div className="past-order-modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>Order Details</h3>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>{t('order_details')}</h3>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 {['PENDING', 'PLACED', 'ORDERED', 'ACCEPTED', 'PREPARING'].includes(selectedOrderDetails.status) && (
                   <button 
@@ -1437,7 +1580,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                     }} 
                     style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '6px 12px', cursor: 'pointer', color: '#ef4444', fontWeight: 600, fontSize: '0.85rem' }}
                   >
-                    Cancel Order
+                    {t('cancel')}
                   </button>
                 )}
                 {/* Download Invoice — only when order is completed/delivered */}
@@ -1447,7 +1590,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                     style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '6px 14px', cursor: 'pointer', color: '#2563eb', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '0.82rem' }}
                     title="Download Invoice"
                   >
-                    <Download size={15} /> Invoice
+                    <Download size={15} /> {t('invoice')}
                   </button>
                 )}
                 <button onClick={() => setSelectedOrderDetails(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1462,7 +1605,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                   <Store size={24} />
                 </div>
                 <div>
-                  <h4 style={{ margin: 0, fontSize: '1rem', color: '#1e293b' }}>{selectedOrderDetails.stores?.name || selectedOrderDetails.items?.[0]?.store || 'Passwala Partner'}</h4>
+                  <h4 style={{ margin: 0, fontSize: '1rem', color: '#1e293b' }}>{selectedOrderDetails.stores?.name || selectedOrderDetails.items?.[0]?.store || t('partner')}</h4>
                   <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Clock size={14} /> {['DELIVERED', 'COMPLETED'].includes(selectedOrderDetails.status) ? 'Delivered on' : 'Ordered on'} {new Date(selectedOrderDetails.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                   </p>
@@ -1472,7 +1615,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
               {/* Address Section */}
               <div style={{ marginBottom: '24px' }}>
                 <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  {(selectedOrderDetails.items?.[0]?.type === 'service' || (selectedOrderDetails.stores && !selectedOrderDetails.stores.vendor_id)) ? 'Service Address' : 'Delivery Address'}
+                  {(selectedOrderDetails.items?.[0]?.type === 'service' || (selectedOrderDetails.stores && !selectedOrderDetails.stores.vendor_id)) ? t('service_address') : t('delivery_address')}
                 </h4>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
                   <MapPin size={20} color="#4f46e5" style={{ marginTop: '2px', flexShrink: 0 }} />
@@ -1484,7 +1627,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
               </div>
 
               <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Items Summary</h4>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{t('items_summary')}</h4>
                 <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
                   {(selectedOrderDetails.items || []).map((item, idx) => (
                     <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', borderBottom: idx !== (selectedOrderDetails.items || []).length - 1 ? '1px solid #e2e8f0' : 'none', background: '#fff' }}>
@@ -1493,26 +1636,26 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                     </div>
                   ))}
                   {(!selectedOrderDetails.items || selectedOrderDetails.items.length === 0) && (
-                    <div style={{ padding: '12px 16px', color: '#64748b' }}>Details not available</div>
+                    <div style={{ padding: '12px 16px', color: '#64748b' }}>{t('details_not_available')}</div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', background: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
                     <span style={{ color: '#64748b', fontWeight: 600 }}>
-                      {selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? 'Total Refunded (Paytm)' : 'Total Paid'}
+                      {selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? t('total_refunded_paytm') : t('total_paid')}
                     </span>
                     <span style={{ color: selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? '#ef4444' : '#10b981', fontWeight: 800, fontSize: '1.1rem' }}>₹{selectedOrderDetails.total_price || selectedOrderDetails.total_amount}</span>
                   </div>
                 </div>
               </div>
 
-              <div>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Payment Info</h4>
+              <div style={{ marginBottom: '24px' }}>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{t('payment_info')}</h4>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: '#f1f5f9', borderRadius: '12px' }}>
                   <CreditCard size={20} color="#64748b" />
                   <div>
                     <div style={{ color: '#334155', fontWeight: 600 }}>
-                      {selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? 'Refunded to Paytm' : (selectedOrderDetails.payment_method || 'Paid Online')}
+                      {selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? t('refunded_to_paytm') : (selectedOrderDetails.payment_method || t('paid_online'))}
                     </div>
-                    <div style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '2px' }}>Transaction ID: {selectedOrderDetails.id?.split('-')[0] || ''}</div>
+                    <div style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '2px' }}>{t('transaction_id')}: {selectedOrderDetails.id?.split('-')[0] || ''}</div>
                   </div>
                   <div style={{ 
                     marginLeft: 'auto', 
@@ -1523,16 +1666,182 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                     padding: '4px 8px', 
                     borderRadius: '8px' 
                   }}>
-                    {selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? 'REFUNDED' : 'SUCCESS'}
+                    {selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? t('refunded') : t('success')}
                   </div>
                 </div>
               </div>
+
+              {/* Rating Section in Modal */}
+              {['DELIVERED', 'COMPLETED'].includes(selectedOrderDetails.status?.toUpperCase()) && (
+                <div style={{ marginTop: '24px', padding: '16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '16px' }}>
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: '0.95rem', color: '#92400e', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800 }}>
+                    ⭐ {ratedOrderIds.has(selectedOrderDetails.id) ? t('your_rating') : t('rate_your_experience')}
+                  </h4>
+                  {ratedOrderIds.has(selectedOrderDetails.id) ? (
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#78350f', fontWeight: 600 }}>{t('already_rated_msg')}</p>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <span style={{ fontSize: '0.82rem', color: '#b45309' }}>{t('help_improve_service')}</span>
+                      <button
+                        style={{
+                          background: 'linear-gradient(135deg,#f59e0b,#d97706)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '8px 16px',
+                          fontSize: '0.82rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 10px rgba(245,158,11,0.2)'
+                        }}
+                        onClick={() => {
+                          setRatingModal({ order: selectedOrderDetails });
+                          setRatingValue(0);
+                          setRatingComment('');
+                          setSelectedOrderDetails(null);
+                        }}
+                      >
+                        {t('rate_now')}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
           </motion.div>
         </div>
       )}
 
+      {/* Rating Modal */}
+      <AnimatePresence>
+        {ratingModal && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+            onClick={() => setRatingModal(null)}
+          >
+            <motion.div
+              initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 26 }}
+              style={{ background: 'white', borderRadius: '28px 28px 0 0', padding: '0', width: '100%', maxWidth: '480px', boxShadow: '0 -12px 50px rgba(0,0,0,0.22)', overflow: 'hidden' }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* ── Header band */}
+              <div style={{ background: 'linear-gradient(135deg,#fff7ed,#fffbeb)', padding: '1.4rem 1.5rem 1rem', borderBottom: '1px solid #fde68a' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 4px', fontWeight: 900, fontSize: '1.15rem', color: '#0f172a' }}>{t('rate_order_title')} ⭐</h3>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#92400e', fontWeight: 600 }}>
+                      Order #{ratingModal.order.id?.slice(0,8).toUpperCase()}
+                      {ratingModal.order.stores?.name ? ` · ${ratingModal.order.stores.name}` : ''}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { setRatingModal(null); setRatingValue(0); setHoverRating(0); setRatingComment(''); }}
+                    style={{ background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', flexShrink: 0 }}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ padding: '1.5rem' }}>
+                {/* ── Emoji display */}
+                <div style={{ textAlign: 'center', fontSize: '3rem', marginBottom: '0.5rem', lineHeight: 1, minHeight: '3.5rem', transition: 'all 0.2s' }}>
+                  {['😶', '😞', '😐', '🙂', '😊', '🤩'][hoverRating || ratingValue]}
+                </div>
+
+                {/* ── Star picker — hover + click */}
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '0.6rem' }}>
+                  {[1,2,3,4,5].map(s => {
+                    const isActive = s <= (hoverRating || ratingValue);
+                    return (
+                      <button
+                        key={s}
+                        onMouseEnter={() => setHoverRating(s)}
+                        onMouseLeave={() => setHoverRating(0)}
+                        onClick={() => setRatingValue(s)}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer', padding: '4px 2px',
+                          transform: s === ratingValue ? 'scale(1.35)' : isActive ? 'scale(1.15)' : 'scale(1)',
+                          transition: 'transform 0.18s cubic-bezier(0.34,1.56,0.64,1), filter 0.15s',
+                          filter: isActive ? 'drop-shadow(0 2px 6px rgba(245,158,11,0.5))' : 'none'
+                        }}
+                      >
+                        <Star
+                          size={38}
+                          fill={isActive ? '#f59e0b' : 'none'}
+                          color={isActive ? '#f59e0b' : '#d1d5db'}
+                          strokeWidth={1.8}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* ── Rating label */}
+                <p style={{ textAlign: 'center', fontSize: '0.9rem', fontWeight: 800, marginBottom: '1.25rem', minHeight: '1.4rem',
+                  color: (hoverRating || ratingValue) > 0 ? '#d97706' : '#94a3b8',
+                  transition: 'color 0.2s'
+                }}>
+                  {['', t('rating_1'), t('rating_2'), t('rating_3'), t('rating_4'), t('rating_5')][hoverRating || ratingValue]}
+                </p>
+
+                {/* ── Comment textarea */}
+                <div style={{ position: 'relative', marginBottom: '1.25rem' }}>
+                  <textarea
+                    placeholder={t('tell_us_more')}
+                    value={ratingComment}
+                    onChange={e => setRatingComment(e.target.value)}
+                    maxLength={300}
+                    rows={3}
+                    style={{
+                      width: '100%', padding: '12px 14px', borderRadius: '14px',
+                      border: `1.5px solid ${ratingValue > 0 ? '#fde68a' : '#e2e8f0'}`,
+                      fontSize: '0.88rem', resize: 'none', outline: 'none',
+                      background: ratingValue > 0 ? '#fffbeb' : '#f8fafc',
+                      boxSizing: 'border-box', lineHeight: 1.5, color: '#0f172a',
+                      transition: 'border-color 0.2s, background 0.2s'
+                    }}
+                  />
+                  <span style={{ position: 'absolute', bottom: '8px', right: '12px', fontSize: '0.7rem', color: '#94a3b8' }}>
+                    {ratingComment.length}/300
+                  </span>
+                </div>
+
+                {/* ── Submit button */}
+                <motion.button
+                  onClick={submitRating}
+                  disabled={ratingSubmitting || ratingValue === 0}
+                  whileTap={{ scale: ratingValue > 0 ? 0.97 : 1 }}
+                  style={{
+                    width: '100%', padding: '14px',
+                    background: ratingValue === 0
+                      ? '#e2e8f0'
+                      : `linear-gradient(135deg, ${{ 1:'#ef4444', 2:'#f97316', 3:'#eab308', 4:'#22c55e', 5:'#f59e0b' }[ratingValue]}, ${{ 1:'#dc2626', 2:'#ea580c', 3:'#ca8a04', 4:'#16a34a', 5:'#d97706' }[ratingValue]})`,
+                    color: ratingValue === 0 ? '#94a3b8' : 'white',
+                    border: 'none', borderRadius: '16px', fontWeight: 900, fontSize: '1rem',
+                    cursor: ratingValue === 0 || ratingSubmitting ? 'not-allowed' : 'pointer',
+                    boxShadow: ratingValue > 0 ? '0 6px 20px rgba(245,158,11,0.35)' : 'none',
+                    transition: 'all 0.25s'
+                  }}
+                >
+                  {ratingSubmitting
+                    ? t('submitting')
+                    : ratingValue === 0
+                      ? t('select_rating_above')
+                      : `${t('submit_rating_btn')} (${ratingValue} ★)`}
+                </motion.button>
+
+                <p style={{ textAlign: 'center', fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.75rem' }}>
+                  {t('feedback_goes_to_store')}
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

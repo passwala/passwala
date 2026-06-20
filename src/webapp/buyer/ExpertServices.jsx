@@ -180,7 +180,7 @@ const ExpertServices = ({ onBack, location, userCoords }) => {
               className={`tab-btn-v3 ${activeTab === tab ? 'active' : ''}`}
               onClick={() => setActiveTab(tab)}
             >
-              {tab === 'All' ? t('expert_services') : t(tab.toLowerCase().replace(' & ', '_'))}
+              {tab === 'All' ? t('expert_services') : t(tab.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''))}
             </button>
           ))}
         </div>
@@ -233,7 +233,7 @@ const ExpertServices = ({ onBack, location, userCoords }) => {
                   </div>
                     <span className="expert-type">
                       {(() => {
-                        const key = (expert.category || '').toLowerCase().replace(' & ', '_');
+                        const key = (expert.category || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
                         const trans = t(key);
                         return trans === key ? (expert.category || '') : trans;
                       })()}
@@ -255,16 +255,18 @@ const ExpertServices = ({ onBack, location, userCoords }) => {
                    <button 
                      className="hire-btn"
                      onClick={() => {
-                       addToCart({
-                         id: expert.id,
-                         name: expert.title,
-                         price: expert.price,
-                         image: expert.image,
-                         type: 'service',
-                         store: expert.name,
-                         shop_id: expert.providerId || expert.id
-                       });
-                       toast.success(`${expert.title} added to cart`);
+                        const success = addToCart({
+                          id: expert.id,
+                          name: expert.title,
+                          price: expert.price,
+                          image: expert.image,
+                          type: 'service',
+                          store: expert.name,
+                          shop_id: expert.providerId || expert.id
+                        });
+                        if (success) {
+                          toast.success(`${expert.title} added to cart`);
+                        }
                      }}
                    >{t('book_now')}</button>
                 </div>

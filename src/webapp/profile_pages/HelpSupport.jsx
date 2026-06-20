@@ -85,17 +85,30 @@ const HelpSupport = () => {
         </div>
 
         <div className="contact-methods">
-           {/* BUG B7 FIX: Open real links instead of empty toast('Coming soon') */}
            <a
              className="contact-btn glass whatsapp-btn"
-             href="https://wa.me/919876543210?text=Hi%20Passwala%20Support%2C%20I%20need%20help"
-             target="_blank"
-             rel="noopener noreferrer"
+             href="#whatsapp"
+             onClick={(e) => { e.preventDefault(); toast('This feature is coming soon!', { icon: '⏳' }); }}
              style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '12px' }}
            >
               <div className="contact-icon-box"><MessageCircle size={20} /></div>
               <div className="contact-text">
-                 <strong>{t('whatsapp_support')}</strong>
+                 <strong style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                   {t('whatsapp_support')}
+                   <span style={{
+                     background: 'linear-gradient(135deg, #fef2f2, #fee2e2)',
+                     color: '#ef4444',
+                     fontSize: '0.62rem',
+                     fontWeight: 800,
+                     padding: '2px 8px',
+                     borderRadius: '6px',
+                     border: '1px solid #fecaca',
+                     textTransform: 'uppercase',
+                     letterSpacing: '0.05em'
+                   }}>
+                     {t('coming_soon')}
+                   </span>
+                 </strong>
                  <span>{t('whatsapp_support_sub')}</span>
               </div>
               <ExternalLink size={16} />
@@ -114,12 +127,28 @@ const HelpSupport = () => {
            </a>
            <a
              className="contact-btn glass call-btn"
-             href="tel:+919876543210"
+             href="#call"
+             onClick={(e) => { e.preventDefault(); toast('This feature is coming soon!', { icon: '⏳' }); }}
              style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '12px' }}
            >
               <div className="contact-icon-box"><Phone size={20} /></div>
               <div className="contact-text">
-                 <strong>{t('call_support')}</strong>
+                 <strong style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                   {t('call_support')}
+                   <span style={{
+                     background: 'linear-gradient(135deg, #fef2f2, #fee2e2)',
+                     color: '#ef4444',
+                     fontSize: '0.62rem',
+                     fontWeight: 800,
+                     padding: '2px 8px',
+                     borderRadius: '6px',
+                     border: '1px solid #fecaca',
+                     textTransform: 'uppercase',
+                     letterSpacing: '0.05em'
+                   }}>
+                     {t('coming_soon')}
+                   </span>
+                 </strong>
                  <span>{t('call_support_sub')}</span>
               </div>
               <ExternalLink size={16} />

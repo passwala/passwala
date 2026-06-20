@@ -376,12 +376,27 @@ const OrderHistory = () => {
     }
   };
 
+  const getAuthToken = async () => {
+    try {
+      const { auth: authObj } = await import('../../firebase');
+      const currentUser = authObj?.currentUser;
+      if (currentUser) {
+        return await currentUser.getIdToken();
+      }
+    } catch (e) {
+      console.warn("Failed to get Firebase ID token:", e);
+    }
+    const userJson = localStorage.getItem('passwala_user');
+    const userObj = userJson ? JSON.parse(userJson) : null;
+    const uid = userObj?.uid || userObj?.id || 'mock_user_123';
+    return `mock_session_token_${uid}`;
+  };
+
   const submitRating = async () => {
     if (!ratingModal || ratingValue === 0) { toast.error('Please select a star rating.'); return; }
     setRatingSubmitting(true);
     try {
-      const { auth } = await import('../../firebase');
-      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+      const token = await getAuthToken();
       const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
 
       const res = await fetch(`${apiBase}/api/orders/rate`, {

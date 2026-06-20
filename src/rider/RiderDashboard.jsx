@@ -281,26 +281,38 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
 
     const fetchActiveOrder = async () => {
       try {
-        // 1. Query delivery_tracking to find the active order ID for this rider
-        const { data: trackingRecord, error: trackingErr } = await supabase
+        // 1. Query delivery_tracking to find recent tracking records for this rider
+        const { data: trackingRecords, error: trackingErr } = await supabase
           .from('delivery_tracking')
           .select('order_id, status')
           .eq('rider_id', riderId)
-          .neq('status', 'DELIVERED')
-          .neq('status', 'CANCELLED')
-          .limit(1)
-          .maybeSingle();
+          .order('updated_at', { ascending: false })
+          .limit(5);
 
-        if (trackingErr || !trackingRecord?.order_id) return;
+        if (trackingErr || !trackingRecords || trackingRecords.length === 0) return;
 
-        // 2. Fetch order details for the active order ID
-        const { data, error } = await supabase
-          .from('orders')
-          .select('*, stores(name, address, lat, lng, vendor_id), addresses(*), users(full_name), order_items(id, quantity, products(name, description))')
-          .eq('id', trackingRecord.order_id)
-          .maybeSingle();
+        // 2. Fetch order details to find the active order (not completed/cancelled)
+        let activeRecord = null;
+        let activeOrderData = null;
 
-        if (!error && data) {
+        for (const record of trackingRecords) {
+          const { data: orderData, error: orderErr } = await supabase
+            .from('orders')
+            .select('*, stores(name, address, lat, lng, vendor_id), addresses(*), users(full_name), order_items(id, quantity, products(name, description))')
+            .eq('id', record.order_id)
+            .maybeSingle();
+
+          if (!orderErr && orderData && !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(orderData.status)) {
+            activeRecord = record;
+            activeOrderData = orderData;
+            break;
+          }
+        }
+
+        if (!activeOrderData || !activeRecord) return;
+        const trackingRecord = activeRecord;
+        const data = activeOrderData;
+
           // Resolve store and customer coords
           let sLat = parseFloat(data.stores?.lat);
           let sLng = parseFloat(data.stores?.lng);
@@ -328,9 +340,17 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           }
 
           let stepIdx = 0;
-          if (data.status === 'PREPARING') stepIdx = 1;
-          if (data.status === 'SHIPPED') stepIdx = 2;
-          if (data.status === 'DISPATCHED') stepIdx = 3;
+          // Prefer precise combinations of orders and delivery_tracking statuses
+          if (data.status === 'OUT_FOR_DELIVERY' && trackingRecord.status === 'DELIVERED') stepIdx = 4;
+          else if (data.status === 'OUT_FOR_DELIVERY' && trackingRecord.status === 'PICKED_UP') stepIdx = 3;
+          else if (data.status === 'PREPARING' && trackingRecord.status === 'PICKED_UP') stepIdx = 2;
+          else if (data.status === 'PREPARING' && trackingRecord.status === 'ASSIGNED') stepIdx = 1;
+          else if (trackingRecord.status === 'PREPARING') stepIdx = 1;
+          else if (trackingRecord.status === 'PICKED_UP') stepIdx = 2;
+          else if (trackingRecord.status === 'OUT_FOR_DELIVERY') stepIdx = 3;
+          else if (data.status === 'PREPARING') stepIdx = 1;
+          else if (data.status === 'SHIPPED') stepIdx = 2;
+          else if (data.status === 'DISPATCHED') stepIdx = 3;
 
           setActiveOrder({
             id: `#ORD-${data.id.substring(0, 6).toUpperCase()}`,
@@ -350,7 +370,6 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
             customerCoords
           });
           setDeliveryStep(stepIdx);
-        }
       } catch (err) {
         console.error("Error fetching active order:", err);
       }
@@ -375,13 +394,6 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           setActiveOrder(null);
           setDeliveryStep(0);
           toast.success(`Order is now ${payload.new.status}!`);
-        } else {
-          let nextIdx = 0;
-          if (payload.new.status === 'PREPARING') nextIdx = 1;
-          if (payload.new.status === 'SHIPPED') nextIdx = 2;
-          if (payload.new.status === 'DISPATCHED') nextIdx = 3;
-          
-          setDeliveryStep(nextIdx);
         }
       })
       .subscribe();
@@ -1549,11 +1561,12 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
       
       if (activeOrder?.dbId) {
          try {
-           let newDbStatus = 'ACCEPTED';
+           let newDbStatus = 'CONFIRMED';
            let trackingStatus = 'ASSIGNED';
-           if (nextIdx === 1) { newDbStatus = 'PREPARING'; trackingStatus = 'PREPARING'; }
-           if (nextIdx === 2) { newDbStatus = 'SHIPPED'; trackingStatus = 'PICKED_UP'; }
-           if (nextIdx === 3) { newDbStatus = 'DISPATCHED'; trackingStatus = 'PICKED_UP'; }
+           if (nextIdx === 1) { newDbStatus = 'PREPARING'; trackingStatus = 'ASSIGNED'; }
+           if (nextIdx === 2) { newDbStatus = 'PREPARING'; trackingStatus = 'PICKED_UP'; }
+           if (nextIdx === 3) { newDbStatus = 'OUT_FOR_DELIVERY'; trackingStatus = 'PICKED_UP'; }
+           if (nextIdx === 4) { newDbStatus = 'OUT_FOR_DELIVERY'; trackingStatus = 'DELIVERED'; }
            
            const { error } = await supabase.from('orders').update({ status: newDbStatus }).eq('id', activeOrder.dbId);
            if (error) console.error("Error updating order step:", error);
@@ -2016,7 +2029,6 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                     ) : (
                       <>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Package size={16}/> {incomingOrder.items} items</span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>⚖️ {incomingOrder.weight ? `${incomingOrder.weight.toFixed(1)} kg` : '0.5 kg'}</span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Navigation size={16}/> {incomingOrder.distance}</span>
                       </>
                     )}
@@ -2078,7 +2090,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                 <h3 style={{ fontWeight: 700, fontSize: '1.05rem', margin: '1rem 0 1rem 0', textAlign: 'center', color: 'var(--rider-text)' }}>Ride Progress</h3>
                 <div className="rider-stepper" style={{ marginBottom: '1rem' }}>
                     <div className="rider-stepper-line" style={{ height: '75%', top: '12%' }}></div>
-                    <div className="rider-stepper-progress" style={{ height: `${(rideStep / 3) * 100}%`, top: '12%', background: 'var(--rider-success)' }}></div>
+                    <div className="rider-stepper-progress" style={{ height: `${(rideStep / 3) * 75}%`, top: '12%', background: 'var(--rider-success)' }}></div>
 
                     {[
                       { title: 'Head to Pickup', desc: 'Start heading to the pickup location' },
@@ -2192,24 +2204,94 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
             <div style={{ padding: '1.5rem' }}>
                 <h3 style={{ fontWeight: 700, fontSize: '1.125rem', marginBottom: '1.5rem', textAlign: 'center', margin: '0 0 1.5rem 0' }}>Delivery Progress</h3>
                 
-                <div className="rider-stepper">
-                    <div className="rider-stepper-line"></div>
-                    <div className="rider-stepper-progress" style={{ height: `${(deliveryStep / (steps.length - 1)) * 100}%` }}></div>
+                <div className="rider-stepper" style={{ paddingLeft: 0 }}>
+                    {/* Vertical line */}
+                    <div style={{
+                      position: 'absolute',
+                      left: '11px',
+                      top: '12px',
+                      bottom: '12px',
+                      width: '2px',
+                      background: 'var(--rider-border)',
+                      zIndex: 0
+                    }} />
+                    {/* Progress line */}
+                    <div style={{
+                      position: 'absolute',
+                      left: '11px',
+                      top: '12px',
+                      width: '2px',
+                      height: `calc((100% - 24px) * ${deliveryStep / (steps.length - 1)})`,
+                      background: 'var(--rider-primary)',
+                      transition: 'height 0.5s ease',
+                      zIndex: 1
+                    }} />
 
                     {steps.map((step, idx) => {
                         const isCompleted = idx < deliveryStep;
                         const isCurrent = idx === deliveryStep;
+                        const isFuture = idx > deliveryStep;
+                        const stepDescriptions = [
+                          `Navigate to ${activeOrder.store}`,
+                          `Confirm items at ${activeOrder.store}`,
+                          'Verify package and start trip',
+                          `Head to ${activeOrder.dropAddress}`,
+                          'Deliver package and complete order'
+                        ];
                         return (
-                            <div key={idx} className={`rider-step ${isCompleted ? 'completed' : ''} ${isCurrent ? 'current' : ''}`} style={{ opacity: isCurrent ? 1 : isCompleted ? 0.7 : 0.4 }}>
-                                <div className="rider-step-icon">
-                                    {isCompleted ? <Check size={14} strokeWidth={3} /> : ''}
-                                </div>
-                                <div className="rider-step-content">
-                                    <h4>{step}</h4>
-                                    {isCurrent && idx === 0 && <p>Navigate to store</p>}
-                                    {isCurrent && idx === 1 && <p>Confirm items at {activeOrder.store}</p>}
-                                    {isCurrent && idx === 3 && <p>Head to {activeOrder.dropAddress}</p>}
-                                </div>
+                            <div key={idx} style={{
+                              display: 'flex',
+                              alignItems: isCompleted ? 'center' : 'flex-start',
+                              gap: '0.75rem',
+                              marginBottom: isCompleted ? '0.6rem' : isCurrent ? '1.25rem' : '0.75rem',
+                              position: 'relative',
+                              paddingLeft: '1.5rem',
+                              opacity: isFuture ? 0.4 : 1,
+                              transition: 'all 0.3s'
+                            }}>
+                              {/* Step icon */}
+                              <div style={{
+                                width: '24px',
+                                height: '24px',
+                                minWidth: '24px',
+                                borderRadius: '50%',
+                                background: isCompleted ? 'var(--rider-primary)' : isCurrent ? 'white' : 'var(--rider-card)',
+                                border: isCompleted ? '2px solid var(--rider-primary)' : isCurrent ? '2px solid var(--rider-primary)' : '2px solid var(--rider-border)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: isCompleted ? 'white' : isCurrent ? 'var(--rider-primary)' : '#94a3b8',
+                                fontSize: '0.7rem',
+                                fontWeight: 800,
+                                marginLeft: '-24px',
+                                zIndex: 10,
+                                boxShadow: isCurrent ? '0 0 0 3px rgba(249,115,22,0.15)' : 'none',
+                                transition: 'all 0.3s'
+                              }}>
+                                {isCompleted ? <Check size={12} strokeWidth={3} /> : isCurrent ? <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--rider-primary)' }} /> : idx + 1}
+                              </div>
+                              {/* Step content */}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <h4 style={{
+                                  margin: 0,
+                                  fontWeight: isCompleted ? 600 : 700,
+                                  fontSize: isCompleted ? '0.78rem' : '0.9rem',
+                                  color: isCompleted ? '#64748b' : isCurrent ? 'var(--rider-text)' : '#9ca3af',
+                                  textDecoration: isCompleted ? 'line-through' : 'none',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}>{step}</h4>
+                                {isCurrent && (
+                                  <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.78rem', color: 'var(--rider-text-secondary)', lineHeight: 1.4 }}>
+                                    {stepDescriptions[idx]}
+                                  </p>
+                                )}
+                              </div>
+                              {/* Completed checkmark badge */}
+                              {isCompleted && (
+                                <span style={{ fontSize: '0.7rem', color: 'var(--rider-primary)', fontWeight: 700, whiteSpace: 'nowrap' }}>Done ✓</span>
+                              )}
                             </div>
                         )
                     })}

@@ -225,4 +225,21 @@ CREATE POLICY "inventory_all"          ON public.inventory          FOR ALL USIN
 CREATE POLICY "deals_all"              ON public.deals              FOR ALL USING (true) WITH CHECK (true);
 
 NOTIFY pgrst, 'reload schema';
+
+-- Enable Realtime
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_publication_tables 
+            WHERE pubname = 'supabase_realtime' AND tablename = 'products'
+        ) THEN
+            ALTER PUBLICATION supabase_realtime ADD TABLE public.products;
+        END IF;
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'supabase_realtime not configured — skipping';
+END $$;
+
 -- ✅ Done: 02a_vendor_shop.sql

@@ -95,6 +95,9 @@ export const NotificationProvider = ({ children }) => {
     return () => unsub && unsub();
   }, []);
 
+  const markAsRead = (id) =>
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+
   const markAllRead = () =>
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
 
@@ -107,6 +110,7 @@ export const NotificationProvider = ({ children }) => {
     <NotificationContext.Provider value={{ 
       notifications, 
       addNotification, 
+      markAsRead,
       markAllRead, 
       dismiss, 
       unreadCount, 
@@ -125,6 +129,7 @@ export const useNotifications = () => {
     return {
       notifications: [],
       addNotification: () => {},
+      markAsRead: () => {},
       markAllRead: () => {},
       dismiss: () => {},
       unreadCount: 0,

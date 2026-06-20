@@ -114,7 +114,7 @@ function checkBookingWindow(tier, event) {
 // Get events with optional category/search/filter params + server-side pagination (Fix #11)
 router.get('/search', async (req, res) => {
   try {
-    const { query, category, filter, page = '1', pageSize = '12' } = req.query;
+    const { query, category, filter, page = '1', pageSize = '12', showType } = req.query;
     const isPast = filter === 'past';
     const now = new Date().toISOString();
     const pageInt     = Math.max(1, parseInt(page) || 1);
@@ -143,6 +143,14 @@ router.get('/search', async (req, res) => {
       supabaseQuery = supabaseQuery.eq('category', category);
     }
 
+    if (showType && showType !== 'all' && showType !== 'undefined') {
+      if (showType === 'tour') {
+        supabaseQuery = supabaseQuery.in('show_type', ['tour', 'festival']);
+      } else {
+        supabaseQuery = supabaseQuery.eq('show_type', showType);
+      }
+    }
+
     if (query && query.trim()) {
       supabaseQuery = supabaseQuery.ilike('title', `%${query.trim()}%`);
     }
@@ -150,16 +158,24 @@ router.get('/search', async (req, res) => {
     const { data: events, error } = await supabaseQuery;
     if (error) throw error;
 
-    // Attach organizer_name via vendors.user_id = events.created_by
+    // Attach organizer_name via vendors.user_id OR service_providers.user_id = events.created_by
     const createdByIds = [...new Set((events || []).map(e => e.created_by).filter(Boolean))];
     let vendorMap = {};
     if (createdByIds.length > 0) {
-      const { data: vendors } = await supabase
-        .from('vendors')
-        .select('user_id, business_name, name')
-        .in('user_id', createdByIds);
+      const [{ data: vendors }, { data: sps }] = await Promise.all([
+        supabase.from('vendors').select('user_id, business_name, name').in('user_id', createdByIds),
+        supabase.from('service_providers').select('user_id, business_name, name').in('user_id', createdByIds)
+      ]);
       if (vendors) {
         vendors.forEach(v => { vendorMap[v.user_id] = v.business_name || v.name || null; });
+      }
+      // service_providers fill gaps (event organizers)
+      if (sps) {
+        sps.forEach(sp => {
+          if (!vendorMap[sp.user_id]) {
+            vendorMap[sp.user_id] = sp.business_name || sp.name || null;
+          }
+        });
       }
     }
 
@@ -181,9 +197,16 @@ router.get('/search', async (req, res) => {
     }
     // Group multiple shows by title + category + created_by to show only one parent event on buyer listings
     const seenMultiples = new Set();
+    const keyCounts = {};
+    visibleEvents.forEach(event => {
+      const key = `${event.title}_${event.category}_${event.created_by}`.toLowerCase().trim();
+      keyCounts[key] = (keyCounts[key] || 0) + 1;
+    });
+
     visibleEvents = visibleEvents.filter(event => {
-      if (event.show_type === 'multiple' || event.show_type === 'festival') {
-        const key = `${event.title}_${event.category}_${event.created_by}`.toLowerCase().trim();
+      const key = `${event.title}_${event.category}_${event.created_by}`.toLowerCase().trim();
+      const isMultiShow = event.show_type === 'multiple' || event.show_type === 'festival' || event.show_type === 'tour' || (keyCounts[key] > 1);
+      if (isMultiShow) {
         if (seenMultiples.has(key)) {
           return false; // Skip duplicate slot listings
         }
@@ -200,7 +223,7 @@ router.get('/search', async (req, res) => {
       return {
         ...event,
         banner_url: banner,
-        organizer_name: vendorMap[event.created_by] || null
+        organizer_name: event.is_admin_organized ? "Passwala Admin" : (vendorMap[event.created_by] || "Passwala Admin")
       };
     });
 
@@ -229,15 +252,29 @@ router.get('/:id', async (req, res) => {
 
     if (error || !event) return res.status(404).json({ error: 'Event not found' });
 
-    // Fetch organizer name from vendors
+    // Fetch organizer name — first check vendors, then service_providers (event organizers)
     let organizer_name = null;
-    if (event.created_by) {
+    if (event.is_admin_organized) {
+      organizer_name = "Passwala Admin";
+    } else if (event.created_by) {
       const { data: vendor } = await supabase
         .from('vendors')
         .select('business_name, name')
         .eq('user_id', event.created_by)
         .maybeSingle();
-      organizer_name = vendor?.business_name || vendor?.name || null;
+      if (vendor?.business_name || vendor?.name) {
+        organizer_name = vendor.business_name || vendor.name;
+      } else {
+        // Check service_providers (for EVENT_ORGANIZER role users)
+        const { data: sp } = await supabase
+          .from('service_providers')
+          .select('business_name, name')
+          .eq('user_id', event.created_by)
+          .maybeSingle();
+        organizer_name = sp?.business_name || sp?.name || "Passwala Admin";
+      }
+    } else {
+      organizer_name = "Passwala Admin";
     }
 
     res.json({ success: true, event: { ...event, organizer_name } });
@@ -539,7 +576,7 @@ router.post('/checkin', userAuth, async (req, res) => {
       .from('event_bookings')
       .select(`
         id, status, ticket_count, qr_code_hash, invoice_number,
-        events(id, title, event_date, venue_name, created_by),
+        events(id, title, event_date, venue_name, created_by, is_admin_organized, allowed_scanner_id),
         event_ticket_tiers(tier_name, price),
         users(full_name, phone)
       `)
@@ -553,6 +590,33 @@ router.post('/checkin', userAuth, async (req, res) => {
 
     if (!booking) {
       return res.status(404).json({ error: 'Ticket not found. Invalid QR code.' });
+    }
+
+    // Verify requester authorization
+    let requesterDbId = null;
+    if (req.user?.uid) {
+      const { data: dbUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('uid', req.user.uid)
+        .maybeSingle();
+      if (dbUser) requesterDbId = dbUser.id;
+    }
+
+    if (!req.isAdmin) {
+      const eventCreator = booking.events?.created_by;
+      const isAdminEvent = booking.events?.is_admin_organized;
+      const allowedScanner = booking.events?.allowed_scanner_id;
+
+      if (isAdminEvent) {
+        if (allowedScanner !== requesterDbId) {
+          return res.status(403).json({ error: 'Forbidden: You are not authorized to scan tickets for this admin organized event.' });
+        }
+      } else {
+        if (eventCreator !== requesterDbId) {
+          return res.status(403).json({ error: 'Forbidden: You are not the organizer of this event.' });
+        }
+      }
     }
 
     // Gate: reject cancelled tickets

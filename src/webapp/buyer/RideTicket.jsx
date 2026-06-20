@@ -5,8 +5,10 @@ import { ArrowLeft, MapPin, Navigation, Share2, XCircle, Clock } from 'lucide-re
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../supabase';
 import GoogleMapWrapper from '../../utils/GoogleMapWrapper';
+import { useTranslation } from '../LanguageContext';
 
 const RideTicket = () => {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { booking, vehicle } = location.state || {};
@@ -360,7 +362,7 @@ const RideTicket = () => {
           onClick={() => navigate(-1)}
           style={{ position: 'absolute', top: '1.25rem', left: '1.25rem', background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem', color: '#64748b', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
         >
-          <ArrowLeft size={16} /> Back
+          <ArrowLeft size={16} /> {t('back')}
         </button>
 
         <div style={{
@@ -375,10 +377,10 @@ const RideTicket = () => {
         </div>
 
         <h2 style={{ margin: '0 0 0.75rem', fontSize: '1.6rem', fontWeight: 900, color: '#0f172a' }}>
-          No Ticket Found
+          {t('no_ticket_found')}
         </h2>
         <p style={{ margin: '0 0 2rem', fontSize: '1rem', color: '#64748b', lineHeight: 1.6, maxWidth: 280 }}>
-          It looks like you haven't booked a city ride yet. Book one now and track it here!
+          {t('no_ticket_found_sub')}
         </p>
 
         <button
@@ -401,7 +403,7 @@ const RideTicket = () => {
           onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
           onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
         >
-          🛵 Book a City Ride
+          🛵 {t('book_city_ride')}
         </button>
 
         <style>{`
@@ -494,7 +496,7 @@ const RideTicket = () => {
       {/* Header */}
       <div style={{ padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'white', borderBottom: '1px solid #f1f5f9' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>Digital Ticket</h2>
+          <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>{t('digital_ticket')}</h2>
         </div>
         <Share2 
           size={20} 
@@ -541,19 +543,19 @@ const RideTicket = () => {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <h3 style={{ margin: '0 0 0.25rem 0', fontWeight: 800 }}>
-              {ticketStatus === 'PENDING' ? 'Finding a Driver...' : 
-               ticketStatus === 'CONFIRMED' ? 'Ride Confirmed' : 
-               ticketStatus === 'ARRIVED' ? 'Driver Arrived' :
-               ticketStatus === 'IN_PROGRESS' ? 'Ride in Progress' :
-               ticketStatus === 'COMPLETED' ? 'Ride Completed' : 'Ride Cancelled'}
+              {ticketStatus === 'PENDING' ? t('finding_driver') : 
+               ticketStatus === 'CONFIRMED' ? t('ride_confirmed') : 
+               ticketStatus === 'ARRIVED' ? t('driver_arrived') :
+               ticketStatus === 'IN_PROGRESS' ? t('ride_in_progress') :
+               ticketStatus === 'COMPLETED' ? t('ride_completed') : t('ride_cancelled')}
             </h3>
             <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              {ticketStatus === 'PENDING' ? 'Please wait while we assign a rider to your booking' : 
-               ticketStatus === 'CONFIRMED' ? 'Show this QR code to the driver' : 
-               ticketStatus === 'ARRIVED' ? 'Your driver has arrived at the pickup location' :
-               ticketStatus === 'IN_PROGRESS' ? 'You are on your way to the destination' :
-               ticketStatus === 'COMPLETED' ? 'Thank you for riding with Passwala!' : 
-               'This booking has been cancelled'}
+              {ticketStatus === 'PENDING' ? t('finding_driver_sub') : 
+               ticketStatus === 'CONFIRMED' ? t('show_qr_to_driver') : 
+               ticketStatus === 'ARRIVED' ? t('driver_arrived_sub') :
+               ticketStatus === 'IN_PROGRESS' ? t('way_to_destination') :
+               ticketStatus === 'COMPLETED' ? t('thanks_riding') : 
+               t('booking_cancelled_sub')}
             </p>
           </div>
           <div style={{ 
@@ -568,7 +570,11 @@ const RideTicket = () => {
             fontSize: '0.75rem', 
             fontWeight: 800 
           }}>
-            {ticketStatus}
+            {ticketStatus === 'PENDING' ? t('pending') || 'PENDING' : 
+             ticketStatus === 'CONFIRMED' ? t('confirmed') || 'CONFIRMED' : 
+             ticketStatus === 'ARRIVED' ? t('arrived') || 'ARRIVED' :
+             ticketStatus === 'IN_PROGRESS' ? t('in_progress') || 'IN_PROGRESS' :
+             ticketStatus === 'COMPLETED' ? t('completed') || 'COMPLETED' : t('cancelled') || 'CANCELLED'}
           </div>
         </div>
 
@@ -586,7 +592,7 @@ const RideTicket = () => {
           }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                {ticketStatus === 'IN_PROGRESS' ? 'Time to Destination' : 'Driver Arrival Time'}
+                {ticketStatus === 'IN_PROGRESS' ? t('time_to_destination') : t('driver_arrival_time')}
               </span>
               <span style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Clock size={20} />
@@ -604,7 +610,7 @@ const RideTicket = () => {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderLeft: '1px solid rgba(0,0,0,0.06)', paddingLeft: '1rem' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Estimated Drop-off
+                {t('estimated_dropoff')}
               </span>
               <span style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Navigation size={20} style={{ transform: 'rotate(45deg)' }} />
@@ -633,16 +639,16 @@ const RideTicket = () => {
           
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
-              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ticket ID</p>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('ticket_id')}</p>
               <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>{bookingData.qr_code_hash ? bookingData.qr_code_hash.split('-')[2] || bookingData.qr_code_hash.substring(0, 8).toUpperCase() : 'N/A'}</h4>
             </div>
             <div>
-              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Seats Booked</p>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('seats_booked')}</p>
               <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--primary)' }}>{bookingData.seat_count}</h4>
             </div>
             {bookingData.seat_numbers?.luggage_weight > 0 && (
               <div>
-                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Luggage Weight</p>
+                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('luggage_weight_label')}</p>
                 <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--primary)' }}>
                   {bookingData.seat_numbers.luggage_weight} kg (₹{bookingData.seat_numbers.luggage_price})
                 </h4>
@@ -671,7 +677,7 @@ const RideTicket = () => {
                 transition: 'all 0.2s'
               }}
             >
-              <XCircle size={18} /> Cancel Ride
+              <XCircle size={18} /> {t('cancel_ride')}
             </button>
           </div>
         )}
