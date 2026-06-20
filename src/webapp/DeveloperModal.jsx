@@ -24,6 +24,37 @@ export default function DeveloperModal({ isOpen, onClose, user }) {
   // Mocks States
   const [mockLog, setMockLog] = useState([]);
 
+  const [activeWindowRequests, setActiveWindowRequests] = useState(0);
+
+  useEffect(() => {
+    let requestTimestamps = [];
+
+    const originalFetch = window.fetch;
+    window.fetch = async function (...args) {
+      const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || '');
+      if (url.includes('supabase.co')) {
+        const now = Date.now();
+        requestTimestamps.push(now);
+        const filtered = requestTimestamps.filter(t => now - t < 60000);
+        requestTimestamps = filtered;
+        setActiveWindowRequests(filtered.length);
+      }
+      return originalFetch.apply(this, args);
+    };
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const filtered = requestTimestamps.filter(t => now - t < 60000);
+      requestTimestamps = filtered;
+      setActiveWindowRequests(filtered.length);
+    }, 1000);
+
+    return () => {
+      window.fetch = originalFetch;
+      clearInterval(interval);
+    };
+  }, []);
+
   const fetchTableData = useCallback(async () => {
     setDbLoading(true);
     try {
@@ -186,6 +217,30 @@ export default function DeveloperModal({ isOpen, onClose, user }) {
             <div>
               <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>Developer Console</h2>
               <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: '#94a3b8' }}>Mode: Localhost Sandbox</p>
+            </div>
+            <div style={{
+              marginLeft: '15px',
+              background: activeWindowRequests > 0 ? '#1e293b' : '#0f172a',
+              border: `1px solid ${activeWindowRequests > 0 ? '#22c55e' : '#475569'}`,
+              borderRadius: '20px',
+              padding: '4px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              color: activeWindowRequests > 0 ? '#22c55e' : '#94a3b8',
+              transition: 'all 0.3s ease'
+            }}>
+              <span style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: activeWindowRequests > 0 ? '#22c55e' : '#94a3b8',
+                boxShadow: activeWindowRequests > 0 ? '0 0 8px #22c55e' : 'none',
+                display: 'inline-block'
+              }} />
+              Supabase Req (last 1 min): {activeWindowRequests}
             </div>
           </div>
           <button onClick={onClose} style={{
