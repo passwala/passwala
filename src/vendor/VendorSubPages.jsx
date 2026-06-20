@@ -565,7 +565,8 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                 event_date: item.event_date ? new Date(item.event_date).toISOString().slice(0, 16) : '',
                 duration: item.duration || '',
                 age_restriction: item.age_restriction || '',
-                language: item.language || ''
+                language: item.language || '',
+                show_type: item.show_type || 'single'
               });
             }
             dbItems = mapped;
