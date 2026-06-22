@@ -20,6 +20,7 @@ import './App.css'
 
 import { supabase } from './supabase'
 import AIAssistant from './webapp/AIAssistant'
+import AIChatWidget from './webapp/buyer/AIChatWidget'
 import DeveloperModal from './webapp/DeveloperModal'
 import CustomerDetails from './webapp/CustomerDetails'
 import { CartProvider, useCart } from './context/CartContext'
@@ -746,7 +747,30 @@ const AppContent = ({
 
             {/* 5. Drawers / Modals */}
             <CartDrawer location={location} isProfileComplete={isProfileComplete} userAddress={userAddress} />
-            <AIAssistant isOpen={isAiChatOpen} onClose={() => setIsAiChatOpen(false)} user={effectiveUser} />
+            <AIChatWidget user={effectiveUser} onLogin={(userData) => {
+              localStorage.setItem('passwala_user', JSON.stringify(userData));
+              localStorage.setItem('passwala_profile_complete', 'true');
+              
+              const newLoc = localStorage.getItem('passwala_location') || 'Satellite, Ahmedabad';
+              const savedCoords = localStorage.getItem('passwala_coords');
+              const newCoords = savedCoords ? JSON.parse(savedCoords) : { lat: 23.0305, lng: 72.5075 };
+              const savedAddr = localStorage.getItem('passwala_user_address');
+              const newAddr = savedAddr ? JSON.parse(savedAddr) : {
+                address_line_1: newLoc,
+                city: 'Ahmedabad',
+                state: 'Gujarat',
+                pincode: '380015',
+                society: newLoc.split(',')[0],
+                house_no: 'Home',
+                floor: 'Ground',
+                is_default: true
+              };
+
+              setLocation(newLoc, newCoords);
+              setUserAddress(newAddr);
+              setUser(userData);
+              setIsProfileComplete(true);
+            }} />
             <DeveloperModal isOpen={isDevModalOpen} onClose={() => setIsDevModalOpen(false)} user={effectiveUser} />
 
             {/* Floating Developer Console Trigger (Localhost only) */}
@@ -810,6 +834,39 @@ function App() {
   } = useAppLocation();
 
   const [isDarkMode, setIsDarkMode] = useTheme();
+
+  useEffect(() => {
+    const handleToggle = () => setIsDarkMode(prev => !prev);
+    window.addEventListener('toggle-theme-external', handleToggle);
+    return () => window.removeEventListener('toggle-theme-external', handleToggle);
+  }, [setIsDarkMode]);
+
+  useEffect(() => {
+    const handleUpdateUser = (e) => {
+      if (e.detail) {
+        setUser(e.detail);
+      }
+    };
+    window.addEventListener('update-user-external', handleUpdateUser);
+    return () => window.removeEventListener('update-user-external', handleUpdateUser);
+  }, [setUser]);
+
+  useEffect(() => {
+    const handleLogoutTrigger = () => handleLogout();
+    window.addEventListener('logout-external', handleLogoutTrigger);
+    return () => window.removeEventListener('logout-external', handleLogoutTrigger);
+  }, [handleLogout]);
+
+  useEffect(() => {
+    const handleLocationUpdate = (e) => {
+      if (e.detail) {
+        updateLocation(e.detail.locationName, e.detail.coords || { lat: 23.0305, lng: 72.5075 });
+        setUserAddress(e.detail.address);
+      }
+    };
+    window.addEventListener('update-location-external', handleLocationUpdate);
+    return () => window.removeEventListener('update-location-external', handleLocationUpdate);
+  }, [updateLocation, setUserAddress]);
 
   return (
     <ErrorBoundary>

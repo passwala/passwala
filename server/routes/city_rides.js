@@ -728,9 +728,9 @@ router.post('/update-status', async (req, res) => {
     }
 
     // Allowlist valid ride stage values to prevent state machine corruption
-    const ALLOWED_RIDE_STAGES = new Set(['PENDING', 'CONFIRMED', 'PICKED_UP', 'ARRIVED', 'COMPLETED', 'CANCELLED']);
+    const ALLOWED_RIDE_STAGES = new Set(['PENDING', 'CONFIRMED', 'EN_ROUTE', 'PICKED_UP', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']);
     if (!ALLOWED_RIDE_STAGES.has(status)) {
-      return res.status(400).json({ error: `Invalid status "${status}". Must be one of: PENDING, CONFIRMED, PICKED_UP, ARRIVED, COMPLETED, CANCELLED` });
+      return res.status(400).json({ error: `Invalid status "${status}". Must be one of: PENDING, CONFIRMED, EN_ROUTE, PICKED_UP, ARRIVED, IN_PROGRESS, COMPLETED, CANCELLED` });
     }
 
     // First fetch current seat_numbers

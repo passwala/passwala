@@ -877,4 +877,150 @@ router.post('/verify-whatsapp-otp', authLimiter, async (req, res) => {
   }
 });
 
+// PUT /api/users/:uid/email — Update user email (secured with userAuth)
+router.put('/:uid/email', userAuth, async (req, res) => {
+  try {
+    const { email } = req.body;
+    const rawId = decodeURIComponent(req.params.uid);
+    const identifier = rawId.includes('@') ? rawId : rawId.replace(/\s/g, '');
+    let user = null;
+    const { data: byId } = await supabase.from('users').select('id').eq('id', identifier).maybeSingle();
+    user = byId;
+    if (!user) {
+      const { data: byUid } = await supabase.from('users').select('id').eq('uid', identifier).maybeSingle();
+      user = byUid;
+    }
+    if (!user) {
+      const { data: byPhone } = await supabase.from('users').select('id').eq('phone', identifier).maybeSingle();
+      user = byPhone;
+    }
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ email })
+      .eq('id', user.id);
+    if (updateError) throw updateError;
+    res.status(200).json({ success: true, message: 'Email updated' });
+  } catch (error) {
+    console.error('Error updating email:', error);
+    res.status(500).json({ error: 'Failed to update email' });
+  }
+});
+
+// PUT /api/users/:uid/phone — Update user phone (secured with userAuth)
+router.put('/:uid/phone', userAuth, async (req, res) => {
+  try {
+    const { phone } = req.body;
+    const rawId = decodeURIComponent(req.params.uid);
+    const identifier = rawId.includes('@') ? rawId : rawId.replace(/\s/g, '');
+    let user = null;
+    const { data: byId } = await supabase.from('users').select('id').eq('id', identifier).maybeSingle();
+    user = byId;
+    if (!user) {
+      const { data: byUid } = await supabase.from('users').select('id').eq('uid', identifier).maybeSingle();
+      user = byUid;
+    }
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ phone })
+      .eq('id', user.id);
+    if (updateError) throw updateError;
+    res.status(200).json({ success: true, message: 'Phone number updated' });
+  } catch (error) {
+    console.error('Error updating phone number:', error);
+    res.status(500).json({ error: 'Failed to update phone number' });
+  }
+});
+
+// PUT /api/users/:uid/address — Update or insert user default address (secured with userAuth)
+router.put('/:uid/address', userAuth, async (req, res) => {
+  try {
+    const { address, city, state, pincode, lat, lng } = req.body;
+    const rawId = decodeURIComponent(req.params.uid);
+    const identifier = rawId.includes('@') ? rawId : rawId.replace(/\s/g, '');
+    let user = null;
+    const { data: byId } = await supabase.from('users').select('id').eq('id', identifier).maybeSingle();
+    user = byId;
+    if (!user) {
+      const { data: byUid } = await supabase.from('users').select('id').eq('uid', identifier).maybeSingle();
+      user = byUid;
+    }
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const { data: existingAddr } = await supabase
+      .from('addresses')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('is_default', true)
+      .maybeSingle();
+    if (existingAddr) {
+      const { error: updateError } = await supabase
+        .from('addresses')
+        .update({ 
+          address_line_1: address,
+          city: city || 'Ahmedabad',
+          state: state || 'Gujarat',
+          pincode: pincode || '380015',
+          lat: lat || null,
+          lng: lng || null
+        })
+        .eq('id', existingAddr.id);
+      if (updateError) throw updateError;
+    } else {
+      const { error: insertError } = await supabase
+        .from('addresses')
+        .insert([{
+          user_id: user.id,
+          address_line_1: address,
+          city: city || 'Ahmedabad',
+          state: state || 'Gujarat',
+          pincode: pincode || '380015',
+          is_default: true,
+          lat: lat || null,
+          lng: lng || null
+        }]);
+      if (insertError) throw insertError;
+    }
+    res.status(200).json({ success: true, message: 'Address updated' });
+  } catch (error) {
+    console.error('Error updating address:', error);
+    res.status(500).json({ error: 'Failed to update address' });
+  }
+});
+
+// PUT /api/users/:uid/wallet — Update / recharge user wallet balance (secured with userAuth)
+router.put('/:uid/wallet', userAuth, async (req, res) => {
+  try {
+    const { amount, action } = req.body;
+    const rawId = decodeURIComponent(req.params.uid);
+    const identifier = rawId.includes('@') ? rawId : rawId.replace(/\s/g, '');
+    let user = null;
+    const { data: byId } = await supabase.from('users').select('id, wallet_balance').eq('id', identifier).maybeSingle();
+    user = byId;
+    if (!user) {
+      const { data: byUid } = await supabase.from('users').select('id, wallet_balance').eq('uid', identifier).maybeSingle();
+      user = byUid;
+    }
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const currentBalance = user.wallet_balance || 0;
+    let newBalance = currentBalance;
+    if (action === 'RECHARGE') {
+      newBalance = currentBalance + Number(amount);
+    } else if (action === 'DEDUCT') {
+      newBalance = Math.max(0, currentBalance - Number(amount));
+    } else {
+      return res.status(400).json({ error: 'Invalid action parameter' });
+    }
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ wallet_balance: newBalance })
+      .eq('id', user.id);
+    if (updateError) throw updateError;
+    res.status(200).json({ success: true, message: 'Wallet balance updated', balance: newBalance });
+  } catch (error) {
+    console.error('Error updating wallet:', error);
+    res.status(500).json({ error: 'Failed to update wallet balance' });
+  }
+});
+
 export default router;

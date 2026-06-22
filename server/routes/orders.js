@@ -560,4 +560,292 @@ router.post('/rate', userAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/orders/book-service
+ * Creates and confirms a service booking order directly from AI assistant
+ */
+router.post('/book-service', userAuth, async (req, res) => {
+  try {
+    const { serviceId, providerId, price, userId: bodyUserId } = req.body;
+
+    if (!serviceId || !providerId) {
+      return res.status(400).json({ error: 'serviceId and providerId are required' });
+    }
+
+    // Resolve database user ID — try multiple lookup strategies
+    const isUuid = (val) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+    let dbUserId = null;
+
+    // Strategy 1: firebase uid column
+    if (!dbUserId && req.user?.uid) {
+      const { data: dbUser } = await supabase.from('users').select('id').eq('uid', req.user.uid).maybeSingle();
+      dbUserId = dbUser?.id;
+    }
+    // Strategy 2: req.user.uid is a DB UUID (phone-OTP mock token)
+    if (!dbUserId && req.user?.uid && isUuid(req.user.uid)) {
+      const { data: dbUser } = await supabase.from('users').select('id').eq('id', req.user.uid).maybeSingle();
+      dbUserId = dbUser?.id;
+    }
+    // Strategy 3: explicit userId from body
+    if (!dbUserId && bodyUserId) {
+      if (isUuid(bodyUserId)) {
+        const { data: dbUser } = await supabase.from('users').select('id').eq('id', bodyUserId).maybeSingle();
+        dbUserId = dbUser?.id;
+      } else {
+        const { data: dbUser } = await supabase.from('users').select('id').eq('uid', bodyUserId).maybeSingle();
+        dbUserId = dbUser?.id;
+      }
+    }
+
+    if (!dbUserId) {
+      return res.status(401).json({ error: 'Unauthorized user profile' });
+    }
+
+    // Ensure service provider is auto-registered as a store
+    const { data: serviceProv } = await supabase
+      .from('service_providers')
+      .select('id, business_name, user_id, phone, address')
+      .eq('id', providerId)
+      .maybeSingle();
+
+    if (serviceProv) {
+      let vendorId = null;
+      if (serviceProv.user_id) {
+        const { data: existingVendor } = await supabase
+          .from('vendors')
+          .select('id')
+          .eq('user_id', serviceProv.user_id)
+          .maybeSingle();
+
+        if (existingVendor) {
+          vendorId = existingVendor.id;
+        } else {
+          const { data: newVendor } = await supabase
+            .from('vendors')
+            .insert([{
+              user_id: serviceProv.user_id,
+              phone: serviceProv.phone || `temp_${Date.now()}`,
+              name: serviceProv.business_name || 'Service Provider',
+              business_name: serviceProv.business_name || 'Service Provider',
+              is_verified: true,
+              profile_completed: true
+            }])
+            .select('id')
+            .single();
+          if (newVendor) vendorId = newVendor.id;
+        }
+      }
+
+      if (vendorId) {
+        await supabase.from('stores').upsert({
+          id: providerId,
+          vendor_id: vendorId,
+          name: serviceProv.business_name || 'Service Provider',
+          address: serviceProv.address || 'Service Area',
+          lat: 23.0225,
+          lng: 72.5714,
+          is_open: true
+        });
+      }
+    }
+
+    // Fetch user address
+    const { data: userAddr } = await supabase
+      .from('addresses')
+      .select('id')
+      .eq('user_id', dbUserId)
+      .eq('is_default', true)
+      .limit(1)
+      .maybeSingle();
+
+    const addressId = userAddr?.id || null;
+
+    // Create the order
+    const total = parseFloat((price * 1.05).toFixed(2));
+    const { data: order, error: orderErr } = await supabase
+      .from('orders')
+      .insert([{
+        user_id: dbUserId,
+        store_id: providerId,
+        address_id: addressId,
+        total_amount: total,
+        payment_method: 'ONLINE',
+        payment_status: 'PAID',
+        status: 'PLACED'
+      }])
+      .select()
+      .single();
+
+    if (orderErr) throw orderErr;
+
+    // Create order item
+    const { error: itemErr } = await supabase
+      .from('order_items')
+      .insert([{
+        order_id: order.id,
+        product_id: serviceId,
+        quantity: 1,
+        price_at_purchase: price
+      }]);
+
+    if (itemErr) throw itemErr;
+
+    // Create service booking
+    const { error: bookingErr } = await supabase
+      .from('service_bookings')
+      .insert([{
+        user_id: dbUserId,
+        provider_id: providerId,
+        service_id: serviceId,
+        status: 'PLACED'
+      }]);
+
+    if (bookingErr) throw bookingErr;
+
+    // Auto-create delivery tracking for service if needed
+    try {
+      await supabase
+        .from('delivery_tracking')
+        .insert([{
+          order_id: order.id,
+          status: 'PENDING',
+          updated_at: new Date().toISOString()
+        }]);
+    } catch (_) {}
+
+    res.json({ success: true, order });
+  } catch (err) {
+    console.error('Service direct booking failed:', err);
+    res.status(500).json({ error: 'Failed to book service' });
+  }
+});
+
+/**
+ * POST /api/orders/place
+ * Places an order for products directly from the AI chat assistant or client
+ */
+router.post('/place', userAuth, async (req, res) => {
+  try {
+    const { items, totalPrice, userId: bodyUserId } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items array is required' });
+    }
+
+    // Resolve database user ID — try multiple lookup strategies
+    let dbUserId = null;
+
+    // Strategy 1: look up by firebase uid column
+    if (!dbUserId && req.user?.uid) {
+      const { data: dbUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('uid', req.user.uid)
+        .maybeSingle();
+      dbUserId = dbUser?.id;
+    }
+
+    // Strategy 2: req.user.uid might already be the DB UUID (phone-OTP mock token)
+    const isUuid = (val) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+    if (!dbUserId && req.user?.uid && isUuid(req.user.uid)) {
+      const { data: dbUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', req.user.uid)
+        .maybeSingle();
+      dbUserId = dbUser?.id;
+    }
+
+    // Strategy 3: use explicit userId from body (trusted — already behind userAuth)
+    if (!dbUserId && bodyUserId) {
+      if (isUuid(bodyUserId)) {
+        const { data: dbUser } = await supabase
+          .from('users')
+          .select('id')
+          .eq('id', bodyUserId)
+          .maybeSingle();
+        dbUserId = dbUser?.id;
+      } else {
+        const { data: dbUser } = await supabase
+          .from('users')
+          .select('id')
+          .eq('uid', bodyUserId)
+          .maybeSingle();
+        dbUserId = dbUser?.id;
+      }
+    }
+
+    if (!dbUserId) {
+      return res.status(401).json({ error: 'Unauthorized user profile' });
+    }
+
+    // Resolve store ID
+    let storeId = items[0]?.store_id || items[0]?.shop_id;
+    if (!storeId) {
+      // Fallback to any active store
+      const { data: anyStore } = await supabase.from('stores').select('id').limit(1).maybeSingle();
+      storeId = anyStore?.id;
+    }
+
+    // Resolve address
+    const { data: userAddr } = await supabase
+      .from('addresses')
+      .select('id')
+      .eq('user_id', dbUserId)
+      .eq('is_default', true)
+      .limit(1)
+      .maybeSingle();
+
+    const addressId = userAddr?.id || null;
+
+    // Create the order
+    const total = parseFloat((totalPrice * 1.05).toFixed(2));
+    const { data: order, error: orderErr } = await supabase
+      .from('orders')
+      .insert([{
+        user_id: dbUserId,
+        store_id: storeId,
+        address_id: addressId,
+        total_amount: total,
+        payment_method: 'ONLINE',
+        payment_status: 'PAID',
+        status: 'PLACED'
+      }])
+      .select()
+      .single();
+
+    if (orderErr) throw orderErr;
+
+    // Create order items
+    const orderItems = items.map(item => ({
+      order_id: order.id,
+      product_id: item.productId || item.id,
+      quantity: item.quantity || item.qty || 1,
+      price_at_purchase: item.price
+    }));
+
+    const { error: itemsErr } = await supabase
+      .from('order_items')
+      .insert(orderItems);
+
+    if (itemsErr) throw itemsErr;
+
+    // Setup delivery tracking
+    try {
+      await supabase
+        .from('delivery_tracking')
+        .insert([{
+          order_id: order.id,
+          status: 'PENDING',
+          updated_at: new Date().toISOString()
+        }]);
+    } catch (_) {}
+
+    res.json({ success: true, order });
+  } catch (err) {
+    console.error('Direct order placement failed:', err);
+    res.status(500).json({ error: 'Failed to place order' });
+  }
+});
+
 export default router;

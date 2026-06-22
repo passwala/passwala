@@ -138,16 +138,29 @@ const AppSettings = ({ isDarkMode, onToggleTheme }) => {
                  </div>
               </div>
            </div>
-           <div className="profile-menu-item" onClick={() => toast('Opening System Diagnostic...')}>
-              <div className="menu-item-left">
-                 <div className="menu-icon-box" style={{ background: 'rgba(100, 116, 139, 0.08)', color: '#64748b' }}><Database size={20} /></div>
-                 <div className="menu-text">
-                    <strong>Cache Management</strong>
-                    <span>Clear cached data</span>
-                 </div>
-              </div>
-              <ChevronRight size={18} color="var(--text-secondary)" />
-           </div>
+            <div className="profile-menu-item" onClick={() => {
+              Object.keys(localStorage).forEach(key => {
+                if (
+                  key.startsWith('admin_cache_') || 
+                  key.startsWith('admin_local_') || 
+                  key.startsWith('vVendorItems_') || 
+                  key.startsWith('vFormData') ||
+                  key === 'admin_active_tab'
+                ) {
+                  localStorage.removeItem(key);
+                }
+              });
+              toast.success('System cache cleared successfully!');
+            }}>
+               <div className="menu-item-left">
+                  <div className="menu-icon-box" style={{ background: 'rgba(100, 116, 139, 0.08)', color: '#64748b' }}><Database size={20} /></div>
+                  <div className="menu-text">
+                     <strong>Cache Management</strong>
+                     <span>Clear cached data</span>
+                  </div>
+               </div>
+               <ChevronRight size={18} color="var(--text-secondary)" />
+            </div>
         </div>
 
         <div className="settings-footer">

@@ -1747,7 +1747,8 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
         if (payload.booking_start) payload.booking_start = toUTCISO(payload.booking_start);
         if (payload.booking_end) payload.booking_end = toUTCISO(payload.booking_end);
         // Validate required fields for events
-        if (!payload.event_date) {
+        const isMultiShow = payload.show_type === 'multiple' || payload.show_type === 'festival' || payload.show_type === 'tour';
+        if (!isMultiShow && !payload.event_date) {
           toast.error('Please set the event date and start time.');
           setSaving(false);
           return;
@@ -1793,12 +1794,21 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
               const d = new Date(localStr);
               return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
             };
+            const slotTiers = (payload.ticket_tiers || []).map(t => {
+              const cap = t.slot_capacities?.[slot.id] !== undefined ? (parseInt(t.slot_capacities[slot.id]) || 0) : (parseInt(t.total_seats) || 0);
+              return {
+                ...t,
+                total_seats: cap,
+                available_seats: cap
+              };
+            });
             const slotPayload = {
               ...payload,
               event_date: toUTCISOSafe(startLocalStr),
               ends_at: toUTCISOSafe(endLocalStr),
               venue_name: (slot.venue_name && slot.venue_name.trim()) ? slot.venue_name.trim() : (payload.venue_name || 'Venue TBA'),
               status: 'UPCOMING', // Ensure each slot is immediately visible to buyers
+              ticket_tiers: slotTiers
             };
             delete slotPayload.schedule_slots; // clean up client-only field
             delete slotPayload.id; // Each slot must be a new record
@@ -1826,6 +1836,20 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
           }
           toast.success(`Published ${payload.schedule_slots.length} shows to Cloud! ☁️`, { id: 'offline-toast' });
           setSyncStatus('cloud');
+          // Clean up the temporary local record since we successfully published the slots to the cloud
+          if (!editingItem && payload.id) {
+            const localKey = `admin_local_${currentTab.table}`;
+            const localAddedCurrent = JSON.parse(localStorage.getItem(localKey) || '[]');
+            const newLocal = localAddedCurrent.filter(item => item.id !== payload.id);
+            safeSetItem(localKey, JSON.stringify(newLocal));
+
+            const cacheKey = `admin_cache_${currentTab.table}`;
+            const cachedListCurrent = JSON.parse(localStorage.getItem(cacheKey) || '[]');
+            const newCached = cachedListCurrent.filter(item => item.id !== payload.id);
+            safeSetItem(cacheKey, JSON.stringify(newCached));
+            
+            setData(prev => prev.filter(item => item.id !== payload.id));
+          }
           fetchData();
         } else {
           let finalPayload = { ...payload };
@@ -2090,7 +2114,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
       }
       if (activeAdminTab === 'vendors_panel') {
         const userRole = item.users?.role ? item.users.role.toUpperCase() : '';
-        if (userRole !== 'VENDOR' && userRole !== '') {
+        if (userRole !== 'VENDOR' && userRole !== 'SERVICE_PROVIDER' && userRole !== 'EVENT_ORGANIZER' && userRole !== '') {
           return;
         }
       }
@@ -2150,7 +2174,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
       }
       if (activeAdminTab === 'vendors_panel') {
         const userRole = item.users?.role ? item.users.role.toUpperCase() : '';
-        if (userRole !== 'VENDOR' && userRole !== '') {
+        if (userRole !== 'VENDOR' && userRole !== 'SERVICE_PROVIDER' && userRole !== 'EVENT_ORGANIZER' && userRole !== '') {
           return;
         }
       }
@@ -3705,11 +3729,41 @@ CREATE TABLE IF NOT EXISTS service_areas (
                                 </div>
                                 <div className="form-field">
                                   <label>Quantity *</label>
-                                  <input type="number" placeholder="100" required value={tier.total_seats || ''} onChange={(e) => {
-                                    const nextTiers = [...formData.ticket_tiers];
-                                    nextTiers[index] = { ...tier, total_seats: parseInt(e.target.value) || 0, available_seats: parseInt(e.target.value) || 0 };
-                                    setFormData({ ...formData, ticket_tiers: nextTiers });
-                                  }} />
+                                  {(formData.schedule_slots && formData.schedule_slots.length > 1) ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
+                                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Seats per Show Date</span>
+                                      {(formData.schedule_slots || []).map((slot, sIdx) => {
+                                        const dateStr = slot.date ? new Date(slot.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : `Show #${sIdx + 1}`;
+                                        const slotCap = tier.slot_capacities?.[slot.id] !== undefined ? tier.slot_capacities[slot.id] : (tier.total_seats || '100');
+                                        return (
+                                          <div key={slot.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                                            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>{dateStr}:</span>
+                                            <input
+                                              type="number"
+                                              className="v-input"
+                                              style={{ padding: '6px 12px', fontSize: '0.8rem', width: '90px', height: '32px', border: '1px solid #cbd5e1', borderRadius: '8px' }}
+                                              placeholder="100"
+                                              required
+                                              value={slotCap}
+                                              onChange={(e) => {
+                                                const nextTiers = [...formData.ticket_tiers];
+                                                const slotCaps = { ...(tier.slot_capacities || {}) };
+                                                slotCaps[slot.id] = e.target.value;
+                                                nextTiers[index] = { ...tier, slot_capacities: slotCaps };
+                                                setFormData({ ...formData, ticket_tiers: nextTiers });
+                                              }}
+                                            />
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <input type="number" placeholder="100" required value={tier.total_seats || ''} onChange={(e) => {
+                                      const nextTiers = [...formData.ticket_tiers];
+                                      nextTiers[index] = { ...tier, total_seats: parseInt(e.target.value) || 0, available_seats: parseInt(e.target.value) || 0 };
+                                      setFormData({ ...formData, ticket_tiers: nextTiers });
+                                    }} />
+                                  )}
                                 </div>
                                 <div className="form-field">
                                   <label>Entries per ticket *</label>
@@ -3919,15 +3973,20 @@ CREATE TABLE IF NOT EXISTS service_areas (
                           <div className="review-tickets-section">
                             <strong>Ticket Tiers ({formData.ticket_tiers?.length || 0})</strong>
                             <div className="review-tiers-list">
-                              {(formData.ticket_tiers || []).map((t, idx) => (
-                                <div className="review-tier-item" key={t.id || idx}>
-                                  <div className="tier-left">
-                                    <strong>{t.tier_name}</strong>
-                                    <span>Capacity: {t.total_seats} seats</span>
+                              {(formData.ticket_tiers || []).map((t, idx) => {
+                                const capacity = (formData.schedule_slots && formData.schedule_slots.length > 1)
+                                  ? formData.schedule_slots.reduce((sum, slot) => sum + (t.slot_capacities?.[slot.id] !== undefined ? (parseInt(t.slot_capacities[slot.id]) || 0) : (parseInt(t.total_seats) || 100)), 0)
+                                  : (t.total_seats || 100);
+                                return (
+                                  <div className="review-tier-item" key={t.id || idx}>
+                                    <div className="tier-left">
+                                      <strong>{t.tier_name}</strong>
+                                      <span>Capacity: {capacity} seats</span>
+                                    </div>
+                                    <span className="tier-price-tag">₹{t.price}</span>
                                   </div>
-                                  <span className="tier-price-tag">₹{t.price}</span>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </div>
                         </div>

@@ -3257,20 +3257,22 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
           };
 
           const getCleanImage = (imgSrc, name = '') => {
-            if (!imgSrc || typeof imgSrc !== 'string') return getFallbackByName(name);
+            if (!imgSrc || typeof imgSrc !== 'string') return businessType === 'event' ? 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&q=80' : getFallbackByName(name);
             let clean = imgSrc.trim();
             if (clean.startsWith('[')) {
               try {
                 const parsed = JSON.parse(clean);
                 if (Array.isArray(parsed) && parsed.length > 0) {
                   clean = parsed[0].trim();
+                } else {
+                  clean = '';
                 }
               } catch (_) { /* ignore */ }
             }
-            if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:') || clean.startsWith('/') || clean.startsWith('blob:')) {
+            if (clean && (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:') || clean.startsWith('/') || clean.startsWith('blob:'))) {
               return clean;
             }
-            return getFallbackByName(name);
+            return businessType === 'event' ? 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&q=80' : getFallbackByName(name);
           };
 
           const cleanImage = getCleanImage(item.image, item.name);
@@ -3290,7 +3292,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                   className="v-card-img"
                   loading="lazy"
                   decoding="async"
-                  onError={(e) => { e.target.onerror = null; e.target.src = getFallbackByName(item.name); }} 
+                  onError={(e) => { e.target.onerror = null; e.target.src = businessType === 'event' ? 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&q=80' : getFallbackByName(item.name); }} 
                 />
                 <div className="v-card-overlay" />
 
