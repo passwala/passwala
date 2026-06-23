@@ -319,17 +319,9 @@ const EventTicket = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-main)', paddingBottom: '2rem' }}>
-      {/* Fix #5: Ticket page header with back button */}
-      <div style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'white' }}>
-        <button
-          onClick={() => navigate(-1)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: '#64748b' }}
-          aria-label="Go back"
-        >
-          <ArrowLeft size={22} />
-        </button>
+      {/* Fix #5: Ticket page header (redundant back button removed, top navbar provides it) */}
+      <div style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white', position: 'relative', borderBottom: '1px solid var(--border-light)' }}>
         <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>Your Ticket</h2>
-        <div style={{ width: 30 }} />{/* spacer to center title */}
       </div>
 
       <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
