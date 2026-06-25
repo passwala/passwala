@@ -209,7 +209,7 @@ body {
 
 /* ── Main Content: flex 1 → fills all space between header and footer ── */
 .main-content {
-  flex: 1;                    /* takes all remaining height */
+  flex: 1 0 auto;             /* takes all remaining height, never shrinks below content size */
   display: flex;
   align-items: center;        /* vertical center */
   justify-content: center;    /* horizontal center */
