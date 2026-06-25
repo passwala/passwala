@@ -22,8 +22,7 @@ body {
   font-family: 'Poppins', system-ui, -apple-system, sans-serif;
   background-color: #ffffff;
   color: var(--text-primary);
-  min-height: 100vh;
-  min-height: 100dvh;
+  min-height: 100svh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -34,8 +33,7 @@ body {
 .screen-container {
   position: relative;
   width: calc(100vw - 48px);
-  height: calc(100vh - 48px);
-  height: calc(100dvh - 48px);
+  height: calc(100svh - 48px);
   margin: 24px;
   background-color: var(--navy-dark);
   border-radius: 32px;
@@ -718,8 +716,7 @@ body.loaded .notify-card {
   }
   .screen-container {
     width: calc(100vw - 40px);
-    height: calc(100vh - 40px);
-    height: calc(100dvh - 40px);
+    height: calc(100svh - 40px);
     margin: 20px;
     border-radius: 28px;
   }
@@ -775,8 +772,7 @@ body.loaded .notify-card {
   }
   .screen-container {
     width: calc(100vw - 24px);
-    height: calc(100vh - 24px);
-    height: calc(100dvh - 24px);
+    height: calc(100svh - 24px);
     margin: 12px;
     border-radius: 20px;
   }
@@ -843,8 +839,7 @@ body.loaded .notify-card {
 @media (max-width: 390px) {
   .screen-container {
     width: calc(100vw - 16px);
-    height: calc(100vh - 16px);
-    height: calc(100dvh - 16px);
+    height: calc(100svh - 16px);
     margin: 8px;
     border-radius: 16px;
   }
