@@ -260,8 +260,7 @@ app.post('/api/notify', async (req, res) => {
   }
 
   try {
-    const trimmedEmail = email.trim().toLowerCase();
-
+    // trimmedEmail already declared above — reuse it
     // Check if the user is already signed up with this email
     const { data: existingUser, error: fetchError } = await supabase
       .from('users')
@@ -316,12 +315,10 @@ app.post('/api/notify', async (req, res) => {
   }
 });
 
+// Start the HTTP server (works for both local dev and Render/production)
+const listenPort = process.env.PORT || PORT;
+app.listen(listenPort, () => {
+  console.log(`🚀 Passwala Coming Soon server running on port ${listenPort}`);
+});
+
 export default app;
-
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`🚀 Passwala Coming Soon server running on http://localhost:${PORT}`);
-  });
-}
-
-
