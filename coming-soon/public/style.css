@@ -134,6 +134,7 @@ body {
   display: flex;
   flex-direction: column;     /* header → main → footer stacked */
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 0;                 /* padding handled inside header/footer */
 }
 
@@ -209,7 +210,7 @@ body {
 
 /* ── Main Content: flex 1 → fills all space between header and footer ── */
 .main-content {
-  flex: 1 0 auto;             /* takes all remaining height, never shrinks below content size */
+  flex: 1 1 auto;             /* takes all remaining height, shrinks if needed */
   display: flex;
   align-items: center;        /* vertical center */
   justify-content: center;    /* horizontal center */
@@ -218,6 +219,7 @@ body {
   max-width: 900px;
   align-self: center;         /* center within content-wrapper */
   padding: 20px 48px;
+  box-sizing: border-box;
 }
 
 .hero-left {
@@ -736,7 +738,7 @@ body.loaded .notify-card {
   }
   /* main-content fills space and centers */
   .main-content {
-    flex: 1;
+    flex: 1 1 auto;
     flex-direction: column;
     gap: 18px;
     align-items: center;
@@ -745,6 +747,7 @@ body.loaded .notify-card {
     width: 100%;
     max-width: 600px;
     align-self: center;
+    box-sizing: border-box;
   }
   .hero-left {
     align-items: center;
@@ -793,7 +796,7 @@ body.loaded .notify-card {
   .badge { padding: 4px 10px; font-size: 0.65rem; }
 
   .main-content {
-    flex: 1;
+    flex: 1 1 auto;
     flex-direction: column;
     gap: 12px;
     align-items: center;
@@ -801,6 +804,7 @@ body.loaded .notify-card {
     padding: 12px 18px;
     width: 100%;
     align-self: center;
+    box-sizing: border-box;
   }
   .hero-left {
     gap: 10px;

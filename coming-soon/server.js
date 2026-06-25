@@ -128,37 +128,6 @@ const getWelcomeEmailHtml = (email) => {
           color: #cbd5e1;
           margin: 0 0 24px 0;
         }
-        .voucher-card {
-          background: rgba(20, 24, 33, 0.85);
-          border: 1.5px dashed rgba(255, 107, 0, 0.4);
-          border-radius: 16px;
-          padding: 24px;
-          margin: 28px 0;
-          position: relative;
-          text-align: center;
-        }
-        .voucher-badge {
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 1.5px;
-          color: #ff8c3a;
-          text-transform: uppercase;
-          margin-bottom: 8px;
-        }
-        .voucher-code {
-          font-size: 32px;
-          font-weight: 800;
-          color: #ffffff;
-          letter-spacing: 3px;
-          margin: 12px 0;
-          text-shadow: 0 0 10px rgba(255, 107, 0, 0.3);
-        }
-        .voucher-details {
-          font-size: 13px;
-          color: #94a3b8;
-          line-height: 1.5;
-          margin: 0;
-        }
         .btn {
           display: inline-block;
           background: #ff6b00;
@@ -241,7 +210,7 @@ app.post('/api/notify', async (req, res) => {
         const mailOptions = {
           from: `"Passwala" <${smtpUser}>`,
           to: trimmedEmail,
-          subject: '🎉 Passwala App Launching Soon! Get Early Access & 50% Off Voucher',
+          subject: '🎉 Passwala App Launching Soon! Get Early Access',
           html: getWelcomeEmailHtml(trimmedEmail)
         };
         await transporter.sendMail(mailOptions);
@@ -293,7 +262,7 @@ app.post('/api/notify', async (req, res) => {
         const mailOptions = {
           from: `"Passwala" <${smtpUser}>`,
           to: trimmedEmail,
-          subject: '🎉 Passwala App Launching Soon! Get Early Access & 50% Off Voucher',
+          subject: '🎉 Passwala App Launching Soon! Get Early Access',
           html: getWelcomeEmailHtml(trimmedEmail)
         };
         await transporter.sendMail(mailOptions);
