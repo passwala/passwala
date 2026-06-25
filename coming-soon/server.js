@@ -201,12 +201,6 @@ const getWelcomeEmailHtml = (email) => {
             <h1>You are on the Exclusive List! 🎉</h1>
             <p>Thank you for subscribing to early access. We are preparing India's smartest neighborhood app to bring you a community-driven marketplace and a smart local economy platform designed for modern urban neighborhoods.</p>
             
-            <div class="voucher-card">
-              <div class="voucher-badge">🎁 Your Welcome Gift</div>
-              <div class="voucher-code">PASSWALA50</div>
-              <p class="voucher-details">Enjoy <strong>50% OFF</strong> (up to ₹150) on your very first order when we launch in your neighborhood. Keep this code safe!</p>
-            </div>
-            
             <p style="margin-bottom: 0;">We'll drop you an update as soon as we launch in your area.</p>
           </div>
           <div class="footer">

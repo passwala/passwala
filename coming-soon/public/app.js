@@ -140,12 +140,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.alreadyRegistered) {
               if (successTitle) successTitle.innerHTML = 'Already Registered! ✨';
               if (successSubtitle) {
-                successSubtitle.innerHTML = `You're already on our early access list. We've already sent your welcome discount voucher <strong class="discount-badge">PASSWALA50</strong> to <span class="highlight-email">${email}</span>.`;
+                successSubtitle.innerHTML = `You're already on our early access list. We'll send updates to <span class="highlight-email">${email}</span>.`;
               }
             } else {
               if (successTitle) successTitle.innerHTML = 'Welcome to the Club! 🎉';
               if (successSubtitle) {
-                successSubtitle.innerHTML = `We've sent your welcome discount voucher <strong class="discount-badge">PASSWALA50</strong> to <span class="highlight-email">${email}</span>. Check your inbox!`;
+                successSubtitle.innerHTML = `We've sent a confirmation email to <span class="highlight-email">${email}</span>. Check your inbox!`;
               }
             }
 
