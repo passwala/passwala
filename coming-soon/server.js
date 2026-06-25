@@ -199,7 +199,7 @@ const getWelcomeEmailHtml = (email) => {
           </div>
           <div class="content">
             <h1>You are on the Exclusive List! 🎉</h1>
-            <p>Thank you for subscribing to early access. We are preparing India's smartest neighborhood app to bring you seamless eco-rides, fresh groceries, verified home services, and premium event passes.</p>
+            <p>Thank you for subscribing to early access. We are preparing India's smartest neighborhood app to bring you a community-driven marketplace and a smart local economy platform designed for modern urban neighborhoods.</p>
             
             <div class="voucher-card">
               <div class="voucher-badge">🎁 Your Welcome Gift</div>
