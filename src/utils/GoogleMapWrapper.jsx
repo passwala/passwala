@@ -111,14 +111,13 @@ const GoogleMapWrapper = ({
         if (markerInfo.svgIcon) {
           markerOptions.icon = {
             url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerInfo.svgIcon),
-            // eslint-disable-next-line no-undef
             scaledSize: new window.google.maps.Size(markerInfo.iconSize?.[0] || 32, markerInfo.iconSize?.[1] || 32),
             anchor: markerInfo.iconAnchor
               ? new window.google.maps.Point(markerInfo.iconAnchor[0], markerInfo.iconAnchor[1])
               : undefined
           };
         }
-        marker = new window.google.maps.Marker(markerOptions); // eslint-disable-line
+        marker = new window.google.maps.Marker(markerOptions);
       }
 
       if (markerInfo.title) {

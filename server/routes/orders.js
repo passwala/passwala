@@ -71,6 +71,70 @@ router.post('/payment/create', userAuth, async (req, res) => {
 });
 
 /**
+ * POST /api/orders/payment/gokwik/create
+ * Initiates a GoKwik checkout session.
+ */
+router.post('/payment/gokwik/create', userAuth, async (req, res) => {
+  const { amount, orderId } = req.body;
+
+  if (!amount || !orderId) {
+    return res.status(400).json({ error: 'amount and orderId are required' });
+  }
+
+  const gokwikUrl = process.env.GOKWIK_API_URL || 'https://sandbox.gokwik.co';
+  const merchantId = process.env.GOKWIK_MERCHANT_ID || '';
+  const appId = process.env.GOKWIK_APP_ID || '';
+  const appSecret = process.env.GOKWIK_APP_SECRET || '';
+
+  const isMock = !merchantId || !appId || !appSecret || merchantId.startsWith('YOUR_');
+
+  try {
+    if (isMock) {
+      console.log(`[GoKwik Simulator] Creating mock payment session for Order: ${orderId}`);
+      const mockToken = `gkwk_token_${crypto.randomBytes(8).toString('hex')}`;
+      return res.json({
+        success: true,
+        is_mock: true,
+        checkout_url: `http://localhost:3001/#/gokwik-checkout?token=${mockToken}&amount=${amount}&orderId=${orderId}`,
+        order_id: `gkwk_order_${crypto.randomBytes(4).toString('hex')}`
+      });
+    }
+
+    console.log(`[GoKwik Real] Initiating checkout session on GoKwik API`);
+    const response = await fetch(`${gokwikUrl}/v2/checkout/init`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'appid': appId,
+        'appsecret': appSecret
+      },
+      body: JSON.stringify({
+        merchant_id: merchantId,
+        order_id: orderId,
+        amount: amount,
+        currency: 'INR',
+        redirect_url: `${req.protocol}://${req.get('host')}/track-orders`
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`GoKwik gateway returned status ${response.status}`);
+    }
+
+    const data = await response.json();
+    res.json({
+      success: true,
+      is_mock: false,
+      checkout_url: data.checkout_url || data.url,
+      order_id: data.order_id
+    });
+  } catch (err) {
+    console.error('🔥 GoKwik Order Creation Failure:', err);
+    res.status(500).json({ error: 'GoKwik gateway initialization failed' });
+  }
+});
+
+/**
  * POST /api/orders/payment/verify
  * Verifies Razorpay payment signature and updates order status.
  */
@@ -668,6 +732,7 @@ router.post('/book-service', userAuth, async (req, res) => {
         user_id: dbUserId,
         store_id: providerId,
         address_id: addressId,
+        subtotal: price,
         total_amount: total,
         payment_method: 'ONLINE',
         payment_status: 'PAID',
@@ -711,7 +776,7 @@ router.post('/book-service', userAuth, async (req, res) => {
           status: 'PENDING',
           updated_at: new Date().toISOString()
         }]);
-    } catch (_) {}
+    } catch (_) { /* ignore delivery tracking error */ }
 
     res.json({ success: true, order });
   } catch (err) {
@@ -806,6 +871,7 @@ router.post('/place', userAuth, async (req, res) => {
         user_id: dbUserId,
         store_id: storeId,
         address_id: addressId,
+        subtotal: totalPrice,
         total_amount: total,
         payment_method: 'ONLINE',
         payment_status: 'PAID',
@@ -839,7 +905,7 @@ router.post('/place', userAuth, async (req, res) => {
           status: 'PENDING',
           updated_at: new Date().toISOString()
         }]);
-    } catch (_) {}
+    } catch (_) { /* ignore delivery tracking error */ }
 
     res.json({ success: true, order });
   } catch (err) {

@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Passwala — Instagram Reel (9:16)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #ff6b00;
+      --bg-dark: #03060d;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: #ffffff;
+      font-family: 'Outfit', sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* Container locked to standard mobile/Reel aspect ratio (9:16) */
+    .reel-container {
+      position: relative;
+      width: 100%;
+      max-width: 450px;
+      height: 100%;
+      max-height: 800px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 107, 0, 0.15);
+      background-color: #040712;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    .glow-orange {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(255, 107, 0, 0.25) 0%, rgba(3, 6, 13, 0) 70%);
+      filter: blur(50px);
+      z-index: 2;
+      pointer-events: none;
+      animation: pulse-glow 3s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulse-glow {
+      0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.8; }
+      100% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+    }
+
+    /* Kinetic Slides */
+    .slide-wrapper {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      text-align: center;
+      padding: 40px 24px;
+    }
+
+    .kinetic-slide {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      animation: slide-in 2s infinite linear;
+    }
+
+    .kinetic-slide.active {
+      display: flex;
+    }
+
+    .pre-title {
+      font-size: 0.9rem;
+      font-weight: 800;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      margin-bottom: 16px;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: text-reveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation-delay: 0.2s;
+    }
+
+    .main-title {
+      font-size: 2.8rem;
+      font-weight: 900;
+      line-height: 1.1;
+      letter-spacing: -1.5px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      opacity: 0;
+      transform: scale(0.8) translateY(30px);
+      animation: zoom-reveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation-delay: 0.4s;
+    }
+
+    .gradient-text {
+      background: linear-gradient(135deg, #ff6b00 0%, #ffaa66 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .description {
+      font-size: 1.1rem;
+      color: #94a3b8;
+      font-weight: 400;
+      line-height: 1.5;
+      max-width: 320px;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: text-reveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation-delay: 0.6s;
+    }
+
+    @keyframes text-reveal {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes zoom-reveal {
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    /* Floating interactive icons in mobile layout */
+    .feature-icons {
+      display: flex;
+      gap: 16px;
+      margin-top: 30px;
+      opacity: 0;
+      animation: fade-in 1s forwards;
+      animation-delay: 0.8s;
+    }
+
+    .icon-box {
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 107, 0, 0.3);
+      background: rgba(255, 107, 0, 0.05);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      box-shadow: 0 4px 15px rgba(255, 107, 0, 0.1);
+    }
+
+    @keyframes fade-in {
+      to { opacity: 1; }
+    }
+
+    /* 3D branding cube on final slide */
+    .cube-container {
+      height: 100px;
+      width: 100px;
+      margin-bottom: 24px;
+      perspective: 400px;
+    }
+
+    .branding-cube {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      animation: spin-cube 4s linear infinite;
+    }
+
+    .cube-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 107, 0, 0.05);
+      border: 2px solid var(--primary);
+      border-radius: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.2rem;
+      font-weight: 900;
+      box-shadow: 0 0 20px rgba(255, 107, 0, 0.25);
+    }
+
+    .face-f { transform: translateZ(50px); }
+    .face-b { transform: rotateY(180deg) translateZ(50px); }
+    .face-l { transform: rotateY(-90deg) translateZ(50px); }
+    .face-r { transform: rotateY(90deg) translateZ(50px); }
+
+    @keyframes spin-cube {
+      from { transform: rotateX(0deg) rotateY(0deg); }
+      to { transform: rotateX(360deg) rotateY(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="reel-container">
+    <div class="glow-orange"></div>
+    <canvas id="warpfield"></canvas>
+
+    <div class="slide-wrapper">
+      <!-- Slide 1: Intro Tease -->
+      <div class="kinetic-slide active" id="slide1">
+        <div class="pre-title">Coming Soon</div>
+        <h1 class="main-title">Something <br><span class="gradient-text">New</span> is Here</h1>
+        <p class="description">Are you ready to experience your city in a brand new way?</p>
+      </div>
+
+      <!-- Slide 2: Features Grid -->
+      <div class="kinetic-slide" id="slide2">
+        <div class="pre-title">Everything Local</div>
+        <h1 class="main-title">All-in-one <br><span class="gradient-text">Platform</span></h1>
+        <p class="description">Rides, local events, verified home experts, and fresh groceries.</p>
+        <div class="feature-icons">
+          <div class="icon-box">🚗</div>
+          <div class="icon-box">🎟️</div>
+          <div class="icon-box">🛠️</div>
+          <div class="icon-box">🛒</div>
+        </div>
+      </div>
+
+      <!-- Slide 3: Final Call Branding -->
+      <div class="kinetic-slide" id="slide3">
+        <div class="cube-container">
+          <div class="branding-cube">
+            <div class="cube-face face-f">P.</div>
+            <div class="cube-face face-b">P.</div>
+            <div class="cube-face face-l">P.</div>
+            <div class="cube-face face-r">P.</div>
+          </div>
+        </div>
+        <div class="pre-title">India's Smartest</div>
+        <h1 class="main-title">Passwala.</h1>
+        <p class="description">Join the early waitlist today for launch discount perks.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Kinetic Warp-speed Particle Engine
+    const canvas = document.getElementById('warpfield');
+    const ctx = canvas.getContext('2d');
+
+    let width = canvas.width = canvas.parentElement.clientWidth;
+    let height = canvas.height = canvas.parentElement.clientHeight;
+
+    const particles = [];
+    const particleCount = 200;
+
+    class Particle {
+      constructor() {
+        this.reset();
+      }
+
+      reset() {
+        this.x = (Math.random() - 0.5) * width * 2;
+        this.y = (Math.random() - 0.5) * height * 2;
+        this.z = Math.random() * width;
+        this.radius = Math.random() * 1.5 + 0.2;
+        this.color = Math.random() > 0.4 ? '#ff6b00' : '#ffffff';
+        this.speed = Math.random() * 8 + 4; // fast warp speed!
+      }
+
+      update() {
+        this.z -= this.speed;
+        if (this.z <= 0) {
+          this.reset();
+        }
+      }
+
+      draw() {
+        // Warp projection (expanding outwards)
+        const k = width / this.z;
+        const px = this.x * k + width / 2;
+        const py = this.y * k + height / 2;
+        const size = this.radius * k;
+
+        if (px < 0 || px > width || py < 0 || py > height) return;
+
+        ctx.beginPath();
+        // Drawing stretch line to show speed warp motion trail
+        const trailLength = size * 2.5;
+        ctx.moveTo(px, py);
+        ctx.lineTo(px - (this.x * 0.05), py - (this.y * 0.05));
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = size * 0.5;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      }
+    }
+
+    for (let i = 0; i < particleCount; i++) {
+      particles.push(new Particle());
+    }
+
+    function animate() {
+      ctx.fillStyle = 'rgba(3, 6, 13, 0.35)'; // trail/motion blur
+      ctx.fillRect(0, 0, width, height);
+
+      particles.forEach(p => {
+        p.update();
+        p.draw();
+      });
+
+      requestAnimationFrame(animate);
+    }
+    animate();
+
+    // Auto Slide Controller
+    const slides = [
+      document.getElementById('slide1'),
+      document.getElementById('slide2'),
+      document.getElementById('slide3')
+    ];
+    let currentSlide = 0;
+
+    setInterval(() => {
+      slides[currentSlide].classList.remove('active');
+      currentSlide = (currentSlide + 1) % slides.length;
+      slides[currentSlide].classList.add('active');
+    }, 2800);
+
+    // Responsive Canvas
+    window.addEventListener('resize', () => {
+      width = canvas.width = canvas.parentElement.clientWidth;
+      height = canvas.height = canvas.parentElement.clientHeight;
+    });
+  </script>
+</body>
+</html>

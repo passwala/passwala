@@ -235,15 +235,24 @@ export const useAuth = () => {
                 syncedManualUser.displayName = usr.full_name || manualUser.displayName || syncedManualUser.displayName;
                 syncedManualUser.photoURL = usr.photo_url || manualUser.photoURL || syncedManualUser.photoURL;
                 
-                const { data: addr } = await supabase.from('addresses').select('*').eq('user_id', usr.id).maybeSingle();
-                if (addr) {
+                // Fetch default address (ordered: default first, then most recent)
+                const { data: addr } = await supabase.from('addresses').select('*')
+                  .eq('user_id', usr.id)
+                  .order('is_default', { ascending: false })
+                  .order('created_at', { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+                if (addr && addr.address_line_1 && addr.address_line_1.trim() !== '') {
                   const parsed = parseAddressLine(addr.address_line_1);
                   addr.house_no = parsed.house_no;
                   addr.floor = parsed.floor;
-                  addr.society = parsed.society;
+                  addr.society = addr.society || parsed.society;
                   setUserAddress(addr);
                   localStorage.setItem('passwala_user_address', JSON.stringify(addr));
+                  const displayLoc = addr.society || addr.city || localStorage.getItem('passwala_location') || 'Ahmedabad';
+                  localStorage.setItem('passwala_location', displayLoc);
                   setIsProfileComplete(true);
+                  localStorage.setItem('passwala_profile_complete', 'true');
                 }
               }
             } catch (err) {
@@ -267,6 +276,7 @@ export const useAuth = () => {
         const phoneNo = rawPhone?.replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, ''); // 10-digit clean
         
         let orFilter = [];
+        if (u.uid) orFilter.push(`uid.eq.${u.uid}`);
         if (u.email) orFilter.push(`email.eq.${u.email}`);
         if (phoneNo) orFilter.push(`phone.eq.${phoneNo}`);   // stored clean (new standard)
         if (rawPhone) orFilter.push(`phone.eq.${rawPhone}`); // stored with +91 (legacy)
@@ -288,30 +298,51 @@ export const useAuth = () => {
             role: 'BUYER'
           };
 
-          const { data: addr } = await supabase.from('addresses').select('*').eq('user_id', usr.id).maybeSingle();
-          if (addr) {
+          // Always fetch the default (or most recent) address from DB on every login
+          const { data: addr } = await supabase.from('addresses').select('*')
+            .eq('user_id', usr.id)
+            .order('is_default', { ascending: false })
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (addr && addr.address_line_1 && addr.address_line_1.trim() !== '') {
             setIsProfileComplete(true);
+            localStorage.setItem('passwala_profile_complete', 'true');
             const parsed = parseAddressLine(addr.address_line_1);
             addr.house_no = parsed.house_no;
             addr.floor = parsed.floor;
-            addr.society = parsed.society;
+            addr.society = addr.society || parsed.society;
 
             setUserAddress(addr);
             localStorage.setItem('passwala_user_address', JSON.stringify(addr));
             
-            const displayLoc = addr.society || addr.city || localStorage.getItem('passwala_location') || 'India';
+            const displayLoc = addr.society || addr.city || localStorage.getItem('passwala_location') || 'Ahmedabad';
             localStorage.setItem('passwala_location', displayLoc);
           } else {
-            const { data: addrLegacy } = await supabase.from('addresses').select('*').eq('user_id', u.uid).maybeSingle();
-            setIsProfileComplete(!!addrLegacy || wasComplete);
-            if (addrLegacy) {
+            // Try legacy lookup by uid (in case user_id was stored as Firebase UID in older records)
+            const { data: addrLegacy } = await supabase.from('addresses').select('*')
+              .eq('user_id', u.uid)
+              .order('is_default', { ascending: false })
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            const hasLegacy = addrLegacy && addrLegacy.address_line_1 && addrLegacy.address_line_1.trim() !== '';
+            const isComplete = hasLegacy || wasComplete;
+            setIsProfileComplete(isComplete);
+            if (isComplete) {
+              localStorage.setItem('passwala_profile_complete', 'true');
+            }
+            if (hasLegacy) {
               const parsed = parseAddressLine(addrLegacy.address_line_1);
               addrLegacy.house_no = parsed.house_no;
               addrLegacy.floor = parsed.floor;
-              addrLegacy.society = parsed.society;
+              addrLegacy.society = addrLegacy.society || parsed.society;
 
               setUserAddress(addrLegacy);
               localStorage.setItem('passwala_user_address', JSON.stringify(addrLegacy));
+              const displayLoc = addrLegacy.society || addrLegacy.city || 'Ahmedabad';
+              localStorage.setItem('passwala_location', displayLoc);
             }
           }
         } else {
@@ -325,14 +356,21 @@ export const useAuth = () => {
             role: 'BUYER'
           };
           setIsProfileComplete(wasComplete);
+          if (wasComplete) {
+            localStorage.setItem('passwala_profile_complete', 'true');
+          }
         }
       } catch (err) {
         console.error("Auto Sync Failed", err);
         setIsProfileComplete(wasComplete);
+        if (wasComplete) {
+          localStorage.setItem('passwala_profile_complete', 'true');
+        }
       }
 
       if (wasComplete) {
         setIsProfileComplete(true);
+        localStorage.setItem('passwala_profile_complete', 'true');
         const savedAddr = localStorage.getItem('passwala_user_address');
         if (savedAddr) {
           setUserAddress(JSON.parse(savedAddr));

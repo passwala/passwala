@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Plus, Minus, Trash2, ShoppingBag, CheckCircle, Sparkles, MapPin, Tag } from 'lucide-react';
+import { X, Plus, Minus, Trash2, ShoppingBag, CheckCircle, Sparkles, MapPin, Tag, Home, Briefcase, Building2 } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { toast } from 'react-hot-toast';
@@ -11,6 +11,18 @@ import './CartDrawer.css';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../../firebase';
 
+const ADDRESS_LABELS = [
+  { key: 'Home',   icon: <Home size={18} />,     color: '#ff7622' },
+  { key: 'Office', icon: <Briefcase size={18} />, color: '#6366f1' },
+  { key: 'PG',     icon: <Building2 size={18} />, color: '#10b981' },
+  { key: 'Other',  icon: <MapPin size={18} />,    color: '#f59e0b' },
+];
+
+const getLabelStyle = (label) => {
+  const found = ADDRESS_LABELS.find(l => l.key === label);
+  return found ? found : ADDRESS_LABELS[3];
+};
+
 const SUPPORTED_SOCIETIES = [
   'hive pg hostel', 
   'shivam residency', 
@@ -20,22 +32,9 @@ const SUPPORTED_SOCIETIES = [
   'vastrapur'
 ];
 
-const loadRazorpayScript = () => {
-  return new Promise((resolve) => {
-    if (window.Razorpay) {
-      resolve(true);
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-};
 
-const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
+
+const CartDrawer = ({ location, isProfileComplete, userAddress, user }) => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { cartItems, cartOpen, setCartOpen, removeFromCart, updateQty, clearCart, totalItems, totalPrice, error } = useCart();
@@ -47,6 +46,185 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
   const [couponCode, setCouponCode] = React.useState('');
   const [appliedCoupon, setAppliedCoupon] = React.useState(null); // { code, discount, message }
   const [couponLoading, setCouponLoading] = React.useState(false);
+
+  // --- GoKwik Checkout Integration ---
+  const [showGokwik, setShowGokwik] = React.useState(false);
+  const [gokwikStep, setGokwikStep] = React.useState('phone'); // phone, otp, payment, success
+  const [gokwikPhone, setGokwikPhone] = React.useState('');
+  const [gokwikOtp, setGokwikOtp] = React.useState('');
+  const [gokwikPaymentMethod, setGokwikPaymentMethod] = React.useState('paytm');
+  const [gokwikOrderDetails, setGokwikOrderDetails] = React.useState(null);
+  const [gokwikCreatedOrders, setGokwikCreatedOrders] = React.useState([]);
+  const [gokwikOrderIdsString, setGokwikOrderIdsString] = React.useState('');
+  const [gokwikItemNames, setGokwikItemNames] = React.useState('');
+
+  const handleGokwikSuccess = async (paymentMethod = 'Paytm') => {
+    try {
+      setGokwikStep('success');
+      toast.loading("Confirming order via GoKwik...", { id: "gokwik_verify_loader" });
+      
+      const token = await getAuthToken();
+      let verifySuccess = false;
+      
+      try {
+        const verifyRes = await fetch('/api/orders/payment/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            razorpay_payment_id: `gkwk_pay_${Array.from(crypto.getRandomValues(new Uint8Array(4))).map(b => b.toString(16).padStart(2,'0')).join('')}`,
+            razorpay_order_id: gokwikOrderDetails?.id || `gkwk_order_mock`,
+            razorpay_signature: `gokwik_signature_mock`,
+            orderId: gokwikOrderIdsString
+          })
+        });
+        if (verifyRes.ok) {
+          const verifyData = await verifyRes.json();
+          if (verifyData.success) {
+            verifySuccess = true;
+          }
+        }
+      } catch (e) {
+        console.warn("GoKwik verification backend failed, falling back to direct database update:", e);
+      }
+
+      if (!verifySuccess) {
+        // Direct database update
+        const { error: updateErr } = await supabase
+          .from('orders')
+          .update({ status: 'PLACED', payment_status: 'PAID', payment_method: paymentMethod })
+          .in('id', gokwikOrderIdsString.split(','));
+        
+        if (updateErr) {
+          await supabase
+            .from('orders')
+            .update({ status: 'PLACED' })
+            .in('id', gokwikOrderIdsString.split(','));
+        }
+      }
+
+      toast.dismiss("gokwik_verify_loader");
+
+      // Notify backend for notifications
+      for (const co of gokwikCreatedOrders) {
+        try {
+          await fetch('/api/orders/notify-new-order', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              orderId: co.order.id,
+              storeId: co.storeId
+            })
+          });
+        } catch (notifErr) {
+          console.warn("⚠️ Notification dispatch failed for order:", co.order.id, notifErr);
+        }
+      }
+
+      addNotification({
+        type: 'ORDER_PLACED',
+        title: 'Order Paid via GoKwik!',
+        message: `Your order from ${gokwikItemNames} has been confirmed.`,
+        storeId: gokwikCreatedOrders[0]?.storeId
+      });
+
+      toast.success(`Order placed successfully via GoKwik!`, { icon: '🎉' });
+      
+      if (appliedCoupon?.code) {
+        redeemPromoCode(appliedCoupon.code);
+        setAppliedCoupon(null);
+        setCouponCode('');
+      }
+
+      setTimeout(() => {
+        setShowGokwik(false);
+        clearCart();
+        setCartOpen(false);
+        setIsPlacingOrder(false);
+        navigate('/track-orders');
+      }, 1500);
+
+    } catch (err) {
+      console.error("GoKwik payment completion failed:", err);
+      toast.error(`Checkout failed: ${err.message}`);
+      setIsPlacingOrder(false);
+    }
+  };
+
+  const [savedAddresses, setSavedAddresses] = React.useState([]);
+  const [selectedAddress, setSelectedAddress] = React.useState(userAddress);
+  const [isChangingAddress, setIsChangingAddress] = React.useState(false);
+
+  React.useEffect(() => {
+    if (userAddress) {
+      setSelectedAddress(userAddress);
+    }
+  }, [userAddress]);
+
+  React.useEffect(() => {
+    const fetchSavedAddresses = async () => {
+      try {
+        const userObj = user || (localStorage.getItem('passwala_user') ? JSON.parse(localStorage.getItem('passwala_user')) : null) || auth.currentUser;
+        if (!userObj) return;
+        const uid = userObj.uid || userObj.id;
+        const email = userObj.email;
+        const phone = (userObj.phoneNumber || userObj.phone || '').replace(/[\s\-().]/g, '').replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, '');
+
+        let filters = [];
+        if (uid) filters.push(`uid.eq.${uid}`);
+        if (email) filters.push(`email.eq.${email}`);
+        if (phone) filters.push(`phone.eq.${phone}`);
+
+        if (filters.length === 0) return;
+
+        const { data: userData } = await supabase.from('users').select('id').or(filters.join(',')).maybeSingle();
+        if (userData?.id) {
+          const { data: addrData } = await supabase
+            .from('addresses')
+            .select('*')
+            .eq('user_id', userData.id)
+            .order('is_default', { ascending: false })
+            .order('created_at', { ascending: false });
+          if (addrData) {
+            setSavedAddresses(addrData);
+          }
+        }
+      } catch (err) {
+        console.warn("Error fetching saved addresses for checkout:", err);
+      }
+    };
+
+    if (showConfirm) {
+      fetchSavedAddresses();
+    }
+  }, [showConfirm, user]);
+
+  const handleSelectAddress = (addr) => {
+    setSelectedAddress(addr);
+    setIsChangingAddress(false);
+    
+    // Save to localStorage
+    localStorage.setItem('passwala_user_address', JSON.stringify(addr));
+    const displayLoc = addr.society || addr.city || 'Ahmedabad';
+    localStorage.setItem('passwala_location', displayLoc);
+    
+    // Trigger external event to update app state
+    window.dispatchEvent(new CustomEvent('update-location-external', {
+      detail: {
+        locationName: displayLoc,
+        coords: { lat: addr.lat || 23.0305, lng: addr.lng || 72.5075 },
+        address: addr
+      }
+    }));
+    
+    toast.success(`Delivery address changed to ${addr.label || 'Selected Address'}!`);
+  };
+
 
 
   const getAuthToken = async () => {
@@ -554,7 +732,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
           delivery_fee: 0,
           user_id: resolvedUserId,
           store_id: currentResolvedStoreId,
-          address_id: (userAddress?.id && userAddress.id.length === 36) ? userAddress.id : resolvedAddressId
+          address_id: (selectedAddress?.id && selectedAddress.id.length === 36) ? selectedAddress.id : resolvedAddressId
         };
 
         let newOrder = null;
@@ -688,247 +866,50 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
 
       const orderIdsString = createdOrders.map(o => o.order.id).join(',');
 
-      // --- PAYMENT GATEWAY INTEGRATION ---
-      toast.loading("Initiating secure payment...", { id: "payment_loader" });
-
+      // --- GoKwik Gateway Integration ---
+      toast.loading("Initiating GoKwik Checkout...", { id: "gokwik_loader" });
+      
       const token = await getAuthToken();
-      let createPayOrderRes = null;
-      let razorpayOrder = null;
-      let gatewayFailed = false;
+      const gokwikRes = await fetch('/api/orders/payment/gokwik/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          amount: total,
+          orderId: orderIdsString
+        })
+      });
 
-      try {
-        createPayOrderRes = await fetch('/api/orders/payment/create', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            amount: total,
-            orderId: orderIdsString
-          })
+      toast.dismiss("gokwik_loader");
+
+      if (!gokwikRes.ok) {
+        throw new Error("Failed to initialize GoKwik session.");
+      }
+
+      const gokwikData = await gokwikRes.json();
+
+      if (gokwikData.is_mock) {
+        // Run in simulated fallback mode
+        setGokwikCreatedOrders(createdOrders);
+        setGokwikOrderIdsString(orderIdsString);
+        setGokwikItemNames(itemNames);
+        setGokwikOrderDetails({
+          id: gokwikData.order_id,
+          amount: total,
         });
-
-        if (!createPayOrderRes.ok) {
-          gatewayFailed = true;
-        } else {
-          razorpayOrder = await createPayOrderRes.json();
-        }
-      } catch (e) {
-        console.warn("Payment gateway connection failed:", e);
-        gatewayFailed = true;
-      }
-
-      toast.dismiss("payment_loader");
-
-      if (gatewayFailed || !razorpayOrder) {
-        const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname) || window.location.hostname.startsWith('192.168.');
-        if (isLocal) {
-          console.warn("⚠️ API server is offline. Activating client-side mock checkout fallback.");
-          razorpayOrder = {
-            id: `order_mock_${Array.from(crypto.getRandomValues(new Uint8Array(4))).map(b => b.toString(16).padStart(2,'0')).join('')}`,
-            amount: Math.round(total * 100),
-            currency: 'INR',
-            receipt: orderIdsString,
-            status: 'created',
-            is_mock: true,
-            key_id: 'rzp_test_mockkeyid_123456'
-          };
-        } else {
-          throw new Error("Could not create gateway transaction order.");
-        }
-      }
-
-      if (razorpayOrder.is_mock) {
-        // Direct order book
-        toast.loading("Confirming order...", { id: "payment_verify_loader" });
         
-        let verifySuccess = false;
-        try {
-          const token = await getAuthToken();
-          const verifyRes = await fetch('/api/orders/payment/verify', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              razorpay_payment_id: `pay_mock_${Array.from(crypto.getRandomValues(new Uint8Array(4))).map(b => b.toString(16).padStart(2,'0')).join('')}`,
-              razorpay_order_id: razorpayOrder.id,
-              razorpay_signature: `mock_signature_sandbox`,
-              orderId: orderIdsString
-            })
-          });
-
-          if (verifyRes.ok) {
-            const verifyData = await verifyRes.json();
-            if (verifyData.success) {
-              verifySuccess = true;
-            }
-          }
-        } catch (e) {
-          console.warn("Verification API failed, doing client-side Supabase fallback:", e);
-        }
-
-        if (!verifySuccess) {
-          // Client-side Direct update fallback
-          const { error: updateErr } = await supabase
-            .from('orders')
-            .update({ status: 'PLACED', payment_status: 'PAID' })
-            .in('id', orderIdsString.split(','));
-          
-          if (updateErr) {
-            // Fallback: update status only if custom payment fields are missing
-            await supabase
-              .from('orders')
-              .update({ status: 'PLACED' })
-              .in('id', orderIdsString.split(','));
-          }
-          verifySuccess = true;
-        }
-
-        toast.dismiss("payment_verify_loader");
-
-          if (verifySuccess) {
-          // Fire backend notifications for each split order (same as real Razorpay path)
-          const notifToken = await getAuthToken();
-          for (const co of createdOrders) {
-            try {
-              await fetch('/api/orders/notify-new-order', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${notifToken}`
-                },
-                body: JSON.stringify({
-                  orderId: co.order.id,
-                  storeId: co.storeId
-                })
-              });
-            } catch (notifErr) {
-              console.warn("⚠️ Notification dispatch failed for order:", co.order.id, notifErr);
-            }
-          }
-
-          addNotification({
-            type: 'ORDER_PLACED',
-            title: 'Order Placed!',
-            message: `Your order from ${itemNames} has been confirmed.`,
-            storeId: createdOrders[0].storeId
-          });
-          toast.success(`Order #${orderIdsString.split(',')[0].slice(0, 6).toUpperCase()} placed successfully!`);
-          // Redeem promo code usage (fire-and-forget)
-          if (appliedCoupon?.code) { redeemPromoCode(appliedCoupon.code); setAppliedCoupon(null); setCouponCode(''); }
-          setShowConfirm(false);
-          clearCart();
-          setCartOpen(false);
-          setIsPlacingOrder(false);
-          navigate('/track-orders');
-        } else {
-          throw new Error("Payment verification marked as failed.");
-        }
-      } else {
-        // Real Razorpay integration
-        const scriptLoaded = await loadRazorpayScript();
-        if (!scriptLoaded) {
-          throw new Error("Failed to load Razorpay SDK. Please check your internet connection.");
-        }
-
-        const options = {
-          key: razorpayOrder.key_id,
-          amount: razorpayOrder.amount,
-          currency: razorpayOrder.currency || 'INR',
-          name: 'Passwala Ahmedabad',
-          description: 'Ahmedabad Neighborhood Delivery',
-          order_id: razorpayOrder.id,
-          handler: async function (response) {
-            try {
-              setIsPlacingOrder(true);
-              toast.loading("Verifying payment...", { id: "payment_verify_loader" });
-
-              const token = await getAuthToken();
-              const verifyRes = await fetch('/api/orders/payment/verify', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_signature: response.razorpay_signature,
-                  orderId: orderIdsString
-                })
-              });
-
-              toast.dismiss("payment_verify_loader");
-
-              if (!verifyRes.ok) {
-                throw new Error("Payment signature verification failed");
-              }
-
-              const verifyData = await verifyRes.json();
-              if (verifyData.success) {
-                // Fire backend notifications for each split order
-                for (const co of createdOrders) {
-                  try {
-                    await fetch('/api/orders/notify-new-order', {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                      },
-                      body: JSON.stringify({
-                        orderId: co.order.id,
-                        storeId: co.storeId
-                      })
-                    });
-                  } catch (notifErr) {
-                    console.warn("⚠️ Notification dispatch failed for order:", co.order.id, notifErr);
-                  }
-                }
-
-                const deliveryLoc = location ? location.split(',')[0] : 'Your Location';
-                toast.success(`Payment successful! Order placed! ₹${total.toLocaleString()}`, { icon: '🎉', duration: 4000 });
-                addNotification({
-                  icon: '📦',
-                  title: 'Order Paid & Placed!',
-                  body: `₹${total.toLocaleString()} • ${itemNames} • Payment verified. Delivery starting at ${deliveryLoc}.`,
-                  color: '#22c55e',
-                });
-                clearCart();
-                setCartOpen(false);
-                setShowConfirm(false);
-                navigate('/track-orders');
-              } else {
-                throw new Error("Signature verification rejected");
-              }
-            } catch (err) {
-              console.error("Payment verification failed:", err);
-              toast.error(`Verification Failed: ${err.message || 'Payment not verified'}`);
-            } finally {
-              setIsPlacingOrder(false);
-            }
-          },
-          prefill: {
-            name: userObj?.displayName || 'Passwala Customer',
-            email: userObj?.email || '',
-            contact: userObj?.phoneNumber || ''
-          },
-          theme: {
-            color: '#ff7622'
-          },
-          modal: {
-            ondismiss: function () {
-              toast.error('Payment cancelled');
-              setIsPlacingOrder(false);
-            }
-          }
-        };
-
-        const rzp = new window.Razorpay(options);
-        rzp.open();
+        const savedPhone = userObj?.phoneNumber || userObj?.phone || '';
+        setGokwikPhone(savedPhone.replace(/^\+91/, ''));
+        setGokwikStep('phone');
+        setShowGokwik(true);
+        setIsPlacingOrder(true);
         setShowConfirm(false);
+      } else {
+        // Redirect to real-time GoKwik hosted checkout page!
+        toast.success("Redirecting to GoKwik Checkout...");
+        window.location.href = gokwikData.checkout_url;
       }
     } catch (err) {
       console.error('Supabase checkout/payment failed:', err);
@@ -1232,11 +1213,14 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
       </div>
 
       {/* Final Confirmation Overlay */}
-      {showConfirm && isProfileComplete && userAddress && (
+      {showConfirm && isProfileComplete && (selectedAddress || userAddress) && (
         <div 
           className="order-confirm-overlay-v4"
           onClick={() => {
-            if (!isPlacingOrder) setShowConfirm(false);
+            if (!isPlacingOrder) {
+              setShowConfirm(false);
+              setIsChangingAddress(false);
+            }
           }}
         >
           <div 
@@ -1245,7 +1229,10 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
           >
              <button 
                className="confirm-close-btn-v4"
-               onClick={() => setShowConfirm(false)}
+               onClick={() => {
+                 setShowConfirm(false);
+                 setIsChangingAddress(false);
+               }}
                disabled={isPlacingOrder}
                title="Cancel and go back"
                style={{ opacity: isPlacingOrder ? 0.5 : 1, cursor: isPlacingOrder ? 'not-allowed' : 'pointer' }}
@@ -1253,43 +1240,301 @@ const CartDrawer = ({ location, isProfileComplete, userAddress }) => {
                 <X size={18} />
              </button>
 
-             <div className="confirm-icon-v4">
-                <CheckCircle size={40} color="#ff7622" />
-             </div>
-             <h2>{isService ? 'Confirm Service' : 'Confirm Delivery'}</h2>
-             <p className="confirm-desc-v4">{isService ? 'Your service expert will visit you at:' : 'Your neighborhood order will be delivered to:'}</p>
-             
-             <div className="confirm-address-card-v4">
-                <MapPin size={20} color="#ff7622" />
-                <div className="confirm-addr-text-v4">
-                   <strong>{userAddress.house_no}, Floor {userAddress.floor}</strong>
-                   <span>{userAddress.society}</span>
-                </div>
-             </div>
+             {isChangingAddress ? (
+               <>
+                 <div className="confirm-icon-v4">
+                    <MapPin size={40} color="#ff7622" />
+                 </div>
+                 <h2>Select Address</h2>
+                 <p className="confirm-desc-v4">Choose delivery location:</p>
+                 <div className="saved-addresses-selector-list">
+                     {savedAddresses.length > 0 ? (
+                       savedAddresses.map(addr => {
+                         const labelInfo = getLabelStyle(addr.name);
+                         const isSelected = selectedAddress?.id === addr.id;
+                         return (
+                           <div 
+                             key={addr.id} 
+                             className={`address-option-card ${isSelected ? 'selected' : ''}`}
+                             onClick={() => handleSelectAddress(addr)}
+                           >
+                             <div className="label-icon" style={{ color: labelInfo.color, background: `${labelInfo.color}15` }}>
+                               {labelInfo.icon}
+                             </div>
+                             <div className="address-details">
+                               <span className="address-name">
+                                 {addr.name || 'Address'} 
+                                 {addr.is_default && <span className="address-default-badge">Default</span>}
+                               </span>
+                               <span className="address-text">
+                                 {addr.address_line_1} {addr.address_line_2 ? `(${addr.address_line_2})` : ''}
+                               </span>
+                             </div>
+                             {isSelected && <CheckCircle size={18} color="#ff7622" style={{ flexShrink: 0 }} />}
+                           </div>
+                         );
+                       })
+                     ) : (
+                       <p style={{ textAlign: 'center', color: '#64748b', fontSize: '0.85rem', margin: '20px 0' }}>No other saved addresses found.</p>
+                     )}
+                  </div>
+                  
+                  <div className="confirm-actions-v4">
+                     <button 
+                       className="confirm-cancel-v4" 
+                       onClick={() => setIsChangingAddress(false)}
+                     >
+                       Back
+                     </button>
+                     <button 
+                       className="confirm-proceed-v4 manage-btn-v4" 
+                       onClick={() => {
+                         setShowConfirm(false);
+                         setIsChangingAddress(false);
+                         setCartOpen(false);
+                         navigate('/manage-addresses');
+                       }}
+                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                     >
+                       <Plus size={16} /> Manage
+                     </button>
+                  </div>
+               </>
+             ) : (
+               <>
+                 <div className="confirm-icon-v4">
+                    <CheckCircle size={40} color="#ff7622" />
+                 </div>
+                 <h2>{isService ? 'Confirm Service' : 'Confirm Delivery'}</h2>
+                 <p className="confirm-desc-v4">{isService ? 'Your service expert will visit you at:' : 'Your neighborhood order will be delivered to:'}</p>
+                 
+                 <div className="confirm-address-card-v4" onClick={() => setIsChangingAddress(true)} style={{ cursor: 'pointer' }}>
+                    <MapPin size={20} color="#ff7622" />
+                    <div className="confirm-addr-text-v4">
+                       <strong>
+                         {selectedAddress?.address_line_1 || 
+                          (selectedAddress?.house_no ? `${selectedAddress.house_no}, Floor ${selectedAddress.floor || ''}` : 
+                           userAddress?.address_line_1 || 
+                           `${userAddress?.house_no || ''}, Floor ${userAddress?.floor || ''}`)
+                         }
+                       </strong>
+                       <span>{selectedAddress?.address_line_2 || selectedAddress?.society || userAddress?.address_line_2 || userAddress?.society || ''}</span>
+                    </div>
+                 </div>
 
-             <div className="confirm-actions-v4">
-                <button 
-                  className="confirm-cancel-v4" 
-                  onClick={() => { setShowConfirm(false); setCartOpen(false); navigate('/complete-profile'); }}
-                  disabled={isPlacingOrder}
-                  style={{ opacity: isPlacingOrder ? 0.5 : 1, cursor: isPlacingOrder ? 'not-allowed' : 'pointer' }}
+                 <div className="confirm-actions-v4">
+                    <button 
+                      className="confirm-cancel-v4" 
+                      onClick={() => setIsChangingAddress(true)}
+                      disabled={isPlacingOrder}
+                      style={{ opacity: isPlacingOrder ? 0.5 : 1, cursor: isPlacingOrder ? 'not-allowed' : 'pointer' }}
+                    >
+                      Change Address
+                    </button>
+                    <button 
+                      className="confirm-proceed-v4" 
+                      onClick={finalPlaceOrder}
+                      disabled={isPlacingOrder}
+                      style={{ opacity: isPlacingOrder ? 0.7 : 1, cursor: isPlacingOrder ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                    >
+                      {isPlacingOrder ? (
+                        <>
+                          <svg className="animate-spin" style={{ width: '16px', height: '16px', border: '2px solid transparent', borderTopColor: 'white', borderRadius: '50%' }} viewBox="0 0 24 24"></svg>
+                          {isService ? 'Booking Service...' : 'Placing Order...'}
+                        </>
+                      ) : (isService ? 'Confirm & Book' : 'Confirm & Deliver')}
+                    </button>
+                 </div>
+               </>
+             )}
+          </div>
+        </div>
+      )}
+
+
+      {/* GoKwik Checkout Simulator Modal */}
+      {showGokwik && (
+        <div className="gokwik-modal-overlay">
+          <div className="gokwik-modal-card">
+            {/* GoKwik Header */}
+            <div className="gokwik-modal-header">
+              <div className="gokwik-logo-area">
+                <span className="gokwik-brand">go<span className="gokwik-orange">kwik</span></span>
+                <span className="gokwik-badge">SECURE</span>
+              </div>
+              <button className="gokwik-close-btn" onClick={() => {
+                setShowGokwik(false);
+                setIsPlacingOrder(false);
+                toast.error('Checkout cancelled');
+              }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Merchant Details */}
+            <div className="gokwik-merchant-bar">
+              <div className="merchant-logo">P.</div>
+              <div className="merchant-info">
+                <h4>Passwala</h4>
+                <p>{gokwikItemNames || 'Items from neighborhood'}</p>
+              </div>
+              <div className="merchant-amount">
+                ₹{gokwikOrderDetails?.amount?.toLocaleString() || '0'}
+              </div>
+            </div>
+
+            {/* Step 1: Phone Login */}
+            {gokwikStep === 'phone' && (
+              <div className="gokwik-body">
+                <h3 className="gokwik-step-title">Enter mobile number for 1-Click Checkout</h3>
+                <p className="gokwik-step-desc">Login with GoKwik to access saved addresses & payment methods</p>
+                <div className="gokwik-input-wrapper">
+                  <span className="gokwik-country-code">+91</span>
+                  <input
+                    type="tel"
+                    className="gokwik-input"
+                    maxLength={10}
+                    placeholder="Enter 10-digit mobile number"
+                    value={gokwikPhone}
+                    onChange={(e) => setGokwikPhone(e.target.value.replace(/\D/g, ''))}
+                  />
+                </div>
+                <button
+                  className="gokwik-action-btn"
+                  disabled={gokwikPhone.length < 10}
+                  onClick={() => setGokwikStep('otp')}
                 >
-                  Change Address
+                  Continue
                 </button>
-                <button 
-                  className="confirm-proceed-v4" 
-                  onClick={finalPlaceOrder}
-                  disabled={isPlacingOrder}
-                  style={{ opacity: isPlacingOrder ? 0.7 : 1, cursor: isPlacingOrder ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                <div className="gokwik-footer-note">
+                  🔒 Your data is fully encrypted and secure.
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: OTP Verification */}
+            {gokwikStep === 'otp' && (
+              <div className="gokwik-body">
+                <h3 className="gokwik-step-title">Verify Mobile Number</h3>
+                <p className="gokwik-step-desc">Enter the 6-digit OTP sent to +91 {gokwikPhone}</p>
+                <div className="gokwik-input-wrapper otp-box">
+                  <input
+                    type="text"
+                    maxLength={6}
+                    className="gokwik-input otp-input"
+                    placeholder="123456"
+                    value={gokwikOtp}
+                    onChange={(e) => setGokwikOtp(e.target.value.replace(/\D/g, ''))}
+                  />
+                </div>
+                <button
+                  className="gokwik-action-btn"
+                  onClick={() => {
+                    setGokwikStep('payment');
+                  }}
                 >
-                  {isPlacingOrder ? (
-                    <>
-                      <svg className="animate-spin" style={{ width: '16px', height: '16px', border: '2px solid transparent', borderTopColor: 'white', borderRadius: '50%' }} viewBox="0 0 24 24"></svg>
-                      {isService ? 'Booking Service...' : 'Placing Order...'}
-                    </>
-                  ) : (isService ? 'Confirm & Book' : 'Confirm & Deliver')}
+                  Verify OTP
                 </button>
-             </div>
+                <button className="gokwik-text-btn" onClick={() => setGokwikStep('phone')}>
+                  Change Mobile Number
+                </button>
+              </div>
+            )}
+
+            {/* Step 3: Payment Options */}
+            {gokwikStep === 'payment' && (
+              <div className="gokwik-body">
+                <h3 className="gokwik-step-title">Select Payment Method</h3>
+                
+                <div className="gokwik-payment-list">
+                  {/* Paytm Option */}
+                  <label className={`gokwik-payment-item ${gokwikPaymentMethod === 'paytm' ? 'active' : ''}`}>
+                    <input
+                      type="radio"
+                      name="gokwik-pay"
+                      value="paytm"
+                      checked={gokwikPaymentMethod === 'paytm'}
+                      onChange={() => setGokwikPaymentMethod('paytm')}
+                    />
+                    <div className="pay-logo">💰</div>
+                    <div className="pay-text">
+                      <strong>Paytm Wallet</strong>
+                      <span>Pay instantly using linked Paytm account</span>
+                    </div>
+                  </label>
+
+                  {/* UPI Option */}
+                  <label className={`gokwik-payment-item ${gokwikPaymentMethod === 'upi' ? 'active' : ''}`}>
+                    <input
+                      type="radio"
+                      name="gokwik-pay"
+                      value="upi"
+                      checked={gokwikPaymentMethod === 'upi'}
+                      onChange={() => setGokwikPaymentMethod('upi')}
+                    />
+                    <div className="pay-logo">📱</div>
+                    <div className="pay-text">
+                      <strong>Google Pay / PhonePe / BHIM UPI</strong>
+                      <span>Instant UPI Payment</span>
+                    </div>
+                  </label>
+
+                  {/* Card Option */}
+                  <label className={`gokwik-payment-item ${gokwikPaymentMethod === 'card' ? 'active' : ''}`}>
+                    <input
+                      type="radio"
+                      name="gokwik-pay"
+                      value="card"
+                      checked={gokwikPaymentMethod === 'card'}
+                      onChange={() => setGokwikPaymentMethod('card')}
+                    />
+                    <div className="pay-logo">💳</div>
+                    <div className="pay-text">
+                      <strong>Credit or Debit Card</strong>
+                      <span>All major Indian banks supported</span>
+                    </div>
+                  </label>
+
+                  {/* COD Option */}
+                  <label className={`gokwik-payment-item ${gokwikPaymentMethod === 'cod' ? 'active' : ''}`}>
+                    <input
+                      type="radio"
+                      name="gokwik-pay"
+                      value="cod"
+                      checked={gokwikPaymentMethod === 'cod'}
+                      onChange={() => setGokwikPaymentMethod('cod')}
+                    />
+                    <div className="pay-logo">🤝</div>
+                    <div className="pay-text">
+                      <strong>Cash on Delivery (COD)</strong>
+                      <span>Pay with cash when order arrives</span>
+                    </div>
+                  </label>
+                </div>
+
+                <button
+                  className="gokwik-action-btn checkout-pay"
+                  onClick={() => handleGokwikSuccess(
+                    gokwikPaymentMethod === 'paytm' ? 'Paytm' : 
+                    gokwikPaymentMethod === 'upi' ? 'UPI' : 
+                    gokwikPaymentMethod === 'card' ? 'Card' : 'COD'
+                  )}
+                >
+                  Pay ₹{gokwikOrderDetails?.amount?.toLocaleString()} Securely
+                </button>
+              </div>
+            )}
+
+            {/* Step 4: Success state */}
+            {gokwikStep === 'success' && (
+              <div className="gokwik-body success-step text-center">
+                <div className="gokwik-success-circle">
+                  <CheckCircle size={48} color="#22c55e" />
+                </div>
+                <h3 className="gokwik-step-title" style={{ marginTop: '16px' }}>Payment Approved</h3>
+                <p className="gokwik-step-desc">Redirecting to order tracking...</p>
+              </div>
+            )}
           </div>
         </div>
       )}

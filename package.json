@@ -10,9 +10,9 @@
     "dev:vendor": "vite --config vite.config.js --mode vendor --host --force",
     "dev:rider": "vite --config vite.config.js --mode rider --host --force",
     "dev:admin": "vite --config vite.config.js --mode admin --host --force",
-    "dev:all": "concurrently \"npm run dev:all:apps\" \"npm run server\"",
+    "dev:all": "concurrently \"npm run dev:all:apps\" \"npm run server\" \"npm run coming-soon\"",
     "dev:all:apps": "concurrently \"npm run dev:web\" \"npm run dev:webapp\" \"npm run dev:vendor\" \"npm run dev:rider\" \"npm run dev:admin\"",
-    "dev:headless": "cross-env HEADLESS=true concurrently \"npm run dev:web\" \"npm run dev:webapp\" \"npm run dev:vendor\" \"npm run dev:rider\" \"npm run dev:admin\" \"npm run server\"",
+    "dev:headless": "cross-env HEADLESS=true concurrently \"npm run dev:web\" \"npm run dev:webapp\" \"npm run dev:vendor\" \"npm run dev:rider\" \"npm run dev:admin\" \"npm run server\" \"npm run coming-soon\"",
     "build": "vite build",
     "build:web": "vite build --mode web",
     "build:webapp": "vite build --mode webapp",
@@ -24,6 +24,7 @@
     "preview": "vite preview",
     "server": "nodemon server/index.js",
     "server:api": "nodemon server/index.js --headless",
+    "coming-soon": "node coming-soon/server.js",
     "test:admin": "node scratch/test_admin_login.js"
   },
   "dependencies": {

@@ -1,0 +1,17 @@
+{
+  "name": "passwala-coming-soon",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Coming soon landing page for Passwala",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "nodemailer": "^9.0.1"
+  }
+}

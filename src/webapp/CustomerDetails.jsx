@@ -30,6 +30,7 @@ const CustomerDetails = ({ user, onComplete }) => {
   const [loading, setLoading] = useState(false);
   const [checkingPromo, setCheckingPromo] = useState(false);
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [dbUserId, setDbUserId] = useState(null);
 
   const { lat, lng, error: geoError, errorCode, rawAddressObj, loading: geoLoading, startTracking, stopTracking } = useSecureLocation();
 
@@ -107,6 +108,7 @@ const CustomerDetails = ({ user, onComplete }) => {
       const { data: profile } = await query.maybeSingle();
          
       if (profile) {
+        setDbUserId(profile.id);
         setFormData(prev => ({
           ...prev,
           fullName: profile.full_name || prev.fullName,
@@ -117,7 +119,9 @@ const CustomerDetails = ({ user, onComplete }) => {
 
       // 2. Fetch Default Address
       const targetUserId = profile?.id || userId;
-      if (!targetUserId) return;
+      if (!targetUserId) {
+        return;
+      }
 
       const { data: address } = await supabase
         .from('addresses')
@@ -157,7 +161,8 @@ const CustomerDetails = ({ user, onComplete }) => {
           houseName: hName,
           houseNo: hNo,
           floor: fl,
-          society: soc,
+          // Use the dedicated society column if available, fall back to parsed value
+          society: address.society || soc,
           landmark: address.address_line_2 || '',
           city: address.city || '',
           pincode: address.pincode || ''
@@ -222,23 +227,74 @@ const CustomerDetails = ({ user, onComplete }) => {
         console.warn('Firebase profile update failed:', fbErr);
       }
 
-      // 1. Update/Upsert User Table
-      // Normalize phone: always store as 10-digit number, no +91 prefix
+      // 1. Resolve/Update User in Database
       const rawPhone = formData.phone || user?.phoneNumber || '';
       const cleanPhone = rawPhone.replace(/[\s\-().]/g, '').replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, '');
 
-      const { data: updatedUser, error: userError } = await supabase
-        .from('users')
-        .upsert([{ 
-          id: userId?.length === 36 ? userId : undefined,
-          uid: user?.uid || userId, // Ensure UID is stored for Auth lookup
-          phone: cleanPhone,
-          full_name: formData.fullName,
-          email: formData.email,
-          role: 'BUYER' // Explicitly set role
-        }], { onConflict: 'uid' }) // Sync by UID
-        .select()
-        .single();
+      const userPayload = {
+        uid: user?.uid || userId, // Ensure UID is stored for Auth lookup
+        phone: cleanPhone,
+        full_name: formData.fullName,
+        email: formData.email,
+        role: 'BUYER' // Explicitly set role
+      };
+
+      let resolvedDbUserId = dbUserId;
+      let updatedUser = null;
+      let userError = null;
+
+      if (resolvedDbUserId) {
+        const { data, error } = await supabase
+          .from('users')
+          .update(userPayload)
+          .eq('id', resolvedDbUserId)
+          .select()
+          .single();
+        updatedUser = data;
+        userError = error;
+      } else {
+        // Try looking up existing user by uid or phone
+        const { data: existing } = await supabase
+          .from('users')
+          .select('id')
+          .or(`uid.eq.${user?.uid || userId},phone.eq.${cleanPhone}`)
+          .maybeSingle();
+
+        if (existing) {
+          resolvedDbUserId = existing.id;
+          setDbUserId(existing.id);
+          const { data, error } = await supabase
+            .from('users')
+            .update(userPayload)
+            .eq('id', existing.id)
+            .select()
+            .single();
+          updatedUser = data;
+          userError = error;
+        } else {
+          // Insert a new user if none exists
+          const { data, error } = await supabase
+            .from('users')
+            .insert([userPayload])
+            .select()
+            .single();
+          updatedUser = data;
+          userError = error;
+          if (data) {
+            resolvedDbUserId = data.id;
+            setDbUserId(data.id);
+          }
+        }
+      }
+
+      if (userError) {
+        console.warn('Supabase user save error:', userError.message);
+      }
+
+      const targetDbUserId = updatedUser?.id || resolvedDbUserId;
+      if (!targetDbUserId) {
+        throw new Error('Failed to resolve database user profile. Please try logging in again.');
+      }
 
       // Attempt Sync through Backend
       const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
@@ -259,17 +315,17 @@ const CustomerDetails = ({ user, onComplete }) => {
         })
       });
 
-      // 2. Update/Upsert Addresses Table directly in Supabase
+      // 2. Update/Upsert Addresses Table directly in Supabase using verified DB UUID
       const { data: existingAddress } = await supabase
         .from('addresses')
         .select('id')
-        .eq('user_id', updatedUser?.id || userId)
+        .eq('user_id', targetDbUserId)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
       const addrPayload = {
-        user_id: updatedUser?.id || userId,
+        user_id: targetDbUserId,
         address_line_1: `${formData.houseName ? formData.houseName + ', ' : ''}${formData.houseNo}, ${formData.floor ? 'Floor ' + formData.floor + ', ' : ''}${formData.society}`,
         address_line_2: formData.landmark,
         city: formData.city,

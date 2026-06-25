@@ -436,7 +436,14 @@ const EventDetails = ({ user }) => {
                   return (
                     <div key={ev.id} className="ed2-similar-card" onClick={() => navigate(`/events/${ev.id}`)}>
                       <div className="ed2-similar-img-wrap">
-                        <img src={evImg} alt={ev.title} />
+                        <img 
+                          src={evImg} 
+                          alt={ev.title} 
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=400&q=70';
+                          }}
+                        />
                       </div>
                       <div className="ed2-similar-info">
                         <p className="ed2-similar-title">{ev.title}</p>

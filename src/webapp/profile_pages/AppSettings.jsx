@@ -105,29 +105,27 @@ const AppSettings = ({ isDarkMode, onToggleTheme }) => {
                  <div className="switch-knob"></div>
               </div>
            </div>
-           <div className="profile-menu-item no-border-hover" onClick={() => {
-              const keys = Object.keys(languages);
-              const currentIndex = keys.indexOf(currentLanguage);
-              const nextIndex = (currentIndex + 1) % keys.length;
-              const nextLang = keys[nextIndex];
-              changeLanguage(nextLang);
-              toast.success(`Language set to ${languages[nextLang].name}`);
-           }}>
-              <div className="menu-item-left">
-                 <div className="menu-icon-box" style={{ background: 'rgba(59, 130, 246, 0.08)', color: '#3b82f6' }}><Globe size={20} /></div>
-                 <div className="menu-text">
-                    <strong>App Language</strong>
-                    <span>Currently: {languages[currentLanguage]?.name || 'English'}</span>
-                 </div>
-              </div>
-              <ChevronRight size={18} color="var(--text-secondary)" />
-           </div>
+        </div>
+
+        <div className="section-header-compact">
+           <h3>LANGUAGE / ભાષા / भाषा</h3>
+        </div>
+        <div className="settings-language-pills">
+          {Object.entries(languages).map(([code, lang]) => (
+            <button
+              key={code}
+              className={`lang-pill-item ${currentLanguage === code ? 'active' : ''}`}
+              onClick={() => { changeLanguage(code); toast.success(`Language set to ${lang.name}`); }}
+            >
+              <Globe size={16} />
+              <span>{lang.name}</span>
+            </button>
+          ))}
         </div>
 
         <div className="section-header-compact">
            <h3>ABOUT PASSWALA</h3>
         </div>
-
         <div className="profile-menu-container glass">
            <div className="profile-menu-item" onClick={() => toast('Passwala v2.0.4. (Built with React & Supabase)')}>
               <div className="menu-item-left">

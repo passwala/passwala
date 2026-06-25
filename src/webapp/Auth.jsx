@@ -314,10 +314,7 @@ const Auth = ({ onLogin }) => {
         const res = await fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...userData,
-            address: { address_line_1: '', address_line_2: '' }
-          })
+          body: JSON.stringify(userData)
         });
         if (res.ok) {
           const data = await res.json();

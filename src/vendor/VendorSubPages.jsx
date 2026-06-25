@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import ReactDOM from 'react-dom';
 import { Package, FileText, IndianRupee, Wallet, Star, Bell, HelpCircle, CheckCircle, Clock, MapPin, Download, ArrowUpRight, ArrowDownRight, Tag, Trash2, PackagePlus, Camera, Wrench, AlertTriangle, X, Calendar, ScanLine, Zap, QrCode, Layers } from 'lucide-react';
 import { supabase } from '../supabase';
@@ -3392,79 +3392,78 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                          <div key={show.id || idx} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: '#475569' }}>
                              <span style={{ fontWeight: 600 }}>📅 {showDateStr}</span>
-                             <span style={{
-                               fontWeight: 700,
-                               color: show.available_seats === 0 ? '#ef4444'
-                                 : show.available_seats / show.total_seats < 0.2 ? '#f59e0b'
-                                 : '#22c55e'
-                             }}>
-                               {show.available_seats === 0 ? 'Sold Out' : `${show.available_seats}/${show.total_seats} left`}
-                             </span>
-                           </div>
-                           {show.total_seats > 0 && (
-                             <div style={{
-                               width: '100%', height: '4px', borderRadius: '10px',
-                               background: '#e2e8f0', overflow: 'hidden'
-                             }}>
-                               <div style={{
-                                 height: '100%', borderRadius: '10px',
-                                 width: `${Math.max(0, Math.min(100, pct))}%`,
-                                 background: show.available_seats === 0 ? '#ef4444'
-                                   : show.available_seats / show.total_seats < 0.2 ? '#f59e0b'
-                                   : '#22c55e',
-                                 transition: 'width 0.4s ease'
-                               }} />
-                             </div>
-                           )}
-                         </div>
-                       );
-                     })}
-                   </div>
-                 ) : (
-                   <>
-                     {businessType === 'event' && item.event_date && (
-                       <p style={{ margin: '4px 0 6px 0', fontSize: '0.75rem', color: '#64748b', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                         <span>📅 {(() => {
-                           try {
-                             const formattedStr = typeof item.event_date === 'string' ? item.event_date.replace(' ', 'T') : item.event_date;
-                             const d = new Date(formattedStr);
-                             if (!isNaN(d.getTime())) {
-                               return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-                             }
-                           } catch (e) {}
-                           return 'Unknown Date';
-                         })()}</span>
-                         {item.venue_name && <span>📍 {item.venue_name}</span>}
-                       </p>
-                     )}
-
-                    {businessType === 'event' && item.total_seats > 0 && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                        <div style={{
-                          flex: 1, height: '5px', borderRadius: '10px',
-                          background: '#e2e8f0', overflow: 'hidden'
-                        }}>
+                              <span style={{
+                                fontWeight: 700,
+                                color: show.available_seats === 0 ? '#ef4444'
+                                  : show.available_seats / show.total_seats < 0.2 ? '#f59e0b'
+                                  : '#22c55e'
+                              }}>
+                                 {show.available_seats === 0 ? 'Sold Out' : `${show.available_seats}/${show.total_seats} left`}
+                              </span>
+                            </div>
+                            {show.total_seats > 0 && (
+                              <div style={{
+                                width: '100%', height: '4px', borderRadius: '10px',
+                                background: '#e2e8f0', overflow: 'hidden'
+                              }}>
+                                <div style={{
+                                  height: '100%', borderRadius: '10px',
+                                  width: `${Math.max(0, Math.min(100, pct))}%`,
+                                  background: show.available_seats === 0 ? '#ef4444'
+                                    : show.available_seats / show.total_seats < 0.2 ? '#f59e0b'
+                                    : '#22c55e',
+                                  transition: 'width 0.4s ease'
+                                }} />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <>
+                      {businessType === 'event' && item.event_date && (
+                        <p style={{ margin: '4px 0 6px 0', fontSize: '0.75rem', color: '#64748b', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                          <span>📅 {(() => {
+                            try {
+                              const formattedStr = typeof item.event_date === 'string' ? item.event_date.replace(' ', 'T') : item.event_date;
+                              const d = new Date(formattedStr);
+                              if (!isNaN(d.getTime())) {
+                                return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                              }
+                            } catch (e) { /* Invalid date format — fall through to 'Unknown Date' */ }
+                            return 'Unknown Date';
+                          })()}</span>
+                          {item.venue_name && <span>📍 {item.venue_name}</span>}
+                        </p>
+                      )}
+                      {businessType === 'event' && item.total_seats > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
                           <div style={{
-                            height: '100%', borderRadius: '10px',
-                            width: `${Math.max(0, Math.min(100, (item.available_seats / item.total_seats) * 100))}%`,
-                            background: item.available_seats === 0 ? '#ef4444'
+                            flex: 1, height: '5px', borderRadius: '10px',
+                            background: '#e2e8f0', overflow: 'hidden'
+                          }}>
+                            <div style={{
+                              height: '100%', borderRadius: '10px',
+                              width: `${Math.max(0, Math.min(100, (item.available_seats / item.total_seats) * 100))}%`,
+                              background: item.available_seats === 0 ? '#ef4444'
+                                : item.available_seats / item.total_seats < 0.2 ? '#f59e0b'
+                                : '#22c55e',
+                              transition: 'width 0.4s ease'
+                            }} />
+                          </div>
+                          <span style={{
+                            fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap',
+                            color: item.available_seats === 0 ? '#ef4444'
                               : item.available_seats / item.total_seats < 0.2 ? '#f59e0b'
-                              : '#22c55e',
-                            transition: 'width 0.4s ease'
-                          }} />
+                              : '#22c55e'
+                          }}>
+                            {item.available_seats === 0 ? 'Sold Out' : `${item.available_seats} seats left`}
+                          </span>
                         </div>
-                        <span style={{
-                          fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap',
-                          color: item.available_seats === 0 ? '#ef4444'
-                            : item.available_seats / item.total_seats < 0.2 ? '#f59e0b'
-                            : '#22c55e'
-                        }}>
-                          {item.available_seats === 0 ? 'Sold Out' : `${item.available_seats} seats left`}
-                        </span>
-                      </div>
-                    )}
-                  </>
-                )}
+                      )}
+                    </>
+                  )}
 
                 <div className="v-card-footer">
                   <div className="v-price-tag">

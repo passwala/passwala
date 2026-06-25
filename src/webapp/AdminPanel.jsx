@@ -245,6 +245,7 @@ const tabSections = [
       { id: 'dashboard_panel', label: 'Dashboard', icon: BarChart3 },
       { id: 'people_map_panel', label: 'People Map', icon: Map, table: 'users' },
       { id: 'users_panel', label: 'Users', icon: Users, table: 'users' },
+      { id: 'coming_soon_panel', label: 'Coming Soon', icon: Clock, table: 'users' },
       { id: 'vendors_panel', label: 'Vendors', icon: ShoppingBag, table: 'vendors' },
       { id: 'riders_panel', label: 'Riders', icon: Truck, table: 'riders' },
     ]
@@ -2088,15 +2089,25 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
     const seenSignatures = new Set();
     filtered.forEach(item => {
       if (currentTab.table === 'users') {
-        const role = item.role ? item.role.toUpperCase() : 'BUYER';
-        if (userRoleFilter === 'BUYER' && role !== 'BUYER' && role !== 'USER') {
-          return;
-        }
-        if (userRoleFilter === 'RIDER' && role !== 'RIDER') {
-          return;
-        }
-        if (userRoleFilter === 'VENDOR' && role !== 'VENDOR' && role !== 'SERVICE_PROVIDER') {
-          return;
+        const nameUpper = (item.full_name || '').toUpperCase();
+        const phoneStr = String(item.phone || '');
+        const isComingSoon = nameUpper === 'COMING SOON SUBSCRIBER' || phoneStr.startsWith('CS_');
+
+        if (activeAdminTab === 'coming_soon_panel') {
+          if (!isComingSoon) return;
+        } else {
+          if (isComingSoon) return;
+
+          const role = item.role ? item.role.toUpperCase() : 'BUYER';
+          if (userRoleFilter === 'BUYER' && role !== 'BUYER' && role !== 'USER') {
+            return;
+          }
+          if (userRoleFilter === 'RIDER' && role !== 'RIDER') {
+            return;
+          }
+          if (userRoleFilter === 'VENDOR' && role !== 'VENDOR' && role !== 'SERVICE_PROVIDER') {
+            return;
+          }
         }
       }
 
@@ -2148,15 +2159,25 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
     filtered.forEach(item => {
       // Filter based on selected userRoleFilter in the Users tab
       if (currentTab.table === 'users') {
-        const role = item.role ? item.role.toUpperCase() : 'BUYER';
-        if (userRoleFilter === 'BUYER' && role !== 'BUYER' && role !== 'USER') {
-          return;
-        }
-        if (userRoleFilter === 'RIDER' && role !== 'RIDER') {
-          return;
-        }
-        if (userRoleFilter === 'VENDOR' && role !== 'VENDOR' && role !== 'SERVICE_PROVIDER') {
-          return;
+        const nameUpper = (item.full_name || '').toUpperCase();
+        const phoneStr = String(item.phone || '');
+        const isComingSoon = nameUpper === 'COMING SOON SUBSCRIBER' || phoneStr.startsWith('CS_');
+
+        if (activeAdminTab === 'coming_soon_panel') {
+          if (!isComingSoon) return;
+        } else {
+          if (isComingSoon) return;
+
+          const role = item.role ? item.role.toUpperCase() : 'BUYER';
+          if (userRoleFilter === 'BUYER' && role !== 'BUYER' && role !== 'USER') {
+            return;
+          }
+          if (userRoleFilter === 'RIDER' && role !== 'RIDER') {
+            return;
+          }
+          if (userRoleFilter === 'VENDOR' && role !== 'VENDOR' && role !== 'SERVICE_PROVIDER') {
+            return;
+          }
         }
       }
 
@@ -2225,7 +2246,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
 
     return (
       <div className="admin-table-container">
-        {currentTab.table === 'users' && (
+        {currentTab.table === 'users' && activeAdminTab !== 'coming_soon_panel' && (
           <div className="user-role-tabs" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', flexWrap: 'wrap' }}>
             {[
               { id: 'ALL', label: 'All Users' },

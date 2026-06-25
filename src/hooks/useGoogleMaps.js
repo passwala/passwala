@@ -6,12 +6,12 @@ let callbacks = [];
 
 export function useGoogleMaps() {
   const [loaded, setLoaded] = useState(
-    isScriptLoaded || (typeof window !== 'undefined' && !!window.google?.maps)
+    isScriptLoaded || (typeof window !== 'undefined' && !!window.google?.maps?.Map)
   );
 
   useEffect(() => {
     // Skip if already loaded
-    if (isScriptLoaded || (typeof window !== 'undefined' && !!window.google?.maps)) {
+    if (isScriptLoaded || (typeof window !== 'undefined' && !!window.google?.maps?.Map)) {
       if (!loaded) { setTimeout(() => setLoaded(true), 0); }
       return;
     }
@@ -36,10 +36,16 @@ export function useGoogleMaps() {
       script.async = true;
       script.defer = true;
       script.onload = () => {
-        isScriptLoading = false;
-        isScriptLoaded = true;
-        callbacks.forEach((cb) => cb());
-        callbacks = [];
+        // Wait for the asynchronous loader to fully populate the maps namespaces
+        const checkMapConstructor = setInterval(() => {
+          if (window.google?.maps?.Map) {
+            clearInterval(checkMapConstructor);
+            isScriptLoading = false;
+            isScriptLoaded = true;
+            callbacks.forEach((cb) => cb());
+            callbacks = [];
+          }
+        }, 50);
       };
       script.onerror = () => {
         console.error('[Maps] Failed to load Google Maps script.');

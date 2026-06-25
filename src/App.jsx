@@ -48,6 +48,7 @@ const Wallet = React.lazy(() => import('./webapp/profile_pages/Wallet'));
 const PrivacySecurity = React.lazy(() => import('./webapp/profile_pages/PrivacySecurity'));
 const HelpSupport = React.lazy(() => import('./webapp/profile_pages/HelpSupport'));
 const AppSettings = React.lazy(() => import('./webapp/profile_pages/AppSettings'));
+const AddressManager = React.lazy(() => import('./webapp/profile_pages/AddressManager'));
 const NeighborhoodHub = React.lazy(() => import('./webapp/buyer/NeighborhoodHub'));
 const CityTicketBooking = React.lazy(() => import('./webapp/buyer/CityTicketBooking'));
 const RideCheckout = React.lazy(() => import('./webapp/buyer/RideCheckout'));
@@ -383,7 +384,7 @@ const AppContent = ({
     syncToken();
   }, [effectiveUser, fcmToken]);
 
-  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const [_isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [isDevModalOpen, setIsDevModalOpen] = useState(false);
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -554,9 +555,10 @@ const AppContent = ({
                             locationPath === '/neighbors' ? t('community') :
                               locationPath === '/order-history' ? t('order_history') :
                                 locationPath === '/wallet' ? t('passwala_wallet') :
-                                  locationPath === '/privacy-security' ? t('privacy_security') :
-                                    locationPath === '/help-support' ? t('help_support') :
-                                      locationPath === '/settings' ? t('settings') : null
+                                  locationPath === '/manage-addresses' ? 'My Addresses' :
+                                    locationPath === '/privacy-security' ? t('privacy_security') :
+                                      locationPath === '/help-support' ? t('help_support') :
+                                        locationPath === '/settings' ? t('settings') : null
                   }
                 />
               )
@@ -652,6 +654,7 @@ const AppContent = ({
                   <Route path="/help-support" element={effectiveUser ? <HelpSupport /> : <Navigate to="/" />} />
                   <Route path="/settings" element={effectiveUser ? <AppSettings isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/" />} />
                   <Route path="/select-location" element={effectiveUser ? <LocationSelector currentLocation={location} onLocationChange={setLocation} /> : <Navigate to="/" />} />
+                  <Route path="/manage-addresses" element={effectiveUser ? <AddressManager user={effectiveUser} /> : <Navigate to="/" />} />
                   <Route path="/complete-profile" element={effectiveUser ? <CustomerDetails user={effectiveUser} onComplete={(addr, name) => { setIsProfileComplete(true); setUserAddress(addr); if (name) { setUser(prev => ({ ...prev, displayName: name })); } navigate('/'); }} /> : <Navigate to="/" />} />
                 </Routes>
               </Suspense>
@@ -746,7 +749,7 @@ const AppContent = ({
             {isWebMode && <Footer />}
 
             {/* 5. Drawers / Modals */}
-            <CartDrawer location={location} isProfileComplete={isProfileComplete} userAddress={userAddress} />
+            <CartDrawer location={location} isProfileComplete={isProfileComplete} userAddress={userAddress} user={effectiveUser} />
             <AIChatWidget user={effectiveUser} onLogin={(userData) => {
               localStorage.setItem('passwala_user', JSON.stringify(userData));
               localStorage.setItem('passwala_profile_complete', 'true');

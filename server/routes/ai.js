@@ -1,6 +1,5 @@
 import express from 'express';
 import supabase from '../supabase.js';
-import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -44,7 +43,7 @@ router.post('/chat', async (req, res) => {
   let responseCard = null;
 
   try {
-    if (lowerInput.includes('history') || lowerInput.includes('past orders') || lowerInput.includes('my orders') || lowerInput.includes('past bookings') || lowerInput.includes('my bookings') || lowerInput.includes('order history')) {
+    if (lowerInput.includes('history') || lowerInput.includes('past orders') || lowerInput.includes('my orders') || lowerInput.includes('past bookings') || lowerInput.includes('my bookings') || lowerInput.includes('order history') || (lowerInput.includes('open') && lowerInput.includes('history'))) {
       responseText = "Sure! I can help you view your order and booking history. I am redirecting you to your Order History page now.";
       responseCard = {
         type: 'navigation',
@@ -55,6 +54,97 @@ router.post('/chat', async (req, res) => {
         data: {
           path: '/order-history',
           pageName: 'Order History'
+        }
+      };
+    } else if (lowerInput.match(/\b(?:open|go\s+to|show|view|navigate\s+to)\s+(?:the\s+)?(?:event|ticket|pass|concert)s?\b/) || lowerInput.includes('open event') || lowerInput.includes('go to events') || lowerInput.includes('show events')) {
+      responseText = "Certainly! 🎫 I am redirecting you to the Events Hub, where you can browse and book upcoming local events.";
+      responseCard = {
+        type: 'navigation',
+        title: 'Open Events Hub',
+        price: 0,
+        details: 'Browse and book premium events near you.',
+        action: 'NAVIGATE',
+        data: {
+          path: '/events',
+          pageName: 'Events Hub'
+        }
+      };
+    } else if (lowerInput.match(/\b(?:open|go\s+to|show|view|navigate\s+to)\s+(?:the\s+)?(?:grocery|groceries|shop|store|market)s?\b/) || lowerInput.includes('open grocery') || lowerInput.includes('go to shops') || lowerInput.includes('show shops') || lowerInput.includes('open market') || lowerInput.includes('near shops')) {
+      responseText = "Certainly! 🛍️ I am redirecting you to the Near Shops page, where you can order groceries and daily essentials.";
+      responseCard = {
+        type: 'navigation',
+        title: 'Open Near Shops',
+        price: 0,
+        details: 'Order groceries and essentials from local neighborhood shops.',
+        action: 'NAVIGATE',
+        data: {
+          path: '/near-shops',
+          pageName: 'Near Shops'
+        }
+      };
+    } else if (lowerInput.match(/\b(?:open|go\s+to|show|view|navigate\s+to)\s+(?:the\s+)?(?:service|expert|plumber|electrician|carpenter|painting|cleaning|home\s+service)s?\b/) || lowerInput.includes('open services') || lowerInput.includes('go to services') || lowerInput.includes('show services')) {
+      responseText = "Certainly! 🛠️ I am redirecting you to the Expert Services page, where you can book verified plumbers, electricians, cleaners, and painters.";
+      responseCard = {
+        type: 'navigation',
+        title: 'Open Expert Services',
+        price: 0,
+        details: 'Book verified, premium home service experts.',
+        action: 'NAVIGATE',
+        data: {
+          path: '/expert-services',
+          pageName: 'Expert Services'
+        }
+      };
+    } else if (lowerInput.match(/\b(?:open|go\s+to|show|view|navigate\s+to)\s+(?:the\s+)?(?:ride|cab|auto|rickshaw|taxi|vehicle)s?\b/) || lowerInput.includes('open ride') || lowerInput.includes('go to rides') || lowerInput.includes('show rides') || lowerInput.includes('open cab') || lowerInput.includes('go to cab')) {
+      responseText = "Certainly! 🛵 I am redirecting you to the City Ride booking page, where you can book local rides across Ahmedabad.";
+      responseCard = {
+        type: 'navigation',
+        title: 'Open City Ride',
+        price: 0,
+        details: 'Book local rides, autos, and cabs across the city.',
+        action: 'NAVIGATE',
+        data: {
+          path: '/city-ride',
+          pageName: 'City Ride'
+        }
+      };
+    } else if (lowerInput.match(/\b(?:open|go\s+to|show|view|navigate\s+to)\s+(?:the\s+)?(?:profile|setting|account)s?\b/) || lowerInput.includes('open profile') || lowerInput.includes('go to profile') || lowerInput.includes('show profile') || lowerInput.includes('open settings') || lowerInput.includes('go to settings')) {
+      responseText = "Certainly! 👤 I am redirecting you to your Account Settings and Profile page.";
+      responseCard = {
+        type: 'navigation',
+        title: 'Open My Profile',
+        price: 0,
+        details: 'View profile details, address settings, and app configurations.',
+        action: 'NAVIGATE',
+        data: {
+          path: '/profile',
+          pageName: 'My Profile'
+        }
+      };
+    } else if (lowerInput.match(/\b(?:open|go\s+to|show|view|navigate\s+to)\s+(?:the\s+)?(?:wallet|balance|recharge)s?\b/) || lowerInput.includes('open wallet') || lowerInput.includes('go to wallet') || lowerInput.includes('recharge wallet') || lowerInput.includes('wallet balance')) {
+      responseText = "Certainly! 💰 I am redirecting you to the Passwala Wallet page, where you can check your balance and recharge.";
+      responseCard = {
+        type: 'navigation',
+        title: 'Open Wallet',
+        price: 0,
+        details: 'Check balance and recharge your Passwala Wallet.',
+        action: 'NAVIGATE',
+        data: {
+          path: '/wallet',
+          pageName: 'Wallet'
+        }
+      };
+    } else if (lowerInput.match(/\b(?:open|go\s+to|show|view|navigate\s+to)\s+(?:the\s+)?(?:community|neighbor|neighbour|neighborhood)s?\b/) || lowerInput.includes('open community') || lowerInput.includes('go to community') || lowerInput.includes('open neighbors') || lowerInput.includes('go to neighbors')) {
+      responseText = "Certainly! 👥 I am redirecting you to the Neighbors Community Hub.";
+      responseCard = {
+        type: 'navigation',
+        title: 'Open Neighbors Hub',
+        price: 0,
+        details: 'Connect, chat, and share with your local Ahmedabad neighborhood.',
+        action: 'NAVIGATE',
+        data: {
+          path: '/neighbors',
+          pageName: 'Neighbors Community'
         }
       };
     } else if (lowerInput.includes('cancel') || lowerInput.includes('cancle') || lowerInput.includes('revert') || lowerInput.includes('abort')) {

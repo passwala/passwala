@@ -926,6 +926,10 @@ const OrderHistory = () => {
                           src={event?.banner_url || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&q=80'}
                           alt={event?.title}
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&q=80';
+                          }}
                         />
                         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(0,0,0,0.05) 0%,rgba(0,0,0,0.7) 100%)' }} />
                         <div style={{ position: 'absolute', bottom: 10, left: 14, right: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>

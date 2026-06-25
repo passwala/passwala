@@ -385,9 +385,9 @@ router.post('/', authLimiter, async (req, res) => {
       });
     }
 
-    // 4. Handle Address if provided
+    // 4. Handle Address if provided and contains valid content
     const { address } = req.body;
-    if (address && resultData) {
+    if (address && address.address_line_1 && address.address_line_1.trim() !== '' && resultData) {
         const addressPayload = {
             user_id: resultData.id,
             address_line_1: address.address_line_1,

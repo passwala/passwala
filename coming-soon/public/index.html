@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Passwala — Coming Soon | India's Neighborhood App</title>
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="Passwala is coming soon to India! Book rides, order fresh groceries, schedule verified home services, and buy premium event passes. Get notified.">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Premium Cinematic Preloader -->
+  <div id="preloader">
+    <div class="loader-content">
+      <div class="loader-logo">
+        <span class="char" style="--i:1">P</span>
+        <span class="char" style="--i:2">a</span>
+        <span class="char" style="--i:3">s</span>
+        <span class="char" style="--i:4">s</span>
+        <span class="char" style="--i:5">w</span>
+        <span class="char" style="--i:6">a</span>
+        <span class="char" style="--i:7">l</span>
+        <span class="char" style="--i:8">a</span>
+        <span class="char dot" style="--i:9">.</span>
+      </div>
+      <div class="loader-progress-wrapper">
+        <div class="loader-progress-bar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Main Screen Card -->
+  <div class="screen-container">
+    
+    <!-- Full-screen Slideshow Images -->
+    <div class="slideshow">
+      <div class="slide active" style="background-image: url('assets/city_rides.png');"></div>
+      <div class="slide" style="background-image: url('assets/groceries.png');"></div>
+      <div class="slide" style="background-image: url('assets/expert_services.png');"></div>
+      <div class="slide" style="background-image: url('assets/event_passes.png');"></div>
+    </div>
+    
+    <!-- Premium Overlays (Dark & Glow Orange) -->
+    <div class="screen-overlay"></div>
+    <div class="orange-glow-top"></div>
+    <div class="orange-glow-bottom"></div>
+
+    <!-- Content Wrapper -->
+    <div class="content-wrapper">
+      <!-- Header -->
+      <header class="header">
+        <div class="logo-container">
+          <div class="logo-glow"></div>
+          <span class="logo-text"><span class="weight-regular">Pass</span><span class="weight-medium">wala</span></span>
+        </div>
+        <div class="badge">COMING SOON</div>
+      </header>
+
+      <!-- Main Layout -->
+      <main class="main-content">
+        <!-- Center/Left Side: Hero Details & Signup -->
+        <div class="hero-left">
+          <div class="coming-soon-badge">Namaste India</div>
+          <h1 class="title">
+            <span class="title-light">India's Smartest</span> <br>
+            <span class="gradient-text">Neighborhood App</span>
+          </h1>
+          <p class="subtitle">
+            We are preparing something amazing. Get ready to experience a seamless platform for verified services, daily essentials, eco-rides, and exclusive event bookings.
+          </p>
+
+          <!-- Notify Form Card -->
+          <div class="notify-card minimal-box" id="notifyCard">
+            <!-- Form content wrapper to allow fading out -->
+            <div class="form-content-wrapper" id="formWrapper">
+              <h2 class="card-title">Get Early Access & Launch Updates</h2>
+              <p class="card-subtitle">Be the first to know when we launch and get exclusive welcome discount vouchers.</p>
+              <form id="notifyForm" class="notify-form">
+                <div class="input-wrapper">
+                  <svg class="mail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                  </svg>
+                  <input type="email" id="emailInput" placeholder="Enter your email address" required aria-label="Email address">
+                </div>
+                <button type="submit" id="submitBtn">
+                  <span>Notify Me</span>
+                  <svg class="arrow-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                  </svg>
+                </button>
+              </form>
+              <div id="statusMsg" class="status-msg"></div>
+            </div>
+
+            <!-- Success content wrapper (hidden by default) -->
+            <div class="success-content-wrapper" id="successWrapper" style="display: none;">
+              <div class="success-icon-box">
+                <svg class="checkmark-svg" viewBox="0 0 52 52">
+                  <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+                  <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                </svg>
+              </div>
+              <h2 class="card-title success-title">Welcome to the Club! 🎉</h2>
+              <p class="card-subtitle success-subtitle">
+                We've sent your welcome discount voucher <strong class="discount-badge">PASSWALA50</strong> to <span id="successEmail" class="highlight-email"></span>. Check your inbox!
+              </p>
+              <button type="button" id="dismissSuccessBtn" class="dismiss-btn">Got It</button>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Sub-Footer Copyright & Legal Links -->
+      <div class="sub-footer">
+        <span class="copyright">© 2026 Passwala and Team</span>
+        <div class="legal-links">
+          <a href="#" id="privacyLink" class="legal-link">Privacy & Policies</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Privacy & Policies Modal -->
+  <div id="privacyModal" class="modal-overlay">
+    <div class="modal-card minimal-box">
+      <div class="modal-header">
+        <h2 class="modal-title">Privacy & Policies</h2>
+        <button id="closeModalBtn" class="close-modal-btn" aria-label="Close modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-text">We only collect your email address to notify you when the Passwala app officially launches. Your email ID is stored securely, and we do not share it with third parties.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Glowing Cursor Follower -->
+  <div class="cursor-dot"></div>
+  <div class="cursor-outline"></div>
+
+  <!-- Scripts -->
+  <script src="app.js"></script>
+</body>
+</html>

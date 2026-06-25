@@ -706,3 +706,441 @@
   0% { transform: scale(0.33); opacity: 0.8; }
   80%, 100% { transform: scale(2.5); opacity: 0; }
 }
+
+/* ── Saved Address Selector (Checkout dialog) ───────────────────── */
+.saved-addresses-selector-list {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin: 18px 0;
+  padding-right: 6px;
+}
+
+/* Custom Scrollbar for Selector List */
+.saved-addresses-selector-list::-webkit-scrollbar {
+  width: 5px;
+}
+.saved-addresses-selector-list::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+.saved-addresses-selector-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.address-option-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left;
+}
+
+.address-option-card:hover {
+  transform: translateY(-2px);
+  border-color: #cbd5e1;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
+}
+
+.address-option-card.selected {
+  border-color: #ff7622;
+  background: #fff8f5;
+  box-shadow: 0 4px 12px rgba(255, 118, 34, 0.08);
+}
+
+.address-option-card .label-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.address-option-card.selected .label-icon {
+  background: #fff0e6 !important;
+}
+
+.address-option-card .address-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.address-option-card .address-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.address-option-card .address-text {
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.address-option-card .address-default-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #ff7622;
+  background: #fff0e6;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* Selector action buttons alignment */
+.confirm-actions-v4 .manage-btn-v4 {
+  background: #6366f1;
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.25);
+}
+
+.confirm-actions-v4 .manage-btn-v4:hover {
+  background: #4f46e5;
+}
+
+/* ── GoKwik Checkout Modal ────────────────────────── */
+.gokwik-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 7, 18, 0.85);
+  backdrop-filter: blur(12px);
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: gokwik-fadeIn 0.25s ease;
+}
+
+.gokwik-modal-card {
+  width: 100%;
+  max-width: 440px;
+  background: #ffffff;
+  border-radius: 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  animation: gokwik-slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  color: #1f2937;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.gokwik-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #f9fafb;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.gokwik-logo-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gokwik-brand {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #2b7d2b;
+  letter-spacing: -0.5px;
+}
+
+.gokwik-orange {
+  color: #ff7622;
+}
+
+.gokwik-badge {
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.gokwik-close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  padding: 4px;
+  border-radius: 50%;
+  transition: all 0.2s;
+  display: grid;
+  place-items: center;
+}
+
+.gokwik-close-btn:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+/* Merchant details header */
+.gokwik-merchant-bar {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f3f4f6;
+  gap: 12px;
+}
+
+.gokwik-merchant-bar .merchant-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ff7622 0%, #ff9e5e 100%);
+  color: #ffffff;
+  font-size: 1.4rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(255, 118, 34, 0.2);
+}
+
+.gokwik-merchant-bar .merchant-info {
+  flex: 1;
+}
+
+.gokwik-merchant-bar .merchant-info h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.gokwik-merchant-bar .merchant-info p {
+  margin: 2px 0 0 0;
+  font-size: 0.78rem;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+.gokwik-merchant-bar .merchant-amount {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+/* Body and inputs */
+.gokwik-body {
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.gokwik-step-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 6px 0;
+}
+
+.gokwik-step-desc {
+  font-size: 0.82rem;
+  color: #6b7280;
+  margin: 0 0 20px 0;
+}
+
+.gokwik-input-wrapper {
+  display: flex;
+  align-items: center;
+  border: 1.5px solid #d1d5db;
+  border-radius: 12px;
+  padding: 0 16px;
+  height: 52px;
+  background: #ffffff;
+  transition: border-color 0.2s;
+  margin-bottom: 18px;
+}
+
+.gokwik-input-wrapper:focus-within {
+  border-color: #ff7622;
+}
+
+.gokwik-country-code {
+  font-weight: 700;
+  color: #374151;
+  margin-right: 12px;
+}
+
+.gokwik-input {
+  border: none;
+  outline: none;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111827;
+  flex: 1;
+  width: 100%;
+}
+
+.otp-box {
+  justify-content: center;
+}
+
+.otp-input {
+  text-align: center;
+  letter-spacing: 12px;
+  font-size: 1.4rem;
+}
+
+.gokwik-action-btn {
+  background: #2b7d2b;
+  color: #ffffff;
+  border: none;
+  height: 52px;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(43, 125, 43, 0.2);
+}
+
+.gokwik-action-btn:hover:not(:disabled) {
+  background: #226422;
+  transform: translateY(-1px);
+}
+
+.gokwik-action-btn:disabled {
+  background: #cbd5e1;
+  color: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.gokwik-text-btn {
+  background: none;
+  border: none;
+  color: #ff7622;
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-top: 14px;
+  cursor: pointer;
+}
+
+.gokwik-text-btn:hover {
+  text-decoration: underline;
+}
+
+.gokwik-footer-note {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 0.72rem;
+  color: #9ca3af;
+}
+
+/* Payment selection list */
+.gokwik-payment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.gokwik-payment-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.gokwik-payment-item:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.gokwik-payment-item.active {
+  border-color: #ff7622;
+  background: #fff8f5;
+}
+
+.gokwik-payment-item input[type="radio"] {
+  accent-color: #ff7622;
+  width: 18px;
+  height: 18px;
+}
+
+.pay-logo {
+  font-size: 1.5rem;
+}
+
+.pay-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.pay-text strong {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.pay-text span {
+  font-size: 0.76rem;
+  color: #6b7280;
+}
+
+.checkout-pay {
+  background: #ff7622;
+  box-shadow: 0 4px 12px rgba(255, 118, 34, 0.25);
+}
+
+.checkout-pay:hover:not(:disabled) {
+  background: #e05e0c;
+}
+
+/* Success steps */
+.success-step {
+  align-items: center;
+  padding: 40px 20px;
+}
+
+.gokwik-success-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #f0fdf4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.2);
+}
+
+@keyframes gokwik-fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes gokwik-slideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+

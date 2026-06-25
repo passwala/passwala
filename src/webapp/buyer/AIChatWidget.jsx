@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, X, MessageSquare, Bot, User, Loader2, Phone, ShieldCheck, ShoppingBag, Wrench, Ticket, Bike, Check, MapPin, RefreshCw, Camera, Wallet, ArrowRight, Mic, MicOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+// eslint-disable-next-line no-unused-vars
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '../../supabase';
 import { useTranslation } from '../LanguageContext';
@@ -108,8 +109,60 @@ const AIChatWidget = ({ user, onLogin }) => {
     if (!transcript || !transcript.trim()) return;
     pendingVoiceInputRef.current = null;
 
-    // Simulate the send with the voice transcript
     const userInput = transcript.trim();
+    const lower = userInput.toLowerCase();
+
+    // Direct Voice Navigation Router (Instantly navigates without AI chat message overhead)
+    if (lower.includes('event') || lower.includes('ticket') || lower.includes('pass') || lower.includes('concert')) {
+      setInput('');
+      setIsOpen(false);
+      navigate('/events');
+      return;
+    }
+    if (lower.includes('grocery') || lower.includes('groceries') || lower.includes('shop') || lower.includes('store') || lower.includes('market')) {
+      setInput('');
+      setIsOpen(false);
+      navigate('/near-shops');
+      return;
+    }
+    if (lower.includes('service') || lower.includes('expert') || lower.includes('plumber') || lower.includes('electrician') || lower.includes('cleaner') || lower.includes('painter') || lower.includes('carpenter')) {
+      setInput('');
+      setIsOpen(false);
+      navigate('/expert-services');
+      return;
+    }
+    if (lower.includes('ride') || lower.includes('cab') || lower.includes('auto') || lower.includes('taxi') || lower.includes('rickshaw')) {
+      setInput('');
+      setIsOpen(false);
+      navigate('/city-ride');
+      return;
+    }
+    if (lower.includes('profile') || lower.includes('setting') || lower.includes('account')) {
+      setInput('');
+      setIsOpen(false);
+      navigate('/profile');
+      return;
+    }
+    if (lower.includes('wallet') || lower.includes('balance') || lower.includes('recharge')) {
+      setInput('');
+      setIsOpen(false);
+      navigate('/wallet');
+      return;
+    }
+    if (lower.includes('community') || lower.includes('neighbor') || lower.includes('neighbour')) {
+      setInput('');
+      setIsOpen(false);
+      navigate('/neighbors');
+      return;
+    }
+    if (lower.includes('history') || lower.includes('past order') || lower.includes('past booking') || lower.includes('my orders') || lower.includes('my bookings')) {
+      setInput('');
+      setIsOpen(false);
+      navigate('/order-history');
+      return;
+    }
+
+    // Simulate the send with the voice transcript
     const userMsg = {
       id: Date.now(),
       text: userInput,
@@ -1241,6 +1294,13 @@ const AIChatWidget = ({ user, onLogin }) => {
                                 <Camera size={16} /> Upload Photo
                               </button>
                             </>
+                          ) : msg.card.action === 'NAVIGATE' ? (
+                            <button 
+                              className="card-confirm-btn" 
+                              onClick={() => handleCardAction(msg.card.action, msg.card.data)}
+                            >
+                              <ArrowRight size={16} /> Go Now
+                            </button>
                           ) : (
                             <button 
                               className="card-confirm-btn" 

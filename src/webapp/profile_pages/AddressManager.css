@@ -1,0 +1,496 @@
+/* ────────────────────────────────────────────────────────────
+   AddressManager.css
+   ─────────────────────────────────────────────────────────── */
+
+.addr-manager-page {
+  padding: 1.2rem 1rem 6rem;
+  min-height: 100vh;
+  background: var(--bg, #f8f9fb);
+  font-family: 'Poppins', 'Inter', sans-serif;
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+.addr-manager-header {
+  margin-bottom: 1.4rem;
+}
+.addr-manager-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 0.2rem;
+}
+.addr-manager-header p {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* ── Loading ─────────────────────────────────────────────── */
+.addr-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 3rem 0;
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+.addr-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #f3f4f6;
+  border-top-color: #ff7622;
+  border-radius: 50%;
+  animation: addr-spin 0.7s linear infinite;
+}
+@keyframes addr-spin { to { transform: rotate(360deg); } }
+
+/* ── Address List ────────────────────────────────────────── */
+.addr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+/* ── Address Card ────────────────────────────────────────── */
+.addr-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 1rem 1.1rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border: 1.5px solid #f0f0f0;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.addr-card.is-default {
+  border-color: #ff7622;
+  box-shadow: 0 4px 18px rgba(255, 118, 34, 0.12);
+}
+
+.addr-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+.addr-label-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.25rem 0.65rem;
+  border-radius: 20px;
+}
+.addr-default-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #ff7622;
+  background: #fff4ee;
+  padding: 0.2rem 0.55rem;
+  border-radius: 20px;
+}
+
+.addr-card-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin-bottom: 0.8rem;
+}
+.addr-pin-icon {
+  color: #9ca3af;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.addr-card-body p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #374151;
+  line-height: 1.5;
+}
+
+.addr-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.addr-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.73rem;
+  font-weight: 600;
+  padding: 0.3rem 0.7rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.addr-action-btn.set-default {
+  background: #fff4ee;
+  color: #ff7622;
+}
+.addr-action-btn.set-default:hover {
+  background: #ff7622;
+  color: #fff;
+}
+.addr-action-btn.edit {
+  background: #eff6ff;
+  color: #3b82f6;
+}
+.addr-action-btn.edit:hover {
+  background: #3b82f6;
+  color: #fff;
+}
+.addr-action-btn.delete {
+  background: #fff1f0;
+  color: #ef4444;
+}
+.addr-action-btn.delete:hover {
+  background: #ef4444;
+  color: #fff;
+}
+
+/* ── Empty State ─────────────────────────────────────────── */
+.addr-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #9ca3af;
+}
+.addr-empty-icon {
+  margin: 0 auto 1rem;
+  color: #d1d5db;
+  display: block;
+}
+.addr-empty h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.4rem;
+}
+.addr-empty p {
+  font-size: 0.82rem;
+  color: #6b7280;
+  max-width: 240px;
+  margin: 0 auto;
+  line-height: 1.55;
+}
+
+/* ── Add Button ──────────────────────────────────────────── */
+.addr-add-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.9rem;
+  background: linear-gradient(135deg, #ff7622 0%, #ff9f5a 100%);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(255, 118, 34, 0.28);
+  transition: opacity 0.18s, transform 0.18s;
+}
+.addr-add-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+
+/* ── Form Overlay ────────────────────────────────────────── */
+.addr-form-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: flex-end;
+}
+
+.addr-form-sheet {
+  width: 100%;
+  background: #fff;
+  border-radius: 24px 24px 0 0;
+  padding: 1.4rem 1.2rem 2rem;
+  max-height: 92vh;
+  overflow-y: auto;
+}
+
+.addr-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.1rem;
+}
+.addr-form-header h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0;
+}
+.addr-form-close {
+  background: #f3f4f6;
+  border: none;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #374151;
+}
+
+/* ── Label Picker ────────────────────────────────────────── */
+.addr-label-picker {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.addr-label-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 10px;
+  border: 1.5px solid #e5e7eb;
+  background: #f9fafb;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.addr-label-option.active {
+  border-color: #ff7622;
+}
+
+/* ── Detect Button ───────────────────────────────────────── */
+.addr-detect-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem;
+  border-radius: 10px;
+  border: 1.5px dashed #d1d5db;
+  background: #f9fafb;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  margin-bottom: 1rem;
+  transition: all 0.18s;
+}
+.addr-detect-btn.success {
+  border-color: #10b981;
+  color: #10b981;
+  background: #f0fdf4;
+}
+.addr-detect-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Fields ──────────────────────────────────────────────── */
+.addr-field-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin-bottom: 1.2rem;
+}
+.addr-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+}
+.addr-field {
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: #1f2937;
+  background: #fafafa;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.18s;
+}
+.addr-field:focus {
+  border-color: #ff7622;
+  background: #fff;
+}
+.addr-select {
+  appearance: none;
+  cursor: pointer;
+}
+
+/* ── Form Actions ────────────────────────────────────────── */
+.addr-form-actions {
+  display: flex;
+  gap: 0.8rem;
+}
+.addr-cancel-btn {
+  flex: 1;
+  padding: 0.75rem;
+  background: #f3f4f6;
+  color: #374151;
+  font-weight: 600;
+  font-size: 0.88rem;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.addr-save-btn {
+  flex: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.75rem;
+  background: linear-gradient(135deg, #ff7622, #ff9f5a);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.88rem;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 3px 12px rgba(255, 118, 34, 0.25);
+}
+.addr-save-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+
+.btn-spinner-sm {
+  width: 16px;
+  height: 16px;
+  border: 2.5px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: addr-spin 0.6s linear infinite;
+}
+
+.btn-spinner-xs {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(239, 68, 68, 0.3);
+  border-top-color: #ef4444;
+  border-radius: 50%;
+  animation: addr-spin 0.6s linear infinite;
+  display: inline-block;
+}
+
+/* ── Dark Mode ───────────────────────────────────────────── */
+.dark .addr-manager-page { background: #0f172a; }
+.dark .addr-manager-header h2 { color: #f1f5f9; }
+.dark .addr-card { background: #1e293b; border-color: #334155; }
+.dark .addr-card-body p { color: #cbd5e1; }
+.dark .addr-form-sheet { background: #1e293b; }
+.dark .addr-form-header h3 { color: #f1f5f9; }
+.dark .addr-form-close { background: #334155; color: #f1f5f9; }
+.dark .addr-field { background: #0f172a; border-color: #334155; color: #f1f5f9; }
+.dark .addr-field:focus { border-color: #ff7622; }
+.dark .addr-detect-btn { background: #1e293b; border-color: #475569; color: #94a3b8; }
+.dark .addr-label-option { background: #1e293b; border-color: #334155; color: #94a3b8; }
+.dark .addr-cancel-btn { background: #334155; color: #f1f5f9; }
+
+/* ── Delete Confirm Modal ────────────────────────────────── */
+.addr-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.addr-confirm-modal {
+  background: #fff;
+  border-radius: 24px;
+  padding: 2rem 1.5rem 1.5rem;
+  max-width: 320px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
+}
+
+.addr-confirm-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #fff1f0;
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+}
+
+.addr-confirm-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 0.5rem;
+}
+
+.addr-confirm-msg {
+  font-size: 0.83rem;
+  color: #6b7280;
+  margin: 0 0 1.5rem;
+  line-height: 1.6;
+}
+
+.addr-confirm-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.addr-confirm-cancel {
+  flex: 1;
+  padding: 0.75rem;
+  background: #f3f4f6;
+  color: #374151;
+  font-weight: 600;
+  font-size: 0.88rem;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.addr-confirm-cancel:hover { background: #e5e7eb; }
+
+.addr-confirm-delete {
+  flex: 1.3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.75rem;
+  background: #ef4444;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.88rem;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+  transition: background 0.18s, box-shadow 0.18s;
+}
+.addr-confirm-delete:hover { background: #dc2626; }
+.addr-confirm-delete:disabled { opacity: 0.7; cursor: not-allowed; }
+
+.btn-spinner-white {
+  border-color: rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+}
+
+/* Dark mode for confirm modal */
+.dark .addr-confirm-modal { background: #1e293b; }
+.dark .addr-confirm-title { color: #f1f5f9; }
+.dark .addr-confirm-cancel { background: #334155; color: #f1f5f9; }
+.dark .addr-confirm-cancel:hover { background: #475569; }
+

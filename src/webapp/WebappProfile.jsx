@@ -12,20 +12,27 @@ import {
   Settings, 
   LogOut,
   Camera,
-  Globe,
   Trash2,
-  MapPin
+  MapPin,
+  User,
+  Phone,
+  Mail,
+  Edit3
 } from 'lucide-react';
 import { useTranslation } from './LanguageContext';
 import { auth } from '../firebase';
+import { supabase } from '../supabase';
 import './WebappProfile.css';
 
 const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser }) => {
-  const { t, changeLanguage, currentLanguage, languages } = useTranslation();
+  const { t } = useTranslation();
   const [localPhoto, setLocalPhoto] = React.useState(user?.photoURL);
   const [isEditingName, setIsEditingName] = React.useState(false);
   const [newName, setNewName] = React.useState(user?.displayName || '');
   const [isUpdatingName, setIsUpdatingName] = React.useState(false);
+  const [isEditingEmail, setIsEditingEmail] = React.useState(false);
+  const [newEmail, setNewEmail] = React.useState(user?.email || '');
+  const [isUpdatingEmail, setIsUpdatingEmail] = React.useState(false);
   const fileInputRef = React.useRef(null);
   
   const navigate = useNavigate();
@@ -33,7 +40,7 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
   const profileItems = [
     { id: 1, titleKey: 'order_history', subtitleKey: 'view_past_bookings', icon: <History size={20} />, class: 'history', path: '/order-history' },
     { id: 2, titleKey: 'passwala_wallet', subtitleKey: 'manage_credits', icon: <Wallet size={20} />, class: 'wallet', path: '/wallet' },
-    { id: 3, titleKey: 'delivery_address', subtitleKey: 'manage_locations', icon: <MapPin size={20} />, class: 'address', path: '/complete-profile' },
+    { id: 3, titleKey: 'delivery_address', subtitleKey: 'manage_locations', icon: <MapPin size={20} />, class: 'address', path: '/manage-addresses' },
     { id: 4, titleKey: 'data_safety_deletion', subtitleKey: 'manage_data_rights', icon: <Trash2 size={20} />, class: 'deletion', path: '/data-deletion' },
     { id: 5, titleKey: 'privacy_security', subtitleKey: 'manage_security', icon: <ShieldCheck size={20} />, class: 'privacy', path: '/privacy-security' },
     { id: 6, titleKey: 'help_support', subtitleKey: 'support_24_7', icon: <HelpCircle size={20} />, class: 'help', path: '/help-support' },
@@ -42,9 +49,8 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
 
   React.useEffect(() => {
     setLocalPhoto(user?.photoURL);
-    if (user?.displayName) {
-      setNewName(user.displayName);
-    }
+    if (user?.displayName) setNewName(user.displayName);
+    if (user?.email) setNewEmail(user.email);
   }, [user]);
 
   const getAuthToken = async () => {
@@ -89,6 +95,35 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
       toast.error('Error updating name');
     } finally {
       setIsUpdatingName(false);
+    }
+  };
+
+  const handleUpdateEmail = async () => {
+    const trimmed = newEmail.trim();
+    if (!trimmed) { toast.error('Email cannot be empty'); return; }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmed)) { toast.error('Please enter a valid email address'); return; }
+    setIsUpdatingEmail(true);
+    try {
+      // Resolve the DB user id
+      const uid  = user?.uid  || user?.id;
+      const phone = (user?.phoneNumber || user?.phone || '').replace(/[\s\-().]/g, '').replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, '');
+      let filters = [];
+      if (uid)   filters.push(`uid.eq.${uid}`);
+      if (phone) filters.push(`phone.eq.${phone}`);
+      const { data: usr } = await supabase.from('users').select('id').or(filters.join(',')).maybeSingle();
+      if (!usr?.id) throw new Error('Could not find your account');
+
+      const { error } = await supabase.from('users').update({ email: trimmed }).eq('id', usr.id);
+      if (error) throw error;
+
+      toast.success('Email updated! ✉️');
+      setIsEditingEmail(false);
+      if (onUpdateUser) onUpdateUser({ ...user, email: trimmed });
+    } catch (err) {
+      toast.error(err.message || 'Failed to update email');
+    } finally {
+      setIsUpdatingEmail(false);
     }
   };
 
@@ -167,18 +202,85 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
       </div>
 
       <div className="profile-scroll-content">
-        <h3 className="section-label">Language / ભાષા / भाषा</h3>
-        <div className="language-pills-row">
-          {Object.entries(languages).map(([code, lang]) => (
-            <button 
-              key={code} 
-              className={`lang-pill-item ${currentLanguage === code ? 'active' : ''}`}
-              onClick={() => changeLanguage(code)}
-            >
-              <Globe size={16} />
-              <span>{lang.name}</span>
-            </button>
-          ))}
+
+        {/* ── Personal Info Card ───────────────────────────── */}
+        <h3 className="section-label">Personal Info</h3>
+        <div className="profile-info-card">
+          {/* Name row */}
+          <div className="profile-info-row" onClick={() => setIsEditingName(true)}>
+            <div className="profile-info-icon name-icon"><User size={18} /></div>
+            <div className="profile-info-content">
+              <span className="profile-info-label">Full Name</span>
+              {isEditingName ? (
+                <div className="profile-info-edit-row">
+                  <input
+                    className="profile-info-input"
+                    type="text"
+                    value={newName}
+                    onChange={e => setNewName(e.target.value)}
+                    autoFocus
+                    onClick={e => e.stopPropagation()}
+                  />
+                  <button className="profile-info-save-btn" onClick={e => { e.stopPropagation(); handleUpdateName(); }} disabled={isUpdatingName}>
+                    {isUpdatingName ? '…' : 'Save'}
+                  </button>
+                  <button className="profile-info-cancel-btn" onClick={e => { e.stopPropagation(); setIsEditingName(false); }}>✕</button>
+                </div>
+              ) : (
+                <span className="profile-info-value">{newName || user?.displayName || 'Tap to add name'}</span>
+              )}
+            </div>
+            {!isEditingName && <Edit3 size={15} className="profile-info-edit-icon" />}
+          </div>
+
+          <div className="profile-info-divider" />
+
+          {/* Phone row */}
+          <div className="profile-info-row">
+            <div className="profile-info-icon phone-icon"><Phone size={18} /></div>
+            <div className="profile-info-content">
+              <span className="profile-info-label">Phone Number</span>
+              <span className="profile-info-value">
+                {user?.phoneNumber
+                  ? (user.phoneNumber.startsWith('+91') ? user.phoneNumber : `+91 ${user.phoneNumber}`)
+                  : user?.phone
+                  ? `+91 ${user.phone}`
+                  : '—'}
+              </span>
+            </div>
+          </div>
+
+          <div className="profile-info-divider" />
+
+          {/* Email row */}
+          <div className="profile-info-row" onClick={() => !isEditingEmail && setIsEditingEmail(true)}>
+            <div className="profile-info-icon email-icon"><Mail size={18} /></div>
+            <div className="profile-info-content">
+              <span className="profile-info-label">Email Address</span>
+              {isEditingEmail ? (
+                <div className="profile-info-edit-row">
+                  <input
+                    className="profile-info-input"
+                    type="email"
+                    value={newEmail}
+                    placeholder="your@email.com"
+                    onChange={e => setNewEmail(e.target.value)}
+                    autoFocus
+                    onClick={e => e.stopPropagation()}
+                  />
+                  <button className="profile-info-save-btn" onClick={e => { e.stopPropagation(); handleUpdateEmail(); }} disabled={isUpdatingEmail}>
+                    {isUpdatingEmail ? '…' : 'Save'}
+                  </button>
+                  <button className="profile-info-cancel-btn" onClick={e => { e.stopPropagation(); setIsEditingEmail(false); setNewEmail(user?.email || ''); }}>✕</button>
+                </div>
+              ) : (
+                <span className="profile-info-value" style={{ color: (user?.email || newEmail) ? undefined : '#94a3b8' }}>
+                  {newEmail || user?.email || 'Tap to add email'}
+                </span>
+              )}
+            </div>
+            {!isEditingEmail && <Edit3 size={15} className="profile-info-edit-icon" />}
+          </div>
         </div>
 
         <h3 className="section-label">{t('account_activity')}</h3>
