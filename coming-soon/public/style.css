@@ -128,7 +128,7 @@ body {
   pointer-events: none;
 }
 
-/* Content Wrapper */
+/* Content Wrapper - uses absolute header/footer, main content fills & centers */
 .content-wrapper {
   position: relative;
   width: 100%;
@@ -136,19 +136,26 @@ body {
   z-index: 10;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  padding: 3vh 48px;
+  align-items: center;
+  justify-content: center;   /* TRUE vertical center for main content */
+  padding: 80px 48px 70px;   /* top/bottom space reserved for abs-positioned header/footer */
   overflow: hidden;
 }
 
 
-/* Header */
+/* Header — absolutely pinned to top of card */
 .header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  height: 6vh;
+  height: 72px;
+  padding: 0 48px;
+  z-index: 20;
 }
 
 .logo-container {
@@ -207,15 +214,14 @@ body {
   animation: tag-breath 4s ease-in-out infinite alternate;
 }
 
-/* Main Content */
+/* Main Content - always perfectly centered */
 .main-content {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 20px;
-  flex: 1;
   width: 100%;
-  padding: 1.5vh 0;
+  max-width: 900px;
 }
 
 .hero-left {
@@ -718,21 +724,22 @@ body.loaded .notify-card {
     margin: 20px;
     border-radius: 28px;
   }
-  .screen-container::after {
-    border-radius: 28px;
+  .screen-container::after { border-radius: 28px; }
+  .header {
+    height: 64px;
+    padding: 0 32px;
   }
   .content-wrapper {
-    padding: 28px 32px 24px;
-    justify-content: space-between;
-    overflow: hidden;
+    padding: 64px 32px 64px;   /* header=64px top, footer=64px bottom */
+    justify-content: center;
+    align-items: center;
   }
   .main-content {
     flex-direction: column;
     gap: 20px;
-    padding: 16px 0;
-    flex: 1;
     align-items: center;
     justify-content: center;
+    width: 100%;
   }
   .hero-left {
     align-items: center;
@@ -744,6 +751,7 @@ body.loaded .notify-card {
   .hero-right { display: none; }
   .title { font-size: 2.1rem; text-align: center; }
   .subtitle { text-align: center; }
+  .sub-footer { padding: 0 32px 18px; }
   .footer-grid { flex-wrap: wrap; gap: 20px; }
 }
 
@@ -763,32 +771,25 @@ body.loaded .notify-card {
     margin: 12px;
     border-radius: 20px;
   }
-  .screen-container::after {
-    border-radius: 20px;
+  .screen-container::after { border-radius: 20px; }
+  .header {
+    height: 56px;
+    padding: 0 18px;
   }
   .content-wrapper {
-    padding: 20px 18px 16px;
-    justify-content: space-between;
-    overflow: hidden;
-  }
-  .header {
-    flex-direction: row;
-    justify-content: space-between;
+    padding: 56px 18px 56px;   /* header=56px top, footer=56px bottom */
+    justify-content: center;
     align-items: center;
-    height: auto;
-    margin-bottom: 0;
-    flex-shrink: 0;
   }
   .logo-container { justify-content: flex-start; }
   .logo-text { font-size: 1.5rem; }
   .badge { padding: 4px 10px; font-size: 0.65rem; }
   .main-content {
     flex-direction: column;
-    gap: 12px;
-    padding: 8px 0;
-    flex: 1;
+    gap: 14px;
     align-items: center;
     justify-content: center;
+    width: 100%;
   }
   .hero-left {
     gap: 10px;
@@ -814,13 +815,9 @@ body.loaded .notify-card {
   .notify-form input { padding: 13px 16px 13px 44px; font-size: 0.85rem; }
   .mail-icon { left: 14px; width: 18px; height: 18px; }
   .sub-footer {
-    flex-direction: row;
-    justify-content: space-between;
+    padding: 0 18px 14px;
     flex-wrap: wrap;
-    gap: 6px;
-    padding-top: 10px;
-    margin-top: 0;
-    flex-shrink: 0;
+    gap: 4px;
   }
   .copyright { font-size: 0.7rem; }
   .legal-link { font-size: 0.7rem; }
@@ -836,7 +833,9 @@ body.loaded .notify-card {
     margin: 8px;
     border-radius: 16px;
   }
-  .content-wrapper { padding: 16px 14px 12px; }
+  .header { height: 50px; padding: 0 14px; }
+  .content-wrapper { padding: 50px 14px 50px; }
+  .sub-footer { padding: 0 14px 12px; }
   .title { font-size: 1.45rem; }
   .subtitle { font-size: 0.78rem; }
   .card-title { font-size: 0.85rem; }
@@ -845,15 +844,20 @@ body.loaded .notify-card {
   .badge { font-size: 0.6rem; padding: 3px 8px; }
 }
 
-/* Sub-Footer Copyright & Legal Links */
+/* Sub-Footer — absolutely pinned to bottom of card */
 .sub-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  padding: 0 48px 20px;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   padding-top: 14px;
-  flex-shrink: 0;
+  z-index: 20;
   opacity: 0;
 }
 
