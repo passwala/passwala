@@ -54,11 +54,10 @@ body {
   background: linear-gradient(225deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.03) 40%, rgba(255, 107, 0, 0.1) 55%, rgba(255, 107, 0, 0.95) 100%);
   background-size: 150% 150%;
   background-position: 0% 0%;
-  -webkit-mask: 
-     linear-gradient(#fff 0 0) content-box, 
-     linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
   -webkit-mask-composite: xor;
-          mask-composite: exclude;
   pointer-events: none;
   z-index: 25;
   animation: glass-shine 10s ease-in-out infinite alternate;
@@ -300,9 +299,10 @@ body {
   border-radius: 20px;
   padding: 1.5px;
   background: linear-gradient(225deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.03) 40%, rgba(255, 107, 0, 0.05) 55%, rgba(255, 107, 0, 0.8) 100%);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
   -webkit-mask-composite: xor;
-          mask-composite: exclude;
   pointer-events: none;
 }
 
@@ -369,9 +369,10 @@ body {
   border-radius: 12px;
   padding: 1.2px;
   background: linear-gradient(225deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.02) 50%, rgba(255, 107, 0, 0.6) 100%);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
   -webkit-mask-composite: xor;
-          mask-composite: exclude;
   pointer-events: none;
 }
 
@@ -404,9 +405,10 @@ body {
   border-radius: 12px;
   padding: 1.5px;
   background: linear-gradient(225deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.03) 40%, rgba(255, 107, 0, 0.1) 60%, rgba(255, 107, 0, 0.95) 100%);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
   -webkit-mask-composite: xor;
-          mask-composite: exclude;
   pointer-events: none;
   transition: all 0.3s ease;
 }
@@ -1131,9 +1133,10 @@ body.loaded .sub-footer {
   border-radius: 12px;
   padding: 1.5px;
   background: linear-gradient(225deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.02) 40%, rgba(255, 107, 0, 0.8) 100%);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
   mask-composite: exclude;
+  -webkit-mask-composite: xor;
   pointer-events: none;
   transition: all 0.3s ease;
 }
