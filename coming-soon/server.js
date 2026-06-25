@@ -55,129 +55,120 @@ const fallbackSignups = new Set();
 // Premium HTML Email Template Generator
 const getWelcomeEmailHtml = (email) => {
   return `
-    <!DOCTYPE html>
-    <html lang="en">
+    <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+    <html xmlns="http://www.w3.org/1999/xhtml" lang="en">
     <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
       <title>Welcome to Passwala</title>
-      <style>
-        body {
-          margin: 0;
-          padding: 0;
-          background-color: #050811;
-          font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-          color: #ffffff;
-          -webkit-font-smoothing: antialiased;
-        }
-        .wrapper {
-          width: 100%;
-          background-color: #050811;
-          padding: 40px 20px;
-          box-sizing: border-box;
-        }
-        .container {
-          max-width: 600px;
-          margin: 0 auto;
-          background: #0d1222;
-          border-radius: 24px;
-          overflow: hidden;
-          position: relative;
-          border: 1px solid rgba(255, 107, 0, 0.25);
-          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-        }
-        .header {
-          padding: 40px 40px 20px 40px;
-          text-align: center;
-        }
-        .logo {
-          font-size: 28px;
-          letter-spacing: -0.5px;
-          font-weight: bold;
-          margin-bottom: 10px;
-        }
-        .logo .brand-light { color: #ffffff; font-weight: 300; }
-        .logo .brand-orange { color: #ff6b00; font-weight: 600; }
-        .logo .brand-dot { color: #ff6b00; }
-        .badge {
-          display: inline-block;
-          background: rgba(255, 107, 0, 0.08);
-          border: 1px solid #ff6b00;
-          color: #ff6b00;
-          padding: 4px 12px;
-          border-radius: 12px;
-          font-size: 11px;
-          font-weight: 800;
-          letter-spacing: 1px;
-          text-transform: uppercase;
-        }
-        .content {
-          padding: 0 40px 40px 40px;
-          text-align: center;
-        }
-        h1 {
-          font-size: 24px;
-          font-weight: 600;
-          margin: 20px 0 10px 0;
-          color: #ffffff;
-          line-height: 1.3;
-        }
-        p {
-          font-size: 15px;
-          line-height: 1.6;
-          color: #cbd5e1;
-          margin: 0 0 24px 0;
-        }
-        .btn {
-          display: inline-block;
-          background: #ff6b00;
-          color: #ffffff !important;
-          text-decoration: none;
-          padding: 14px 30px;
-          border-radius: 12px;
-          font-weight: 600;
-          font-size: 15px;
-          margin-top: 10px;
-          box-shadow: 0 10px 20px rgba(255, 107, 0, 0.2);
-        }
-        .footer {
-          background: #090c16;
-          padding: 30px 40px;
-          text-align: center;
-          border-top: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .footer p {
-          font-size: 12px;
-          color: #64748b;
-          margin: 0 0 8px 0;
-        }
-        .footer a {
-          color: #ff6b00;
-          text-decoration: none;
+      <style type="text/css">
+        /* Client-specific Styles */
+        body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+        table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+        img { -ms-interpolation-mode: bicubic; }
+
+        /* Reset Styles */
+        img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+        table { border-collapse: collapse !important; }
+        body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; }
+
+        /* Mobile Styles */
+        @media screen and (max-width: 600px) {
+          .container { width: 100% !important; max-width: 100% !important; border-radius: 0px !important; border-left: none !important; border-right: none !important; }
+          .header { padding: 30px 20px 15px 20px !important; }
+          .content { padding: 0 20px 30px 20px !important; }
+          .footer { padding: 25px 20px !important; }
+          .logo { font-size: 26px !important; }
+          h1 { font-size: 21px !important; }
+          p { font-size: 14px !important; }
         }
       </style>
     </head>
-    <body>
-      <div class="wrapper">
-        <div class="container">
-          <div class="header">
-            <div class="logo">
-              <span class="brand-light">Pass</span><span class="brand-orange">wala</span><span class="brand-dot">.</span>
-            </div>
-            <div class="badge">Namaste India</div>
-          </div>
-          <div class="content">
-            <h1>You are on the Exclusive List! 🎉</h1>
-            <p>Thank you for subscribing to early access. We are preparing India's smartest neighborhood app to bring you a community-driven marketplace and a smart local economy platform designed for modern urban neighborhoods.</p>
-            
-            <p style="margin-bottom: 0;">We'll drop you an update as soon as we launch in your area.</p>
-          </div>
-          <div class="footer">
-            <p>© ${new Date().getFullYear()} Passwala. All rights reserved.</p>
-            <p>Made with ❤️ in India</p>
-          </div>
-        </div>
-      </div>
+    <body style="margin: 0; padding: 0; background-color: #050811;">
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #050811; table-layout: fixed;">
+        <tr>
+          <td align="center" style="padding: 24px 10px;">
+            <!--[if (gte mso 9)|(IE)]>
+            <table align="center" border="0" cellspacing="0" cellpadding="0" width="600">
+            <tr>
+            <td align="center" valign="top" width="600">
+            <![endif]-->
+            <table class="container" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #0d1222; border: 1px solid rgba(255, 107, 0, 0.25); border-radius: 24px; overflow: hidden; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);">
+              
+              <!-- Header -->
+              <tr>
+                <td class="header" align="center" style="padding: 40px 40px 20px 40px;">
+                  <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                    <tr>
+                      <td align="center">
+                        <div class="logo" style="font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 28px; font-weight: bold; letter-spacing: -0.5px; color: #ffffff; margin-bottom: 10px;">
+                          <span style="color: #ffffff; font-weight: 300;">Pass</span><span style="color: #ff6b00; font-weight: 600;">wala</span><span style="color: #ff6b00;">.</span>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td align="center">
+                        <div class="badge" style="display: inline-block; background: rgba(255, 107, 0, 0.08); border: 1px solid #ff6b00; color: #ff6b00; padding: 4px 12px; border-radius: 12px; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;">
+                          Namaste India
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Content -->
+              <tr>
+                <td class="content" align="center" style="padding: 0 40px 40px 40px;">
+                  <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                    <tr>
+                      <td align="center" style="padding-top: 10px;">
+                        <h1 style="font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 24px; font-weight: 600; margin: 10px 0; color: #ffffff; line-height: 1.3;">
+                          You are on the Exclusive List! 🎉
+                        </h1>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td align="center" style="padding-top: 10px;">
+                        <p style="font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; line-height: 1.6; color: #cbd5e1; margin: 0 0 20px 0;">
+                          Thank you for subscribing to early access. We are preparing India's smartest neighborhood app to bring you a community-driven marketplace and a smart local economy platform designed for modern urban neighborhoods.
+                        </p>
+                        <p style="font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; line-height: 1.6; color: #cbd5e1; margin: 0;">
+                          We'll drop you an update as soon as we launch in your area.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Footer -->
+              <tr>
+                <td class="footer" align="center" style="background-color: #090c16; padding: 30px 40px; border-top: 1px solid rgba(255, 255, 255, 0.05);">
+                  <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                    <tr>
+                      <td align="center" style="font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; color: #64748b; line-height: 1.5; padding-bottom: 6px;">
+                        &copy; ${new Date().getFullYear()} Passwala. All rights reserved.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td align="center" style="font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; color: #64748b; line-height: 1.5;">
+                        Made with &hearts; in India
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+            </table>
+            <!--[if (gte mso 9)|(IE)]>
+            </td>
+            </tr>
+            </table>
+            <![endif]-->
+          </td>
+        </tr>
+      </table>
     </body>
     </html>
   `;

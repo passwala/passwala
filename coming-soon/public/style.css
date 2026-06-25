@@ -18,11 +18,15 @@
   padding: 0;
 }
 
+html, body {
+  background-color: #ffffff;
+}
+
 body {
   font-family: 'Poppins', system-ui, -apple-system, sans-serif;
-  background-color: #ffffff;
   color: var(--text-primary);
-  min-height: 100svh;
+  min-height: 100dvh;
+  height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -33,7 +37,7 @@ body {
 .screen-container {
   position: relative;
   width: calc(100vw - 48px);
-  height: calc(100svh - 48px);
+  height: calc(100dvh - 48px);
   margin: 24px;
   background-color: var(--navy-dark);
   border-radius: 32px;
@@ -135,6 +139,7 @@ body {
   flex-direction: column;     /* header → main → footer stacked */
   overflow-y: auto;
   overflow-x: hidden;
+  min-height: 0;              /* prevents flex container from expanding past viewport */
   padding: 0;                 /* padding handled inside header/footer */
 }
 
@@ -220,6 +225,7 @@ body {
   align-self: center;         /* center within content-wrapper */
   padding: 20px 48px;
   box-sizing: border-box;
+  min-height: 0;              /* prevents flex overflow */
 }
 
 .hero-left {
@@ -675,189 +681,208 @@ body.loaded .loader-content {
   }
 }
 
-/* Staggered load only after preloader finishes */
-.header, 
-.coming-soon-badge, 
-.title, 
-.subtitle, 
-.notify-card {
-  opacity: 0;
+/* Staggered load animations — desktop only */
+@media (min-width: 992px) {
+  .header,
+  .coming-soon-badge,
+  .title,
+  .subtitle,
+  .notify-card {
+    opacity: 0;
+  }
+
+  body.loaded .header {
+    animation: glassBlurEntrance 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 0.15s;
+  }
+
+  body.loaded .coming-soon-badge {
+    animation: glassBlurEntrance 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 0.3s;
+  }
+
+  body.loaded .title {
+    animation: glassBlurEntrance 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 0.45s;
+  }
+
+  body.loaded .subtitle {
+    animation: glassBlurEntrance 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 0.6s;
+  }
+
+  body.loaded .notify-card {
+    animation: glassBlurEntrance 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 0.75s;
+  }
 }
 
-body.loaded .header {
-  animation: glassBlurEntrance 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  animation-delay: 0.15s;
-}
-
-body.loaded .coming-soon-badge {
-  animation: glassBlurEntrance 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  animation-delay: 0.3s;
-}
-
-body.loaded .title {
-  animation: glassBlurEntrance 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  animation-delay: 0.45s;
-}
-
-body.loaded .subtitle {
-  animation: glassBlurEntrance 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  animation-delay: 0.6s;
-}
-
-body.loaded .notify-card {
-  animation: glassBlurEntrance 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  animation-delay: 0.75s;
-}
-
-/* ── Tablet (≤ 991px) ─────────────────────────────────────────── */
+/* ── Tablet & Mobile (≤ 991px): Full-screen scrollable layout ── */
 @media (max-width: 991px) {
-  body {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    background-color: #ffffff;
+  html, body {
+    background-color: var(--navy-dark) !important;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
-  .screen-container {
-    width: calc(100vw - 40px);
-    height: calc(100svh - 40px);
-    margin: 20px;
-    border-radius: 28px;
-  }
-  .screen-container::after { border-radius: 28px; }
 
-  /* header stays at natural height, padding adjusts */
-  .header {
-    height: 64px;
-    padding: 0 28px;
-    flex-shrink: 0;
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
   }
-  /* content-wrapper is pure flex column — NO padding override */
+
+  body {
+    min-height: 100vh;
+    height: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Background layers: fixed so they stay behind scrolling content */
+  .slideshow,
+  .screen-overlay,
+  .orange-glow-top,
+  .orange-glow-bottom {
+    position: fixed;
+  }
+
+  /* Screen container: fills viewport, grows with content */
+  .screen-container {
+    width: 100%;
+    min-height: 100vh;
+    height: auto;
+    flex: 1;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+  }
+  .screen-container::after { display: none; }
+
+  /* Content wrapper: flex column to push footer to bottom */
   .content-wrapper {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
     padding: 0;
   }
-  /* main-content fills space and centers */
+
+  /* Sticky header */
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(5, 8, 17, 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    height: 64px;
+    padding: 0 24px;
+    flex-shrink: 0;
+  }
+
+  /* Main: flex 1 fills all remaining space, content centered */
   .main-content {
-    flex: 1 1 auto;
+    flex: 1;
+    display: flex;
     flex-direction: column;
-    gap: 18px;
     align-items: center;
     justify-content: center;
-    padding: 16px 28px;
+    gap: 20px;
+    padding: 28px 20px 20px;
     width: 100%;
-    max-width: 600px;
+    max-width: 560px;
     align-self: center;
     box-sizing: border-box;
+    min-height: 0;
   }
+
   .hero-left {
     align-items: center;
     text-align: center;
     width: 100%;
-    gap: 14px;
+    gap: 16px;
   }
   .hero-right { display: none; }
-  .title { font-size: 2.1rem; text-align: center; }
-  .subtitle { text-align: center; }
-  /* sub-footer stays at bottom naturally */
+  .title { font-size: 2.2rem; text-align: center; }
+  .subtitle { text-align: center; font-size: 0.95rem; }
+
+  /* Sub-footer: always visible and pinned to bottom */
   .sub-footer {
     flex-shrink: 0;
-    padding: 12px 28px 18px;
+    padding: 16px 24px 20px;
+    opacity: 1 !important;
+    animation: none !important;
   }
-  .footer-grid { flex-wrap: wrap; gap: 20px; }
 }
 
-/* ── Mobile (≤ 576px) ────────────────────────────────────────── */
+/* ── Mobile (≤ 576px) ── */
 @media (max-width: 576px) {
-  body {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    background-color: #ffffff;
-  }
-  .screen-container {
-    width: calc(100vw - 24px);
-    height: calc(100svh - 24px);
-    margin: 12px;
-    border-radius: 20px;
-  }
-  .screen-container::after { border-radius: 20px; }
-
   .header {
-    height: 54px;
+    height: 56px;
     padding: 0 18px;
-    flex-shrink: 0;
   }
-  .content-wrapper {
-    padding: 0;
-  }
-  .logo-container { justify-content: flex-start; }
-  .logo-text { font-size: 1.5rem; }
+  .logo-text { font-size: 1.4rem; }
   .badge { padding: 4px 10px; font-size: 0.65rem; }
 
   .main-content {
-    flex: 1 1 auto;
-    flex-direction: column;
-    gap: 12px;
-    align-items: center;
-    justify-content: center;
-    padding: 12px 18px;
-    width: 100%;
-    align-self: center;
-    box-sizing: border-box;
+    gap: 18px;
+    padding: 24px 16px 16px;
+    min-height: 0;
   }
-  .hero-left {
-    gap: 10px;
-    align-items: center;
-    text-align: center;
-    width: 100%;
-  }
+  .hero-left { gap: 14px; }
   .title {
-    font-size: 1.6rem;
+    font-size: clamp(1.6rem, 6.5vw, 2.2rem);
     letter-spacing: -0.5px;
-    text-align: center;
   }
   .subtitle {
-    font-size: 0.82rem;
-    line-height: 1.5;
-    text-align: center;
+    font-size: 0.88rem;
+    line-height: 1.65;
+    max-width: 92%;
   }
-  .minimal-box { padding: 16px 14px; }
-  .card-title { font-size: 0.9rem; text-align: center; }
-  .card-subtitle { font-size: 0.72rem; margin-bottom: 10px; text-align: center; }
+  .minimal-box { padding: 20px 16px; border-radius: 16px; }
+  .card-title { font-size: 0.95rem; }
+  .card-subtitle { font-size: 0.75rem; margin-bottom: 14px; }
   .notify-form { flex-direction: column; gap: 10px; }
-  .notify-form button { width: 100%; padding: 13px 20px; font-size: 0.85rem; }
-  .notify-form input { padding: 13px 16px 13px 44px; font-size: 0.85rem; }
+  .notify-form button { width: 100%; padding: 14px 20px; font-size: 0.9rem; }
+  .notify-form input { padding: 14px 16px 14px 44px; font-size: 0.9rem; }
   .mail-icon { left: 14px; width: 18px; height: 18px; }
 
   .sub-footer {
-    flex-shrink: 0;
-    padding: 12px 18px 14px;
+    padding: 14px 18px 20px;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: 6px;
+    justify-content: center;
+    opacity: 1 !important;
+    animation: none !important;
   }
-  .copyright { font-size: 0.7rem; }
-  .legal-link { font-size: 0.7rem; }
+  .copyright { font-size: 0.72rem; }
+  .legal-link { font-size: 0.72rem; }
   .loader-logo { font-size: 2rem; }
 }
 
-/* ── Small phones (≤ 390px) ─────────────────────────────────── */
+/* ── Small phones (≤ 390px) ── */
 @media (max-width: 390px) {
-  .screen-container {
-    width: calc(100vw - 16px);
-    height: calc(100svh - 16px);
-    margin: 8px;
-    border-radius: 16px;
-  }
-  .header { height: 48px; padding: 0 14px; }
-  .main-content { padding: 10px 14px; gap: 10px; }
-  .sub-footer { padding: 10px 14px 12px; }
-  .title { font-size: 1.45rem; }
-  .subtitle { font-size: 0.78rem; }
-  .card-title { font-size: 0.85rem; }
-  .card-subtitle { font-size: 0.68rem; }
-  .logo-text { font-size: 1.35rem; }
+  .header { height: 52px; padding: 0 14px; }
+  .main-content { padding: 20px 14px; gap: 14px; min-height: 0; }
+  .sub-footer { padding: 12px 14px 18px; }
+  .title { font-size: clamp(1.4rem, 6vw, 1.7rem); }
+  .subtitle { font-size: 0.82rem; max-width: 95%; }
+  .card-title { font-size: 0.9rem; }
+  .card-subtitle { font-size: 0.72rem; }
+  .logo-text { font-size: 1.25rem; }
   .badge { font-size: 0.6rem; padding: 3px 8px; }
+  .minimal-box { padding: 16px 12px; }
 }
 
 /* ── Sub-Footer: natural flex child, pinned at bottom by flex order ── */
@@ -871,12 +896,19 @@ body.loaded .notify-card {
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   position: relative;         /* keeps z-index context */
   z-index: 20;
-  opacity: 0;
+  /* opacity handled per breakpoint below */
 }
 
-body.loaded .sub-footer {
-  animation: glassBlurEntrance 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  animation-delay: 0.9s;
+/* Desktop only: animate sub-footer in after preloader */
+@media (min-width: 992px) {
+  .sub-footer {
+    opacity: 0;
+  }
+
+  body.loaded .sub-footer {
+    animation: glassBlurEntrance 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 0.9s;
+  }
 }
 
 .copyright {
