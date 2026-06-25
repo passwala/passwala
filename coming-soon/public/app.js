@@ -106,13 +106,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const successSubtitle = document.getElementById('successSubtitle');
   const dismissSuccessBtn = document.getElementById('dismissSuccessBtn');
 
+  let isSubmitting = false;
   if (notifyForm && formWrapper && successWrapper) {
     notifyForm.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (isSubmitting) return;
 
       const email = emailInput.value.trim();
       if (!email) return;
 
+      isSubmitting = true;
       submitBtn.disabled = true;
       statusMsg.className = 'status-msg';
       statusMsg.innerText = 'Registering email... ⏳';
@@ -159,6 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
         statusMsg.className = 'status-msg error';
         statusMsg.innerText = 'Network error. Please check your connection and try again.';
       } finally {
+        isSubmitting = false;
         submitBtn.disabled = false;
       }
     });

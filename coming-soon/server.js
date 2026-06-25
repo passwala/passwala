@@ -316,7 +316,7 @@ app.post('/api/notify', async (req, res) => {
 });
 
 // Start the HTTP server (works for both local dev and Render/production)
-const listenPort = process.env.PORT || PORT;
+const listenPort = process.env.COMING_SOON_PORT || 3006;
 app.listen(listenPort, () => {
   console.log(`🚀 Passwala Coming Soon server running on port ${listenPort}`);
 });

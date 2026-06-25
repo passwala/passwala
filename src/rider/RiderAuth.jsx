@@ -236,6 +236,7 @@ function RiderAuth({ onLogin }) {
   };
 
   const handleWhatsAppLogin = async () => {
+    if (loading) return;
     if (phone.length !== 10) {
       toast.error('Please enter a valid 10-digit number');
       return;
@@ -268,6 +269,7 @@ function RiderAuth({ onLogin }) {
   };
 
   const handleVerifyOtp = async () => {
+    if (loading) return;
     if (otp.length !== 6) {
       toast.error('Please enter the 6-digit OTP');
       return;

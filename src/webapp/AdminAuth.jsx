@@ -13,6 +13,7 @@ const AdminAuth = ({ onAdminLogin }) => {
 
   const handleAdminAuth = async (e) => {
     if (e) e.preventDefault();
+    if (loading) return;
     if (!adminCode.trim()) {
       toast.error('Please enter the access code');
       return;

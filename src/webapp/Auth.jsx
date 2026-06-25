@@ -195,6 +195,7 @@ const Auth = ({ onLogin }) => {
 
 
   const handleVerifyOtp = async () => {
+    if (loading) return;
     const otpValue = otp.join('');
     if (otpValue.length !== 6) { toast.error('Enter 6-digit Code'); return; }
     try {

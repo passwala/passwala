@@ -13,6 +13,7 @@ const VendorAuth = ({ onLogin }) => {
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
+    if (loading) return;
     const clean = phone.replace(/\D/g, '');
     if (clean.length !== 10) {
       toast.error('Enter a valid 10-digit mobile number');
@@ -29,6 +30,7 @@ const VendorAuth = ({ onLogin }) => {
 
   const handleWhatsAppLogin = async (e) => {
     if (e) e.preventDefault();
+    if (loading) return;
     const clean = phone.replace(/\D/g, '');
     if (clean.length !== 10) {
       toast.error('Enter a valid 10-digit mobile number');
@@ -63,6 +65,7 @@ const VendorAuth = ({ onLogin }) => {
 
   const handleVerifyOtp = async (e) => {
     if (e) e.preventDefault();
+    if (loading) return;
     if (otpVal.length !== 6) {
       toast.error('Enter 6-digit OTP');
       return;
