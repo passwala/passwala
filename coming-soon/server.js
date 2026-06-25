@@ -236,7 +236,7 @@ app.post('/api/notify', async (req, res) => {
 
   if (!supabase) {
     if (fallbackSignups.has(trimmedEmail)) {
-      return res.status(200).json({ success: true, message: 'You are already registered!' });
+      return res.status(200).json({ success: true, alreadyRegistered: true, message: 'You are already registered!' });
     }
     fallbackSignups.add(trimmedEmail);
 
@@ -275,7 +275,7 @@ app.post('/api/notify', async (req, res) => {
     }
 
     if (existingUser && existingUser.length > 0) {
-      return res.status(200).json({ success: true, message: 'You are already registered!' });
+      return res.status(200).json({ success: true, alreadyRegistered: true, message: 'You are already registered!' });
     }
 
     // Generate a unique dummy phone number matching the CS_ prefix pattern

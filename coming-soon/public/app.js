@@ -104,6 +104,8 @@ const statusMsg = document.getElementById('statusMsg');
 const formWrapper = document.getElementById('formWrapper');
 const successWrapper = document.getElementById('successWrapper');
 const successEmail = document.getElementById('successEmail');
+const successTitle = document.getElementById('successTitle');
+const successSubtitle = document.getElementById('successSubtitle');
 const dismissSuccessBtn = document.getElementById('dismissSuccessBtn');
 
 if (notifyForm && formWrapper && successWrapper) {
@@ -135,9 +137,19 @@ if (notifyForm && formWrapper && successWrapper) {
         
         setTimeout(() => {
           formWrapper.style.display = 'none';
-          if (successEmail) {
-            successEmail.innerText = email;
+          
+          if (data.alreadyRegistered) {
+            if (successTitle) successTitle.innerHTML = 'Already Registered! ✨';
+            if (successSubtitle) {
+              successSubtitle.innerHTML = `You're already on our early access list. We've already sent your welcome discount voucher <strong class="discount-badge">PASSWALA50</strong> to <span id="successEmail" class="highlight-email">${email}</span>.`;
+            }
+          } else {
+            if (successTitle) successTitle.innerHTML = 'Welcome to the Club! 🎉';
+            if (successSubtitle) {
+              successSubtitle.innerHTML = `We've sent your welcome discount voucher <strong class="discount-badge">PASSWALA50</strong> to <span id="successEmail" class="highlight-email">${email}</span>. Check your inbox!`;
+            }
           }
+
           successWrapper.style.display = 'flex';
           emailInput.value = '';
           statusMsg.innerText = '';
