@@ -702,17 +702,18 @@ body.loaded .notify-card {
 /* Responsive Styles */
 @media (max-width: 991px) {
   body {
-    display: block; /* Disable flex centering to prevent bottom scrolling empty space */
-    overflow-y: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
   }
   .screen-container {
-    height: auto;
-    min-height: calc(100vh - 48px);
-    margin: 24px 24px 0 24px; /* Align to top, remove bottom margin */
-    border-radius: 32px 32px 0 0; /* Flat bottom on tablet/mobile scroll */
+    height: calc(100vh - 48px);
+    margin: 24px;
+    border-radius: 32px;
   }
   .screen-container::after {
-    border-radius: 32px 32px 0 0;
+    border-radius: 32px;
   }
   .content-wrapper {
     padding: 30px 24px;
@@ -720,7 +721,7 @@ body.loaded .notify-card {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    overflow: visible; /* Allow natural expansion and scrolling on mobile */
+    overflow-y: auto; /* Allow internal scrolling if content is too tall */
   }
   .main-content {
     flex-direction: column;
@@ -742,16 +743,17 @@ body.loaded .notify-card {
 /* Mobile Screen Perfect Optimization */
 @media (max-width: 576px) {
   .screen-container {
-    margin: 12px 12px 0 12px; /* Remove bottom margin */
+    margin: 12px;
     width: calc(100vw - 24px);
-    min-height: calc(100vh - 12px);
-    border-radius: 20px 20px 0 0; /* Rounded top, flat bottom edge */
+    height: calc(100vh - 24px);
+    border-radius: 20px; /* Fully rounded card floating */
   }
   .screen-container::after {
-    border-radius: 20px 20px 0 0;
+    border-radius: 20px;
   }
   .content-wrapper {
     padding: 24px 16px 16px 16px;
+    overflow-y: auto; /* Scroll internally if height is restricted */
   }
   .header {
     flex-direction: column; /* Stack logo and badge centered */
