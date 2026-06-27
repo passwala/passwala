@@ -18,7 +18,7 @@ const CATEGORIES = [
 ];
 
 const PAGE_SIZE = 12;
-const BASE_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+const BASE_URL = import.meta.env.VITE_API_URL || '';
 const FALLBACK_IMG = 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=400&q=80';
 
 const EventHub = () => {

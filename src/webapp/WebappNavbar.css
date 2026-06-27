@@ -4,16 +4,22 @@
   left: 0;
   right: 0;
   height: 60px;
-  background: var(--glass-bg);
+  background: rgba(255, 255, 255, 0.9) !important; /* Solid elegant light background by default */
   display: flex;
   align-items: center;
   padding: 0 1rem;
   z-index: 2000;
   box-shadow: var(--shadow-sm);
-  border-bottom: 1px solid var(--border-light);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Dark Mode Override for Navbar */
+body.dark-mode .webapp-navbar {
+  background: rgba(18, 20, 28, 0.9) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
 .navbar-top-main {
@@ -37,12 +43,17 @@
 .navbar-title-text {
   font-size: 1.15rem;
   font-weight: 800;
-  color: var(--text-primary);
+  color: #121215 !important; /* Dark text for light mode */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: -0.3px;
   margin: 0;
+}
+
+/* Dark Mode Override for Navbar Title */
+body.dark-mode .navbar-title-text {
+  color: #f5f6f9 !important; /* Light text for dark mode */
 }
 
 .webapp-brand-group-v3 {
@@ -171,11 +182,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-primary);
+  color: #121215 !important; /* Dark arrow in light mode */
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   flex-shrink: 0;
   margin-left: -4px;
+}
+
+/* Dark Mode Override for Back Button */
+body.dark-mode .nav-back-btn {
+  color: #f5f6f9 !important; /* Light arrow in dark mode */
 }
 
 .nav-back-btn:hover {

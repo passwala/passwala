@@ -717,112 +717,122 @@ body.loaded .loader-content {
   }
 }
 
-/* ── Tablet & Mobile (≤ 991px): Full-screen scrollable layout ── */
+/* ── Tablet & Mobile (≤ 991px) ── */
 @media (max-width: 991px) {
   html, body {
     background-color: var(--navy-dark) !important;
+    overflow: -moz-scrollbars-none;
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-
   html::-webkit-scrollbar,
-  body::-webkit-scrollbar {
-    display: none !important;
-    width: 0 !important;
-    height: 0 !important;
-  }
+  body::-webkit-scrollbar { display: none !important; }
 
   body {
-    min-height: 100vh;
-    height: auto;
-    overflow-x: hidden;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    display: flex;
-    flex-direction: column;
+    display: block !important;
+    height: auto !important;
+    min-height: 100svh;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    align-items: unset !important;
+    justify-content: unset !important;
   }
 
-  /* Background layers: fixed so they stay behind scrolling content */
+  /* All decorative backgrounds: fixed, cover full screen */
   .slideshow,
   .screen-overlay,
   .orange-glow-top,
   .orange-glow-bottom {
-    position: fixed;
+    position: fixed !important;
+    top: 0; left: 0;
+    width: 100% !important;
+    height: 100% !important;
   }
 
-  /* Screen container: fills viewport, grows with content */
+  /* Screen container: full width, auto height block */
   .screen-container {
-    width: 100%;
-    min-height: 100vh;
-    height: auto;
-    flex: 1;
-    margin: 0;
-    border-radius: 0;
-    box-shadow: none;
-    overflow: visible;
-    display: flex;
-    flex-direction: column;
+    position: relative !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: unset !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    display: block !important;
+    background: transparent !important;
   }
-  .screen-container::after { display: none; }
+  .screen-container::after { display: none !important; }
 
-  /* Content wrapper: flex column to push footer to bottom */
+  /* Content wrapper: exactly fits the visible viewport area */
   .content-wrapper {
-    position: relative;
+    position: relative !important;
     z-index: 10;
     width: 100%;
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: visible;
-    padding: 0;
+    /* Use svh for visible area; dvh as fallback for older browsers */
+    height: 100svh;
+    min-height: 100svh;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  /* Fallback for browsers without svh support */
+  @supports not (height: 100svh) {
+    .content-wrapper {
+      height: 100dvh;
+      min-height: 100dvh;
+    }
   }
 
   /* Sticky header */
   .header {
-    position: sticky;
+    position: sticky !important;
     top: 0;
     z-index: 100;
-    background: rgba(5, 8, 17, 0.92);
+    background: rgba(5, 8, 17, 0.95) !important;
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    height: 64px;
-    padding: 0 24px;
+    height: 58px !important;
+    padding: 0 18px !important;
     flex-shrink: 0;
+    flex-direction: row !important;
   }
 
-  /* Main: flex 1 fills all remaining space, content centered */
+  /* Main: takes all space between header and footer */
   .main-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 20px;
-    padding: 28px 20px 20px;
-    width: 100%;
-    max-width: 560px;
-    align-self: center;
-    box-sizing: border-box;
-    min-height: 0;
+    flex: 1 !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 14px !important;
+    padding: 20px 18px !important;
+    width: 100% !important;
+    max-width: 520px !important;
+    align-self: center !important;
+    box-sizing: border-box !important;
   }
 
   .hero-left {
-    align-items: center;
-    text-align: center;
-    width: 100%;
-    gap: 16px;
+    align-items: center !important;
+    text-align: center !important;
+    width: 100% !important;
+    gap: 12px !important;
+    flex-direction: column !important;
   }
-  .hero-right { display: none; }
-  .title { font-size: 2.2rem; text-align: center; }
-  .subtitle { text-align: center; font-size: 0.95rem; }
+  .hero-right { display: none !important; }
+  .title { font-size: 1.9rem !important; text-align: center !important; }
+  .subtitle { text-align: center !important; font-size: 0.88rem !important; }
 
-  /* Sub-footer: always visible and pinned to bottom */
+  /* Sub-footer: always visible, pinned at bottom of content-wrapper */
   .sub-footer {
-    flex-shrink: 0;
-    padding: 16px 24px 20px;
+    flex-shrink: 0 !important;
+    padding: 12px 18px 16px !important;
     opacity: 1 !important;
     animation: none !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.07) !important;
   }
 }
 

@@ -873,8 +873,6 @@ router.post('/place', userAuth, async (req, res) => {
         address_id: addressId,
         subtotal: totalPrice,
         total_amount: total,
-        payment_method: 'ONLINE',
-        payment_status: 'PAID',
         status: 'PLACED'
       }])
       .select()

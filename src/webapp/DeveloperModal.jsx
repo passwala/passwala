@@ -670,6 +670,31 @@ export default function DeveloperModal({ isOpen, onClose, user }) {
                   </button>
                 </div>
 
+                <div style={{ background: '#111827', padding: '16px', borderRadius: '16px', border: '1px solid #374151' }}>
+                  <h4 style={{ margin: '0 0 6px', fontSize: '0.95rem', fontWeight: 800 }}>Onboarding Wizard</h4>
+                  <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: '#cbd5e1' }}>
+                    Clears the onboarding completion flag from localStorage so the wizard shows up immediately on refresh.
+                  </p>
+                  <button
+                    onClick={() => {
+                      localStorage.removeItem('passwala_onboarding_done');
+                      window.location.reload();
+                    }}
+                    style={{
+                      background: '#a855f7',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '10px 20px',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Reset & Show Wizard
+                  </button>
+                </div>
+
                 <div style={{ background: '#1e1b4b', padding: '16px', borderRadius: '16px', border: '1px solid #312e81' }}>
                   <h4 style={{ margin: '0 0 6px', fontSize: '0.95rem', fontWeight: 800 }}>Supabase Flood Test</h4>
                   <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: '#cbd5e1' }}>

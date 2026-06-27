@@ -20,7 +20,7 @@ const EventDetails = ({ user }) => {
   const tiersRef = useRef(null);
   const similarRowRef = useRef(null);
 
-  const baseUrl = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+  const baseUrl = import.meta.env.VITE_API_URL || '';
 
   const fetchEvent = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);

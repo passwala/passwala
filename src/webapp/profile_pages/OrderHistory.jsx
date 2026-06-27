@@ -24,6 +24,8 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import './ProfilePages.css';
 import { useTranslation } from '../LanguageContext';
+import { apiFetch } from '../../utils/apiClient';
+import { OrderSkeleton, EventSkeleton } from '../components/Skeletons';
 
 const _ = motion;
 
@@ -153,13 +155,19 @@ const OrderHistory = () => {
     const userId = resolvedEventUserIdRef.current;
     if (!userId) { toast.error('Could not verify your identity. Please refresh and try again.'); return; }
     try {
-      const res = await fetch(`${BASE_URL}/api/events/cancel`, {
+      let authHeaders = { 'Content-Type': 'application/json' };
+      try {
+        const token = await getAuthToken();
+        if (token) {
+          authHeaders['Authorization'] = `Bearer ${token}`;
+        }
+      } catch (_) { /* no auth token */ }
+
+      const data = await apiFetch(`${BASE_URL}/api/events/cancel`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify({ bookingId: booking.id, userId })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
       toast.success('Ticket cancelled. Seats have been released.');
       fetchEventBookings();
     } catch (err) {
@@ -209,22 +217,18 @@ const OrderHistory = () => {
         currentUserIdRef.current = resolvedUserId;
         const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
 
-        // BUG B4 FIX: Attach Firebase auth token — userAuth middleware requires it
+        // BUG B4 FIX: Attach auth token (Firebase or WhatsApp session) — userAuth middleware requires it
         let authHeaders = { 'Content-Type': 'application/json' };
         try {
-          const { getAuth } = await import('firebase/auth');
-          const fbAuth = getAuth();
-          if (fbAuth.currentUser) {
-            const token = await fbAuth.currentUser.getIdToken();
+          const token = await getAuthToken();
+          if (token) {
             authHeaders['Authorization'] = `Bearer ${token}`;
           }
-        } catch (_) { /* no firebase auth — WhatsApp users fall through */ }
+        } catch (_) { /* no auth token */ }
 
-        const res = await fetch(`${apiBase}/api/orders/user-history/${resolvedUserId}`, {
+        dbOrders = await apiFetch(`${apiBase}/api/orders/user-history/${resolvedUserId}`, {
           headers: authHeaders
         });
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        dbOrders = await res.json();
       } else {
         console.warn("Could not resolve a valid 36-char user UUID for OrderHistory, skipping query to avoid Postgres UUID cast crash.");
       }
@@ -376,7 +380,7 @@ const OrderHistory = () => {
     }
   };
 
-  const getAuthToken = async () => {
+  async function getAuthToken() {
     try {
       const { auth: authObj } = await import('../../firebase');
       const currentUser = authObj?.currentUser;
@@ -823,10 +827,7 @@ const OrderHistory = () => {
           {/* ORDERS TAB */}
           {activeTab === 'orders' && (
             loading ? (
-              <div className="discovery-loading">
-                <div className="spinner"></div>
-                <p>Gathering your past orders...</p>
-              </div>
+              <OrderSkeleton count={3} />
             ) : (
             <div className="orders-list-profile">
               {orders.length === 0 ? (
@@ -892,10 +893,7 @@ const OrderHistory = () => {
           {/* EVENT TICKETS TAB */}
           {activeTab === 'events' && (
             eventLoading ? (
-              <div className="discovery-loading">
-                <div className="spinner"></div>
-                <p>Loading your event tickets...</p>
-              </div>
+              <EventSkeleton count={2} />
             ) : eventBookings.length === 0 ? (
               <div className="empty-state-profile">
                 <Ticket size={48} />

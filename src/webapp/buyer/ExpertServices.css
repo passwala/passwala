@@ -209,6 +209,12 @@
   position: relative;
   width: 72px;
   height: 72px;
+  flex-shrink: 0;
+}
+
+.expert-details {
+  flex: 1;
+  min-width: 0;
 }
 
 .expert-avatar-fallback {
@@ -538,6 +544,8 @@ body:not(.dark-mode) .rating-pill {
   padding: 0.6rem 0.8rem;
   border-radius: 8px;
   border: 1px solid var(--glass-border);
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* ── Tablet (768px – 1023px): 2-col expert cards ── */

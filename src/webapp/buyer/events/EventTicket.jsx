@@ -6,7 +6,7 @@ import { toast } from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-const BASE_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+const BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // Fix #9: Named constant so both the timer and the SVG ring share the same source value
 const REDIRECT_SECONDS = 6;

@@ -23,6 +23,7 @@ import AIAssistant from './webapp/AIAssistant'
 import AIChatWidget from './webapp/buyer/AIChatWidget'
 import DeveloperModal from './webapp/DeveloperModal'
 import CustomerDetails from './webapp/CustomerDetails'
+import OnboardingWizard from './webapp/OnboardingWizard'
 import { CartProvider, useCart } from './context/CartContext'
 import CartDrawer from './webapp/buyer/CartDrawer'
 import { NotificationProvider, useNotifications } from './context/NotificationContext'
@@ -296,7 +297,37 @@ const AppContent = ({
 }) => {
   const navigate = useNavigate();
   const locationPath = useLocation().pathname;
-  const { t } = useTranslation();
+  const { t, changeLanguage } = useTranslation();
+
+  // ── Onboarding Wizard: show by default on first load ──────────────────────
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    if (!isWebappMode) return false;
+    const urlParams = new URLSearchParams(window.location.search);
+    // Force reset and show if URL parameter is present
+    if (urlParams.get('onboarding') === 'true' || urlParams.get('force_onboarding') === 'true') {
+      localStorage.removeItem('passwala_onboarding_done');
+      return true;
+    }
+    return !localStorage.getItem('passwala_onboarding_done');
+  });
+  const handleOnboardingComplete = (prefs) => {
+    setShowOnboarding(false);
+    if (!prefs) return;
+    
+    // 1. Apply selected language vibe
+    if (prefs.language) {
+      changeLanguage(prefs.language);
+    }
+    
+    // 2. Apply chosen theme aesthetic
+    if (prefs.theme) {
+      if (prefs.theme === 'dark' || prefs.theme === 'cyber') {
+        setIsDarkMode(true);
+      } else {
+        setIsDarkMode(false);
+      }
+    }
+  };
 
   // ── IMP 7: Maintenance mode enforcement ─────────────────────────────────────
   const [maintenanceMode, setMaintenanceMode] = useState(false);
@@ -362,19 +393,43 @@ const AppContent = ({
   useEffect(() => {
     const syncToken = async () => {
       if (!effectiveUser?.id || !fcmToken) return;
+
+      const lastSyncedKey = `fcm_synced_${effectiveUser.id}`;
+      if (sessionStorage.getItem(lastSyncedKey) === fcmToken) {
+        return; // Already synced in this session, skip redundant call
+      }
+
       console.log('🔄 Syncing FCM token via Backend only:', fcmToken);
       try {
         const baseUrl = import.meta.env.VITE_API_URL || '';
+        let authHeaders = { 'Content-Type': 'application/json' };
         
+        try {
+          const { auth: fbAuth } = await import('./firebase');
+          if (fbAuth?.currentUser) {
+            const token = await fbAuth.currentUser.getIdToken();
+            authHeaders['Authorization'] = `Bearer ${token}`;
+          } else {
+            // Fallback for mock session/WhatsApp in dev
+            const userJson = localStorage.getItem('passwala_user');
+            const userObj = userJson ? JSON.parse(userJson) : null;
+            const uid = userObj?.uid || userObj?.id;
+            if (uid && !import.meta.env.PROD) {
+              authHeaders['Authorization'] = `Bearer mock_session_token_${uid}`;
+            }
+          }
+        } catch (_) { /* fallback */ }
+
         const response = await fetch(`${baseUrl}/api/users/${effectiveUser.id}/fcm-token`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders,
           body: JSON.stringify({ fcmToken })
         });
         if (!response.ok) {
           console.warn('⚠️ Server endpoint FCM Token sync failed:', response.statusText);
         } else {
           console.log('✅ FCM Token synced exclusively to Express Backend');
+          sessionStorage.setItem(lastSyncedKey, fcmToken); // Cache sync status
         }
       } catch (err) {
         console.warn('⚠️ Error during FCM token backend synchronization:', err);
@@ -541,7 +596,7 @@ const AppContent = ({
                 onJoin={() => navigate('/auth')}
               />
             ) : (
-              (isWebappMode && effectiveUser && isProfileComplete) && (
+              (isWebappMode && effectiveUser && isProfileComplete && !showOnboarding) && (
                 <WebappNavbar
                   user={effectiveUser} location={location} onLocationChange={setLocation}
                   isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)}
@@ -585,13 +640,15 @@ const AppContent = ({
                   <Route path="/" element={
                     <>
                       {isWebappMode ? (
-                        (isProfileComplete) ? <NeighborhoodHub
-                          user={effectiveUser}
-                          setLocation={setLocation}
-                          location={location}
-                          onLogout={handleLogout}
-                          onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : v === 'CITY_RIDES' ? '/city-ride' : v === 'EVENTS' ? '/events' : '/')}
-                        /> : <Auth onLogin={(userData) => {
+                        (isProfileComplete) ? (
+                          <NeighborhoodHub
+                            user={effectiveUser}
+                            setLocation={setLocation}
+                            location={location}
+                            onLogout={handleLogout}
+                            onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : v === 'CITY_RIDES' ? '/city-ride' : v === 'EVENTS' ? '/events' : '/')}
+                          />
+                        ) : <Auth onLogin={(userData) => {
                           localStorage.setItem('passwala_user', JSON.stringify(userData));
                           localStorage.setItem('passwala_profile_complete', 'true');
                           
@@ -660,8 +717,8 @@ const AppContent = ({
               </Suspense>
             </main>
 
-            {/* 4. Global Footers/Navs */}
-            {isWebappMode && effectiveUser && isProfileComplete && (
+            {/* 4. Global Footers/Navs — hidden during onboarding */}
+            {isWebappMode && effectiveUser && isProfileComplete && !showOnboarding && (
               <BottomNav activeTab={currentView} user={effectiveUser} onTabChange={(v) => {
                 if (v === 'NEIGHBORS') { setShowComingSoon(true); return; }
                 const routeMap = {
@@ -673,6 +730,11 @@ const AppContent = ({
                 };
                 if (routeMap[v]) navigate(routeMap[v]);
               }} />
+            )}
+
+            {/* ── Duolingo-style Onboarding Wizard (first-time users only) ── */}
+            {isWebappMode && showOnboarding && effectiveUser && isProfileComplete && (
+              <OnboardingWizard user={effectiveUser} onComplete={handleOnboardingComplete} />
             )}
 
             {/* ── Coming Soon Modal ── */}

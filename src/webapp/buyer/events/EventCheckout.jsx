@@ -4,7 +4,7 @@ import { ArrowLeft, MapPin, Calendar, Receipt, Clock, AlertTriangle } from 'luci
 import { toast } from 'react-hot-toast';
 import { checkBookingWindow } from '../../../utils/checkBookingWindow';
 
-const BASE_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+const BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // Fix #19: Mirror the server-side GST_RATE so both sides stay in sync
 const GST_RATE = 0.09; // 9% CGST + 9% SGST = 18% (Gujarat entertainment services)

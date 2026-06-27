@@ -19,6 +19,8 @@ import { supabase } from '../../supabase';
 import { useCart } from '../../context/CartContext';
 import { getOSRMRoute } from '../../utils/dijkstra';
 import { useTranslation } from '../LanguageContext';
+import { apiFetch } from '../../utils/apiClient';
+import { ShopSkeleton } from '../components/Skeletons';
 
 
 const NearShops = ({ location, userCoords }) => {
@@ -185,12 +187,9 @@ const NearShops = ({ location, userCoords }) => {
         ? address 
         : `${address}, Ahmedabad, Gujarat, India`; // Fallback, could be enhanced with user location string
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchString)}&limit=1`;
-      const res = await fetch(url, { headers: { 'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)' } });
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.length > 0) {
-          return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-        }
+      const data = await apiFetch(url, { headers: { 'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)' } });
+      if (data && data.length > 0) {
+        return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
       }
     } catch (err) {
       console.warn('Geocoding error:', err);
@@ -473,7 +472,9 @@ const NearShops = ({ location, userCoords }) => {
         <div className="shops-list-panel">
         <div className="shops-list" style={{ paddingBottom: '120px' }}>
            <AnimatePresence mode='popLayout'>
-           {filteredShops.length > 0 ? (
+           {loading ? (
+             <ShopSkeleton count={3} />
+           ) : filteredShops.length > 0 ? (
              filteredShops.map((shop, i) => (
                <Motion.div 
                  layout

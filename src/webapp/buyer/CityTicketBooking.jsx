@@ -151,148 +151,156 @@ const CityTicketBooking = ({ user, userCoords }) => {
 
     setSearchResults(localMatches);
 
-    // 2. Debounce external autocomplete/geocoding calls by 500ms
+    // 2. Debounce external autocomplete/geocoding calls by 400ms
     if (searchDebounceRef.current) {
       clearTimeout(searchDebounceRef.current);
     }
 
-    if (query.trim().length >= 2) {
+    // Nominatim fallback: searches ALL location types (roads, buildings, schools, areas)
+    const queryNominatimFallback = async (qText) => {
+      try {
+        // Try two queries: one bounded (Ahmedabad bbox) and one with city suffix for broader results
+        const queries = [
+          // 1. Broad search within Ahmedabad bounding box — no bounded=1 so we get more results
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(qText + ', Ahmedabad')}&viewbox=72.35,23.3,72.75,22.85&bounded=0&countrycodes=in&limit=15&addressdetails=1`,
+          // 2. State-level search for anything missed
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(qText)}&viewbox=72.35,23.3,72.75,22.85&bounded=0&countrycodes=in&limit=10&city=Ahmedabad&addressdetails=1`,
+        ];
+        const [res1] = await Promise.all([fetch(queries[0], { headers: { 'Accept-Language': 'en', 'User-Agent': 'Passwalaa-App/1.0' } })]);
+        if (res1.status === 429) return;
+        const data = await res1.json();
+        if (Array.isArray(data)) {
+          // Prefer within-Ahmedabad results, fall back to all returned
+          const inCity = data.filter(item => isWithinAhmedabad(parseFloat(item.lat), parseFloat(item.lon)));
+          const externalResults = inCity.length > 0 ? inCity : data;
+          setSearchResults(prev => {
+            const merged = [...prev];
+            externalResults.forEach(ext => {
+              const extName = ext.display_name.split(',')[0].toLowerCase();
+              const exists = merged.some(local => local.display_name.split(',')[0].toLowerCase() === extName);
+              if (!exists) merged.push(ext);
+            });
+            return merged;
+          });
+        }
+      } catch (e) {
+        console.error('Nominatim fallback error:', e);
+      }
+    };
+
+    if (query.trim().length >= 1) {
       searchDebounceRef.current = setTimeout(async () => {
-        // Use Google Places Autocomplete if available
+        // ── Google Places Autocomplete: ALL types (roads, schools, PGs, buildings, colleges) ──
         if (window.google && window.google.maps && window.google.maps.places) {
           try {
             const autocompleteService = new window.google.maps.places.AutocompleteService();
+            // Session token groups requests for billing; no `types` restriction = all POI categories
+            const sessionToken = new window.google.maps.places.AutocompleteSessionToken();
             autocompleteService.getPlacePredictions({
               input: query,
+              // Soft-bias toward Ahmedabad; strictBounds:false means results outside also appear
               locationBias: new window.google.maps.LatLngBounds(
-                new window.google.maps.LatLng(22.9, 72.4),
-                new window.google.maps.LatLng(23.25, 72.7)
+                new window.google.maps.LatLng(22.85, 72.35),
+                new window.google.maps.LatLng(23.3, 72.75)
               ),
-              componentRestrictions: { country: 'in' }
-            }, (predictions, status) => {
-              if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+              componentRestrictions: { country: 'in' },
+              sessionToken,
+              // No `types` field = returns ALL: roads, buildings, schools, PGs, universities, localities
+            }, async (predictions, status) => {
+              if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions && predictions.length > 0) {
                 const googleResults = predictions.map(p => ({
                   display_name: p.description,
                   place_id: p.place_id,
-                  is_google: true
+                  is_google: true,
+                  _sessionToken: sessionToken,
                 }));
                 setSearchResults(prev => {
                   const merged = [...prev];
                   googleResults.forEach(g => {
                     const gName = g.display_name.split(',')[0].toLowerCase();
                     const exists = merged.some(local => local.display_name.split(',')[0].toLowerCase() === gName);
-                    if (!exists) {
-                      merged.push(g);
-                    }
+                    if (!exists) merged.push(g);
                   });
                   return merged;
                 });
+              } else {
+                await queryNominatimFallback(query);
               }
             });
           } catch (e) {
-            console.error('Google Autocomplete error:', e);
+            console.error('Google Autocomplete error, falling back:', e);
+            await queryNominatimFallback(query);
           }
           return;
         }
 
-        // Fallback: OpenStreetMap Nominatim
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=72.4,23.25,72.7,22.9&bounded=1&countrycodes=in&limit=20`,
-            { 
-              headers: { 
-                'Accept-Language': 'en',
-                'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
-              } 
-            }
-          );
-          if (res.status === 429) {
-            console.warn('Nominatim rate limit (429) hit. Displaying local cache matches only.');
-            return;
-          }
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            const filtered = data.filter(item => 
-              isWithinAhmedabad(parseFloat(item.lat), parseFloat(item.lon))
-            );
-            const externalResults = filtered.length > 0 ? filtered : data;
-            
-            setSearchResults(prev => {
-              const merged = [...prev];
-              externalResults.forEach(ext => {
-                const extName = ext.display_name.split(',')[0].toLowerCase();
-                const exists = merged.some(local => local.display_name.split(',')[0].toLowerCase() === extName);
-                if (!exists) {
-                  merged.push(ext);
-                }
-              });
-              return merged;
-            });
-          }
-        } catch (e) {
-          console.error('Search error:', e);
-        }
-      }, 500);
+        // Direct Fallback if Google Maps is not loaded
+        await queryNominatimFallback(query);
+      }, 400);
     }
   };
 
   const triggerSearch = async (query, type) => {
     if (!query) return;
-    
-    // Use Google Places Autocomplete if available
+
+    const triggerNominatimFallback = async (qText, searchType) => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(qText + ', Ahmedabad')}&viewbox=72.35,23.3,72.75,22.85&bounded=0&countrycodes=in&limit=10&addressdetails=1`,
+          { headers: { 'Accept-Language': 'en', 'User-Agent': 'Passwalaa-App/1.0' } }
+        );
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const match = data.find(item => isWithinAhmedabad(parseFloat(item.lat), parseFloat(item.lon))) || data[0];
+          if (match) {
+            handleSearchResultSelect(match, searchType);
+          } else {
+            toast.error('Location found is outside Ahmedabad city limits.');
+          }
+        } else {
+          toast.error('No locations found. Try adding more detail (e.g. area name).');
+        }
+      } catch (e) {
+        console.error('Search trigger fallback error:', e);
+        toast.error('No locations found matching search term');
+      }
+    };
+
+    // ── Google Places: ALL types (roads, buildings, colleges, PGs, schools) ──
     if (window.google && window.google.maps && window.google.maps.places) {
       try {
         const autocompleteService = new window.google.maps.places.AutocompleteService();
+        const sessionToken = new window.google.maps.places.AutocompleteSessionToken();
         autocompleteService.getPlacePredictions({
           input: query,
           locationBias: new window.google.maps.LatLngBounds(
-            new window.google.maps.LatLng(22.9, 72.4),
-            new window.google.maps.LatLng(23.25, 72.7)
+            new window.google.maps.LatLng(22.85, 72.35),
+            new window.google.maps.LatLng(23.3, 72.75)
           ),
-          componentRestrictions: { country: 'in' }
-        }, (predictions, status) => {
+          componentRestrictions: { country: 'in' },
+          sessionToken,
+          // No `types` = all POI categories (roads, schools, areas, buildings)
+        }, async (predictions, status) => {
           if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions && predictions.length > 0) {
             const first = predictions[0];
             handleSearchResultSelect({
               display_name: first.description,
               place_id: first.place_id,
-              is_google: true
+              is_google: true,
+              _sessionToken: sessionToken,
             }, type);
           } else {
-            toast.error('No locations found matching search term');
+            await triggerNominatimFallback(query, type);
           }
         });
       } catch (e) {
-        console.error('Google Autocomplete trigger error:', e);
+        console.error('Google Autocomplete trigger error, falling back:', e);
+        await triggerNominatimFallback(query, type);
       }
       return;
     }
 
-    // Fallback: OpenStreetMap Nominatim
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=72.4,23.25,72.7,22.9&bounded=1&countrycodes=in&limit=10`,
-        { 
-          headers: { 
-            'Accept-Language': 'en',
-            'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)'
-          } 
-        }
-      );
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        const match = data.find(item => isWithinAhmedabad(parseFloat(item.lat), parseFloat(item.lon)));
-        if (match) {
-          handleSearchResultSelect(match, type);
-        } else {
-          toast.error('Location found is outside Ahmedabad city limits.');
-        }
-      } else {
-        toast.error('No locations found matching search term');
-      }
-    } catch (e) {
-      console.error('Search trigger error:', e);
-    }
+    await triggerNominatimFallback(query, type);
   };
 
   const handleSearchResultSelect = (result, type) => {
@@ -652,9 +660,9 @@ const CityTicketBooking = ({ user, userCoords }) => {
             googleMarkers.push({
               position: [lat, lng],
               title: `Available Vehicle (${vehicle.vehicle_type || 'Bike'})`,
-              svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 38 38"><circle cx="19" cy="19" r="17" fill="#ff6b00" stroke="white" stroke-width="3" /><g transform="translate(9, 9)"><polygon points="3,11 22,2 13,21 11,13" fill="none" stroke="white" stroke-width="2" style="transform: rotate(45deg); transform-origin: 11px 11px;"/></g></svg>`,
-              iconSize: [38, 38],
-              iconAnchor: [19, 19]
+              svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><defs><linearGradient id="markerGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#ff8c00" /><stop offset="100%" stop-color="#ff3e00" /></linearGradient><filter id="markerShadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#ff3e00" flood-opacity="0.4"/></filter></defs><circle cx="20" cy="20" r="17.5" fill="url(#markerGrad)" stroke="white" stroke-width="2.5" filter="url(#markerShadow)" /><g transform="translate(6, 6)" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle cx="6" cy="21" r="4.5" stroke-width="2.5" /><circle cx="22" cy="21" r="4.5" stroke-width="2.5" /><path d="M 11 21 L 17 21" /><path d="M 2 21 C 2 15, 11 14, 11 21" fill="white" fill-opacity="0.15" /><path d="M 6 14.5 L 14 14.5" stroke-width="3" /><path d="M 17 21 L 20.5 10" /><path d="M 18.5 10 L 22.5 10" /><path d="M 20.5 10 L 22 21" /><path d="M 20.5 10 L 21.5 7" stroke-width="2" /></g></svg>`,
+              iconSize: [40, 40],
+              iconAnchor: [20, 20]
             });
           });
 
