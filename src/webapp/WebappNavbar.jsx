@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useNotifications } from '../context/NotificationContext';
 import NotificationPanel from './NotificationPanel';
+import { showShoppingUI, LAUNCH_MODE } from '../launchConfig';
 import './WebappNavbar.css';
 
 const WebappNavbar = ({ user, onOpenProfile, onBack, title, location }) => {
@@ -52,21 +53,27 @@ const WebappNavbar = ({ user, onOpenProfile, onBack, title, location }) => {
         </div>
 
         <div className="navbar-right-actions">
-          <button className="nav-action-btn-v2" onClick={() => setCartOpen(true)}>
-             <ShoppingBag size={20} />
-             {totalItems > 0 && <span className="nav-cart-badge">{totalItems}</span>}
-          </button>
-          
-          <div style={{ position: 'relative' }}>
-            <button className="nav-action-btn-v2" onClick={() => setShowNotifications(!showNotifications)}>
-               <Bell size={20} />
-               {unreadCount > 0 && <span className="notif-dot"></span>}
+          {/* Cart icon — hidden in launch mode when shopping is not enabled */}
+          {showShoppingUI() && (
+            <button className="nav-action-btn-v2" onClick={() => setCartOpen(true)}>
+               <ShoppingBag size={20} />
+               {totalItems > 0 && <span className="nav-cart-badge">{totalItems}</span>}
             </button>
-            
-            {showNotifications && (
-              <NotificationPanel onClose={() => setShowNotifications(false)} />
-            )}
-          </div>
+          )}
+          
+          {/* Bell notification — hidden in launch mode (no order notifications yet) */}
+          {!LAUNCH_MODE && (
+            <div style={{ position: 'relative' }}>
+              <button className="nav-action-btn-v2" onClick={() => setShowNotifications(!showNotifications)}>
+                 <Bell size={20} />
+                 {unreadCount > 0 && <span className="notif-dot"></span>}
+              </button>
+              
+              {showNotifications && (
+                <NotificationPanel onClose={() => setShowNotifications(false)} />
+              )}
+            </div>
+          )}
           
           {(title !== 'Profile' && !window.location.pathname.includes('/profile')) && (
             <button 

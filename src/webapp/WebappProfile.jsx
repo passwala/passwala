@@ -17,11 +17,13 @@ import {
   User,
   Phone,
   Mail,
-  Edit3
+  Edit3,
+  Ticket
 } from 'lucide-react';
 import { useTranslation } from './LanguageContext';
 import { auth } from '../firebase';
 import { supabase } from '../supabase';
+import { showShoppingUI, hasEventBookings, isFeatureEnabled } from '../launchConfig';
 import './WebappProfile.css';
 
 const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser }) => {
@@ -37,15 +39,31 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
   
   const navigate = useNavigate();
 
-  const profileItems = [
-    { id: 1, titleKey: 'order_history', subtitleKey: 'view_past_bookings', icon: <History size={20} />, class: 'history', path: '/order-history' },
-    { id: 2, titleKey: 'passwala_wallet', subtitleKey: 'manage_credits', icon: <Wallet size={20} />, class: 'wallet', path: '/wallet' },
-    { id: 3, titleKey: 'delivery_address', subtitleKey: 'manage_locations', icon: <MapPin size={20} />, class: 'address', path: '/manage-addresses' },
-    { id: 4, titleKey: 'data_safety_deletion', subtitleKey: 'manage_data_rights', icon: <Trash2 size={20} />, class: 'deletion', path: '/data-deletion' },
-    { id: 5, titleKey: 'privacy_security', subtitleKey: 'manage_security', icon: <ShieldCheck size={20} />, class: 'privacy', path: '/privacy-security' },
-    { id: 6, titleKey: 'help_support', subtitleKey: 'support_24_7', icon: <HelpCircle size={20} />, class: 'help', path: '/help-support' },
-    { id: 7, titleKey: 'settings', subtitleKey: 'app_preferences', icon: <Settings size={20} />, class: 'settings', path: '/settings' }
+  const allProfileItems = [
+    // In events-only launch mode: shows as 'My Tickets'; in full launch: 'Order History'
+    {
+      id: 1,
+      titleKey:    showShoppingUI() ? 'order_history'    : null,
+      subtitleKey: showShoppingUI() ? 'view_past_bookings' : null,
+      customTitle:    showShoppingUI() ? null : 'My Tickets',
+      customSubtitle: showShoppingUI() ? null : 'View your booked tickets',
+      icon:  showShoppingUI() ? <History size={20} /> : <Ticket size={20} />,
+      class: showShoppingUI() ? 'history' : 'history',
+      path:  '/order-history',
+      launchHidden: !isFeatureEnabled('events') && !hasEventBookings()
+    },
+    { id: 2, titleKey: 'passwala_wallet',    subtitleKey: 'manage_credits',     icon: <Wallet size={20} />,    class: 'wallet',   path: '/wallet',            launchHidden: true },
+    { id: 3, titleKey: 'delivery_address',   subtitleKey: 'manage_locations',   icon: <MapPin size={20} />,    class: 'address',  path: '/manage-addresses',  launchHidden: true },
+    { id: 4, titleKey: 'data_safety_deletion', subtitleKey: 'manage_data_rights', icon: <Trash2 size={20} />,  class: 'deletion', path: '/data-deletion' },
+    { id: 5, titleKey: 'privacy_security',   subtitleKey: 'manage_security',    icon: <ShieldCheck size={20} />, class: 'privacy', path: '/privacy-security' },
+    { id: 6, titleKey: 'help_support',       subtitleKey: 'support_24_7',       icon: <HelpCircle size={20} />, class: 'help',    path: '/help-support' },
+    { id: 7, titleKey: 'settings',           subtitleKey: 'app_preferences',    icon: <Settings size={20} />,  class: 'settings', path: '/settings' }
   ];
+
+  // Hide shopping-related items in launch mode (code preserved, never removed)
+  const profileItems = showShoppingUI()
+    ? allProfileItems
+    : allProfileItems.filter(item => !item.launchHidden);
 
   React.useEffect(() => {
     setLocalPhoto(user?.photoURL);
@@ -289,15 +307,15 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
             <button 
               key={item.id} 
               className="profile-menu-item"
-              onClick={() => item.path ? navigate(item.path) : toast(`Opening ${t(item.titleKey)}...`)}
+              onClick={() => item.path ? navigate(item.path) : toast(`Opening ${item.customTitle || t(item.titleKey)}...`)}
             >
               <div className="menu-item-left">
                 <div className={`menu-icon-box ${item.class}`}>
                   {item.icon}
                 </div>
                 <div className="menu-text">
-                   <strong>{t(item.titleKey)}</strong>
-                   <span>{t(item.subtitleKey)}</span>
+                   <strong>{item.customTitle || t(item.titleKey)}</strong>
+                   <span>{item.customSubtitle || t(item.subtitleKey)}</span>
                 </div>
               </div>
               <ChevronRight size={18} className="chevron-right" />

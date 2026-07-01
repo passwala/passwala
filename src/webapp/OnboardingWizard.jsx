@@ -6,87 +6,88 @@ const STEPS = [
   {
     id: 'welcome',
     mascotMood: 'wave',
-    question: "yo, welcome to Passwala! 🔥",
-    subtitle: "ur neighbourhood super-app just dropped. let's vibe fr fr 🫡",
+    question: "Welcome to Passwala! 🔥",
+    subtitle: "Your neighbourhood super-app — shop, ride, explore and connect, all in one place.",
     type: 'info',
-    cta: "let's go bestie →",
+    cta: "Get Started →",
   },
   {
     id: 'use_for',
     mascotMood: 'think',
-    question: "what you here for? no cap 👀",
-    subtitle: 'pick all that hit different',
+    question: "What are you looking for?",
+    subtitle: 'Pick everything that applies to you',
     type: 'multi_card',
     options: [
-      { id: 'rides',    emoji: '🚗', label: 'City Rides',      sub: 'drop off szn' },
-      { id: 'events',   emoji: '🎟️', label: 'Events',          sub: 'main character era' },
-      { id: 'shopping', emoji: '🛍️', label: 'Near Shops',      sub: 'treat yourself bestie' },
-      { id: 'services', emoji: '🔧', label: 'Home Services',   sub: 'adulting unlocked' },
-      { id: 'community', emoji: '💬', label: 'Community',       sub: 'vibe with neighbors' },
+      // { id: 'rides',     emoji: '🛵', label: 'City Rides',     sub: 'Quick rides around the city' },
+      { id: 'events',    emoji: '🎟️', label: 'Events',          sub: 'Local events & city experiences' },
+      { id: 'sports',    emoji: '⚽', label: 'Sports Venues',   sub: 'Book play areas & sports slots' },
+      // { id: 'shopping',  emoji: '🛍️', label: 'Near Shops',     sub: 'Shop from stores near you' },
+      // { id: 'services',  emoji: '🔧', label: 'Home Services',  sub: 'Professionals at your doorstep' },
+      // { id: 'community', emoji: '💬', label: 'Community',      sub: 'Connect with your neighbours' },
     ],
   },
   {
     id: 'vibe',
     mascotMood: 'happy',
-    question: "what's ur vibe rn? ✨",
-    subtitle: 'we stan personalisation',
+    question: "How do you like to explore?",
+    subtitle: 'Choose the experience that suits you',
     type: 'single_card',
     options: [
-      { id: 'quick', emoji: '⚡', label: 'Fast mode',    sub: 'no time to waste fr' },
-      { id: 'rich',  emoji: '🌟', label: 'Explore mode', sub: 'all the features bestie' },
-      { id: 'deals', emoji: '🏷️', label: 'Deal hunter',  sub: 'slay + save era' },
+      { id: 'quick', emoji: '⚡', label: 'Fast & Simple',  sub: 'Quick access to what you need' },
+      { id: 'rich',  emoji: '🌟', label: 'Full Experience', sub: 'Explore all features in detail' },
+      { id: 'deals', emoji: '🏷️', label: 'Deal Finder',    sub: 'Always looking for the best price' },
     ],
   },
   {
     id: 'language',
     mascotMood: 'speak',
-    question: "what's ur language? 🗣️",
-    subtitle: "we talk local, select ur vibe",
+    question: "Select your preferred language",
+    subtitle: "Choose the language you are most comfortable with",
     type: 'single_card',
     options: [
-      { id: 'en', emoji: '🇬🇧', label: 'English',            sub: 'global energy' },
-      { id: 'hi', emoji: '🇮🇳', label: 'हिन्दी (Hindi)',       sub: 'desi vibe' },
-      { id: 'gu', emoji: '🦁', label: 'ગુજરાતી (Gujarati)',   sub: 'ahmedabad pride' },
+      { id: 'en', emoji: '🇬🇧', label: 'English',            sub: 'International language' },
+      { id: 'hi', emoji: '🇮🇳', label: 'हिन्दी (Hindi)',       sub: 'Most spoken in India' },
+      { id: 'gu', emoji: '🦁', label: 'ગુજરાતી (Gujarati)',   sub: 'Local language of Ahmedabad' },
     ],
   },
   {
     id: 'theme',
     mascotMood: 'happy',
-    question: "what's ur aesthetic? 🎨",
-    subtitle: "customize how Passwala looks for u",
+    question: "Choose your app theme",
+    subtitle: "Pick how Passwala looks on your device",
     type: 'single_card',
     options: [
-      { id: 'dark',  emoji: '🌌', label: 'Midnight dark', sub: 'easy on the eyes' },
-      { id: 'light', emoji: '☀️', label: 'Vivid light',  sub: 'clean & bright' },
-      { id: 'cyber', emoji: '👾', label: 'Neon orange',   sub: 'cyberpunk vibe fr' },
+      { id: 'dark',  emoji: '🌌', label: 'Dark Mode',    sub: 'Easy on the eyes at night' },
+      { id: 'light', emoji: '☀️', label: 'Light Mode',   sub: 'Bright and clean interface' },
+      { id: 'cyber', emoji: '👾', label: 'Neon Orange',  sub: 'Bold, high-energy look' },
     ],
   },
   {
     id: 'voice',
     mascotMood: 'speak',
-    question: "want me to talk? 🔊",
-    subtitle: "i can literally narrate ur life (app updates ofc)",
+    question: "Enable voice announcements?",
+    subtitle: "Get spoken updates for orders and important alerts",
     type: 'voice_toggle',
   },
   {
     id: 'notifications',
     mascotMood: 'happy',
-    question: "stay in the loop? 🔔",
-    subtitle: "get high-key order updates & local deals",
+    question: "How should we notify you?",
+    subtitle: "Stay updated with order status and local offers",
     type: 'single_card',
     options: [
-      { id: 'whatsapp', emoji: '💬', label: 'WhatsApp alerts', sub: 'fast & direct fr' },
-      { id: 'push',     emoji: '📱', label: 'Push notifications', sub: 'sleek popups bestie' },
-      { id: 'silent',   emoji: '📴', label: 'Silent mode', sub: 'lowkey, check when i want' },
+      { id: 'whatsapp', emoji: '💬', label: 'WhatsApp Alerts',      sub: 'Instant messages on WhatsApp' },
+      { id: 'push',     emoji: '📱', label: 'Push Notifications',   sub: 'Pop-ups directly on your phone' },
+      { id: 'silent',   emoji: '📴', label: 'Silent Mode',          sub: 'No alerts — I will check manually' },
     ],
   },
   {
     id: 'done',
     mascotMood: 'celebrate',
-    question: "ur all set bestie!! 🎉",
-    subtitle: "Passwala just got customised for YOU. it's giving main character.",
+    question: "You are all set! 🎉",
+    subtitle: "Passwala has been personalised for you. Welcome to your neighbourhood super-app.",
     type: 'done',
-    cta: 'Start exploring 🚀',
+    cta: 'Start Exploring →',
   },
 ];
 
@@ -132,7 +133,11 @@ const OnboardingWizard = ({ user, onComplete }) => {
 
   useEffect(() => {
     const saved = answers[current.id];
-    if (current.type === 'multi_card') setSelected(Array.isArray(saved) ? saved : []);
+    if (current.type === 'multi_card') {
+      // Pre-select ALL options by default; restore saved selection if returning to this step
+      const allIds = current.options.map(o => o.id);
+      setSelected(Array.isArray(saved) && saved.length > 0 ? saved : allIds);
+    }
     else if (current.type === 'single_card') setSelected(saved ? [saved] : []);
     else setSelected([]);
   }, [step]);
@@ -150,7 +155,8 @@ const OnboardingWizard = ({ user, onComplete }) => {
 
   const toggleCard = (id) => {
     if (current.type === 'multi_card') {
-      setSelected(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+      // Cards cannot be unselected — only add, never remove
+      setSelected(p => p.includes(id) ? p : [...p, id]);
     } else { setSelected([id]); }
   };
 
@@ -234,14 +240,18 @@ const OnboardingWizard = ({ user, onComplete }) => {
 
           {current.type === 'info' && (
             <div className="onb-pills">
-              {['🛍️ Shopping', '🚗 Rides', '🎟️ Events', '🔧 Services', '💬 Community'].map(c => (
-                <span key={c} className="onb-pill">{c}</span>
-              ))}
+              {/* Hidden features: 'show event and sport other all feature hide, not a remove' */}
+              {/* <span className="onb-pill">🛍️ Shopping</span> */}
+              {/* <span className="onb-pill">🛵 Rides</span> */}
+              <span className="onb-pill">🎟️ Events</span>
+              <span className="onb-pill">⚽ Sports</span>
+              {/* <span className="onb-pill">🔧 Services</span> */}
+              {/* <span className="onb-pill">💬 Community</span> */}
             </div>
           )}
 
           {(current.type === 'single_card' || current.type === 'multi_card') && (
-            <div className="onb-grid onb-grid-2">
+            <div className={`onb-grid ${current.options.length === 3 ? 'onb-grid-3' : 'onb-grid-2'}`}>
               {current.options.map(opt => (
                 <button
                   key={opt.id}
@@ -263,12 +273,12 @@ const OnboardingWizard = ({ user, onComplete }) => {
               <div className={`onb-voice-card ${voiceOn ? 'v-on' : ''}`}>
                 <div className="onb-voice-row">
                   <div>
-                    <div className="onb-v-label">voice {voiceOn ? 'ON 🔊' : 'OFF 🔇'}</div>
-                    <div className="onb-v-sub">{voiceOn ? "giving podcast energy rn" : "silent mode, lowkey"}</div>
+                    <div className="onb-v-label">Voice {voiceOn ? 'ON 🔊' : 'OFF 🔇'}</div>
+                    <div className="onb-v-sub">{voiceOn ? 'Spoken announcements are enabled' : 'All announcements are silent'}</div>
                   </div>
                   <button
                     className={`onb-toggle ${voiceOn ? 'ton' : ''}`}
-                    onClick={() => { const n = !voiceOn; setVoiceOn(n); if (n) speak("voice mode on bestie!"); else window.speechSynthesis?.cancel(); }}
+                    onClick={() => { const n = !voiceOn; setVoiceOn(n); if (n) speak('Voice mode enabled'); else window.speechSynthesis?.cancel(); }}
                   >
                     <span className="onb-knob" />
                   </button>
@@ -278,12 +288,14 @@ const OnboardingWizard = ({ user, onComplete }) => {
                 <button className={`onb-card-opt ${!voiceOn ? 'onb-selected' : ''}`} onClick={() => { setVoiceOn(false); window.speechSynthesis?.cancel(); }}>
                   <span className="onb-opt-emoji">🔇</span>
                   <span className="onb-opt-label">Silent</span>
-                  <span className="onb-opt-sub">lowkey vibes</span>
+                  <span className="onb-opt-sub">No audio announcements</span>
+                  {!voiceOn && <span className="onb-check-badge">✓</span>}
                 </button>
-                <button className={`onb-card-opt ${voiceOn ? 'onb-selected' : ''}`} onClick={() => { setVoiceOn(true); speak("voice mode!"); }}>
+                <button className={`onb-card-opt ${voiceOn ? 'onb-selected' : ''}`} onClick={() => { setVoiceOn(true); speak('Voice mode!'); }}>
                   <span className="onb-opt-emoji">🔊</span>
                   <span className="onb-opt-label">Voice On</span>
-                  <span className="onb-opt-sub">podcast mode</span>
+                  <span className="onb-opt-sub">Speak order & alert updates</span>
+                  {voiceOn && <span className="onb-check-badge">✓</span>}
                 </button>
               </div>
             </div>
@@ -297,9 +309,9 @@ const OnboardingWizard = ({ user, onComplete }) => {
                 ))}
               </div>
               <p className="onb-done-text">
-                welcome to the squad,{' '}
-                <span className="onb-name-hl">{user?.displayName?.split(' ')[0] || 'bestie'}</span>! 🙌
-                <br /><span className="onb-done-sub">it's giving personalised Passwala energy ngl</span>
+                Welcome,{' '}
+                <span className="onb-name-hl">{user?.displayName?.split(' ')[0] || 'there'}</span>! 🙌
+                <br /><span className="onb-done-sub">Passwala is now personalised just for you.</span>
               </p>
             </div>
           )}

@@ -19,6 +19,7 @@ import { Cpu } from 'lucide-react'
 import './App.css'
 
 import { supabase } from './supabase'
+import { isFeatureEnabled } from './launchConfig'
 import AIAssistant from './webapp/AIAssistant'
 import AIChatWidget from './webapp/buyer/AIChatWidget'
 import DeveloperModal from './webapp/DeveloperModal'
@@ -58,6 +59,11 @@ const EventHub = React.lazy(() => import('./webapp/buyer/events/EventHub'));
 const EventDetails = React.lazy(() => import('./webapp/buyer/events/EventDetails'));
 const EventCheckout = React.lazy(() => import('./webapp/buyer/events/EventCheckout'));
 const EventTicket = React.lazy(() => import('./webapp/buyer/events/EventTicket'));
+// Sports Venue Booking
+const SportsHub = React.lazy(() => import('./webapp/buyer/sports/SportsHub'));
+const VenueDetails = React.lazy(() => import('./webapp/buyer/sports/VenueDetails'));
+const SportsCheckout = React.lazy(() => import('./webapp/buyer/sports/SportsCheckout'));
+const SportsTicket = React.lazy(() => import('./webapp/buyer/sports/SportsTicket'));
 
 // Dedicated Environment-based Modes (no fragile port fallbacks)
 const appMode = import.meta.env.VITE_APP_MODE || import.meta.env.MODE || 'web';
@@ -118,7 +124,7 @@ export class ErrorBoundary extends React.Component {
             stack: error?.stack,
             component: errorInfo?.componentStack?.split('\n')?.[1]?.trim()
           })
-        }).catch(() => {}); // non-blocking, best-effort
+        }).catch(() => { }); // non-blocking, best-effort
       } catch (_) { /* ignore */ }
     }
   }
@@ -303,22 +309,44 @@ const AppContent = ({
   const [showOnboarding, setShowOnboarding] = useState(() => {
     if (!isWebappMode) return false;
     const urlParams = new URLSearchParams(window.location.search);
-    // Force reset and show if URL parameter is present
     if (urlParams.get('onboarding') === 'true' || urlParams.get('force_onboarding') === 'true') {
       localStorage.removeItem('passwala_onboarding_done');
       return true;
     }
     return !localStorage.getItem('passwala_onboarding_done');
   });
+  const [onboardingPrefs, setOnboardingPrefs] = useState(() => {
+    try {
+      const saved = localStorage.getItem('passwala_onboarding_prefs');
+      return saved ? JSON.parse(saved) : null;
+    } catch (_) {
+      return null;
+    }
+  });
+
+  // Re-evaluate onboarding whenever the user changes (e.g. fresh login)
+  useEffect(() => {
+    if (!isWebappMode || !effectiveUser) return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const forceOnboarding = urlParams.get('onboarding') === 'true' || urlParams.get('force_onboarding') === 'true';
+    if (forceOnboarding) {
+      localStorage.removeItem('passwala_onboarding_done');
+      setShowOnboarding(true);
+    } else if (!localStorage.getItem('passwala_onboarding_done')) {
+      setShowOnboarding(true);
+    }
+  }, [effectiveUser]);
+
   const handleOnboardingComplete = (prefs) => {
     setShowOnboarding(false);
     if (!prefs) return;
-    
+    setOnboardingPrefs(prefs);
+
     // 1. Apply selected language vibe
     if (prefs.language) {
       changeLanguage(prefs.language);
     }
-    
+
     // 2. Apply chosen theme aesthetic
     if (prefs.theme) {
       if (prefs.theme === 'dark' || prefs.theme === 'cyber') {
@@ -337,7 +365,7 @@ const AppContent = ({
     fetch(`${base}/api/platform-settings`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data?.settings?.maintenanceMode) setMaintenanceMode(true); })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // BUG B6 FIX: Move title useEffect BEFORE the maintenance return
@@ -365,7 +393,7 @@ const AppContent = ({
     const sub = supabase.channel(channelName)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `user_id=eq.${effectiveUser.id}` }, (payload) => {
         const shortId = payload.new.id.substring(0, 6).toUpperCase();
-        
+
         // Skip toast for PLACED / PENDING status as CartDrawer already shows a successful placement toast
         if (payload.new.status !== 'PLACED' && payload.new.status !== 'PENDING') {
           toast.success(`Order #${shortId} is now ${payload.new.status}`, {
@@ -403,7 +431,7 @@ const AppContent = ({
       try {
         const baseUrl = import.meta.env.VITE_API_URL || '';
         let authHeaders = { 'Content-Type': 'application/json' };
-        
+
         try {
           const { auth: fbAuth } = await import('./firebase');
           if (fbAuth?.currentUser) {
@@ -435,7 +463,7 @@ const AppContent = ({
         console.warn('⚠️ Error during FCM token backend synchronization:', err);
       }
     };
-    
+
     syncToken();
   }, [effectiveUser, fcmToken]);
 
@@ -636,7 +664,7 @@ const AppContent = ({
                       )}
                     </Suspense>
                   } />
-                  
+
                   <Route path="/" element={
                     <>
                       {isWebappMode ? (
@@ -646,12 +674,13 @@ const AppContent = ({
                             setLocation={setLocation}
                             location={location}
                             onLogout={handleLogout}
-                            onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : v === 'CITY_RIDES' ? '/city-ride' : v === 'EVENTS' ? '/events' : '/')}
+                            onboardingPrefs={onboardingPrefs}
+                            onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : v === 'CITY_RIDES' ? '/city-ride' : v === 'EVENTS' ? '/events' : v === 'SPORTS' ? '/sports' : '/')}
                           />
                         ) : <Auth onLogin={(userData) => {
                           localStorage.setItem('passwala_user', JSON.stringify(userData));
                           localStorage.setItem('passwala_profile_complete', 'true');
-                          
+
                           const newLoc = localStorage.getItem('passwala_location') || 'India';
                           const savedCoords = localStorage.getItem('passwala_coords');
                           const newCoords = savedCoords ? JSON.parse(savedCoords) : { lat: 20.5937, lng: 78.9629 };
@@ -690,10 +719,11 @@ const AppContent = ({
                   <Route path="/policies" element={<Policies />} />
 
                   {/* Common Application Routes (Suspended correctly) */}
-                  <Route path="/near-shops" element={effectiveUser ? <NearShops onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/" />} />
-                  <Route path="/expert-services" element={effectiveUser ? <ExpertServices onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/" />} />
-                  <Route path="/neighbors" element={effectiveUser ? <NeighborsCommunity onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />} />
-                  <Route path="/track-orders" element={effectiveUser ? <TrackOrders user={effectiveUser} userCoords={userCoords} onBack={() => navigate('/')} /> : <Navigate to="/" />} />
+                  {/* Routes for features — redirected to home if not launched yet */}
+                  <Route path="/near-shops" element={!isFeatureEnabled('shopping') ? <Navigate to="/" /> : (effectiveUser ? <NearShops onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/" />)} />
+                  <Route path="/expert-services" element={!isFeatureEnabled('services') ? <Navigate to="/" /> : (effectiveUser ? <ExpertServices onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/" />)} />
+                  <Route path="/neighbors" element={!isFeatureEnabled('community') ? <Navigate to="/" /> : (effectiveUser ? <NeighborsCommunity onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />)} />
+                  <Route path="/track-orders" element={!isFeatureEnabled('shopping') ? <Navigate to="/" /> : (effectiveUser ? <TrackOrders user={effectiveUser} userCoords={userCoords} onBack={() => navigate('/')} /> : <Navigate to="/" />)} />
                   <Route path="/city-ride" element={effectiveUser ? <CityTicketBooking user={effectiveUser} userCoords={userCoords} onBack={() => navigate('/')} /> : <Navigate to="/" />} />
                   <Route path="/ride-checkout" element={effectiveUser ? <RideCheckout /> : <Navigate to="/" />} />
                   <Route path="/ride-ticket" element={effectiveUser ? <RideTicket /> : <Navigate to="/" />} />
@@ -704,6 +734,11 @@ const AppContent = ({
                   <Route path="/events/checkout" element={effectiveUser ? <EventCheckout user={effectiveUser} /> : <Navigate to="/" />} />
                   <Route path="/events/ticket" element={effectiveUser ? <EventTicket /> : <Navigate to="/" />} />
                   <Route path="/events/:id" element={effectiveUser ? <EventDetails user={effectiveUser} /> : <Navigate to="/" />} />
+                  {/* Sports Venue Booking — checkout/ticket BEFORE :id param to avoid collision */}
+                  <Route path="/sports" element={effectiveUser ? <SportsHub user={effectiveUser} /> : <Navigate to="/" />} />
+                  <Route path="/sports/checkout" element={effectiveUser ? <SportsCheckout user={effectiveUser} /> : <Navigate to="/" />} />
+                  <Route path="/sports/ticket" element={effectiveUser ? <SportsTicket /> : <Navigate to="/" />} />
+                  <Route path="/sports/:id" element={effectiveUser ? <VenueDetails user={effectiveUser} /> : <Navigate to="/" />} />
                   <Route path="/profile" element={effectiveUser ? <WebappProfile user={effectiveUser} onLogout={handleLogout} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} onUpdateUser={(updated) => setUser(updated)} /> : <Navigate to="/" />} />
                   <Route path="/order-history" element={effectiveUser ? <OrderHistory /> : <Navigate to="/" />} />
                   <Route path="/wallet" element={effectiveUser ? <Wallet user={effectiveUser} /> : <Navigate to="/" />} />
@@ -722,18 +757,18 @@ const AppContent = ({
               <BottomNav activeTab={currentView} user={effectiveUser} onTabChange={(v) => {
                 if (v === 'NEIGHBORS') { setShowComingSoon(true); return; }
                 const routeMap = {
-                  'DASHBOARD':       '/',
-                  'NEAR_SHOPS':      '/near-shops',
+                  'DASHBOARD': '/',
+                  'NEAR_SHOPS': '/near-shops',
                   'EXPERT_SERVICES': '/expert-services',
-                  'TRACKING':        '/track-orders',
-                  'PROFILE':         '/profile',
+                  'TRACKING': '/track-orders',
+                  'PROFILE': '/profile',
                 };
                 if (routeMap[v]) navigate(routeMap[v]);
               }} />
             )}
 
-            {/* ── Duolingo-style Onboarding Wizard (first-time users only) ── */}
-            {isWebappMode && showOnboarding && effectiveUser && isProfileComplete && (
+            {/* ── Duolingo-style Onboarding Wizard (first-time users only, shown after login & profile complete) ── */}
+            {isWebappMode && effectiveUser && isProfileComplete && showOnboarding && (
               <OnboardingWizard user={effectiveUser} onComplete={handleOnboardingComplete} />
             )}
 
@@ -774,33 +809,33 @@ const AppContent = ({
                   `}</style>
 
                   {/* Icon */}
-                  <div style={{ fontSize:'3.5rem', lineHeight:1, marginBottom:'0.75rem', display:'inline-block', animation:'cs-rocket 1.6s ease-in-out infinite' }}>🚀</div>
+                  <div style={{ fontSize: '3.5rem', lineHeight: 1, marginBottom: '0.75rem', display: 'inline-block', animation: 'cs-rocket 1.6s ease-in-out infinite' }}>🚀</div>
 
                   {/* Badge */}
                   <div style={{
-                    display:'inline-block', background:'linear-gradient(135deg,#ff7622,#ff9f4a)',
-                    color:'white', fontSize:'0.65rem', fontWeight:900, letterSpacing:'0.12em',
-                    padding:'4px 12px', borderRadius:'100px', marginBottom:'1rem',
-                    textTransform:'uppercase'
+                    display: 'inline-block', background: 'linear-gradient(135deg,#ff7622,#ff9f4a)',
+                    color: 'white', fontSize: '0.65rem', fontWeight: 900, letterSpacing: '0.12em',
+                    padding: '4px 12px', borderRadius: '100px', marginBottom: '1rem',
+                    textTransform: 'uppercase'
                   }}>Coming Soon</div>
 
-                  <h2 style={{ fontSize:'1.35rem', fontWeight:800, color:'#0f172a', margin:'0 0 0.5rem' }}>Community Hub 🏘️</h2>
-                  <p style={{ fontSize:'0.9rem', color:'#64748b', lineHeight:1.6, margin:'0 0 1.75rem' }}>
-                    Connect with your neighbors, join local groups, share updates &amp; discover what&apos;s happening around you — <strong style={{color:'#ff7622'}}>launching very soon!</strong>
+                  <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.5rem' }}>Community Hub 🏘️</h2>
+                  <p style={{ fontSize: '0.9rem', color: '#64748b', lineHeight: 1.6, margin: '0 0 1.75rem' }}>
+                    Connect with your neighbors, join local groups, share updates &amp; discover what&apos;s happening around you — <strong style={{ color: '#ff7622' }}>launching very soon!</strong>
                   </p>
 
                   <button
                     onClick={() => setShowComingSoon(false)}
                     style={{
-                      width:'100%', padding:'0.85rem',
-                      background:'linear-gradient(135deg,#ff7622,#ff9f4a)',
-                      color:'white', border:'none', borderRadius:'14px',
-                      fontWeight:800, fontSize:'0.95rem', cursor:'pointer',
-                      boxShadow:'0 6px 20px rgba(255,118,34,0.35)',
-                      transition:'transform 0.15s'
+                      width: '100%', padding: '0.85rem',
+                      background: 'linear-gradient(135deg,#ff7622,#ff9f4a)',
+                      color: 'white', border: 'none', borderRadius: '14px',
+                      fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer',
+                      boxShadow: '0 6px 20px rgba(255,118,34,0.35)',
+                      transition: 'transform 0.15s'
                     }}
-                    onMouseDown={e=>e.currentTarget.style.transform='scale(0.97)'}
-                    onMouseUp={e=>e.currentTarget.style.transform='scale(1)'}
+                    onMouseDown={e => e.currentTarget.style.transform = 'scale(0.97)'}
+                    onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
                   >
                     Got it! ✨
                   </button>
@@ -811,58 +846,34 @@ const AppContent = ({
             {isWebMode && <Footer />}
 
             {/* 5. Drawers / Modals */}
-            <CartDrawer location={location} isProfileComplete={isProfileComplete} userAddress={userAddress} user={effectiveUser} />
-            <AIChatWidget user={effectiveUser} onLogin={(userData) => {
-              localStorage.setItem('passwala_user', JSON.stringify(userData));
-              localStorage.setItem('passwala_profile_complete', 'true');
-              
-              const newLoc = localStorage.getItem('passwala_location') || 'Satellite, Ahmedabad';
-              const savedCoords = localStorage.getItem('passwala_coords');
-              const newCoords = savedCoords ? JSON.parse(savedCoords) : { lat: 23.0305, lng: 72.5075 };
-              const savedAddr = localStorage.getItem('passwala_user_address');
-              const newAddr = savedAddr ? JSON.parse(savedAddr) : {
-                address_line_1: newLoc,
-                city: 'Ahmedabad',
-                state: 'Gujarat',
-                pincode: '380015',
-                society: newLoc.split(',')[0],
-                house_no: 'Home',
-                floor: 'Ground',
-                is_default: true
-              };
+            {effectiveUser && !showOnboarding && isProfileComplete && (
+              <CartDrawer location={location} isProfileComplete={isProfileComplete} userAddress={userAddress} user={effectiveUser} />
+            )}
+            {(!effectiveUser || !showOnboarding) && (
+              <AIChatWidget user={effectiveUser} onLogin={(userData) => {
+                localStorage.setItem('passwala_user', JSON.stringify(userData));
+                localStorage.setItem('passwala_profile_complete', 'true');
 
-              setLocation(newLoc, newCoords);
-              setUserAddress(newAddr);
-              setUser(userData);
-              setIsProfileComplete(true);
-            }} />
-            <DeveloperModal isOpen={isDevModalOpen} onClose={() => setIsDevModalOpen(false)} user={effectiveUser} />
+                const newLoc = localStorage.getItem('passwala_location') || 'Satellite, Ahmedabad';
+                const savedCoords = localStorage.getItem('passwala_coords');
+                const newCoords = savedCoords ? JSON.parse(savedCoords) : { lat: 23.0305, lng: 72.5075 };
+                const savedAddr = localStorage.getItem('passwala_user_address');
+                const newAddr = savedAddr ? JSON.parse(savedAddr) : {
+                  address_line_1: newLoc,
+                  city: 'Ahmedabad',
+                  state: 'Gujarat',
+                  pincode: '380015',
+                  society: newLoc.split(',')[0],
+                  house_no: 'Home',
+                  floor: 'Ground',
+                  is_default: true
+                };
 
-            {/* Floating Developer Console Trigger (Localhost only) */}
-            {isLocalhost && (
-              <button
-                onClick={() => setIsDevModalOpen(true)}
-                style={{
-                  position: 'fixed',
-                  bottom: '80px',
-                  right: '20px',
-                  zIndex: 9999,
-                  background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
-                  border: '1.5px solid #ff7622',
-                  borderRadius: '50%',
-                  width: '45px',
-                  height: '45px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 8px 24px rgba(255, 118, 34, 0.25)',
-                  cursor: 'pointer',
-                  color: '#ff7622'
-                }}
-                title="Open Developer Console (Ctrl+Alt+D)"
-              >
-                <Cpu size={20} />
-              </button>
+                setLocation(newLoc, newCoords);
+                setUserAddress(newAddr);
+                setUser(userData);
+                setIsProfileComplete(true);
+              }} />
             )}
           </>
         )}

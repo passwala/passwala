@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, X, MessageSquare, Bot, User, Loader2, Phone, ShieldCheck, ShoppingBag, Wrench, Ticket, Bike, Check, MapPin, RefreshCw, Camera, Wallet, ArrowRight, Mic, MicOff, Menu, SquarePen, ChevronDown, Sparkles, Plus } from 'lucide-react';
+import { Send, X, MessageSquare, MessageCircle, Bot, User, Loader2, Phone, ShieldCheck, ShoppingBag, Wrench, Ticket, Bike, Check, MapPin, RefreshCw, Camera, Wallet, ArrowRight, Mic, MicOff, Menu, SquarePen, ChevronDown, Sparkles, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 // eslint-disable-next-line no-unused-vars
 import { AnimatePresence, motion } from 'framer-motion';
@@ -15,21 +15,35 @@ const AIChatWidget = ({ user, onLogin }) => {
   const { clearCart } = useCart();
   const [isOpen, setIsOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    const handleOpenChat = () => setIsOpen(true);
+    window.addEventListener('open-passwala-ai-chat', handleOpenChat);
+    return () => window.removeEventListener('open-passwala-ai-chat', handleOpenChat);
+  }, []);
   const [messages, setMessages] = useState([
     {
       id: 1,
-      text: "Namaste! 🙏 Welcome to Passwala. I am your AI neighborhood assistant. You can log in, book rides, order groceries, or book local home services directly through me! \n\nPlease enter your 10-digit mobile number to begin: 📱",
+      text: "Namaste! 🙏 Welcome to Passwala. I am your AI assistant. You can log in, buy event passes, or book sports venues directly through me! \n\nPlease enter your 10-digit mobile number to begin: 📱",
       sender: 'ai',
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  
+
   // Chat flow state: 'PHONE' -> 'OTP' -> 'LOCATION_PROMPT' -> 'LOGGED_IN'
   const [chatState, setChatState] = useState('PHONE');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [userSession, setUserSession] = useState(null);
+
+  // Sports slot picker state
+  const [pendingVenueSlot, setPendingVenueSlot] = useState(null);
+  // { venueId, venueName, sport, selectedDate, slots, selectedSlotIds }
+
+  // Event tier picker state
+  const [pendingEventTier, setPendingEventTier] = useState(null);
+  // { eventId, eventTitle, tiers, selectedTierId, qty }
 
   // Voice command states
   const [isListening, setIsListening] = useState(false);
@@ -37,7 +51,7 @@ const AIChatWidget = ({ user, onLogin }) => {
   const recognitionRef = useRef(null);
   const pendingVoiceInputRef = useRef(null);
   const [voiceSendTrigger, setVoiceSendTrigger] = useState(0);
-  
+
   const scrollRef = useRef(null);
 
   // Real database dynamic stats and user profile
@@ -55,7 +69,7 @@ const AIChatWidget = ({ user, onLogin }) => {
           try {
             const parsed = JSON.parse(savedUser);
             userId = parsed.id;
-          } catch (e) {}
+          } catch (e) { }
         }
       }
       if (userId) {
@@ -83,7 +97,7 @@ const AIChatWidget = ({ user, onLogin }) => {
         .from('riders')
         .select('*', { count: 'exact', head: true })
         .eq('is_active', true);
-      
+
       let ridersCount = activeRiders || 0;
       if (ridersCount === 0) {
         const { count: totalRiders } = await supabase
@@ -138,7 +152,7 @@ const AIChatWidget = ({ user, onLogin }) => {
         setMessages([
           {
             id: 1,
-            text: `Welcome back, ${parsed.displayName || 'Friend'}! 😊 I see you're logged in. What can I book for you today? (Rides 🛵, Services 🛠️, Event Passes 🎫, or Groceries 🛍️)`,
+            text: `Welcome back, ${parsed.displayName || 'Friend'}! 😊 I see you're logged in. What can I book for you today?\n\n🎫 Events  🏏 Sports Venues`,
             sender: 'ai',
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }
@@ -158,7 +172,7 @@ const AIChatWidget = ({ user, onLogin }) => {
       setMessages([
         {
           id: 1,
-          text: "Namaste! 🙏 Welcome to Passwala. I am your AI neighborhood assistant. You can log in, book rides, order groceries, or book local home services directly through me! \n\nPlease enter your 10-digit mobile number to begin: 📱",
+          text: "Namaste! 🙏 Welcome to Passwala. I am your AI neighborhood assistant. You can log in, book rides, buy event passes, book sports venues, or order groceries directly through me! \n\nPlease enter your 10-digit mobile number to begin: 📱",
           sender: 'ai',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
@@ -264,32 +278,32 @@ const AIChatWidget = ({ user, onLogin }) => {
         user: userSession
       })
     })
-    .then(res => res.json())
-    .then(data => {
-      if (data && data.text) {
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.text) {
+          setMessages(prev => [...prev, {
+            id: Date.now() + 2,
+            text: data.text,
+            sender: 'ai',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            card: data.card || null
+          }]);
+        } else {
+          throw new Error('No text from AI');
+        }
+      })
+      .catch(() => {
         setMessages(prev => [...prev, {
-          id: Date.now() + 2,
-          text: data.text,
+          id: Date.now() + 5,
+          text: "I didn't quite catch that. Could you please try again? 🎙️",
           sender: 'ai',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          card: data.card || null
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }]);
-      } else {
-        throw new Error('No text from AI');
-      }
-    })
-    .catch(() => {
-      setMessages(prev => [...prev, {
-        id: Date.now() + 5,
-        text: "I didn't quite catch that. Could you please try again? 🎙️",
-        sender: 'ai',
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }]);
-    })
-    .finally(() => {
-      setIsTyping(false);
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      })
+      .finally(() => {
+        setIsTyping(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voiceSendTrigger]);
 
   const toggleListening = () => {
@@ -404,7 +418,7 @@ const AIChatWidget = ({ user, onLogin }) => {
         const searchId = userSession?.id || userSession?.phoneNumber || userSession?.email || userSession?.uid;
         const res = await fetch(`${BASE_API}/api/users/${encodeURIComponent(searchId)}/photo`, {
           method: 'PUT',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
@@ -413,7 +427,7 @@ const AIChatWidget = ({ user, onLogin }) => {
         if (!res.ok) throw new Error('Upload failed');
         const data = await res.json();
         const uploadedPhotoUrl = data.photoURL || base64String;
-        
+
         const updatedUser = { ...userSession, photoURL: uploadedPhotoUrl };
         localStorage.setItem('passwala_user', JSON.stringify(updatedUser));
         setUserSession(updatedUser);
@@ -460,17 +474,17 @@ const AIChatWidget = ({ user, onLogin }) => {
         // Clear session local storage
         localStorage.removeItem('passwala_user');
         localStorage.removeItem('passwala_profile_complete');
-        
+
         // Dispatch global logout event
         window.dispatchEvent(new CustomEvent('logout-external'));
-        
+
         // Reset assistant state
         setChatState('PHONE');
         setPhoneNumber('');
         setUserSession(null);
         setUserName('Friend');
         setWalletBalance(150.00);
-        
+
         setMessages([
           {
             id: Date.now(),
@@ -486,15 +500,15 @@ const AIChatWidget = ({ user, onLogin }) => {
 
     // Direct Text Navigation Router (Instantly navigates when logged in)
     if (chatState === 'LOGGED_IN') {
-      const cleanInput = lowerInput.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g,"").trim();
-      
+      const cleanInput = lowerInput.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "").trim();
+
       // Track Orders / Delivery Status
       if (
-        cleanInput.includes('track order') || 
-        cleanInput.includes('track the order') || 
-        cleanInput.includes('track my order') || 
-        cleanInput.includes('order status') || 
-        cleanInput.includes('where is my order') || 
+        cleanInput.includes('track order') ||
+        cleanInput.includes('track the order') ||
+        cleanInput.includes('track my order') ||
+        cleanInput.includes('order status') ||
+        cleanInput.includes('where is my order') ||
         cleanInput.includes('delivery status')
       ) {
         setTimeout(() => {
@@ -504,12 +518,12 @@ const AIChatWidget = ({ user, onLogin }) => {
         }, 600);
         return;
       }
-      
+
       // Order History / Bookings
       if (
-        cleanInput.includes('order history') || 
-        cleanInput.includes('my orders') || 
-        cleanInput.includes('past orders') || 
+        cleanInput.includes('order history') ||
+        cleanInput.includes('my orders') ||
+        cleanInput.includes('past orders') ||
         cleanInput.includes('my bookings')
       ) {
         setTimeout(() => {
@@ -522,11 +536,11 @@ const AIChatWidget = ({ user, onLogin }) => {
 
       // Book a Ride
       if (
-        cleanInput === 'ride' || 
-        cleanInput === 'cab' || 
-        cleanInput === 'taxi' || 
-        cleanInput.includes('book a ride') || 
-        cleanInput.includes('book ride') || 
+        cleanInput === 'ride' ||
+        cleanInput === 'cab' ||
+        cleanInput === 'taxi' ||
+        cleanInput.includes('book a ride') ||
+        cleanInput.includes('book ride') ||
         cleanInput.includes('city ride')
       ) {
         setTimeout(() => {
@@ -539,10 +553,10 @@ const AIChatWidget = ({ user, onLogin }) => {
 
       // Groceries / Neighborhood Shops
       if (
-        cleanInput === 'grocery' || 
-        cleanInput === 'groceries' || 
-        cleanInput.includes('order groceries') || 
-        cleanInput.includes('near shops') || 
+        cleanInput === 'grocery' ||
+        cleanInput === 'groceries' ||
+        cleanInput.includes('order groceries') ||
+        cleanInput.includes('near shops') ||
         cleanInput.includes('shops near me')
       ) {
         setTimeout(() => {
@@ -555,9 +569,9 @@ const AIChatWidget = ({ user, onLogin }) => {
 
       // Expert Home Services
       if (
-        cleanInput.includes('book local pro') || 
-        cleanInput.includes('expert services') || 
-        cleanInput.includes('local services') || 
+        cleanInput.includes('book local pro') ||
+        cleanInput.includes('expert services') ||
+        cleanInput.includes('local services') ||
         cleanInput.includes('home services') ||
         cleanInput === 'plumber' ||
         cleanInput === 'electrician' ||
@@ -571,20 +585,9 @@ const AIChatWidget = ({ user, onLogin }) => {
         return;
       }
 
-      // Concerts & Event Tickets
-      if (
-        cleanInput.includes('event') || 
-        cleanInput.includes('ticket') || 
-        cleanInput.includes('concert') || 
-        cleanInput.includes('show')
-      ) {
-        setTimeout(() => {
-          setIsOpen(false);
-          navigate('/events');
-          setIsTyping(false);
-        }, 600);
-        return;
-      }
+      // Concerts & Event Tickets — keep in chat, let backend respond with card
+      // Sports — keep in chat, let backend respond with venue/slot card
+      // (No redirects for events or sports — handled by AI backend)
     }
 
     try {
@@ -604,7 +607,7 @@ const AIChatWidget = ({ user, onLogin }) => {
         }
 
         setPhoneNumber(cleanPhone);
-        
+
         const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
         const res = await fetch(`${BASE_API}/api/users/send-whatsapp-otp`, {
           method: 'POST',
@@ -738,8 +741,8 @@ const AIChatWidget = ({ user, onLogin }) => {
     } catch (err) {
       console.warn('⚠️ AI chat processing failed:', err);
       setTimeout(() => {
-        let errorText = "I didn't quite catch that. Would you like me to book a Ride 🛵, buy Event Passes 🎫, book Home Services 🛠️, or order Groceries 🛍️?";
-        
+        let errorText = "I didn't quite catch that. Would you like me to buy Event Passes 🎫, or book Sports Venues 🏏?";
+
         if (chatState === 'PHONE') {
           errorText = `⚠️ Connection to the backend server failed. Please ensure the server is running on port 3004 and your connection is stable, then try entering your mobile number again!`;
         } else if (chatState === 'OTP') {
@@ -747,7 +750,7 @@ const AIChatWidget = ({ user, onLogin }) => {
         } else if (chatState === 'LOCATION_PROMPT') {
           errorText = `⚠️ Failed to set the location due to a server error. Please try again or tap Skip.`;
         }
-        
+
         setMessages(prev => [...prev, {
           id: Date.now() + 5,
           text: errorText,
@@ -948,6 +951,15 @@ const AIChatWidget = ({ user, onLogin }) => {
             userId: cardData.userId
           })
         });
+      } else if (actionType === 'CANCEL_SPORT') {
+        res = await fetch(`${BASE_API}/api/sports/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            booking_id: cardData.bookingId,
+            userId: cardData.userId
+          })
+        });
       } else if (actionType === 'BOOK_EVENT') {
         // Build a rich user identity payload so backend can resolve user ID via any available identifier
         const rawPhone = userSession?.phoneNumber?.replace(/\D/g, '').slice(-10) || '';
@@ -977,11 +989,154 @@ const AIChatWidget = ({ user, onLogin }) => {
             ticketCount: cardData.ticketCount || 1
           })
         });
+      } else if (actionType === 'SHOW_VENUE_SLOTS') {
+        // Fetch slots for selected venue and show inline slot picker
+        const today = new Date().toISOString().split('T')[0];
+        const fetchDate = cardData.selectedDate || today;
+        try {
+          const slotsRes = await fetch(`${BASE_API}/api/ai/sports-slots`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ venueId: cardData.venueId, date: fetchDate, sport: cardData.sport || 'all' })
+          });
+          const slotsData = await slotsRes.json();
+          const slots = slotsData.slots || [];
+
+          setPendingVenueSlot({
+            venueId: cardData.venueId,
+            venueName: cardData.venueName,
+            sport: cardData.sport || 'all',
+            selectedDate: fetchDate,
+            slots,
+            selectedSlotIds: []
+          });
+
+          setMessages(prev => [...prev, {
+            id: Date.now(),
+            text: `📊 Here are the available slots at **${cardData.venueName}** for ${new Date(fetchDate + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}:`,
+            sender: 'ai',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            card: {
+              type: 'sports_slot_picker',
+              venueId: cardData.venueId,
+              venueName: cardData.venueName,
+              sport: cardData.sport || 'all',
+              selectedDate: fetchDate,
+              slots
+            }
+          }]);
+        } catch (err) {
+          setMessages(prev => [...prev, {
+            id: Date.now(),
+            text: `❌ Failed to load slots for ${cardData.venueName}. Please try again.`,
+            sender: 'ai',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }]);
+        }
+        setIsTyping(false);
+        return;
+      } else if (actionType === 'BOOK_SPORT') {
+        if (!cardData.slotIds || cardData.slotIds.length === 0) {
+          setMessages(prev => [...prev, {
+            id: Date.now(),
+            text: '⚠️ Please select at least one available time slot to book.',
+            sender: 'ai',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }]);
+          setIsTyping(false);
+          return;
+        }
+        res = await fetch(`${BASE_API}/api/sports/book`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            venue_id: cardData.venueId,
+            slot_ids: cardData.slotIds,
+            sport_type: cardData.sport,
+            user_id: userSession?.id || userSession?.uid || null,
+            user_phone: userSession?.phoneNumber?.replace(/\D/g, '').slice(-10) || null,
+            user_name: userSession?.displayName || null,
+            user_email: userSession?.email || null
+          })
+        });
+        const bookData = await res.json();
+        if (res.ok && bookData.success) {
+          const b = bookData.booking || bookData.bookings?.[0];
+          setMessages(prev => [...prev, {
+            id: Date.now(),
+            text: `✅ Court booked! **${cardData.venueName}** \n🏏 ${cardData.sport?.replace('_', ' ')} \n📅 ${cardData.selectedDate} \n⏰ ${cardData.timeRange || 'Selected slots'} \n🎫 QR: ${b?.qr_code || 'PW-SPORT-OK'} \n\nSee your booking in Order History ➜`,
+            sender: 'ai',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }]);
+          setPendingVenueSlot(null);
+        } else {
+          setMessages(prev => [...prev, {
+            id: Date.now(),
+            text: `❌ Booking failed: ${bookData.error || 'Please try again or book from the Sports page.'}`,
+            sender: 'ai',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }]);
+        }
+        setIsTyping(false);
+        return;
+      } else if (actionType === 'SHOW_EVENT_TIERS') {
+        // Fetch full tier list for the selected event
+        try {
+          const tierRes = await fetch(`${BASE_API}/api/ai/event-slots`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ eventId: cardData.eventId })
+          });
+          const tierData = await tierRes.json();
+          if (!tierRes.ok || !tierData.success) throw new Error(tierData.error || 'Failed');
+
+          const tiers = tierData.tiers || [];
+          if (tiers.length === 0) {
+            setMessages(prev => [...prev, {
+              id: Date.now(),
+              text: `⚠️ No ticket tiers found for **${cardData.eventTitle}**. Please book from the Events page.`,
+              sender: 'ai',
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            }]);
+            setIsTyping(false);
+            return;
+          }
+
+          setPendingEventTier({
+            eventId: cardData.eventId,
+            eventTitle: cardData.eventTitle,
+            tiers,
+            selectedTierId: tiers[0]?.id || null,
+            qty: 1
+          });
+
+          setMessages(prev => [...prev, {
+            id: Date.now(),
+            text: `🎫 Select your ticket tier for **${cardData.eventTitle}**:`,
+            sender: 'ai',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            card: {
+              type: 'event_tier_picker',
+              eventId: cardData.eventId,
+              eventTitle: cardData.eventTitle,
+              tiers
+            }
+          }]);
+        } catch (err) {
+          setMessages(prev => [...prev, {
+            id: Date.now(),
+            text: `❌ Could not load tiers for this event. Try booking from the Events page.`,
+            sender: 'ai',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }]);
+        }
+        setIsTyping(false);
+        return;
       } else if (actionType === 'BOOK_SERVICE') {
         const token = await getAuthToken();
         res = await fetch(`${BASE_API}/api/orders/book-service`, {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
@@ -997,7 +1152,7 @@ const AIChatWidget = ({ user, onLogin }) => {
         const searchId = userSession?.id || userSession?.phoneNumber || userSession?.email || userSession?.uid;
         res = await fetch(`${BASE_API}/api/users/${encodeURIComponent(searchId)}/name`, {
           method: 'PUT',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
@@ -1030,7 +1185,7 @@ const AIChatWidget = ({ user, onLogin }) => {
         const searchId = userSession?.id || userSession?.phoneNumber || userSession?.email || userSession?.uid;
         res = await fetch(`${BASE_API}/api/users/${encodeURIComponent(searchId)}/email`, {
           method: 'PUT',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
@@ -1063,7 +1218,7 @@ const AIChatWidget = ({ user, onLogin }) => {
         const searchId = userSession?.id || userSession?.phoneNumber || userSession?.email || userSession?.uid;
         res = await fetch(`${BASE_API}/api/users/${encodeURIComponent(searchId)}/phone`, {
           method: 'PUT',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
@@ -1096,7 +1251,7 @@ const AIChatWidget = ({ user, onLogin }) => {
         const searchId = userSession?.id || userSession?.phoneNumber || userSession?.email || userSession?.uid;
         res = await fetch(`${BASE_API}/api/users/${encodeURIComponent(searchId)}/address`, {
           method: 'PUT',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
@@ -1143,7 +1298,7 @@ const AIChatWidget = ({ user, onLogin }) => {
         const searchId = userSession?.id || userSession?.phoneNumber || userSession?.email || userSession?.uid;
         res = await fetch(`${BASE_API}/api/users/${encodeURIComponent(searchId)}/wallet`, {
           method: 'PUT',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
@@ -1215,7 +1370,7 @@ const AIChatWidget = ({ user, onLogin }) => {
             store_id: cardData.storeId
           }
         }));
-        
+
         setMessages(prev => [...prev, {
           id: Date.now(),
           text: `Added ${cardData.name} (Qty: ${cardData.quantity || 1}) to your cart! 🛍️ Would you like to confirm and place this order directly from the assistant?`,
@@ -1244,7 +1399,7 @@ const AIChatWidget = ({ user, onLogin }) => {
         const token = await getAuthToken();
         res = await fetch(`${BASE_API}/api/orders/place`, {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
@@ -1259,7 +1414,7 @@ const AIChatWidget = ({ user, onLogin }) => {
           clearCart();
           setMessages(prev => [...prev, {
             id: Date.now(),
-            text: `🎉 Order placed successfully! Order Reference: #${data.order.id.substring(0,8).toUpperCase()}. Your neighborhood delivery agent has been notified.`,
+            text: `🎉 Order placed successfully! Order Reference: #${data.order.id.substring(0, 8).toUpperCase()}. Your neighborhood delivery agent has been notified.`,
             sender: 'ai',
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }]);
@@ -1291,7 +1446,9 @@ const AIChatWidget = ({ user, onLogin }) => {
       if (res.ok && (data.success || data.booking || data.order)) {
         const textMsg = actionType === 'CANCEL_RIDE'
           ? "✅ Ride booking cancelled successfully. Your ticket has been voided."
-          : `✅ Booking confirmed successfully! Pass ID/Reference: ${data.booking?.qr_code_hash || data.order?.id || 'PW-CONFIRMED'}. You can track it in your profile's History page.`;
+          : actionType === 'CANCEL_SPORT'
+            ? "✅ Sports slot booking cancelled successfully. Your slot is now available again."
+            : `✅ Booking confirmed successfully! Pass ID/Reference: ${data.booking?.qr_code_hash || data.order?.id || 'PW-CONFIRMED'}. You can track it in your profile's History page.`;
 
         setMessages(prev => [...prev, {
           id: Date.now() + 1,
@@ -1321,13 +1478,15 @@ const AIChatWidget = ({ user, onLogin }) => {
 
   const handleResetChat = () => {
     setInput('');
+    setPendingVenueSlot(null);
+    setPendingEventTier(null);
     if (!userSession) {
       setChatState('PHONE');
       setPhoneNumber('');
       setMessages([
         {
           id: 1,
-          text: "Namaste! 🙏 Welcome to Passwala. I am your AI neighborhood assistant. You can log in, book rides, order groceries, or book local home services directly through me! \n\nPlease enter your 10-digit mobile number to begin: 📱",
+          text: "Namaste! 🙏 Welcome to Passwala. I am your AI neighborhood assistant. You can log in, book rides, buy event passes, book sports venues, or order groceries directly through me! \n\nPlease enter your 10-digit mobile number to begin: 📱",
           sender: 'ai',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
@@ -1337,7 +1496,7 @@ const AIChatWidget = ({ user, onLogin }) => {
       setMessages([
         {
           id: 1,
-          text: `Welcome back, ${userSession.displayName || 'Friend'}! 😊 I see you're logged in. What can I book for you today? (Rides 🛵, Services 🛠️, Event Passes 🎫, or Groceries 🛍️)`,
+          text: `Welcome back, ${userSession.displayName || 'Friend'}! 😊 What can I book for you today?\n\n🎫 Events  🏏 Sports Venues`,
           sender: 'ai',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
@@ -1347,7 +1506,7 @@ const AIChatWidget = ({ user, onLogin }) => {
 
   return (
     <>
-      <button 
+      <button
         className="ai-chat-toggle-btn shadow-lg"
         onClick={() => setIsOpen(!isOpen)}
         style={{
@@ -1369,12 +1528,19 @@ const AIChatWidget = ({ user, onLogin }) => {
           transition: 'transform 0.2s ease'
         }}
       >
-        {isOpen ? <X size={26} /> : <MessageSquare size={26} />}
+        {isOpen ? (
+          <X size={26} />
+        ) : (
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <MessageCircle size={26} />
+            <Sparkles size={12} style={{ position: 'absolute', top: -4, right: -4, color: '#fef08a' }} />
+          </div>
+        )}
       </button>
 
       <AnimatePresence>
         {isOpen && (
-          <motion.div 
+          <motion.div
             className="ai-chat-widget-window glass shadow-2xl"
             initial={{ opacity: 0, scale: 0 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -1382,81 +1548,7 @@ const AIChatWidget = ({ user, onLogin }) => {
             transition={{ type: 'spring', damping: 26, stiffness: 210 }}
             style={{ transformOrigin: 'calc(100% - 54px) calc(100% - 54px)' }}
           >
-            {/* ── Sidebar (Left Panel) ── */}
-            <div className={`chat-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
-              <div className="sidebar-top-actions">
-                <div className="sidebar-header-row">
-                  <button 
-                    className="sidebar-menu-toggle-btn" 
-                    onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
-                    title="Toggle Sidebar"
-                  >
-                    <Menu size={18} />
-                  </button>
-                </div>
-                
-                <button className="new-chat-btn" onClick={handleResetChat}>
-                  <span>New chat</span>
-                  <Plus size={16} />
-                </button>
-
-                <div className="sidebar-menu-list">
-                  <button className="sidebar-menu-item active">
-                    <Bot size={16} color="#ff6b00" />
-                    <span>Shopping Agent</span>
-                  </button>
-                  <button className="sidebar-menu-item" onClick={() => { setIsOpen(false); navigate('/events'); }}>
-                    <Ticket size={16} />
-                    <span>Event Helper</span>
-                  </button>
-                  <button className="sidebar-menu-item" onClick={() => { setIsOpen(false); navigate('/city-ride'); }}>
-                    <Bike size={16} />
-                    <span>Ride Navigator</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="sidebar-footer-profile">
-                {userSession ? (
-                  <>
-                    {user?.photoURL || userSession?.photoURL ? (
-                      <img 
-                        src={user?.photoURL || userSession?.photoURL} 
-                        alt="Profile" 
-                        style={{ 
-                          width: '34px', 
-                          height: '34px', 
-                          borderRadius: '50%', 
-                          objectFit: 'cover',
-                          display: 'block',
-                          border: '1.5px solid #ff6b00'
-                        }} 
-                      />
-                    ) : (
-                      <div className="profile-avatar-circle">
-                        {userSession?.displayName ? userSession.displayName.substring(0, 2).toUpperCase() : 'KD'}
-                      </div>
-                    )}
-                    <div className="profile-info">
-                      <span className="profile-name">{userSession?.displayName || userSession?.full_name || 'Friend'}</span>
-                      <span className="profile-role">Active Neighbor</span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="profile-avatar-circle" style={{ backgroundColor: '#e5e5e5', color: '#737373', display: 'flex', alignItems: 'center', justify: 'center' }}>
-                      <User size={16} />
-                    </div>
-                    <div className="profile-info">
-                      <span className="profile-name" style={{ color: '#737373' }}>Guest Neighbor</span>
-                      <span className="profile-role" style={{ color: '#a3a3a3' }}>Not Logged In</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* ── Main Chat Panel (Right Side) ── */}
+            {/* ── Main Chat Panel ── */}
             <div className="chat-main-panel">
               <div className="chat-main-header">
                 <div className="header-title-dropdown">
@@ -1473,22 +1565,22 @@ const AIChatWidget = ({ user, onLogin }) => {
                 /* ── ChatGPT Centered Landing Screen (Start State) ── */
                 <div className="chat-landing-container">
                   <div className="chat-landing-content-split">
-                    
+
                     {/* Left Column: AI Command Console */}
                     <div className="chat-landing-left-column">
                       <h1 className="chat-landing-title">Where should we begin?</h1>
 
                       <div className="chat-input-wrapper-chatgpt">
-                        <input 
+                        <input
                           type={chatState === 'PHONE' || chatState === 'OTP' ? 'tel' : 'text'}
                           maxLength={chatState === 'PHONE' ? 10 : chatState === 'OTP' ? 6 : undefined}
                           className="chatgpt-style-input"
                           placeholder={
                             chatState === 'PHONE' ? "Enter your mobile number to start..." :
-                            chatState === 'OTP' ? "Enter the 6-digit verification code..." :
-                            chatState === 'LOCATION_PROMPT' ? "Click below to allow location..." :
-                            isListening ? "Listening..." :
-                            "Ask anything..."
+                              chatState === 'OTP' ? "Enter the 6-digit verification code..." :
+                                chatState === 'LOCATION_PROMPT' ? "Click below to allow location..." :
+                                  isListening ? "Listening..." :
+                                    "Ask anything..."
                           }
                           value={input}
                           onChange={(e) => {
@@ -1503,7 +1595,7 @@ const AIChatWidget = ({ user, onLogin }) => {
 
                         <div className="input-actions-right">
                           {speechSupported && chatState === 'LOGGED_IN' && (
-                            <button 
+                            <button
                               onClick={toggleListening}
                               className={`input-action-btn-circle ${isListening ? 'active' : ''}`}
                               title={isListening ? 'Stop listening' : 'Voice command'}
@@ -1511,9 +1603,9 @@ const AIChatWidget = ({ user, onLogin }) => {
                               <Mic size={16} />
                             </button>
                           )}
-                          <button 
-                            disabled={!input.trim()} 
-                            onClick={handleSend} 
+                          <button
+                            disabled={!input.trim()}
+                            onClick={handleSend}
                             className="send-msg-btn-filled"
                           >
                             <Send size={16} />
@@ -1522,119 +1614,31 @@ const AIChatWidget = ({ user, onLogin }) => {
                       </div>
 
                       {/* Shortcut Pills / Verification Actions */}
-                      {chatState === 'LOCATION_PROMPT' ? (
+                      {chatState === 'LOCATION_PROMPT' && (
                         <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
-                          <button 
-                            onClick={handleShareLocation} 
-                            style={{ 
-                              display: 'flex', alignItems: 'center', gap: '6px', 
-                              background: '#ff6b00', color: 'white', padding: '12px 24px', 
-                              borderRadius: '100px', border: 'none', fontWeight: '700', 
-                              fontSize: '0.9rem', cursor: 'pointer', boxShadow: '0 4px 15px rgba(255,107,0,0.2)' 
+                          <button
+                            onClick={handleShareLocation}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '6px',
+                              background: '#ff6b00', color: 'white', padding: '12px 24px',
+                              borderRadius: '100px', border: 'none', fontWeight: '700',
+                              fontSize: '0.9rem', cursor: 'pointer', boxShadow: '0 4px 15px rgba(255,107,0,0.2)'
                             }}
                           >
                             <MapPin size={16} /> Allow Location Access
                           </button>
-                          <button 
-                            onClick={handleSkipLocation} 
-                            style={{ 
-                              background: '#f4f4f4', color: '#4d4d4d', padding: '12px 24px', 
-                              borderRadius: '100px', border: '1px solid #e5e5e5', 
-                              fontWeight: '600', fontSize: '0.9rem', cursor: 'pointer' 
+                          <button
+                            onClick={handleSkipLocation}
+                            style={{
+                              background: '#f4f4f4', color: '#4d4d4d', padding: '12px 24px',
+                              borderRadius: '100px', border: '1px solid #e5e5e5',
+                              fontWeight: '600', fontSize: '0.9rem', cursor: 'pointer'
                             }}
                           >
                             Skip
                           </button>
                         </div>
-                      ) : (
-                        <div className="chat-shortcut-pills-row">
-                          <button className="shortcut-pill-btn" onClick={() => { setInput("Book a Ride 🛵"); }}>
-                            <span>Book a Ride 🛵</span>
-                          </button>
-                          <button className="shortcut-pill-btn" onClick={() => { setInput("Order Groceries 🛍️"); }}>
-                            <span>Order Groceries 🛍️</span>
-                          </button>
-                          <button className="shortcut-pill-btn" onClick={() => { setInput("Book Local Pro 🛠️"); }}>
-                            <span>Book Local Pro 🛠️</span>
-                          </button>
-                        </div>
                       )}
-
-                      {/* Welcome Message Card */}
-                      {messages.length > 0 && (
-                        <div className="welcome-card-container">
-                          <div className="welcome-card-header">
-                            <Bot size={18} color="#ff6b00" />
-                            <span>Passwala Shopping Assistant</span>
-                          </div>
-                          <p className="welcome-card-body">{messages[0].text}</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Right Column: Live Neighborhood Deck */}
-                    <div className="chat-landing-right-column">
-                      <div className="neighborhood-live-deck">
-                        <div className="deck-title-row">
-                          <span className="live-pulse-dot"></span>
-                          <h3>{userSession ? 'Sindhubhavan Hub' : 'Passwala Hub'}</h3>
-                        </div>
-
-                        {/* Passwala Wallet Card */}
-                        <div className="passwala-wallet-card" style={!userSession ? { filter: 'grayscale(0.15)', opacity: 0.9 } : {}}>
-                          <div className="wallet-card-header">
-                            <span className="wallet-brand">passwala.</span>
-                            <div className="wallet-chip"></div>
-                          </div>
-                          <div className="wallet-card-balance-row">
-                            <span className="wallet-label">Balance</span>
-                            <span className="wallet-value">₹{userSession ? walletBalance.toFixed(2) : '0.00'}</span>
-                          </div>
-                          <div className="wallet-card-footer">
-                            <span className="wallet-holder">{userSession ? userName : 'GUEST'}</span>
-                            {userSession ? (
-                              <button className="wallet-quick-topup" onClick={() => { setInput("Add money to wallet 💳"); }}>+ Top Up</button>
-                            ) : (
-                              <button className="wallet-quick-topup" style={{ opacity: 0.7, cursor: 'not-allowed' }} disabled>Locked</button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Live Feed Stats */}
-                        <div className="live-stats-grid">
-                          <div className="stat-card">
-                            <span className="stat-icon">🛵</span>
-                            <span className="stat-val">{stats.riders}</span>
-                            <span className="stat-lbl">Riders Live</span>
-                          </div>
-                          <div className="stat-card">
-                            <span className="stat-icon">🛍️</span>
-                            <span className="stat-val">{stats.shops}</span>
-                            <span className="stat-lbl">Shops Open</span>
-                          </div>
-                          <div className="stat-card">
-                            <span className="stat-icon">🛠️</span>
-                            <span className="stat-val">{stats.pros}</span>
-                            <span className="stat-lbl">Pros Online</span>
-                          </div>
-                        </div>
-
-                        {/* Activity Card */}
-                        <div className="live-activity-card">
-                          <h4>Quick Quick Actions</h4>
-                          <div className="activity-item" onClick={() => { setInput("Check my active bookings 📅"); }}>
-                            <span className="activity-bullet"></span>
-                            <p>Check Active Bookings</p>
-                            <ArrowRight size={14} className="activity-arrow" />
-                          </div>
-                          <div className="activity-item" onClick={() => { setInput("Show best food offers 🍕"); }}>
-                            <span className="activity-bullet"></span>
-                            <p>Explore Local Offers</p>
-                            <ArrowRight size={14} className="activity-arrow" />
-                          </div>
-                        </div>
-
-                      </div>
                     </div>
 
                   </div>
@@ -1652,19 +1656,19 @@ const AIChatWidget = ({ user, onLogin }) => {
                             </div>
                           ) : (
                             user?.photoURL || userSession?.photoURL ? (
-                              <img 
-                                src={user?.photoURL || userSession?.photoURL} 
-                                alt="Profile" 
+                              <img
+                                src={user?.photoURL || userSession?.photoURL}
+                                alt="Profile"
                                 className="user-avatar-circle-msg"
-                                style={{ 
-                                  width: '32px', 
-                                  height: '32px', 
-                                  borderRadius: '50%', 
+                                style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '50%',
                                   objectFit: 'cover',
                                   display: 'block',
                                   border: '1px solid #ff6b00',
                                   padding: 0
-                                }} 
+                                }}
                               />
                             ) : (
                               <div className="user-avatar-circle-msg">
@@ -1673,11 +1677,41 @@ const AIChatWidget = ({ user, onLogin }) => {
                             )
                           )}
                           <div className="widget-msg-bubble">
-                            <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{msg.text}</p>
-                            
+                            <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
+                              {msg.text && msg.text.includes('See your booking in Order History ➜') ? (
+                                <>
+                                  {msg.text.split('See your booking in Order History ➜')[0]}
+                                  <span
+                                    onClick={() => {
+                                      setIsOpen(false);
+                                      navigate('/order-history');
+                                    }}
+                                    style={{ color: '#ff6b00', fontWeight: 'bold', textDecoration: 'underline', cursor: 'pointer' }}
+                                  >
+                                    See your booking in Order History ➜
+                                  </span>
+                                  {msg.text.split('See your booking in Order History ➜')[1]}
+                                </>
+                              ) : msg.text && msg.text.includes("profile's History page") ? (
+                                <>
+                                  {msg.text.split("profile's History page")[0]}
+                                  <span
+                                    onClick={() => {
+                                      setIsOpen(false);
+                                      navigate('/order-history');
+                                    }}
+                                    style={{ color: '#ff6b00', fontWeight: 'bold', textDecoration: 'underline', cursor: 'pointer' }}
+                                  >
+                                    profile's History page
+                                  </span>
+                                  {msg.text.split("profile's History page")[1]}
+                                </>
+                              ) : msg.text}
+                            </p>
+
                             {msg.showResendButton && (
                               <div style={{ marginTop: '10px' }}>
-                                <button 
+                                <button
                                   onClick={handleResendOtp}
                                   style={{
                                     display: 'flex',
@@ -1709,7 +1743,7 @@ const AIChatWidget = ({ user, onLogin }) => {
 
                             {msg.showLocationButtons && (
                               <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <button 
+                                <button
                                   onClick={handleShareLocation}
                                   style={{
                                     display: 'flex',
@@ -1729,7 +1763,7 @@ const AIChatWidget = ({ user, onLogin }) => {
                                 >
                                   <MapPin size={16} /> Allow Location Access
                                 </button>
-                                <button 
+                                <button
                                   onClick={handleSkipLocation}
                                   style={{
                                     background: '#f1f5f9',
@@ -1755,7 +1789,7 @@ const AIChatWidget = ({ user, onLogin }) => {
                                       <span style={{ fontWeight: '700', fontSize: '0.85rem', color: '#0f172a' }}>{item.name}</span>
                                       <span style={{ fontSize: '0.8rem', color: '#ff6b00', fontWeight: '800' }}>₹{item.price}</span>
                                     </div>
-                                    <button 
+                                    <button
                                       onClick={() => handleCardAction('ORDER_PRODUCT', item)}
                                       style={{ background: '#ff6b00', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer', transition: 'background-color 0.2s' }}
                                       onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#e05e00'}
@@ -1766,26 +1800,324 @@ const AIChatWidget = ({ user, onLogin }) => {
                                   </div>
                                 ))}
                               </div>
-                            ) : msg.card && msg.card.type === 'events_list' ? (
-                              <div className="widget-events-list-card" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
-                                {msg.card.items.map((item, idx) => (
-                                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', border: '1px solid rgba(255, 107, 0, 0.15)', borderRadius: '12px', padding: '10px 14px' }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                                      <span style={{ fontWeight: '700', fontSize: '0.85rem', color: '#0f172a' }}>{item.title}</span>
-                                      <span style={{ fontSize: '0.72rem', color: '#64748b' }}>{item.venue}</span>
-                                      <span style={{ fontSize: '0.8rem', color: '#ff6b00', fontWeight: '800', marginTop: '2px' }}>₹{item.price}</span>
+
+                            ) : msg.card && msg.card.type === 'sports_venues_list' ? (
+                              /* ── Sports Venues List Card ── */
+                              <div className="ai-venues-grid" style={{ marginTop: '12px' }}>
+                                {msg.card.items.map((venue, idx) => (
+                                  <div key={idx} className="ai-venue-card">
+                                    {venue.image && (
+                                      <img src={venue.image} alt={venue.name} className="ai-venue-img" onError={(e) => { e.target.style.display = 'none'; }} />
+                                    )}
+                                    <div className="ai-venue-info">
+                                      <div className="ai-venue-name">{venue.name}</div>
+                                      <div className="ai-venue-addr">📍 {venue.address}</div>
+                                      <div className="ai-venue-sports">
+                                        {(venue.sports || []).slice(0, 3).map((s, si) => (
+                                          <span key={si} className="ai-sport-badge">{s.emoji} {s.label}</span>
+                                        ))}
+                                      </div>
+                                      <div className="ai-venue-meta">
+                                        {venue.rating && <span className="ai-venue-rating">⭐ {venue.rating}</span>}
+                                        {venue.minPrice && <span className="ai-venue-price">₹{venue.minPrice}/hr</span>}
+                                      </div>
                                     </div>
-                                    <button 
-                                      onClick={() => handleCardAction('BOOK_EVENT', item)}
-                                      style={{ background: '#ff6b00', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer', transition: 'background-color 0.2s' }}
-                                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#e05e00'}
-                                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#ff6b00'}
+                                    <button
+                                      className="ai-check-slots-btn"
+                                      onClick={() => handleCardAction('SHOW_VENUE_SLOTS', {
+                                        venueId: venue.venueId,
+                                        venueName: venue.name,
+                                        sport: venue.detectedSport || 'all'
+                                      })}
                                     >
-                                      Book
+                                      📅 Check Slots
                                     </button>
                                   </div>
                                 ))}
                               </div>
+
+                            ) : msg.card && msg.card.type === 'sports_slot_picker' ? (
+                              /* ── Sports Slot Picker Card ── */
+                              (() => {
+                                const slotCard = msg.card;
+                                const localState = pendingVenueSlot && pendingVenueSlot.venueId === slotCard.venueId ? pendingVenueSlot : { selectedDate: slotCard.selectedDate, slots: slotCard.slots || [], selectedSlotIds: [], sport: slotCard.sport, venueId: slotCard.venueId, venueName: slotCard.venueName, bookingDuration: 1 };
+                                const isLatest = msg.id === messages[messages.length - 1]?.id || messages.slice(-3).some(m => m.id === msg.id && m.card?.type === 'sports_slot_picker');
+
+                                // Consecutive slots combination helper
+                                const getCombinedSlots = (targetSlots, duration) => {
+                                  if (!duration || duration === 1) return targetSlots;
+                                  const result = [];
+                                  const sorted = [...targetSlots].sort((a, b) => a.slot_time.localeCompare(b.slot_time));
+                                  for (let i = 0; i <= sorted.length - duration; i++) {
+                                    let isContiguousAvailable = true;
+                                    const group = [];
+                                    for (let j = 0; j < duration; j++) {
+                                      const currentSlot = sorted[i + j];
+                                      if (currentSlot.status !== 'available') {
+                                        isContiguousAvailable = false;
+                                        break;
+                                      }
+                                      if (j > 0) {
+                                        const prevSlot = group[j - 1];
+                                        const prevEnd = prevSlot.slot_end_time.slice(0, 5);
+                                        const currStart = currentSlot.slot_time.slice(0, 5);
+                                        if (prevEnd !== currStart) {
+                                          isContiguousAvailable = false;
+                                          break;
+                                        }
+                                      }
+                                      group.push(currentSlot);
+                                    }
+                                    if (isContiguousAvailable) {
+                                      const first = group[0];
+                                      const last = group[group.length - 1];
+                                      const totalPrice = group.reduce((sum, s) => sum + (s.price || 0), 0);
+                                      result.push({
+                                        id: `virtual_${first.id}_to_${last.id}`,
+                                        slot_time: first.slot_time,
+                                        slot_end_time: last.slot_end_time,
+                                        price: totalPrice,
+                                        status: 'available',
+                                        slot_date: first.slot_date,
+                                        slots: group
+                                      });
+                                    }
+                                  }
+                                  return result;
+                                };
+
+                                const displaySlots = getCombinedSlots(localState.slots || [], localState.bookingDuration || 1);
+
+                                // Generate next 7 days
+                                const next7 = [];
+                                for (let i = 0; i < 7; i++) {
+                                  const d = new Date(); d.setDate(d.getDate() + i);
+                                  next7.push({ dateStr: d.toISOString().split('T')[0], label: i === 0 ? 'Today' : d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }) });
+                                }
+                                const formatT = (t) => { if (!t) return ''; const [h, m] = t.split(':'); let hr = parseInt(h); const ap = hr >= 12 ? 'PM' : 'AM'; hr = hr % 12 || 12; return `${hr}${parseInt(m) ? ':' + m : ''} ${ap}`; };
+                                return (
+                                  <div className="ai-slot-picker-wrap">
+                                    {/* Date Strip */}
+                                    <div className="ai-date-strip">
+                                      {next7.map(d => (
+                                        <button
+                                          key={d.dateStr}
+                                          className={`ai-date-chip ${localState.selectedDate === d.dateStr ? 'active' : ''}`}
+                                          onClick={async () => {
+                                            if (!isLatest) return;
+                                            setIsTyping(true);
+                                            const BASE_API2 = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+                                            const r = await fetch(`${BASE_API2}/api/ai/sports-slots`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venueId: localState.venueId, date: d.dateStr, sport: localState.sport }) });
+                                            const rd = await r.json();
+                                            setPendingVenueSlot(prev => ({ ...prev, selectedDate: d.dateStr, slots: rd.slots || [], selectedSlotIds: [], bookingDuration: prev?.bookingDuration || 1 }));
+                                            setIsTyping(false);
+                                          }}
+                                        >{d.label}</button>
+                                      ))}
+                                    </div>
+
+                                    {/* Duration Selector */}
+                                    <div className="ai-duration-selector" style={{ display: 'flex', gap: '8px', padding: '0 16px 8px', overflowX: 'auto', borderBottom: '1px solid #f1f5f9', marginBottom: '10px' }}>
+                                      <span style={{ fontSize: '0.8rem', color: '#64748b', alignSelf: 'center', fontWeight: 600, marginRight: '4px' }}>Duration:</span>
+                                      {[1, 2, 3, 4].map(dur => (
+                                        <button
+                                          key={dur}
+                                          className={`ai-duration-chip ${localState.bookingDuration === dur ? 'active' : ''}`}
+                                          style={{
+                                            padding: '5px 12px',
+                                            borderRadius: '20px',
+                                            border: '1px solid',
+                                            borderColor: localState.bookingDuration === dur ? '#ff6b00' : '#e2e8f0',
+                                            backgroundColor: localState.bookingDuration === dur ? '#fffaf0' : '#ffffff',
+                                            color: localState.bookingDuration === dur ? '#ff6b00' : '#64748b',
+                                            fontSize: '0.78rem',
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                            whiteSpace: 'nowrap',
+                                            transition: 'all 0.2s'
+                                          }}
+                                          onClick={() => {
+                                            if (!isLatest) return;
+                                            setPendingVenueSlot(prev => {
+                                              const currentPrev = prev || { selectedDate: slotCard.selectedDate, slots: slotCard.slots || [], selectedSlotIds: [], sport: slotCard.sport, venueId: slotCard.venueId, venueName: slotCard.venueName };
+                                              return { ...currentPrev, bookingDuration: dur, selectedSlotIds: [] };
+                                            });
+                                          }}
+                                        >
+                                          {dur} {dur === 1 ? 'Hr' : 'Hrs'}
+                                        </button>
+                                      ))}
+                                    </div>
+
+                                    {/* Slot Grid */}
+                                    {displaySlots.length === 0 ? (
+                                      <p className="ai-no-slots">❌ No slots available for this duration.</p>
+                                    ) : (
+                                      <div className="ai-slot-grid">
+                                        {displaySlots.map((slot, si) => {
+                                          const isSelected = (localState.bookingDuration || 1) === 1
+                                            ? (localState.selectedSlotIds || []).includes(slot.id)
+                                            : slot.slots && slot.slots.every(s => (localState.selectedSlotIds || []).includes(s.id));
+                                          const isBooked = slot.status !== 'available';
+                                          return (
+                                            <button
+                                              key={si}
+                                              className={`ai-slot-chip ${isBooked ? 'booked' : isSelected ? 'selected' : 'available'}`}
+                                              disabled={isBooked || !isLatest}
+                                              onClick={() => {
+                                                if (!isLatest || isBooked) return;
+                                                if ((localState.bookingDuration || 1) === 1) {
+                                                  setPendingVenueSlot(prev => {
+                                                    const currentPrev = prev || { selectedDate: slotCard.selectedDate, slots: slotCard.slots || [], selectedSlotIds: [], sport: slotCard.sport, venueId: slotCard.venueId, venueName: slotCard.venueName };
+                                                    const ids = currentPrev.selectedSlotIds || [];
+                                                    const newIds = ids.includes(slot.id) ? ids.filter(x => x !== slot.id) : [...ids, slot.id];
+                                                    return { ...currentPrev, selectedSlotIds: newIds };
+                                                  });
+                                                } else {
+                                                  const subSlotIds = (slot.slots || []).map(s => s.id);
+                                                  setPendingVenueSlot(prev => {
+                                                    const currentPrev = prev || { selectedDate: slotCard.selectedDate, slots: slotCard.slots || [], selectedSlotIds: [], sport: slotCard.sport, venueId: slotCard.venueId, venueName: slotCard.venueName };
+                                                    const ids = currentPrev.selectedSlotIds || [];
+                                                    const allSelected = subSlotIds.every(id => ids.includes(id));
+                                                    const newIds = allSelected ? ids.filter(id => !subSlotIds.includes(id)) : subSlotIds;
+                                                    return { ...currentPrev, selectedSlotIds: newIds };
+                                                  });
+                                                }
+                                              }}
+                                            >
+                                              <span className="ai-slot-time">{formatT(slot.slot_time)}</span>
+                                              <span className="ai-slot-end">-{formatT(slot.slot_end_time)}</span>
+                                              <span className="ai-slot-price">₹{slot.price}</span>
+                                              {isBooked && <span className="ai-slot-status-label">Booked</span>}
+                                              {isSelected && <span className="ai-slot-check">✔</span>}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                    {/* Book CTA */}
+                                    {isLatest && (localState.selectedSlotIds || []).length > 0 && (
+                                      <button
+                                        className="ai-book-slots-cta"
+                                        onClick={() => {
+                                          if (!localState.selectedSlotIds?.length) return;
+                                          const sortedSlots = (localState.slots || []).filter(s => (localState.selectedSlotIds || []).includes(s.id)).sort((a, b) => a.slot_time.localeCompare(b.slot_time));
+                                          const first = sortedSlots[0]; const last = sortedSlots[sortedSlots.length - 1];
+                                          const formatT2 = (t) => { if (!t) return ''; const [h, m] = t.split(':'); let hr = parseInt(h); const ap = hr >= 12 ? 'PM' : 'AM'; hr = hr % 12 || 12; return `${hr}${parseInt(m) ? ':' + m : ''} ${ap}`; };
+                                          const timeRange = `${formatT2(first?.slot_time)} – ${formatT2(last?.slot_end_time)}`;
+                                          handleCardAction('BOOK_SPORT', { venueId: localState.venueId, venueName: localState.venueName, sport: localState.sport, slotIds: localState.selectedSlotIds, selectedDate: localState.selectedDate, timeRange });
+                                        }}
+                                      >
+                                        ⚡ Book {(localState.selectedSlotIds || []).length} Slot{(localState.selectedSlotIds || []).length > 1 ? 's' : ''} →
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })()
+
+                            ) : msg.card && msg.card.type === 'events_list' ? (
+                              /* ── Events List Card (enhanced) ── */
+                              <div className="widget-events-list-card" style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
+                                {msg.card.items.map((item, idx) => (
+                                  <div key={idx} className="ai-event-card">
+                                    {item.image && (
+                                      <img src={item.image} alt={item.title} className="ai-event-img" onError={(e) => { e.target.style.display = 'none'; }} />
+                                    )}
+                                    <div className="ai-event-info">
+                                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                                        {item.category && <span className="ai-event-cat-badge">{item.category}</span>}
+                                        {item.dateLabel && <span className="ai-event-date-badge">📅 {item.dateLabel}</span>}
+                                      </div>
+                                      <div className="ai-event-title">{item.title}</div>
+                                      <div className="ai-event-venue">📍 {item.venue}</div>
+                                      <div className="ai-event-price-row">
+                                        <span className="ai-event-price">from ₹{item.price}</span>
+                                        <button
+                                          className="ai-view-tickets-btn"
+                                          onClick={() => handleCardAction('SHOW_EVENT_TIERS', { eventId: item.eventId, eventTitle: item.title })}
+                                        >
+                                          🎫 View Tickets
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+
+                            ) : msg.card && msg.card.type === 'event_tier_picker' ? (
+                              /* ── Event Tier Picker Card ── */
+                              (() => {
+                                const tierCard = msg.card;
+                                const localTierState = pendingEventTier && pendingEventTier.eventId === tierCard.eventId ? pendingEventTier : { eventId: tierCard.eventId, eventTitle: tierCard.eventTitle, tiers: tierCard.tiers || [], selectedTierId: tierCard.tiers?.[0]?.id, qty: 1 };
+                                const isLatest = msg.id === messages[messages.length - 1]?.id || messages.slice(-3).some(m => m.id === msg.id && m.card?.type === 'event_tier_picker');
+                                const selectedTier = (localTierState.tiers || []).find(t => t.id === localTierState.selectedTierId);
+                                return (
+                                  <div className="ai-tier-picker-wrap">
+                                    {(localTierState.tiers || []).map((tier, ti) => (
+                                      <div
+                                        key={ti}
+                                        className={`ai-tier-row ${localTierState.selectedTierId === tier.id ? 'selected' : ''}`}
+                                        onClick={() => isLatest && setPendingEventTier(prev => prev ? { ...prev, selectedTierId: tier.id } : prev)}
+                                      >
+                                        <div className="ai-tier-info">
+                                          <span className="ai-tier-name">{tier.name}</span>
+                                          {tier.availableSeats != null && <span className="ai-tier-seats">{tier.availableSeats} left</span>}
+                                        </div>
+                                        <span className="ai-tier-price">₹{tier.price}</span>
+                                        {localTierState.selectedTierId === tier.id && <span className="ai-tier-check">✔</span>}
+                                      </div>
+                                    ))}
+                                    {/* Qty Stepper */}
+                                    {isLatest && (
+                                      <div className="ai-qty-row">
+                                        <span className="ai-qty-label">Qty:</span>
+                                        <button className="ai-qty-btn" onClick={() => setPendingEventTier(prev => prev ? { ...prev, qty: Math.max(1, (prev.qty || 1) - 1) } : prev)}>-</button>
+                                        <span className="ai-qty-val">{localTierState.qty || 1}</span>
+                                        <button className="ai-qty-btn" onClick={() => setPendingEventTier(prev => prev ? { ...prev, qty: Math.min(10, (prev.qty || 1) + 1) } : prev)}>+</button>
+                                        <button
+                                          className="ai-confirm-tier-btn"
+                                          disabled={!localTierState.selectedTierId}
+                                          onClick={() => {
+                                            if (!localTierState.selectedTierId) return;
+                                            handleCardAction('BOOK_EVENT', {
+                                              eventId: localTierState.eventId,
+                                              tierId: localTierState.selectedTierId,
+                                              ticketCount: localTierState.qty || 1
+                                            });
+                                            setPendingEventTier(null);
+                                          }}
+                                        >
+                                          ⚡ Confirm {localTierState.qty || 1} Ticket{(localTierState.qty || 1) > 1 ? 's' : ''} →
+                                        </button>
+                                      </div>
+                                    )}
+                                    {selectedTier && (
+                                      <div className="ai-tier-total">Total: ₹{(selectedTier.price * (localTierState.qty || 1)).toLocaleString('en-IN')}</div>
+                                    )}
+                                  </div>
+                                );
+                              })()
+
+                            ) : msg.card && msg.card.type === 'bookings_list' ? (
+                              /* ── Bookings List Card for Cancellation ── */
+                              <div className="widget-bookings-list-card" style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
+                                {msg.card.items.map((item, idx) => (
+                                  <div key={idx} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a' }}>{item.title}</div>
+                                    <div style={{ fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>{item.details}</div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ff6b00' }}>₹{item.price}</span>
+                                      <button
+                                        style={{ margin: 0, padding: '6px 14px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, background: '#ef4444', color: 'white', border: 'none', cursor: 'pointer', width: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                        onClick={() => handleCardAction(item.action, item.data)}
+                                      >
+                                        ❌ Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+
                             ) : msg.card && (
                               <div className="widget-action-card">
                                 <div className="card-header-icon">
@@ -1805,30 +2137,30 @@ const AIChatWidget = ({ user, onLogin }) => {
                                 <div className="card-actions-row">
                                   {msg.card.action === 'UPDATE_PHOTO' ? (
                                     <>
-                                      <input 
-                                        type="file" 
-                                        id="chat-photo-upload" 
-                                        accept="image/*" 
-                                        style={{ display: 'none' }} 
+                                      <input
+                                        type="file"
+                                        id="chat-photo-upload"
+                                        accept="image/*"
+                                        style={{ display: 'none' }}
                                         onChange={handlePhotoUpload}
                                       />
-                                      <button 
-                                        className="card-confirm-btn" 
+                                      <button
+                                        className="card-confirm-btn"
                                         onClick={() => document.getElementById('chat-photo-upload').click()}
                                       >
                                         <Camera size={16} /> Upload Photo
                                       </button>
                                     </>
                                   ) : msg.card.action === 'NAVIGATE' ? (
-                                    <button 
-                                      className="card-confirm-btn" 
+                                    <button
+                                      className="card-confirm-btn"
                                       onClick={() => handleCardAction(msg.card.action, msg.card.data)}
                                     >
                                       <ArrowRight size={16} /> Go Now
                                     </button>
                                   ) : (
-                                    <button 
-                                      className="card-confirm-btn" 
+                                    <button
+                                      className="card-confirm-btn"
                                       onClick={() => handleCardAction(msg.card.action, msg.card.data)}
                                     >
                                       <Check size={16} /> Confirm
@@ -1837,7 +2169,7 @@ const AIChatWidget = ({ user, onLogin }) => {
                                 </div>
                               </div>
                             )}
-                            
+
                             <span className="widget-msg-time">{msg.time}</span>
                           </div>
                         </div>
@@ -1860,17 +2192,17 @@ const AIChatWidget = ({ user, onLogin }) => {
                   <div className="active-chat-input-bar-container">
                     <div className="active-input-inner">
                       <div className="chat-input-wrapper-chatgpt">
-                        <input 
+                        <input
                           type={chatState === 'PHONE' || chatState === 'OTP' ? 'tel' : 'text'}
                           maxLength={chatState === 'PHONE' ? 10 : chatState === 'OTP' ? 6 : undefined}
                           className="chatgpt-style-input"
                           placeholder={
                             chatState === 'PHONE' ? "Enter your mobile number..." :
-                            chatState === 'OTP' ? "Enter the 6-digit OTP..." :
-                            chatState === 'LOCATION_PROMPT' ? "Use the buttons above to share location..." :
-                            isListening ? "🎙️ Listening... speak now" :
-                            "Ask AI or tap 🎙️ to speak..."
-                          } 
+                              chatState === 'OTP' ? "Enter the 6-digit OTP..." :
+                                chatState === 'LOCATION_PROMPT' ? "Use the buttons above to share location..." :
+                                  isListening ? "🎙️ Listening... speak now" :
+                                    "Ask AI or tap 🎙️ to speak..."
+                          }
                           value={input}
                           onChange={(e) => {
                             let val = e.target.value;
@@ -1884,7 +2216,7 @@ const AIChatWidget = ({ user, onLogin }) => {
 
                         <div className="input-actions-right">
                           {speechSupported && chatState === 'LOGGED_IN' && (
-                            <button 
+                            <button
                               onClick={toggleListening}
                               className={`input-action-btn-circle ${isListening ? 'active' : ''}`}
                               title={isListening ? 'Stop listening' : 'Voice command'}
@@ -1892,9 +2224,9 @@ const AIChatWidget = ({ user, onLogin }) => {
                               <Mic size={16} />
                             </button>
                           )}
-                          <button 
-                            disabled={!input.trim()} 
-                            onClick={handleSend} 
+                          <button
+                            disabled={!input.trim()}
+                            onClick={handleSend}
                             className="send-msg-btn-filled"
                           >
                             <Send size={16} />

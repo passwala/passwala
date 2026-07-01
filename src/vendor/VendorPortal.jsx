@@ -33,10 +33,12 @@ import {
   Settings,
   Layers,
   Calendar,
-  Ticket
+  Ticket,
+  Trophy
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { auth } from '../firebase';
+import { LAUNCH_MODE } from '../launchConfig';
 import './VendorPortal.css';
 import { 
   VendorInventory, 
@@ -103,7 +105,11 @@ const VendorPortal = ({ user, onLogout }) => {
   
   // Onboarding State
   const [onboardingSubStep, setOnboardingSubStep] = useState(() => parseInt(localStorage.getItem('vOnboardingStep') || '1')); 
-  const [businessType, setBusinessType] = useState(() => localStorage.getItem('vBusinessType') || 'shop'); 
+  const [businessType, setBusinessType] = useState(() => {
+    // In launch mode: always default to 'event' (only event feature is live)
+    if (LAUNCH_MODE) return 'event';
+    return localStorage.getItem('vBusinessType') || 'shop';
+  });
   const [formData, setFormData] = useState(() => {
     const saved = localStorage.getItem('vFormData');
     return saved ? JSON.parse(saved) : { name: '', aadhar_no: '', business_name: '', license_no: '', address: '', lat: '', lng: '' };
@@ -121,6 +127,7 @@ const VendorPortal = ({ user, onLogout }) => {
   const [hasEventConsole, setHasEventConsole] = useState(false);
   const [hasServiceConsole, setHasServiceConsole] = useState(false);
   const [hasRentalConsole, setHasRentalConsole] = useState(false);
+  const [hasSportsConsole, setHasSportsConsole] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeTarget, setUpgradeTarget] = useState('event'); // 'event' | 'service' | 'rental' | 'shop'
   // Per-console upgrade fees fetched from server (set by Admin in Settings)
@@ -246,6 +253,29 @@ const VendorPortal = ({ user, onLogout }) => {
 
           // Total revenue from all non-CANCELLED bookings
           totalEarnings = activeBookings.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+        }
+      } else if (businessType === 'sports') {
+        const { data: venues } = await supabase.from('sports_venues').select('id').eq('owner_id', foundStoreId);
+        if (venues && venues.length > 0) {
+          const venueIds = venues.map(v => v.id);
+          const { data: bookings, error: bookingsError } = await supabase
+            .from('venue_bookings')
+            .select('*')
+            .in('venue_id', venueIds);
+          
+          if (!bookingsError && bookings) {
+            ordersList = bookings.map(b => ({
+              ...b,
+              created_at: b.created_at,
+              total_amount: b.total_amount,
+              status: b.status
+            }));
+            const activeBookings = ordersList.filter(o => o.status === 'confirmed' || o.status === 'CONFIRMED' || o.status === 'completed' || o.status === 'COMPLETED');
+            pendingCount = activeBookings.length;
+            const completedBookings = ordersList.filter(o => o.status === 'completed' || o.status === 'COMPLETED');
+            deliveredCount = completedBookings.length;
+            totalEarnings = activeBookings.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+          }
         }
       } else {
         const { data: vendorOrders } = await supabase.from('orders').select('*').eq('store_id', foundStoreId);
@@ -452,15 +482,34 @@ const VendorPortal = ({ user, onLogout }) => {
           "Other Events"
         ];
 
-        const hasEvent = (userData?.role === 'EVENT_ORGANIZER' || (spData && EVENT_CATEGORIES.includes(spData.category)) || approvedConsoles.includes('event'));
+        const SPORTS_CATEGORIES = [
+          "Cricket & Football Turf",
+          "Badminton Court",
+          "Pickleball & Tennis",
+          "Indoor Games & Snooker",
+          "Multisport Arena"
+        ];
+
+        const isSportsCategory = (cat) => {
+          if (!cat) return false;
+          const c = cat.toLowerCase();
+          return c.includes('court') || c.includes('turf') || c.includes('badminton') || c.includes('tennis') || c.includes('pickleball') || c.includes('snooker') || c.includes('cricket') || c.includes('football') || c.includes('arena') || c.includes('sport');
+        };
+
+        const localForm = JSON.parse(localStorage.getItem('vFormData') || '{}');
+        const effectiveCategory = spData?.category || localForm?.category || '';
+
+        const hasEvent = (userData?.role === 'EVENT_ORGANIZER' || (spData && EVENT_CATEGORIES.includes(effectiveCategory)) || approvedConsoles.includes('event'));
         const hasShop = (!!vData || approvedConsoles.includes('shop'));
-        const hasService = ((!!spData && !EVENT_CATEGORIES.includes(spData.category) && spData.category !== 'Rental') || approvedConsoles.includes('service'));
-        const hasRental = ((!!spData && spData.category === 'Rental') || approvedConsoles.includes('rental'));
+        const hasSports = ((spData && isSportsCategory(effectiveCategory)) || approvedConsoles.includes('sports'));
+        const hasService = ((!!spData && !EVENT_CATEGORIES.includes(effectiveCategory) && !isSportsCategory(effectiveCategory) && effectiveCategory !== 'Rental') || approvedConsoles.includes('service'));
+        const hasRental = ((!!spData && effectiveCategory === 'Rental') || approvedConsoles.includes('rental'));
 
         setHasEventConsole(hasEvent);
         setHasShopConsole(hasShop);
         setHasServiceConsole(hasService);
         setHasRentalConsole(hasRental);
+        setHasSportsConsole(hasSports);
 
         let data = null;
         let detectedType = 'shop';
@@ -473,6 +522,9 @@ const VendorPortal = ({ user, onLogout }) => {
         } else if (storedType === 'shop' && hasShop) {
           data = vData;
           detectedType = 'shop';
+        } else if (storedType === 'sports' && hasSports) {
+          data = spData;
+          detectedType = 'sports';
         } else if (storedType === 'service' && hasService) {
           data = spData;
           detectedType = 'service';
@@ -485,6 +537,9 @@ const VendorPortal = ({ user, onLogout }) => {
         } else if (hasEvent) {
           data = spData;
           detectedType = 'event';
+        } else if (hasSports) {
+          data = spData;
+          detectedType = 'sports';
         } else if (hasService) {
           data = spData;
           detectedType = 'service';
@@ -494,6 +549,7 @@ const VendorPortal = ({ user, onLogout }) => {
         } else {
           data = spData || vData;
           if (hasEvent) detectedType = 'event';
+          else if (hasSports) detectedType = 'sports';
           else if (hasService) detectedType = 'service';
           else if (hasRental) detectedType = 'rental';
           else detectedType = 'shop';
@@ -597,8 +653,8 @@ const VendorPortal = ({ user, onLogout }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'profile', label: 'My Profile', icon: User },
-    { id: 'inventory', label: businessType === 'shop' ? 'Products' : businessType === 'event' ? 'Events' : businessType === 'rental' ? 'Rentals' : 'Services', icon: businessType === 'shop' ? Package : businessType === 'event' ? Calendar : Wrench },
-    { id: 'orders', label: businessType === 'shop' ? 'Orders' : businessType === 'event' ? 'Ticket Sales' : businessType === 'rental' ? 'Rental Bookings' : 'Bookings', icon: FileText },
+    { id: 'inventory', label: businessType === 'shop' ? 'Products' : businessType === 'event' ? 'Events' : businessType === 'sports' ? 'Sports Venues' : businessType === 'rental' ? 'Rentals' : 'Services', icon: businessType === 'shop' ? Package : businessType === 'event' ? Calendar : businessType === 'sports' ? Trophy : Wrench },
+    { id: 'orders', label: businessType === 'shop' ? 'Orders' : businessType === 'event' ? 'Ticket Sales' : businessType === 'sports' ? 'Court Bookings' : businessType === 'rental' ? 'Rental Bookings' : 'Bookings', icon: FileText },
     { id: 'earnings', label: 'Earnings', icon: IndianRupee },
     { id: 'reviews', label: 'Reviews & Ratings', icon: Star },
     { id: 'notifications', label: 'Notifications', icon: Bell },
@@ -793,7 +849,8 @@ const VendorPortal = ({ user, onLogout }) => {
               bg: '#fff7ed'
             });
           }
-          if (!hasServiceConsole) {
+          // Service, Shop, Rental upgrade cards — hidden in launch mode (code preserved)
+          if (!LAUNCH_MODE && !hasServiceConsole) {
             upgrades.push({
               target: 'service',
               title: "Want to offer professional services?",
@@ -805,7 +862,7 @@ const VendorPortal = ({ user, onLogout }) => {
             });
           }
 
-          if (!hasShopConsole) {
+          if (!LAUNCH_MODE && !hasShopConsole) {
             upgrades.push({
               target: 'shop',
               title: "Want to open a digital retail shop?",
@@ -1015,9 +1072,28 @@ const VendorPortal = ({ user, onLogout }) => {
           await supabase.from('event_organizer_requests').delete().eq('phone', phone).eq('target_console', 'shop');
         } 
         else if (businessType === 'event') {
-          await supabase.from('events').delete().eq('created_by', vendorData.user_id || user?.uid);
+          const userId = vendorData.user_id || user?.uid;
+
+          // Step 1: Get all event IDs created by this organizer
+          const { data: orgEvents } = await supabase
+            .from('events')
+            .select('id')
+            .eq('created_by', userId);
+
+          const eventIds = orgEvents && orgEvents.length > 0 ? orgEvents.map(e => e.id) : [];
+
+          // Step 2: Delete all ticket bookings for those events (buyer side cleanup)
+          if (eventIds.length > 0) {
+            await supabase.from('event_bookings').delete().in('event_id', eventIds);
+          }
+
+          // Step 3: Delete all events — buyer side will no longer show them
+          await supabase.from('events').delete().eq('created_by', userId);
+
+          // Step 4: Remove upgrade/organizer request
           await supabase.from('event_organizer_requests').delete().eq('phone', phone).eq('target_console', 'event');
 
+          // Step 5: Delete service_providers profile if no other console exists
           const hasOtherSP = hasServiceConsole || hasRentalConsole;
           if (!hasOtherSP) {
             await supabase.from('service_providers').delete().eq('id', targetId);
@@ -1146,13 +1222,39 @@ const VendorPortal = ({ user, onLogout }) => {
         await supabase.from('service_bookings').delete().eq('provider_id', targetId);
         await supabase.from('services').delete().eq('provider_id', targetId);
 
-        // 6. Delete vendor profile
+        // 6. Delete all events and event bookings for this organizer (buyer side cleanup)
+        const userId = vendorData?.user_id || user?.uid;
+        if (userId) {
+          // 6a. Get event IDs
+          const { data: orgEvents } = await supabase
+            .from('events')
+            .select('id')
+            .eq('created_by', userId);
+
+          const eventIds = orgEvents && orgEvents.length > 0 ? orgEvents.map(e => e.id) : [];
+
+          // 6b. Delete ticket bookings first (cascading cleanup)
+          if (eventIds.length > 0) {
+            await supabase.from('event_bookings').delete().in('event_id', eventIds);
+          }
+
+          // 6c. Delete events — buyer side listing is now clean
+          await supabase.from('events').delete().eq('created_by', userId);
+
+          // 6d. Delete any pending organizer upgrade requests
+          const phone = vendorData?.phone || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : null);
+          if (phone) {
+            await supabase.from('event_organizer_requests').delete().eq('phone', phone);
+          }
+        }
+
+        // 7. Delete vendor profile
         const { error: vendorError } = await supabase.from('vendors').delete().eq('id', targetId);
         if (vendorError) {
           console.warn("Vendors table delete error/skip (could be service provider):", vendorError.message);
         }
 
-        // 7. Delete service provider profile
+        // 8. Delete service provider profile
         const { error: providerError } = await supabase.from('service_providers').delete().eq('id', targetId);
         if (providerError) {
           console.warn("Service providers table delete error/skip (could be shop):", providerError.message);
@@ -1273,7 +1375,7 @@ const VendorPortal = ({ user, onLogout }) => {
             <div>
               <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', marginBottom: '6px' }}>{currentData?.name || 'Partner Profile'}</h2>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <div className="v-status-badge" style={{ display: 'inline-flex' }}>{businessType === 'shop' ? 'Shop Owner' : businessType === 'event' ? 'Event Organizer' : 'Service Provider'}</div>
+                <div className="v-status-badge" style={{ display: 'inline-flex' }}>{businessType === 'shop' ? 'Shop Owner' : businessType === 'event' ? 'Event Organizer' : businessType === 'sports' ? 'Venue Partner' : 'Service Provider'}</div>
                 <div className="v-status-badge" style={{ background: '#f1f5f9', color: '#64748b', borderColor: '#e2e8f0' }}>ID: {currentData?.id?.toString().slice(0, 8)}</div>
               </div>
             </div>
@@ -1379,20 +1481,22 @@ const VendorPortal = ({ user, onLogout }) => {
               <div className="v-input v-readonly" style={{ padding: '14px 18px', background: '#f8fafc', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>+91 {resolvedVendor.phone || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : '9999999999')}</div>
             </div>
 
-            <div className="v-form-group" style={{ gridColumn: '1 / -1' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: '#475569', marginBottom: '12px' }}>
-                <MapPin size={16} color="var(--v-primary)" /> OFFICIAL BUSINESS ADDRESS
-              </label>
-              {isEditingProfile ? 
-                <textarea 
-                  className="v-input" 
-                  style={{ minHeight: '100px', padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)', resize: 'none' }}
-                  value={currentData?.address || ''} 
-                  onChange={e => setEditFormData({...editFormData, address: e.target.value})} 
-                /> :
-                <div className="v-input v-readonly" style={{ minHeight: '80px', padding: '14px 18px', background: '#f8fafc', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent', lineHeight: 1.6 }}>{currentData?.address || 'Address not set'}</div>
-              }
-            </div>
+            {businessType !== 'event' && (
+              <div className="v-form-group" style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: '#475569', marginBottom: '12px' }}>
+                  <MapPin size={16} color="var(--v-primary)" /> OFFICIAL BUSINESS ADDRESS
+                </label>
+                {isEditingProfile ? 
+                  <textarea 
+                    className="v-input" 
+                    style={{ minHeight: '100px', padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)', resize: 'none' }}
+                    value={currentData?.address || ''} 
+                    onChange={e => setEditFormData({...editFormData, address: e.target.value})} 
+                  /> :
+                  <div className="v-input v-readonly" style={{ minHeight: '80px', padding: '14px 18px', background: '#f8fafc', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent', lineHeight: 1.6 }}>{currentData?.address || 'Address not set'}</div>
+                }
+              </div>
+            )}
 
             {isEditingProfile ? (
               <div className="v-form-group" style={{ gridColumn: '1 / -1' }}>
@@ -1528,34 +1632,41 @@ const VendorPortal = ({ user, onLogout }) => {
           </div>
           
           <div className="registration-type-grid" style={{ marginTop: '2.5rem' }}>
-            <motion.div 
-              whileHover={{ scale: 1.02, y: -5 }}
-              whileTap={{ scale: 0.98 }}
-              className={`type-card ${businessType === 'shop' ? 'active' : ''}`} 
-              onClick={() => setBusinessType('shop')} 
-              style={{ padding: '2rem 1.5rem', textAlign: 'center', cursor: 'pointer', borderRadius: '24px', border: businessType === 'shop' ? '2px solid var(--v-primary)' : '1.5px solid #e2e8f0', background: businessType === 'shop' ? 'var(--v-primary-soft)' : 'white', transition: 'all 0.3s ease' }}
-            >
-               <div style={{ width: '64px', height: '64px', borderRadius: '18px', background: businessType === 'shop' ? 'white' : '#f8fafc', margin: '0 auto 1.25rem auto', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: businessType === 'shop' ? '0 10px 20px rgba(249, 115, 22, 0.1)' : 'none' }}>
-                 <ShoppingCart size={32} color={businessType === 'shop' ? '#f97316' : '#94a3b8'} />
-               </div>
-               <h4 style={{ fontWeight: 850, margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>Retail Store</h4>
-               <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>Sell products and reach local customers instantly.</p>
-            </motion.div>
+            {/* Retail Store card — hidden in launch mode (code preserved) */}
+            {!LAUNCH_MODE && (
+              <motion.div 
+                whileHover={{ scale: 1.02, y: -5 }}
+                whileTap={{ scale: 0.98 }}
+                className={`type-card ${businessType === 'shop' ? 'active' : ''}`} 
+                onClick={() => setBusinessType('shop')} 
+                style={{ padding: '2rem 1.5rem', textAlign: 'center', cursor: 'pointer', borderRadius: '24px', border: businessType === 'shop' ? '2px solid var(--v-primary)' : '1.5px solid #e2e8f0', background: businessType === 'shop' ? 'var(--v-primary-soft)' : 'white', transition: 'all 0.3s ease' }}
+              >
+                 <div style={{ width: '64px', height: '64px', borderRadius: '18px', background: businessType === 'shop' ? 'white' : '#f8fafc', margin: '0 auto 1.25rem auto', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: businessType === 'shop' ? '0 10px 20px rgba(249, 115, 22, 0.1)' : 'none' }}>
+                   <ShoppingCart size={32} color={businessType === 'shop' ? '#f97316' : '#94a3b8'} />
+                 </div>
+                 <h4 style={{ fontWeight: 850, margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>Retail Store</h4>
+                 <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>Sell products and reach local customers instantly.</p>
+              </motion.div>
+            )}
 
-            <motion.div 
-              whileHover={{ scale: 1.02, y: -5 }}
-              whileTap={{ scale: 0.98 }}
-              className={`type-card ${businessType === 'service' ? 'active' : ''}`} 
-              onClick={() => setBusinessType('service')} 
-              style={{ padding: '2rem 1.5rem', textAlign: 'center', cursor: 'pointer', borderRadius: '24px', border: businessType === 'service' ? '2px solid var(--v-primary)' : '1.5px solid #e2e8f0', background: businessType === 'service' ? 'var(--v-primary-soft)' : 'white', transition: 'all 0.3s ease' }}
-            >
-               <div style={{ width: '64px', height: '64px', borderRadius: '18px', background: businessType === 'service' ? 'white' : '#f8fafc', margin: '0 auto 1.25rem auto', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: businessType === 'service' ? '0 10px 20px rgba(249, 115, 22, 0.1)' : 'none' }}>
-                 <Wrench size={32} color={businessType === 'service' ? '#f97316' : '#94a3b8'} />
-               </div>
-               <h4 style={{ fontWeight: 850, margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>Professional</h4>
-               <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>Offer your expertise and specialized services.</p>
-            </motion.div>
+            {/* Professional / Service card — hidden in launch mode (code preserved) */}
+            {!LAUNCH_MODE && (
+              <motion.div 
+                whileHover={{ scale: 1.02, y: -5 }}
+                whileTap={{ scale: 0.98 }}
+                className={`type-card ${businessType === 'service' ? 'active' : ''}`} 
+                onClick={() => setBusinessType('service')} 
+                style={{ padding: '2rem 1.5rem', textAlign: 'center', cursor: 'pointer', borderRadius: '24px', border: businessType === 'service' ? '2px solid var(--v-primary)' : '1.5px solid #e2e8f0', background: businessType === 'service' ? 'var(--v-primary-soft)' : 'white', transition: 'all 0.3s ease' }}
+              >
+                 <div style={{ width: '64px', height: '64px', borderRadius: '18px', background: businessType === 'service' ? 'white' : '#f8fafc', margin: '0 auto 1.25rem auto', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: businessType === 'service' ? '0 10px 20px rgba(249, 115, 22, 0.1)' : 'none' }}>
+                   <Wrench size={32} color={businessType === 'service' ? '#f97316' : '#94a3b8'} />
+                 </div>
+                 <h4 style={{ fontWeight: 850, margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>Professional</h4>
+                 <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>Offer your expertise and specialized services.</p>
+              </motion.div>
+            )}
 
+            {/* Event Organizer card — ALWAYS visible (launch mode feature) */}
             <motion.div 
                whileHover={{ scale: 1.02, y: -5 }}
                whileTap={{ scale: 0.98 }}
@@ -1568,6 +1679,21 @@ const VendorPortal = ({ user, onLogout }) => {
                 </div>
                 <h4 style={{ fontWeight: 850, margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>Event Organizer</h4>
                 <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>Organize events, concerts and sell passes online.</p>
+            </motion.div>
+
+            {/* Sports Venue card */}
+            <motion.div
+               whileHover={{ scale: 1.02, y: -5 }}
+               whileTap={{ scale: 0.98 }}
+               className={`type-card ${businessType === 'sports' ? 'active' : ''}`}
+               onClick={() => setBusinessType('sports')}
+               style={{ padding: '2rem 1.5rem', textAlign: 'center', cursor: 'pointer', borderRadius: '24px', border: businessType === 'sports' ? '2px solid var(--v-primary)' : '1.5px solid #e2e8f0', background: businessType === 'sports' ? 'var(--v-primary-soft)' : 'white', transition: 'all 0.3s ease' }}
+            >
+                <div style={{ width: '64px', height: '64px', borderRadius: '18px', background: businessType === 'sports' ? 'white' : '#f8fafc', margin: '0 auto 1.25rem auto', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: businessType === 'sports' ? '0 10px 20px rgba(249, 115, 22, 0.1)' : 'none' }}>
+                  <Trophy size={32} color={businessType === 'sports' ? '#f97316' : '#94a3b8'} />
+                </div>
+                <h4 style={{ fontWeight: 850, margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>Sports Venue</h4>
+                <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>List courts for Cricket, Badminton, Turf, Pickleball & more.</p>
             </motion.div>
           </div>
 
@@ -1633,8 +1759,17 @@ const VendorPortal = ({ user, onLogout }) => {
             </div>
 
             <div className="v-form-group">
-              <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', marginBottom: '8px' }}>{businessType === 'shop' ? 'SHOP NAME' : businessType === 'event' ? 'EVENT AGENCY NAME' : 'SERVICE BRAND NAME'}</label>
-              <input type="text" placeholder={`E.g. ${businessType === 'shop' ? 'The Urban Grocery' : businessType === 'event' ? 'Star Events' : 'Master Cleaners'}`} className="v-input" style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)' }} value={formData.business_name} onChange={e => setFormData({...formData, business_name: e.target.value})} />
+              <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', marginBottom: '8px' }}>
+                {businessType === 'shop' ? 'SHOP NAME' : businessType === 'event' ? 'EVENT AGENCY NAME' : businessType === 'sports' ? 'SPORTS VENUE NAME' : 'SERVICE BRAND NAME'}
+              </label>
+              <input 
+                type="text" 
+                placeholder={`E.g. ${businessType === 'shop' ? 'The Urban Grocery' : businessType === 'event' ? 'Star Events' : businessType === 'sports' ? 'Apex Sports Turf' : 'Master Cleaners'}`} 
+                className="v-input" 
+                style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)' }} 
+                value={formData.business_name} 
+                onChange={e => setFormData({...formData, business_name: e.target.value})} 
+              />
             </div>
 
             <div className="v-form-group">
@@ -1667,6 +1802,14 @@ const VendorPortal = ({ user, onLogout }) => {
                     <option value="Corporate & Business">Corporate & Business</option>
                     <option value="Other Events">Other Events</option>
                   </>
+                ) : businessType === 'sports' ? (
+                  <>
+                    <option value="Cricket & Football Turf">Cricket & Football Turf</option>
+                    <option value="Badminton Court">Badminton Court</option>
+                    <option value="Pickleball & Tennis">Pickleball & Tennis</option>
+                    <option value="Indoor Games & Snooker">Indoor Games & Snooker</option>
+                    <option value="Multisport Arena">Multisport Arena</option>
+                  </>
                 ) : (
                   <>
                     <option value="Plumbing Services">Plumbing Services</option>
@@ -1698,68 +1841,74 @@ const VendorPortal = ({ user, onLogout }) => {
               />
             </div>
 
-            <div className="v-form-group">
-              <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', marginBottom: '8px' }}>STORE ADDRESS</label>
-              <textarea 
-                placeholder="Full physical location of your business" 
-                className="v-input" 
-                style={{ minHeight: '90px', resize: 'none', padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)', lineHeight: 1.5 }}
-                value={formData.address || ''} 
-                onChange={e => setFormData({...formData, address: e.target.value})} 
-              />
-            </div>
+            {/* STORE ADDRESS — hidden for event organizer (not needed), code preserved */}
+            {businessType !== 'event' && (
+              <div className="v-form-group">
+                <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', marginBottom: '8px' }}>STORE ADDRESS</label>
+                <textarea 
+                  placeholder="Full physical location of your business" 
+                  className="v-input" 
+                  style={{ minHeight: '90px', resize: 'none', padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)', lineHeight: 1.5 }}
+                  value={formData.address || ''} 
+                  onChange={e => setFormData({...formData, address: e.target.value})} 
+                />
+              </div>
+            )}
 
-            <div className="v-form-group">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', margin: 0 }}>STORE COORDINATES (GPS)</label>
-                <button 
-                  type="button" 
-                  onClick={() => {
-                    if (!window.isSecureContext) {
-                      toast.error(`GPS needs HTTPS. Use: https://${window.location.hostname}:3002`, { duration: 5000 });
-                      return;
-                    }
-                    if (navigator.geolocation) {
-                      navigator.geolocation.getCurrentPosition((pos) => {
-                        setFormData({
-                          ...formData,
-                          lat: pos.coords.latitude.toFixed(6),
-                          lng: pos.coords.longitude.toFixed(6)
+            {/* STORE COORDINATES — hidden for event organizer (not needed), code preserved */}
+            {businessType !== 'event' && (
+              <div className="v-form-group">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', margin: 0 }}>STORE COORDINATES (GPS)</label>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      if (!window.isSecureContext) {
+                        toast.error(`GPS needs HTTPS. Use: https://${window.location.hostname}:3002`, { duration: 5000 });
+                        return;
+                      }
+                      if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition((pos) => {
+                          setFormData({
+                            ...formData,
+                            lat: pos.coords.latitude.toFixed(6),
+                            lng: pos.coords.longitude.toFixed(6)
+                          });
+                          toast.success("GPS Coordinates detected!");
+                        }, () => {
+                          toast.error("Failed to detect location. Please enter manually.");
                         });
-                        toast.success("GPS Coordinates detected!");
-                      }, () => {
-                        toast.error("Failed to detect location. Please enter manually.");
-                      });
-                    } else {
-                      toast.error("Geolocation not supported by your browser.");
-                    }
-                  }}
-                  style={{ background: 'none', border: 'none', color: 'var(--v-primary, #f97316)', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                >
-                  <MapPin size={12} /> Auto-Detect GPS
-                </button>
+                      } else {
+                        toast.error("Geolocation not supported by your browser.");
+                      }
+                    }}
+                    style={{ background: 'none', border: 'none', color: 'var(--v-primary, #f97316)', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <MapPin size={12} /> Auto-Detect GPS
+                  </button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <input 
+                    type="number" 
+                    step="any"
+                    placeholder="Latitude (e.g. 23.0225)" 
+                    className="v-input" 
+                    style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)' }} 
+                    value={formData.lat || ''} 
+                    onChange={e => setFormData({...formData, lat: e.target.value})} 
+                  />
+                  <input 
+                    type="number" 
+                    step="any"
+                    placeholder="Longitude (e.g. 72.5714)" 
+                    className="v-input" 
+                    style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)' }} 
+                    value={formData.lng || ''} 
+                    onChange={e => setFormData({...formData, lng: e.target.value})} 
+                  />
+                </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <input 
-                  type="number" 
-                  step="any"
-                  placeholder="Latitude (e.g. 23.0225)" 
-                  className="v-input" 
-                  style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)' }} 
-                  value={formData.lat || ''} 
-                  onChange={e => setFormData({...formData, lat: e.target.value})} 
-                />
-                <input 
-                  type="number" 
-                  step="any"
-                  placeholder="Longitude (e.g. 72.5714)" 
-                  className="v-input" 
-                  style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)' }} 
-                  value={formData.lng || ''} 
-                  onChange={e => setFormData({...formData, lng: e.target.value})} 
-                />
-              </div>
-            </div>
+            )}
           </div>
 
           <button 
@@ -1772,7 +1921,8 @@ const VendorPortal = ({ user, onLogout }) => {
                !formData.business_name ||
                !formData.category ||
                !formData.license_no ||
-               !formData.address
+               // Address only required for shop/service/rental — not event organizer
+               (businessType !== 'event' && !formData.address)
              }
           >
             Continue
@@ -1837,8 +1987,8 @@ const VendorPortal = ({ user, onLogout }) => {
                 lat: finalLat,
                 lng: finalLng
               };
-              if (businessType === 'shop' || businessType === 'event') {
-                tablePayload.category = formData.category || (businessType === 'shop' ? 'Grocery' : 'Music & Concerts');
+              if (businessType === 'shop' || businessType === 'event' || businessType === 'sports' || businessType === 'service' || businessType === 'rental') {
+                tablePayload.category = formData.category || (businessType === 'shop' ? 'General Store' : businessType === 'event' ? 'Music & Concerts' : businessType === 'sports' ? 'Badminton Court' : 'Plumbing Services');
               }
 
               if (supabase) {
@@ -2071,22 +2221,27 @@ const VendorPortal = ({ user, onLogout }) => {
               <Menu size={20} />
             </button>
             <div className="v-status-badge">
-              <span>{businessType === 'shop' ? 'STORE ONLINE' : businessType === 'event' ? 'EVENT PORTAL ACTIVE' : businessType === 'rental' ? 'RENTALS ONLINE' : 'SERVICE ONLINE'}</span>
+              <span>{businessType === 'shop' ? 'STORE ONLINE' : businessType === 'event' ? 'EVENT PORTAL ACTIVE' : businessType === 'sports' ? 'SPORTS VENUE ACTIVE' : businessType === 'rental' ? 'RENTALS ONLINE' : 'SERVICE ONLINE'}</span>
             </div>
           </div>
 
           <div className="v-top-right">
              {(() => {
-               const activeConsoles = [];
-               if (hasShopConsole) activeConsoles.push({ id: 'shop', label: 'Store' });
-               if (hasEventConsole) activeConsoles.push({ id: 'event', label: 'Events' });
-               if (hasServiceConsole) activeConsoles.push({ id: 'service', label: 'Profession' });
-               if (hasRentalConsole) activeConsoles.push({ id: 'rental', label: 'Rentals' });
+                const allConsoles = [];
+                if (hasShopConsole) allConsoles.push({ id: 'shop', label: 'Store' });
+                if (hasEventConsole) allConsoles.push({ id: 'event', label: 'Events' });
+                if (hasSportsConsole) allConsoles.push({ id: 'sports', label: 'Sports' });
+                if (hasServiceConsole) allConsoles.push({ id: 'service', label: 'Profession' });
+                if (hasRentalConsole) allConsoles.push({ id: 'rental', label: 'Rentals' });
+                // In launch mode: only show event and sports consoles in switcher (others hidden, not removed)
+                const activeConsoles = LAUNCH_MODE
+                  ? allConsoles.filter(c => c.id === 'event' || c.id === 'sports')
+                  : allConsoles;
 
-               if (activeConsoles.length <= 1) return null;
+                if (activeConsoles.length <= 1) return null;
 
-               const consoleIcons = { shop: Store, event: Calendar, service: Wrench, rental: Package };
-               const consoleColors = { shop: '#10b981', event: '#f97316', service: '#6366f1', rental: '#06b6d4' };
+                const consoleIcons = { shop: Store, event: Calendar, sports: Trophy, service: Wrench, rental: Package };
+                const consoleColors = { shop: '#10b981', event: '#f97316', sports: '#ef4444', service: '#6366f1', rental: '#06b6d4' };
                const currentConsole = activeConsoles.find(c => c.id === businessType) || activeConsoles[0];
                const CurrentIcon = consoleIcons[businessType] || Store;
                const currentColor = consoleColors[businessType] || '#f97316';
@@ -2189,7 +2344,7 @@ const VendorPortal = ({ user, onLogout }) => {
                                  <span style={{ flex: 1 }}>
                                    <span style={{ display: 'block', fontWeight: 800, fontSize: '0.85rem', color: '#0f172a' }}>{c.label} Console</span>
                                    <span style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', fontWeight: 500, marginTop: '1px' }}>
-                                     {c.id === 'shop' ? 'Products & Orders' : c.id === 'event' ? 'Events & Tickets' : c.id === 'service' ? 'Services & Bookings' : 'Rentals & Availability'}
+                                     {c.id === 'shop' ? 'Products & Orders' : c.id === 'event' ? 'Events & Tickets' : c.id === 'sports' ? 'Courts & Slot Bookings' : c.id === 'service' ? 'Services & Bookings' : 'Rentals & Availability'}
                                    </span>
                                  </span>
                                  {isActive && (

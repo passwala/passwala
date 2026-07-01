@@ -2,16 +2,19 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Home, LayoutGrid, Bell, Search, User, Users, Truck } from 'lucide-react';
+import { isFeatureEnabled } from '../launchConfig';
 import './BottomNav.css';
 
 const BottomNav = ({ activeTab, onTabChange, user }) => {
-  const tabs = [
+  const allTabs = [
     { id: 'DASHBOARD',       icon: Home,        label: 'Home',      title: 'Home' },
-    { id: 'TRACKING',        icon: Truck,        label: 'Orders',    title: 'Track Orders' },
-    { id: 'NEIGHBORS',       icon: Users,        label: 'Community', title: 'Community' },
-    { id: 'EXPERT_SERVICES', icon: LayoutGrid,   label: 'Expert',    title: 'Expert Services' },
+    { id: 'TRACKING',        icon: Truck,        label: 'Orders',    title: 'Track Orders',     launchFeature: 'shopping' },
+    { id: 'NEIGHBORS',       icon: Users,        label: 'Community', title: 'Community',         launchFeature: 'community' },
+    { id: 'EXPERT_SERVICES', icon: LayoutGrid,   label: 'Expert',    title: 'Expert Services',  launchFeature: 'services' },
     { id: 'PROFILE',         icon: User,         label: 'Profile',   title: 'My Profile' },
   ];
+  // Hide tabs for features not yet launched (code preserved, never removed)
+  const tabs = allTabs.filter(tab => !tab.launchFeature || isFeatureEnabled(tab.launchFeature));
 
   return (
     <div className="bottom-nav-container" role="navigation" aria-label="Main navigation">

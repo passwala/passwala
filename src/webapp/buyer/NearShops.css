@@ -2,8 +2,8 @@
   width: 100%;
   min-height: 100vh;
   padding: 1rem 1rem 6rem; /* top | sides | bottom – extra bottom for mobile nav */
-  max-width: 1400px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
 }
 
 .near-shops-header {

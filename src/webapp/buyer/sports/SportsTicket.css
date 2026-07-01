@@ -1,0 +1,157 @@
+/* SportsTicket */
+.st-root { min-height: 100vh; background: #f8fafc; font-family: 'Inter', sans-serif; padding-bottom: 40px; }
+
+/* Success Header */
+.st-success-header {
+  position: relative; overflow: hidden;
+  padding: 56px 20px 48px; text-align: center;
+}
+
+.st-hero-bg {
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, #1a1a2e, #0f3460, #1e3a5f);
+}
+
+.st-success-icon {
+  position: relative; z-index: 1;
+  color: #4ade80; margin-bottom: 16px;
+  animation: pop 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+.st-success-title {
+  position: relative; z-index: 1;
+  font-size: 1.8rem; font-weight: 900; color: #fff; margin: 0 0 8px;
+}
+
+.st-success-sub {
+  position: relative; z-index: 1;
+  font-size: 0.9rem; color: rgba(255,255,255,0.7); margin: 0;
+}
+
+@keyframes pop {
+  0% { transform: scale(0); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Ticket Card */
+.st-ticket {
+  margin: -32px 16px 0;
+  background: #fff; border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.12);
+  position: relative; z-index: 2;
+}
+
+.st-ticket-top {
+  display: flex; align-items: center; gap: 14px;
+  padding: 20px;
+  background: linear-gradient(135deg, #fff7ed, #ffedd5);
+  border-bottom: 1px solid #fed7aa;
+}
+
+.st-sport-icon {
+  width: 52px; height: 52px; border-radius: 14px;
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.6rem; flex-shrink: 0;
+}
+
+.st-sport-label { font-size: 0.78rem; font-weight: 600; color: #ea580c; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
+.st-venue-name  { font-size: 1rem; font-weight: 800; color: #1e293b; }
+
+.st-invoice-badge {
+  margin-left: auto;
+  background: #fff; color: #f97316;
+  font-size: 0.75rem; font-weight: 800;
+  padding: 4px 10px; border-radius: 99px;
+  border: 1.5px solid #fed7aa;
+}
+
+/* Details */
+.st-ticket-details {
+  padding: 20px; display: flex; flex-direction: column; gap: 14px;
+}
+
+.st-ticket-row { display: flex; gap: 16px; }
+.st-ticket-cell { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+
+.st-cell-label {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+}
+
+.st-cell-val { font-size: 0.92rem; font-weight: 700; color: #1e293b; }
+
+/* Tear Line */
+.st-tear-line {
+  display: flex; align-items: center; gap: 0;
+  position: relative; margin: 0 -1px;
+}
+
+.st-tear-dot {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: #f8fafc; border: 2px solid #f1f5f9;
+  flex-shrink: 0;
+}
+.st-tear-dot.left  { margin-left: -12px; }
+.st-tear-dot.right { margin-right: -12px; }
+
+.st-tear-dashes {
+  flex: 1; height: 2px;
+  background-image: repeating-linear-gradient(90deg, #e2e8f0 0, #e2e8f0 10px, transparent 10px, transparent 18px);
+}
+
+/* QR */
+.st-qr-section {
+  padding: 24px 20px; display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+
+.st-qr-wrap {
+  width: 160px; height: 160px; border-radius: 16px;
+  border: 3px solid #f1f5f9; padding: 8px;
+  background: #fff;
+}
+
+.st-qr-img { width: 100%; height: 100%; }
+
+.st-qr-code-text { font-family: monospace; font-size: 0.75rem; color: #94a3b8; letter-spacing: 0.1em; }
+.st-qr-hint      { font-size: 0.78rem; color: #64748b; text-align: center; }
+
+/* Amount */
+.st-ticket-amount {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; background: #f8fafc; border-top: 1px solid #f1f5f9;
+}
+
+.st-amount-label { font-size: 0.85rem; color: #64748b; font-weight: 600; }
+.st-amount-val   { font-size: 1.3rem; font-weight: 900; color: #f97316; }
+
+/* Status Badge */
+.st-status-badge {
+  text-align: center; padding: 12px;
+  background: #f0fdf4; color: #16a34a;
+  font-size: 0.85rem; font-weight: 800; letter-spacing: 0.08em;
+  border-top: 1px solid #bbf7d0;
+}
+
+/* Actions */
+.st-actions {
+  display: flex; gap: 12px; padding: 24px 16px 0;
+}
+
+.st-action-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px; border-radius: 14px; font-size: 0.9rem; font-weight: 700;
+  cursor: pointer; border: none; transition: transform 0.15s;
+}
+
+.st-action-btn:active { transform: scale(0.97); }
+
+.st-action-btn.secondary {
+  background: #f1f5f9; color: #475569;
+}
+
+.st-action-btn.primary {
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  color: #fff; box-shadow: 0 4px 16px rgba(249,115,22,0.35);
+}

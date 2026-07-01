@@ -27,14 +27,16 @@ body.dark-mode .webapp-navbar {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
+  max-width: none !important;
+  margin: 0;
   gap: 0.75rem;
 }
 
 .navbar-left {
-  display: flex;
-  align-items: center;
+  display: flex !important;
+  align-items: center !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
   gap: 0.5rem;
   min-width: 0;
   flex: 1;
@@ -57,8 +59,10 @@ body.dark-mode .navbar-title-text {
 }
 
 .webapp-brand-group-v3 {
-  display: flex;
-  align-items: center;
+  display: flex !important;
+  align-items: center !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
   gap: 8px;
   min-width: 0;
   max-width: 100%;
@@ -73,9 +77,9 @@ body.dark-mode .navbar-title-text {
 }
 
 .brand-text-stack {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
   min-width: 0;
   flex: 1;
 }
@@ -93,8 +97,10 @@ body.dark-mode .navbar-title-text {
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-secondary);
-  display: flex;
-  align-items: center;
+  display: flex !important;
+  align-items: center !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
   gap: 3px;
   min-width: 0;
 }
@@ -366,7 +372,7 @@ body.dark-mode .nav-back-btn {
   }
 
   .navbar-top-main {
-    max-width: 1200px;
+    max-width: none !important;
   }
 
   /* Show the brand logo and name on desktop now that sidebar is gone */

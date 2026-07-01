@@ -1,6 +1,6 @@
-﻿import React from 'react';
+import React from 'react';
 import ReactDOM from 'react-dom';
-import { Package, FileText, IndianRupee, Wallet, Star, Bell, HelpCircle, CheckCircle, Clock, MapPin, Download, ArrowUpRight, ArrowDownRight, Tag, Trash2, PackagePlus, Camera, Wrench, AlertTriangle, X, Calendar, ScanLine, Zap, QrCode, Layers } from 'lucide-react';
+import { Package, FileText, IndianRupee, Wallet, Star, Bell, HelpCircle, CheckCircle, Clock, MapPin, Download, ArrowUpRight, ArrowDownRight, Tag, Trash2, PackagePlus, Camera, Wrench, AlertTriangle, X, Calendar, ScanLine, Zap, QrCode, Layers, Trophy } from 'lucide-react';
 import { supabase } from '../supabase';
 import { toast } from 'react-hot-toast';
 // eslint-disable-next-line no-unused-vars
@@ -56,7 +56,7 @@ const uploadImageToSupabase = async (dataUrl, folder = 'events') => {
 };
 
 // ── QR Scanner Modal (camera-based) ─────────────────────────────────────────
-const QRScannerModal = ({ isOpen, onClose, onScan }) => {
+const QRScannerModal = ({ isOpen, onClose, onScan, businessType }) => {
   const videoRef = React.useRef(null);
   const canvasRef = React.useRef(null);
   const streamRef = React.useRef(null);
@@ -287,7 +287,7 @@ const QRScannerModal = ({ isOpen, onClose, onScan }) => {
 
         {/* Tip */}
         <p style={{ color: '#475569', fontSize: '0.72rem', textAlign: 'center', margin: '1rem 0 0 0', lineHeight: 1.5 }}>
-          📱 Ask attendee to open <strong style={{ color: '#94a3b8' }}>Order History → My Events → View Ticket</strong>
+          📱 Ask attendee to open <strong style={{ color: '#94a3b8' }}>Order History → {businessType === 'sports' ? 'Sports Slots' : 'My Events'} → View Ticket</strong>
         </p>
 
         <style>{`
@@ -501,23 +501,42 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
     }
 
     let dbItems = [];
-    const isValidUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(storeId || vendorData?.user_id);
+    const effectiveId = storeId || vendorData?.id || vendorData?.user_id;
+    const isValidUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(effectiveId);
     if (supabase && (isValidUuid || businessType === 'event')) {
       try {
-        const targetTable = businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : 'services';
-        let query = supabase.from(targetTable).select('*');
-        if (businessType === 'event') {
-          const userId = vendorData?.user_id || storeId;
-          if (userId) {
-            query = query.or(`created_by.eq.${userId},allowed_scanner_id.eq.${userId}`);
+        let data = null;
+        let error = null;
+        if (businessType === 'sports') {
+          const BASE_URL = window.location.protocol === 'https:'
+            ? ''
+            : (window._API_URL || `http://${window.location.hostname}:3004`);
+          const res = await fetch(`${BASE_URL}/api/sports/vendor-venues?owner_id=${storeId || vendorData?.id}`);
+          const resData = await res.json();
+          if (res.ok && resData.success) {
+            data = resData.venues;
+          } else {
+            error = { message: resData.error || 'Failed to fetch venues' };
           }
         } else {
-          const idCol = businessType === 'shop' ? 'store_id' : 'provider_id';
-          query = query.eq(idCol, storeId);
+          const targetTable = businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : 'services';
+          let query = supabase.from(targetTable).select('*');
+          if (businessType === 'event') {
+            const userId = vendorData?.user_id || storeId || vendorData?.id;
+            if (userId) {
+              query = query.or(`created_by.eq.${userId},allowed_scanner_id.eq.${userId}`);
+            }
+          } else {
+            const idCol = businessType === 'shop' ? 'store_id' : 'provider_id';
+            query = query.eq(idCol, storeId || vendorData?.id);
+          }
+          const res = await query;
+          data = res.data;
+          error = res.error;
         }
 
-        const { data, error } = await query;
-        if (!error && data) {
+        if (error) throw error;
+        if (data) {
           let filteredData = data;
           if (businessType === 'shop') {
             filteredData = data.filter(item => item.description !== 'Service item auto-registered');
@@ -537,6 +556,9 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                   availableSeats = tiers.reduce((s, t) => s + (t.available_seats || 0), 0);
                 }
               } catch (e) { console.warn(e); }
+            } else if (businessType === 'sports') {
+              const prices = Object.values(item.price_per_hour || {});
+              eventPrice = prices.length > 0 ? Math.min(...prices) : 0;
             } else {
               eventPrice = item.price;
             }
@@ -548,7 +570,12 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
               price: eventPrice,
               total_seats: totalSeats,
               available_seats: availableSeats,
-              image: item.image_url || item.banner_url || item.image,
+              image: businessType === 'sports' && Array.isArray(item.images) && item.images.length > 0
+                ? item.images[0]
+                : (item.image_url || item.banner_url || item.image),
+              sports: item.sport_types || [],
+              price_per_hour: item.price_per_hour || {},
+              images: item.images || [],
               barcode: item.barcode || '',
               barcode_type: item.barcode_type || 'EAN-13',
               stock_quantity: item.stock_quantity !== null && item.stock_quantity !== undefined ? item.stock_quantity : 9999,
@@ -636,8 +663,8 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
     fetchCatalog();
 
     if (storeId && supabase) {
-      const targetTable = businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : 'services';
-      const idCol = businessType === 'shop' ? 'store_id' : businessType === 'event' ? 'created_by' : 'provider_id';
+      const targetTable = businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : businessType === 'sports' ? 'sports_venues' : 'services';
+      const idCol = businessType === 'shop' ? 'store_id' : businessType === 'event' ? 'created_by' : businessType === 'sports' ? 'owner_id' : 'provider_id';
       const filterVal = businessType === 'event' ? (vendorData?.user_id || storeId) : storeId;
       
       const sub = supabase.channel(`vendor_inventory_${storeId}`)
@@ -712,7 +739,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
     if (editingId) {
       if (storeId || vendorData?.user_id) {
         try {
-          const targetTable = businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : 'services';
+          const targetTable = businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : businessType === 'sports' ? 'sports_venues' : 'services';
           let updatePayload = {};
           if (businessType === 'shop') {
             updatePayload = {
@@ -724,7 +751,8 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
               barcode_type: newItem.barcode_type || 'EAN-13',
               stock_quantity: parseInt(newItem.stock_quantity) || 0
             };
-            const { error } = await supabase.from(targetTable).update(updatePayload).eq('id', editingId);
+            const res = await supabase.from(targetTable).update(updatePayload).eq('id', editingId);
+            let error = res.error;
             if (error) throw error;
           } else if (businessType === 'event') {
             if (newItem.show_type === 'multiple' || newItem.show_type === 'festival' || newItem.show_type === 'tour') {
@@ -876,6 +904,39 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                 }
               }
             }
+          } else if (businessType === 'sports') {
+            const pricePerHour = {};
+            if (newItem.sports && newItem.sports.length > 0) {
+              newItem.sports.forEach(sp => {
+                pricePerHour[sp] = parseFloat(newItem.price) || 400;
+              });
+            }
+            updatePayload = {
+              name: newItem.name,
+              description: newItem.detail || 'Updated Manually',
+              address: newItem.detail || 'Ahmedabad',
+              sport_types: newItem.sports || [],
+              price_per_hour: pricePerHour,
+              images: newItem.images || []
+            };
+            let error = null;
+            const BASE_URL = window.location.protocol === 'https:'
+              ? ''
+              : (window._API_URL || `http://${window.location.hostname}:3004`);
+            try {
+              const res = await fetch(`${BASE_URL}/api/sports/venues/${editingId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatePayload)
+              });
+              const resData = await res.json();
+              if (!res.ok || !resData.success) {
+                error = { message: resData.error || 'Failed to update venue' };
+              }
+            } catch (err) {
+              error = { message: err.message };
+            }
+            if (error) throw error;
           } else {
             updatePayload = {
               title: newItem.name,
@@ -899,8 +960,20 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
           ...item,
           name: newItem.name,
           detail: newItem.detail || 'Updated Manually',
-          price: parseFloat(newItem.price),
-          image: newItem.image,
+          price: (() => {
+            if (businessType === 'sports') {
+              // pricePerHour is defined in outer scope
+              const prices = Object.values(pricePerHour || {});
+              return prices.length > 0 ? Math.min(...prices) : parseFloat(newItem.price);
+            }
+            return parseFloat(newItem.price);
+          })(),
+          price_per_hour: businessType === 'sports' ? pricePerHour : (newItem.price_per_hour || {}),
+          sports: newItem.sports || [],
+          images: newItem.images || [],
+          image: businessType === 'sports' && Array.isArray(newItem.images) && newItem.images.length > 0
+            ? newItem.images[0]
+            : newItem.image,
           barcode: newItem.barcode || '',
           barcode_type: newItem.barcode_type || 'EAN-13',
           stock_quantity: parseInt(newItem.stock_quantity) || 0,
@@ -945,7 +1018,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
 
     if ((storeId || vendorData?.user_id) && (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(storeId) || businessType === 'event')) {
       try {
-        const targetTable = businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : 'services';
+        const targetTable = businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : businessType === 'sports' ? 'sports_venues' : 'services';
         
         if (businessType === 'event' && (newItem.show_type === 'multiple' || newItem.show_type === 'festival' || newItem.show_type === 'tour') && newItem.schedule_slots && newItem.schedule_slots.length > 0) {
           for (const slot of newItem.schedule_slots) {
@@ -1046,6 +1119,30 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
             age_restriction: newItem.age_restriction || null,
             language: newItem.language || null
           };
+        } else if (businessType === 'sports') {
+          const pricePerHour = {};
+          if (newItem.sports && newItem.sports.length > 0) {
+            newItem.sports.forEach(sp => {
+              pricePerHour[sp] = parseFloat(newItem.price) || 400;
+            });
+          }
+          payload = {
+            owner_id: storeId || vendorData?.id,
+            owner_user_id: vendorData?.user_id || null,
+            owner_name: vendorData?.name || 'Partner',
+            owner_phone: vendorData?.phone || '',
+            name: newItem.name,
+            description: newItem.detail || 'Added Manually',
+            address: newItem.detail || 'Ahmedabad',
+            city: 'Ahmedabad',
+            sport_types: newItem.sports || [],
+            price_per_hour: pricePerHour,
+            images: newItem.images || [],
+            status: 'approved',
+            open_time: '00:00:00',
+            close_time: '00:00:00',
+            slot_duration_mins: 60
+          };
         } else {
           payload = {
             provider_id: storeId,
@@ -1057,9 +1154,35 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
           };
         }
 
-        const { data, error } = await supabase.from(targetTable).insert([payload]).select();
+        let data = null;
+        let error = null;
+        if (businessType === 'sports') {
+          const BASE_URL = window.location.protocol === 'https:'
+            ? ''
+            : (window._API_URL || `http://${window.location.hostname}:3004`);
+          try {
+            const res = await fetch(`${BASE_URL}/api/sports/venues`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            const resData = await res.json();
+            if (res.ok && resData.success) {
+              data = [resData.venue];
+            } else {
+              error = { message: resData.error || 'Failed to register venue' };
+            }
+          } catch (err) {
+            error = { message: err.message };
+          }
+        } else {
+          const res = await supabase.from(targetTable).insert([payload]).select();
+          data = res.data;
+          error = res.error;
+        }
+
         if (error) {
-          console.error('Supabase insert error:', error);
+          console.error('Insert error:', error);
           toast.error(`Failed to publish listing: ${error.message}`);
           return;
         }
@@ -1090,8 +1213,8 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
             id: data[0].id,
             name: data[0].name || data[0].title,
             detail: data[0].description || data[0].category || 'Added Manually',
-            price: businessType === 'event' ? parseFloat(newProductObj.price) : data[0].price,
-            image: data[0].image_url || data[0].banner_url || data[0].image,
+            price: businessType === 'sports' ? (data[0].price_per_hour ? Math.min(...Object.values(data[0].price_per_hour)) : parseFloat(newItem.price)) : (businessType === 'event' ? parseFloat(newProductObj.price) : data[0].price),
+            image: businessType === 'sports' ? (data[0].images?.[0] || null) : (data[0].image_url || data[0].banner_url || data[0].image),
             barcode: data[0].barcode || '',
             barcode_type: data[0].barcode_type || 'EAN-13',
             stock_quantity: data[0].stock_quantity || 0,
@@ -1222,7 +1345,10 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
       ticket_tiers: tiers,
       duration: item.duration || '',
       age_restriction: item.age_restriction || '',
-      language: item.language || ''
+      language: item.language || '',
+      sports: item.sports || [],
+      price_per_hour: item.price_per_hour || {},
+      images: item.images || []
     });
     setEventWizardStep(2);
     setShowForm(true);
@@ -1314,17 +1440,19 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                 <Package size={20} color="#f97316" />
               ) : businessType === 'event' ? (
                 <Package size={20} color="#f97316" />
+              ) : businessType === 'sports' ? (
+                <Trophy size={20} color="#f97316" />
               ) : (
                 <Wrench size={20} color="#f97316" />
               )}
             </div>
             <span className="v-hero-badge-text" style={{ color: '#f97316' }}>
-              {businessType === 'shop' ? 'Store Management' : businessType === 'event' ? 'Event Management' : 'Service Management'}
+              {businessType === 'shop' ? 'Store Management' : businessType === 'event' ? 'Event Management' : businessType === 'sports' ? 'Venue Management' : 'Service Management'}
             </span>
           </div>
-          <h1 className="v-hero-title">{businessType === 'shop' ? 'Product Catalog' : businessType === 'event' ? 'Events & Shows' : 'Service Menu'}</h1>
+          <h1 className="v-hero-title">{businessType === 'shop' ? 'Product Catalog' : businessType === 'event' ? 'Events & Shows' : businessType === 'sports' ? 'Venue Management' : 'Service Menu'}</h1>
           <p className="v-hero-subtitle">
-            {businessType === 'event' ? 'Manage your events, ticket pricing, and passes details for local audiences.' : 'Manage your digital storefront and keep your price list updated for local customers.'}
+            {businessType === 'event' ? 'Manage your events, ticket pricing, and passes details for local audiences.' : businessType === 'sports' ? 'Manage your sports courts, turf bookings, hourly slots, and pricing.' : 'Manage your digital storefront and keep your price list updated for local customers.'}
           </p>
         </div>
 
@@ -1335,7 +1463,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
           className="v-btn-primary"
         >
           <PackagePlus size={20} />
-          {businessType === 'shop' ? 'Add Product' : businessType === 'event' ? 'Add Event' : 'Add Service'}
+          {businessType === 'shop' ? 'Add Product' : businessType === 'event' ? 'Add Event' : businessType === 'sports' ? 'Add Venue' : 'Add Service'}
         </motion.button>
         {businessType === 'event' && (
           <motion.button
@@ -3092,7 +3220,465 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                       )
                     )}
                   </div>
-                ) : (
+                ) : businessType === 'sports' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', overflowY: 'auto', flex: 1, padding: '2.5rem 3rem' }}>
+                  <div className="v-form-row-2col">
+                    <div className="v-form-group">
+                      <label>Venue Name *</label>
+                      <input required type="text" className="v-input" placeholder="e.g. Apex Sports Arena" value={newItem.name || ''} onChange={e => setNewItem({ ...newItem, name: e.target.value })} style={{ outline: 'none' }} />
+                    </div>
+                    <div className="v-form-group">
+                      <label>Venue Address *</label>
+                      <input required type="text" className="v-input" placeholder="Full physical address..." value={newItem.detail || ''} onChange={e => setNewItem({ ...newItem, detail: e.target.value })} style={{ outline: 'none' }} />
+                    </div>
+                  </div>
+                  <div className="v-form-row-2col">
+                    <div className="v-form-group">
+                      <label>Base Price per Hour (₹) *</label>
+                      <input required type="number" className="v-input" placeholder="e.g. 400" value={newItem.price || ''} onChange={e => setNewItem({ ...newItem, price: e.target.value })} style={{ outline: 'none' }} />
+                    </div>
+                  </div>
+
+                  <div className="v-form-group">
+                    <label style={{ marginBottom: '12px', display: 'block' }}>Select Sports Offered *</label>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      {[
+                        { id: 'box_cricket', label: 'Box Cricket' },
+                        { id: 'turf', label: 'Football Turf' },
+                        { id: 'badminton', label: 'Badminton' },
+                        { id: 'tennis', label: 'Tennis' },
+                        { id: 'pickleball', label: 'Pickleball' },
+                        { id: 'padel', label: 'Padel' },
+                        { id: 'table_tennis', label: 'Table Tennis' },
+                        { id: 'snooker', label: 'Snooker' }
+                      ].map(sport => {
+                        const isChecked = newItem.sports?.includes(sport.id);
+                        return (
+                          <button
+                            key={sport.id}
+                            type="button"
+                            onClick={() => {
+                              const nextSports = isChecked ? [] : [sport.id];
+                              const nextSlots = (newItem.slots || []).filter(s => s.sport === sport.id);
+                              setNewItem({ ...newItem, sports: nextSports, slots: nextSlots });
+                            }}
+                            style={{
+                              padding: '8px 16px',
+                              borderRadius: '20px',
+                              border: isChecked ? '2px solid var(--v-primary)' : '1px solid #cbd5e1',
+                              background: isChecked ? 'var(--v-primary-soft)' : 'white',
+                              color: isChecked ? 'var(--v-primary)' : '#475569',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              outline: 'none'
+                            }}
+                          >
+                            {sport.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Slots Generator / Manager */}
+                  {newItem.sports && newItem.sports.length > 0 && (
+                    <div className="v-form-group" style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                      <h4 style={{ margin: '0 0 12px 0', fontWeight: 900, color: '#0f172a' }}>📅 Manage Time Slots</h4>
+                      
+                      {/* Generator Row */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', alignItems: 'end', marginBottom: '1.5rem', background: 'white', padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Date</span>
+                          <input type="date" id="gen-date" className="v-input" defaultValue={new Date().toISOString().split('T')[0]} style={{ outline: 'none' }} />
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Start Time</span>
+                          <input type="time" id="gen-start" className="v-input" defaultValue="06:00" style={{ outline: 'none' }} />
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '4px', fontWeight: 800 }}>End Time</span>
+                          <input type="time" id="gen-end" className="v-input" defaultValue="22:00" style={{ outline: 'none' }} />
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Price per Hour</span>
+                          <input type="number" id="gen-price" className="v-input" defaultValue="400" style={{ outline: 'none' }} />
+                        </div>
+                        <button
+                          type="button"
+                          className="v-btn-primary"
+                          style={{ height: '42px', padding: '0 12px', justifyContent: 'center', whiteSpace: 'nowrap', outline: 'none' }}
+                          onClick={() => {
+                            const date = document.getElementById('gen-date').value;
+                            const sport = newItem.sports[0];
+                            const start = document.getElementById('gen-start').value;
+                            const end = document.getElementById('gen-end').value;
+                            const price = parseFloat(document.getElementById('gen-price').value) || 400;
+
+                            if (!sport) {
+                              toast.error("Please select a sport first!");
+                              return;
+                            }
+
+                            // Generate hourly slots
+                            let startH = parseInt(start.split(':')[0]);
+                            let endH = parseInt(end.split(':')[0]);
+                            if (start === end || end === '00:00') {
+                              startH = 0;
+                              endH = 24;
+                            } else if (endH < startH) {
+                              endH = 24;
+                            }
+                            const newSlots = [...(newItem.slots || [])];
+
+                            for (let h = startH; h < endH; h++) {
+                              const sTime = `${String(h).padStart(2, '0')}:00`;
+                              const eTime = `${String(h + 1).padStart(2, '0')}:00`;
+                              const exists = newSlots.some(s => s.date === date && s.sport === sport && s.start_time === sTime);
+                              if (!exists) {
+                                newSlots.push({ date, sport, start_time: sTime, end_time: eTime, price });
+                              }
+                            }
+                            setNewItem(prev => ({ ...prev, slots: newSlots }));
+                            toast.success("Generated slots successfully!");
+                          }}
+                        >
+                          Generate Slots
+                        </button>
+                      </div>
+
+                      {/* Slots List */}
+                      <div style={{ maxHeight: '250px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {(!newItem.slots || newItem.slots.length === 0) ? (
+                          <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', background: 'white', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                            No slots generated yet. Use the generator above to add multiple slots.
+                          </div>
+                        ) : (
+                          newItem.slots.map((slot, index) => (
+                            <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 2fr 1.5fr 1fr', gap: '12px', alignItems: 'center', background: 'white', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                              <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.85rem' }}>📅 {slot.date}</span>
+                              <span style={{ fontWeight: 800, color: 'var(--v-primary)', fontSize: '0.85rem' }}>
+                                {slot.sport === 'box_cricket' ? 'Box Cricket' : slot.sport === 'turf' ? 'Football Turf' : slot.sport.charAt(0).toUpperCase() + slot.sport.slice(1)}
+                              </span>
+                              <span style={{ fontWeight: 700, color: '#475569', fontSize: '0.85rem' }}>⏰ {slot.start_time} - {slot.end_time}</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 900 }}>₹</span>
+                                <input
+                                  type="number"
+                                  className="v-input"
+                                  style={{ height: '28px', padding: '2px 8px', fontSize: '0.8rem', outline: 'none' }}
+                                  value={slot.price}
+                                  onChange={e => {
+                                    const slots = [...newItem.slots];
+                                    slots[index].price = parseFloat(e.target.value) || 0;
+                                    setNewItem(prev => ({ ...prev, slots }));
+                                  }}
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', justifyContent: 'center', outline: 'none' }}
+                                onClick={() => {
+                                  setNewItem(prev => ({ ...prev, slots: prev.slots.filter((_, i) => i !== index) }));
+                                }}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="v-form-group">
+                    <label>Venue Images *</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
+                      {(newItem.images || []).map((img, idx) => (
+                        <div key={idx} style={{ position: 'relative', height: '90px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                          <img src={img} alt={`Preview ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <button
+                            type="button"
+                            style={{ position: 'absolute', top: '4px', right: '4px', background: 'white', border: 'none', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.15)', cursor: 'pointer', zIndex: 10, outline: 'none' }}
+                            onClick={() => {
+                              setNewItem({ ...newItem, images: newItem.images.filter((_, i) => i !== idx) });
+                            }}
+                          >
+                            <Trash2 size={12} color="#ef4444" />
+                          </button>
+                        </div>
+                      ))}
+                      {(!newItem.images || newItem.images.length < 5) && (
+                        <label style={{ height: '90px', border: '2px dashed #cbd5e1', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#f8fafc', gap: '4px' }}>
+                          <input 
+                            type="file" 
+                            hidden 
+                            accept="image/*" 
+                            onChange={(e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                const tempUrl = URL.createObjectURL(file);
+                                const nextImages = [...(newItem.images || []), tempUrl];
+                                setNewItem({ ...newItem, images: nextImages });
+                                const reader = new FileReader();
+                                reader.onloadend = async () => {
+                                  const publicUrl = await uploadImageToSupabase(reader.result, 'venues');
+                                  setNewItem(prev => ({
+                                    ...prev,
+                                    images: (prev.images || []).map(img => img === tempUrl ? publicUrl : img)
+                                  }));
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }} 
+                          />
+                          <Camera size={20} color="#94a3b8" />
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Add Photo</span>
+                        </label>
+                      )}
+                    </div>
+                  </div>
+
+                  <div 
+                    className="v-form-actions" 
+                    style={{ 
+                      padding: '1.5rem 0 0 0', 
+                      borderTop: '1px solid #f1f5f9', 
+                      background: 'white',
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      gap: '1rem'
+                    }}
+                  >
+                    <button type="button" onClick={() => setShowForm(false)} className="v-btn-outline">Discard</button>
+                    <button type="submit" className="v-btn-primary">
+                      {editingId ? 'Update Venue' : 'Publish Venue'}
+                    </button>
+                  </div>
+                </div>
+              ) : businessType === 'sports' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', overflowY: 'auto', flex: 1, padding: '2.5rem 3rem' }}>
+                  <div className="v-form-row-2col">
+                    <div className="v-form-group">
+                      <label>Venue Name *</label>
+                      <input required type="text" className="v-input" placeholder="e.g. Apex Sports Arena" value={newItem.name || ''} onChange={e => setNewItem({ ...newItem, name: e.target.value })} style={{ outline: 'none' }} />
+                    </div>
+                    <div className="v-form-group">
+                      <label>Venue Address *</label>
+                      <input required type="text" className="v-input" placeholder="Full physical address..." value={newItem.detail || ''} onChange={e => setNewItem({ ...newItem, detail: e.target.value })} style={{ outline: 'none' }} />
+                    </div>
+                  </div>
+
+                  <div className="v-form-group">
+                    <label style={{ marginBottom: '12px', display: 'block' }}>Select Sports Offered *</label>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      {[
+                        { id: 'box_cricket', label: 'Box Cricket' },
+                        { id: 'turf', label: 'Football Turf' },
+                        { id: 'badminton', label: 'Badminton' },
+                        { id: 'tennis', label: 'Tennis' },
+                        { id: 'pickleball', label: 'Pickleball' },
+                        { id: 'padel', label: 'Padel' },
+                        { id: 'table_tennis', label: 'Table Tennis' },
+                        { id: 'snooker', label: 'Snooker' }
+                      ].map(sport => {
+                        const isChecked = newItem.sports?.includes(sport.id);
+                        return (
+                          <button
+                            key={sport.id}
+                            type="button"
+                            onClick={() => {
+                              const nextSports = isChecked ? [] : [sport.id];
+                              const nextSlots = (newItem.slots || []).filter(s => s.sport === sport.id);
+                              setNewItem({ ...newItem, sports: nextSports, slots: nextSlots });
+                            }}
+                            style={{
+                              padding: '8px 16px',
+                              borderRadius: '20px',
+                              border: isChecked ? '2px solid var(--v-primary)' : '1px solid #cbd5e1',
+                              background: isChecked ? 'var(--v-primary-soft)' : 'white',
+                              color: isChecked ? 'var(--v-primary)' : '#475569',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              outline: 'none'
+                            }}
+                          >
+                            {sport.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Slots Generator / Manager */}
+                  {newItem.sports && newItem.sports.length > 0 && (
+                    <div className="v-form-group" style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                      <h4 style={{ margin: '0 0 12px 0', fontWeight: 900, color: '#0f172a' }}>📅 Manage Time Slots</h4>
+                      
+                      {/* Generator Row */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', alignItems: 'end', marginBottom: '1.5rem', background: 'white', padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Date</span>
+                          <input type="date" id="gen-date" className="v-input" defaultValue={new Date().toISOString().split('T')[0]} style={{ outline: 'none' }} />
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Start Time</span>
+                          <input type="time" id="gen-start" className="v-input" defaultValue="06:00" style={{ outline: 'none' }} />
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '4px', fontWeight: 800 }}>End Time</span>
+                          <input type="time" id="gen-end" className="v-input" defaultValue="22:00" style={{ outline: 'none' }} />
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Price per Hour</span>
+                          <input type="number" id="gen-price" className="v-input" defaultValue="400" style={{ outline: 'none' }} />
+                        </div>
+                        <button
+                          type="button"
+                          className="v-btn-primary"
+                          style={{ height: '42px', padding: '0 12px', justifyContent: 'center', whiteSpace: 'nowrap', outline: 'none' }}
+                          onClick={() => {
+                            const date = document.getElementById('gen-date').value;
+                            const sport = newItem.sports[0];
+                            const start = document.getElementById('gen-start').value;
+                            const end = document.getElementById('gen-end').value;
+                            const price = parseFloat(document.getElementById('gen-price').value) || 400;
+
+                            if (!sport) {
+                              toast.error("Please select a sport first!");
+                              return;
+                            }
+
+                            // Generate hourly slots
+                            const startH = parseInt(start.split(':')[0]);
+                            const endH = parseInt(end.split(':')[0]);
+                            const newSlots = [...(newItem.slots || [])];
+
+                            for (let h = startH; h < endH; h++) {
+                              const sTime = `sq${String(h).padStart(2, '0')}:00`;
+                              const eTime = `sq${String(h + 1).padStart(2, '0')}:00`;
+                              const exists = newSlots.some(s => s.date === date && s.sport === sport && s.start_time === sTime);
+                              if (!exists) {
+                                newSlots.push({ date, sport, start_time: sTime, end_time: eTime, price });
+                              }
+                            }
+                            setNewItem(prev => ({ ...prev, slots: newSlots }));
+                            toast.success("Generated slots successfully!");
+                          }}
+                        >
+                          Generate Slots
+                        </button>
+                      </div>
+
+                      {/* Slots List */}
+                      <div style={{ maxHeight: '250px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {(!newItem.slots || newItem.slots.length === 0) ? (
+                          <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', background: 'white', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                            No slots generated yet. Use the generator above to add multiple slots.
+                          </div>
+                        ) : (
+                          newItem.slots.map((slot, index) => (
+                            <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 2fr 1.5fr 1fr', gap: '12px', alignItems: 'center', background: 'white', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                              <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.85rem' }}>📅 {slot.date}</span>
+                              <span style={{ fontWeight: 800, color: 'var(--v-primary)', fontSize: '0.85rem' }}>
+                                {slot.sport === 'box_cricket' ? 'Box Cricket' : slot.sport === 'turf' ? 'Football Turf' : slot.sport.charAt(0).toUpperCase() + slot.sport.slice(1)}
+                              </span>
+                              <span style={{ fontWeight: 700, color: '#475569', fontSize: '0.85rem' }}>⏰ {slot.start_time} - {slot.end_time}</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 900 }}>₹</span>
+                                <input
+                                  type="number"
+                                  className="v-input"
+                                  style={{ height: '28px', padding: '2px 8px', fontSize: '0.8rem', outline: 'none' }}
+                                  value={slot.price}
+                                  onChange={e => {
+                                    const slots = [...newItem.slots];
+                                    slots[index].price = parseFloat(e.target.value) || 0;
+                                    setNewItem(prev => ({ ...prev, slots }));
+                                  }}
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', justifyContent: 'center', outline: 'none' }}
+                                onClick={() => {
+                                  setNewItem(prev => ({ ...prev, slots: prev.slots.filter((_, i) => i !== index) }));
+                                }}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="v-form-group">
+                    <label>Venue Images *</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
+                      {(newItem.images || []).map((img, idx) => (
+                        <div key={idx} style={{ position: 'relative', height: '90px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                          <img src={img} alt={`Preview ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <button
+                            type="button"
+                            style={{ position: 'absolute', top: '4px', right: '4px', background: 'white', border: 'none', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.15)', cursor: 'pointer', zIndex: 10, outline: 'none' }}
+                            onClick={() => {
+                              setNewItem({ ...newItem, images: newItem.images.filter((_, i) => i !== idx) });
+                            }}
+                          >
+                            <Trash2 size={12} color="#ef4444" />
+                          </button>
+                        </div>
+                      ))}
+                      {(!newItem.images || newItem.images.length < 5) && (
+                        <label style={{ height: '90px', border: '2px dashed #cbd5e1', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#f8fafc', gap: '4px' }}>
+                          <input 
+                            type="file" 
+                            hidden 
+                            accept="image/*" 
+                            onChange={(e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                const tempUrl = URL.createObjectURL(file);
+                                const nextImages = [...(newItem.images || []), tempUrl];
+                                setNewItem({ ...newItem, images: nextImages });
+                                const reader = new FileReader();
+                                reader.onloadend = async () => {
+                                  const publicUrl = await uploadImageToSupabase(reader.result, 'venues');
+                                  setNewItem(prev => ({
+                                    ...prev,
+                                    images: (prev.images || []).map(img => img === tempUrl ? publicUrl : img)
+                                  }));
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }} 
+                          />
+                          <Camera size={20} color="#94a3b8" />
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Add Photo</span>
+                        </label>
+                      )}
+                    </div>
+                  </div>
+
+                  <div 
+                    className="v-form-actions" 
+                    style={{ 
+                      padding: '1.5rem 0 0 0', 
+                      borderTop: '1px solid #f1f5f9', 
+                      background: 'white',
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      gap: '1rem'
+                    }}
+                  >
+                    <button type="button" onClick={() => setShowForm(false)} className="v-btn-outline">Discard</button>
+                    <button type="submit" className="v-btn-primary">
+                      {editingId ? 'Update Venue' : 'Publish Venue'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
                   // STANDARD PRODUCT/SERVICE FORM FIELDS
                   <>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', overflowY: 'auto', flex: 1, padding: '2.5rem 3rem' }}>
@@ -3335,7 +3921,11 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
                                 : isClosed
                                 ? '🚫 Event Closed'
                                 : 'Active Event')
-                            : 'Active Service'}
+                            : businessType === 'sports'
+                              ? 'Active Venue'
+                              : businessType === 'sports'
+                              ? 'Active Venue'
+                              : 'Active Service'}
                       </span>
                     );
                   })()}
@@ -3980,8 +4570,62 @@ export const VendorOrders = ({ storeId, businessType, vendorData }) => {
               }
             }];
           });
-          setOrders(data);
         } else if (!error) {
+          setOrders([]);
+        }
+      } else if (businessType === 'sports') {
+        const BASE_URL = window.location.protocol === 'https:'
+          ? ''
+          : `http://${window.location.hostname}:3004`;
+
+        const venuesRes = await fetch(`${BASE_URL}/api/sports/vendor-venues?owner_id=${storeId}`);
+        if (venuesRes.ok) {
+          const venuesData = await venuesRes.json();
+          const venues = venuesData.venues || [];
+
+          if (venues.length > 0) {
+            let allBookings = [];
+            for (const venue of venues) {
+              const bookingsRes = await fetch(`${BASE_URL}/api/sports/vendor-bookings?venue_id=${venue.id}`);
+              if (bookingsRes.ok) {
+                const bookingsData = await bookingsRes.json();
+                if (bookingsData.success && bookingsData.bookings) {
+                  allBookings.push(...bookingsData.bookings.map(b => ({ ...b, sports_venues: venue })));
+                }
+              }
+            }
+
+            allBookings.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            const mappedBookings = allBookings.map(b => ({
+              id: b.id,
+              created_at: b.created_at,
+              status: b.status,
+              total_amount: b.total_amount,
+              subtotal: b.base_amount || b.total_amount,
+              qr_code_hash: b.qr_code,
+              ticket_count: 1,
+              event_title: b.sports_venues?.name || 'Court Booking',
+              users: {
+                full_name: b.user_name || 'Player',
+                phone: b.user_phone || 'N/A'
+              },
+              addresses: {
+                address_line_1: b.sports_venues?.address || 'Court',
+                society: b.sports_venues?.city || 'Ahmedabad'
+              },
+              order_items: [{
+                quantity: 1,
+                products: {
+                  name: `${b.sport_type?.toUpperCase().replace('_', ' ')} Slot on ${b.slot_date ? new Date(b.slot_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''} (${b.slot_time} - ${b.slot_end_time})`
+                }
+              }]
+            }));
+            setOrders(mappedBookings);
+          } else {
+            setOrders([]);
+          }
+        } else {
           setOrders([]);
         }
       } else {
@@ -4098,7 +4742,7 @@ export const VendorOrders = ({ storeId, businessType, vendorData }) => {
 
   React.useEffect(() => {
     fetchOrders(true);
-    const targetTable = businessType === 'service' ? 'service_bookings' : 'orders';
+    const targetTable = businessType === 'service' ? 'service_bookings' : businessType === 'sports' ? 'venue_bookings' : 'orders';
     const channel = supabase
       .channel('vendor-orders-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: targetTable }, () => {
@@ -4176,6 +4820,12 @@ export const VendorOrders = ({ storeId, businessType, vendorData }) => {
           .update({ status: newStatus })
           .eq('id', orderId);
         if (error) throw error;
+      } else if (businessType === 'sports') {
+        const { error } = await supabase
+          .from('venue_bookings')
+          .update({ status: newStatus.toLowerCase() })
+          .eq('id', orderId);
+        if (error) throw error;
       } else if (isService) {
         const { error: bookingErr } = await supabase
           .from('service_bookings')
@@ -4245,15 +4895,17 @@ export const VendorOrders = ({ storeId, businessType, vendorData }) => {
   const getStatusStyle = (status) => {
     const isService = businessType === 'service';
     const isEvent = businessType === 'event';
-    switch (status) {
+    const isSports = businessType === 'sports';
+    const cleanStatus = String(status || '').toUpperCase();
+    switch (cleanStatus) {
       case 'PENDING':
-      case 'PLACED': return { bg: '#fff7ed', text: '#f97316', dot: '#f97316', label: isEvent ? 'Ticket Booked' : isService ? 'New Booking' : 'New Order', icon: <Bell size={14} /> };
+      case 'PLACED': return { bg: '#fff7ed', text: '#f97316', dot: '#f97316', label: isEvent ? 'Ticket Booked' : isSports ? 'Pending Slot' : isService ? 'New Booking' : 'New Order', icon: <Bell size={14} /> };
       case 'ACCEPTED': 
-      case 'CONFIRMED': return { bg: '#e0f2fe', text: '#0ea5e9', dot: '#0ea5e9', label: isEvent ? 'Ticket Booked' : isService ? 'Expert Assigned' : 'Rider Accepted', icon: <CheckCircle size={14} /> };
+      case 'CONFIRMED': return { bg: '#e0f2fe', text: '#0ea5e9', dot: '#0ea5e9', label: isEvent ? 'Ticket Booked' : isSports ? 'Court Booked' : isService ? 'Expert Assigned' : 'Rider Accepted', icon: <CheckCircle size={14} /> };
       case 'PREPARING': return { bg: '#eff6ff', text: '#3b82f6', dot: '#3b82f6', label: isEvent ? 'Processing' : isService ? 'Expert Preparing' : 'In Progress', icon: <Clock size={14} /> };
       case 'SHIPPED': return { bg: '#faf5ff', text: '#a855f7', dot: '#a855f7', label: isEvent ? 'Dispatched' : isService ? 'Expert En Route' : 'Out for Delivery', icon: <MapPin size={14} /> };
       case 'COMPLETED':
-      case 'DELIVERED': return { bg: '#f0fdf4', text: '#22c55e', dot: '#22c55e', label: isEvent ? 'Attended / Checked In' : isService ? 'Service Completed' : 'Completed', icon: <CheckCircle size={14} /> };
+      case 'DELIVERED': return { bg: '#f0fdf4', text: '#22c55e', dot: '#22c55e', label: isEvent ? 'Attended / Checked In' : isSports ? 'Completed' : isService ? 'Service Completed' : 'Completed', icon: <CheckCircle size={14} /> };
       default: return { bg: '#f1f5f9', text: '#64748b', dot: '#64748b', label: status, icon: <FileText size={14} /> };
     }
   };
@@ -4276,13 +4928,13 @@ export const VendorOrders = ({ storeId, businessType, vendorData }) => {
             <div className="v-hero-badge-icon" style={{ background: '#fef2f2' }}>
               <FileText size={24} color="#ef4444" />
             </div>
-            <span className="v-hero-badge-text" style={{ color: '#ef4444' }}>{businessType === 'event' ? 'Ticket Booking Console' : 'Fulfillment Dashboard'}</span>
+            <span className="v-hero-badge-text" style={{ color: '#ef4444' }}>{businessType === 'event' ? 'Ticket Booking Console' : businessType === 'sports' ? 'Venue Booking Console' : 'Fulfillment Dashboard'}</span>
           </div>
-          <h1 className="v-hero-title">{businessType === 'service' ? 'Live Bookings' : businessType === 'event' ? 'Ticket Bookings' : 'Live Orders'}</h1>
-          <p className="v-hero-subtitle">{businessType === 'service' ? 'Real-time tracking and operational control for your services' : businessType === 'event' ? 'Real-time tracking and control of ticket bookings and passes' : 'Real-time tracking and operational control for your store'}</p>
+          <h1 className="v-hero-title">{businessType === 'service' ? 'Live Bookings' : businessType === 'event' ? 'Ticket Bookings' : businessType === 'sports' ? 'Court Bookings' : 'Live Orders'}</h1>
+          <p className="v-hero-subtitle">{businessType === 'service' ? 'Real-time tracking and operational control for your services' : businessType === 'event' ? 'Real-time tracking and control of ticket bookings and passes' : businessType === 'sports' ? 'Real-time tracking and control of sports slot bookings' : 'Real-time tracking and operational control for your store'}</p>
         </div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-          {businessType === 'event' && (
+          {(businessType === 'event' || businessType === 'sports') && (
             <button
               onClick={() => setQrScannerOpen({ open: true, booking: null })}
               style={{
@@ -4360,7 +5012,7 @@ export const VendorOrders = ({ storeId, businessType, vendorData }) => {
 
           return filteredList.map((order, i) => {
             const style = getStatusStyle(order.status);
-            const isService = businessType === 'service';
+            const isService = businessType === 'service' || businessType === 'sports';
             return (
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
@@ -4459,7 +5111,25 @@ export const VendorOrders = ({ storeId, businessType, vendorData }) => {
                     )
                   ) : (
                     <>
-                      {['PENDING', 'PLACED'].includes(order.status) && (
+                      {businessType === 'sports' && (order.status?.toUpperCase() === 'CONFIRMED' || order.status?.toUpperCase() === 'BOOKED') && (
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => updateStatus(order.id, 'COMPLETED')}
+                          className="v-btn-primary"
+                          style={{ flex: 1, padding: '16px', background: '#16a34a', boxShadow: '0 10px 25px rgba(22, 163, 74, 0.2)' }}
+                        >
+                          ✅ Check In Player / Complete Slot
+                        </motion.button>
+                      )}
+                      {businessType === 'sports' && (order.status?.toUpperCase() === 'COMPLETED') && (
+                        <div
+                          style={{ flex: 1, padding: '16px', background: '#f0fdf4', color: '#16a34a', borderRadius: '14px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #bbf7d0', gap: '8px' }}
+                        >
+                          ✅ Completed & Checked In
+                        </div>
+                      )}
+                      {businessType !== 'sports' && ['PENDING', 'PLACED'].includes(order.status) && (
                         <motion.button
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
@@ -4470,7 +5140,7 @@ export const VendorOrders = ({ storeId, businessType, vendorData }) => {
                           {isService ? 'Confirm Booking' : 'Confirm Order'}
                         </motion.button>
                       )}
-                      {order.status === 'ACCEPTED' && (
+                      {businessType !== 'sports' && order.status === 'ACCEPTED' && (
                         <motion.button
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
@@ -4481,7 +5151,7 @@ export const VendorOrders = ({ storeId, businessType, vendorData }) => {
                           {isService ? 'Initiate Service' : 'Initiate Fulfillment'}
                         </motion.button>
                       )}
-                      {order.status === 'PREPARING' && (
+                      {businessType !== 'sports' && order.status === 'PREPARING' && (
                         <motion.button
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
@@ -4492,7 +5162,7 @@ export const VendorOrders = ({ storeId, businessType, vendorData }) => {
                           {isService ? 'Dispatch Expert' : 'Confirm Ready for Pickup'}
                         </motion.button>
                       )}
-                      {['SHIPPED', 'DISPATCHED'].includes(order.status) && (
+                      {businessType !== 'sports' && ['SHIPPED', 'DISPATCHED'].includes(order.status) && (
                         isService ? (
                           <motion.button
                             whileHover={{ scale: 1.02 }}
@@ -4514,7 +5184,7 @@ export const VendorOrders = ({ storeId, businessType, vendorData }) => {
                     </>
                   )}
                   {businessType !== 'event' && (
-                    ['PENDING', 'PLACED', 'ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED', 'CONFIRMED'].includes(order.status) ? (
+                    ['PENDING', 'PLACED', 'ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED', 'CONFIRMED'].includes(String(order.status || '').toUpperCase()) ? (
                       <button
                         onClick={() => {
                           setConfirmDialog({
@@ -4561,8 +5231,50 @@ export const VendorOrders = ({ storeId, businessType, vendorData }) => {
       />
       <QRScannerModal
         isOpen={qrScannerOpen.open}
+        businessType={businessType}
         onClose={() => setQrScannerOpen({ open: false, booking: null })}
         onScan={async (scannedHash) => {
+          if (businessType === 'sports') {
+            const { data, error } = await supabase
+              .from('venue_bookings')
+              .select('id, status, user_name, sport_type, qr_code, slot_date, slot_time')
+              .eq('qr_code', scannedHash)
+              .maybeSingle();
+
+            if (error || !data) {
+              toast.error('❌ Invalid QR — Booking not found');
+              return;
+            }
+
+            if (data.slot_date && data.slot_time) {
+              const [hours, minutes] = data.slot_time.split(':').map(Number);
+              const slotDate = new Date(data.slot_date);
+              slotDate.setHours(hours, minutes, 0, 0);
+
+              const now = new Date();
+              const fifteenMinutesBefore = new Date(slotDate.getTime() - 15 * 60 * 1000);
+
+              if (now < fifteenMinutesBefore) {
+                toast.error(`⚠️ Too early! Booking starts at ${data.slot_time} on ${data.slot_date}`);
+                return;
+              }
+            }
+            if (data.status === 'COMPLETED' || data.status === 'completed') {
+              toast.success(`✅ ${data.user_name || 'Player'} already checked in`);
+              setQrScannerOpen({ open: false, booking: null });
+              return;
+            }
+            if (data.status === 'CANCELLED' || data.status === 'cancelled') {
+              toast.error('⛔ This booking has been cancelled');
+              return;
+            }
+            await supabase.from('venue_bookings').update({ status: 'completed', checked_in_at: new Date().toISOString() }).eq('id', data.id);
+            toast.success(`🎉 ${data.user_name || 'Player'} checked in successfully!`);
+            setQrScannerOpen({ open: false, booking: null });
+            fetchOrders();
+            return;
+          }
+
           const { data, error } = await supabase
             .from('event_bookings')
             .select('id, status, users(full_name, phone), events(title)')
@@ -4867,28 +5579,18 @@ export const VendorReviews = ({ storeId, businessType }) => {
     const fetchReviews = async () => {
       if (!storeId) { setReviews([]); return; }
       try {
-        const { data, error } = await supabase
-          .from('order_ratings')
-          .select('rating, comment, created_at, order_id, users(full_name)')
-          .eq('store_id', storeId)
-          .order('created_at', { ascending: false });
-        
-        if (!error && data) {
-          const revs = data.map(r => ({
-            user: r.users?.full_name || 'Passwala User',
-            rating: r.rating || 5,
-            comment: r.comment || `Great service! (Order #${r.order_id ? String(r.order_id).substring(0, 6).toUpperCase() : ''})`,
-            date: new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-            avatar: (r.users?.full_name || 'P').charAt(0)
-          }));
-          setReviews(revs);
+        const BASE_URL = window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`;
+        const res = await fetch(`${BASE_URL}/api/ratings/vendor/${storeId}?businessType=${businessType}`);
+        const data = await res.json();
+        if (data.success && data.reviews) {
+          setReviews(data.reviews);
         }
       } catch (err) {
         console.error("Reviews error:", err);
       }
     };
     fetchReviews();
-  }, [storeId]);
+  }, [storeId, businessType]);
 
   return (
     <div className="v-container animate-fade-in">

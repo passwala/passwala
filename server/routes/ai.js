@@ -5,19 +5,21 @@ import path from 'path';
 
 const router = express.Router();
 
-const SYSTEM_INSTRUCTION = `You are the Passwala Help Bot, Ahmedabad's premium neighborhood assistant.
-Your goal is to help users log in, order groceries, book rides, book home services, and buy event passes.
+const SYSTEM_INSTRUCTION = `You are the Passwala AI Assistant, Ahmedabad's premium neighborhood assistant.
+Your goal is to help users log in, order groceries, book rides, book home services, buy event passes, and book sports venue slots.
 
 Always start with warm, local greetings like "Jai Shree Krishna! 🙏" or "Namaste!".
 You must communicate in a mix of Hindi, Gujarati, and English (Hinglish/Gujlish).
 
 You have access to tools to book:
 1. Rides: Provide pickup and dropoff areas.
-2. Events: Provide the event title.
+2. Events: Provide the event title — show available ticket tiers and dates.
 3. Services: Provide the service type (plumber, electrician, etc.).
 4. Products: Provide grocery items.
+5. Sports Venues: Search by sport type (badminton, cricket, football, etc.), show available time slots, and book directly.
 
-When a user asks to book or buy something, search for details and trigger the correct JSON card.`;
+When a user asks to book or buy something, search for details and trigger the correct JSON card.
+For sports, always show venue cards first, then slot availability on demand.`;
 
 // POST /api/ai/chat
 router.post('/chat', async (req, res) => {
@@ -164,34 +166,89 @@ router.post('/chat', async (req, res) => {
       }
 
       if (resolvedUserId) {
+        // If they specify slot/sport/court/venue/play/cricket/football/badminton
+        const isSportsKeyword = /(slot|sport|court|venue|play|cricket|football|badminton)/i.test(lowerInput);
+        
+        if (isSportsKeyword || !lowerInput.includes('ride')) {
+          // 1. Try to find confirmed sports venue slot bookings
+          const { data: sportsBookings } = await supabase
+            .from('venue_bookings')
+            .select('*')
+            .eq('user_id', resolvedUserId)
+            .eq('status', 'confirmed')
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+          if (sportsBookings && sportsBookings.length > 0) {
+            const venueIds = [...new Set(sportsBookings.map(b => b.venue_id))];
+            const { data: venues } = await supabase
+              .from('sports_venues')
+              .select('id, name, address')
+              .in('id', venueIds);
+
+            const venueMap = new Map(venues?.map(v => [v.id, v]) || []);
+
+            const listItems = sportsBookings.map(booking => {
+              const venue = venueMap.get(booking.venue_id);
+              const venueName = venue?.name || 'Venue';
+              return {
+                title: `Sports Booking at ${venueName}`,
+                price: booking.total_amount,
+                details: `Date: ${booking.slot_date} | Time: ${booking.slot_time.slice(0,5)} - ${booking.slot_end_time.slice(0,5)}`,
+                action: 'CANCEL_SPORT',
+                data: {
+                  bookingId: booking.id,
+                  userId: resolvedUserId
+                }
+              };
+            });
+
+            responseText = `I found **${sportsBookings.length}** active sports bookings under your account. Please choose which one you would like to cancel:`;
+            responseCard = {
+              type: 'bookings_list',
+              items: listItems
+            };
+            return res.json({ text: responseText, card: responseCard });
+          }
+        }
+
+        // 2. Default to ride bookings or tickets if no sports booking was matched or keyword matched ride
         const { data: bookings } = await supabase
           .from('ticket_bookings')
           .select('*')
           .eq('user_id', resolvedUserId)
           .eq('status', 'CONFIRMED')
-          .ilike('qr_code_hash', '%RIDE%')
           .order('created_at', { ascending: false })
-          .limit(1);
+          .limit(10);
 
         if (bookings && bookings.length > 0) {
-          const booking = bookings[0];
-          responseText = `Sure! I found your active ride booking (Reference: ${booking.qr_code_hash}) from **${booking.pickup_area}** to **${booking.drop_area}**. Would you like to cancel it?`;
+          const listItems = bookings.map(booking => {
+            const isRide = (booking.qr_code_hash || '').includes('RIDE');
+            return {
+              title: isRide ? `Ride Booking` : `Event Pass Booking`,
+              price: booking.total_price,
+              details: isRide 
+                ? `Route: ${booking.pickup_area} ➡️ ${booking.drop_area}`
+                : `Seat Count: ${booking.seat_count} | Booked on: ${new Date(booking.created_at).toLocaleDateString()}`,
+              action: 'CANCEL_RIDE',
+              data: {
+                bookingId: booking.id,
+                userId: resolvedUserId
+              }
+            };
+          });
+
+          responseText = `I found **${bookings.length}** active confirmed bookings under your account. Please choose which one you would like to cancel:`;
           responseCard = {
-            type: 'ride',
-            title: 'Cancel Passwala Ride',
-            price: booking.total_price,
-            details: `Route: ${booking.pickup_area} ➡️ ${booking.drop_area} | Ref: ${booking.qr_code_hash}`,
-            action: 'CANCEL_RIDE',
-            data: {
-              bookingId: booking.id,
-              userId: resolvedUserId
-            }
+            type: 'bookings_list',
+            items: listItems
           };
+          return res.json({ text: responseText, card: responseCard });
         } else {
-          responseText = "I couldn't find any active confirmed ride bookings under your account to cancel.";
+          responseText = "I couldn't find any active confirmed bookings under your account to cancel.";
         }
       } else {
-        responseText = "Please log in to cancel your ride booking.";
+        responseText = "Please log in to cancel your booking.";
       }
     } else if (lowerInput.includes('ride') || lowerInput.includes('cab') || lowerInput.includes('auto') || lowerInput.includes('rickshaw') || lowerInput.includes('go to')) {
       // Find active vehicle
@@ -337,6 +394,85 @@ router.post('/chat', async (req, res) => {
         }
       };
     } else if (
+      lowerInput.includes('sport') ||
+      lowerInput.includes('badminton') ||
+      lowerInput.includes('box cricket') ||
+      lowerInput.includes('football turf') ||
+      lowerInput.includes('cricket net') ||
+      lowerInput.includes('pickleball') ||
+      lowerInput.includes('table tennis') ||
+      lowerInput.includes('padel') ||
+      lowerInput.includes('snooker') ||
+      lowerInput.includes('billiard') ||
+      (lowerInput.includes('tennis') && !lowerInput.includes('table')) ||
+      (lowerInput.includes('court') && !lowerInput.includes('short')) ||
+      (lowerInput.includes('turf') && !lowerInput.includes('natural')) ||
+      (lowerInput.includes('venue') && !lowerInput.includes('event')) ||
+      lowerInput.includes('book a slot') ||
+      lowerInput.includes('book slot') ||
+      (lowerInput.includes('play') && (lowerInput.includes('cricket') || lowerInput.includes('football') || lowerInput.includes('badminton')))
+    ) {
+      // Extract sport type from message
+      const SPORT_KEYWORD_MAP = {
+        badminton: 'badminton',
+        'box cricket': 'box_cricket',
+        cricket: 'box_cricket',
+        'football turf': 'turf',
+        football: 'turf',
+        turf: 'turf',
+        'cricket net': 'cricket_net',
+        pickleball: 'pickleball',
+        'table tennis': 'table_tennis',
+        padel: 'padel',
+        tennis: 'tennis',
+        snooker: 'snooker',
+        pool: 'pool',
+        billiard: 'pool',
+      };
+      let detectedSport = 'all';
+      for (const [keyword, sport] of Object.entries(SPORT_KEYWORD_MAP)) {
+        if (lowerInput.includes(keyword)) { detectedSport = sport; break; }
+      }
+
+      // Query approved venues
+      let venueQuery = supabase
+        .from('sports_venues')
+        .select('id, name, address, city, sport_types, price_per_hour, rating, images, amenities')
+        .eq('status', 'approved');
+
+      if (detectedSport !== 'all') {
+        venueQuery = venueQuery.contains('sport_types', [detectedSport]);
+      }
+
+      const { data: venues } = await venueQuery.limit(4);
+
+      if (venues && venues.length > 0) {
+        const SPORT_EMOJI = { badminton:'🏸', box_cricket:'🏏', turf:'⚽', cricket_net:'🎯', pickleball:'🥒', table_tennis:'🏓', padel:'🎾', tennis:'🎾', snooker:'🎱', pool:'🎱', cricket:'🏏' };
+        const SPORT_LABELS = { badminton:'Badminton', box_cricket:'Box Cricket', turf:'Football Turf', cricket_net:'Cricket Net', pickleball:'Pickleball', table_tennis:'Table Tennis', padel:'Padel', tennis:'Tennis', snooker:'Snooker', pool:'Pool/Billiards', cricket:'Cricket' };
+
+        const venueItems = venues.map(v => {
+          const prices = Object.values(v.price_per_hour || {});
+          const minPrice = prices.length ? Math.min(...prices) : null;
+          const sports = (v.sport_types || []).map(s => ({ id: s, label: SPORT_LABELS[s] || s, emoji: SPORT_EMOJI[s] || '🏅' }));
+          return {
+            venueId: v.id,
+            name: v.name,
+            address: v.address || v.city || 'Ahmedabad',
+            sports,
+            rating: v.rating || null,
+            minPrice,
+            image: (v.images || [])[0] || null,
+            detectedSport,
+          };
+        });
+
+        const sportLabel = detectedSport !== 'all' ? (SPORT_LABELS[detectedSport] || detectedSport) : 'Sports';
+        responseText = `Found ${venues.length} ${sportLabel} venue${venues.length > 1 ? 's' : ''} near you! 🏅 Tap **Check Slots** on any venue to see real-time availability.`;
+        responseCard = { type: 'sports_venues_list', items: venueItems, detectedSport };
+      } else {
+        responseText = `No sports venues found${detectedSport !== 'all' ? ` for ${detectedSport.replace('_', ' ')}` : ''} right now. Please check back later or try a different sport!`;
+      }
+    } else if (
       lowerInput.includes('event') ||
       lowerInput.includes('concert') ||
       lowerInput.includes('ticket') ||
@@ -352,7 +488,7 @@ router.post('/chat', async (req, res) => {
       // Fetch active events (with filters for showType or title)
       let queryBuilder = supabase
         .from('events')
-        .select('id, title, venue_name, show_type')
+        .select('id, title, venue_name, show_type, event_date, category, banner_url')
         .neq('status', 'PENDING_APPROVAL')
         .neq('status', 'REJECTED');
 
@@ -378,19 +514,31 @@ router.post('/chat', async (req, res) => {
       if (events && events.length > 0) {
         const eventItems = [];
         for (const event of events) {
-          const { data: tiers } = await supabase.from('event_ticket_tiers').select('id, tier_name, price').eq('event_id', event.id).limit(1);
-          const tier = tiers?.[0];
+          const { data: tiers } = await supabase.from('event_ticket_tiers').select('id, tier_name, price, available_seats').eq('event_id', event.id).limit(3);
+          const cheapestTier = tiers?.[0];
+          // Format event date
+          let dateLabel = null;
+          if (event.event_date) {
+            try {
+              const d = new Date(event.event_date);
+              dateLabel = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+            } catch (e) { /* ignore */ }
+          }
           eventItems.push({
             eventId: event.id,
-            tierId: tier?.id || null,
+            tierId: cheapestTier?.id || null,
             title: event.title,
             venue: event.venue_name || 'Ahmedabad Venue',
-            price: tier?.price || 499,
+            price: cheapestTier?.price || 499,
+            category: event.category || null,
+            dateLabel,
+            image: event.banner_url || null,
+            tiers: (tiers || []).map(t => ({ id: t.id, name: t.tier_name, price: t.price, seats: t.available_seats })),
             ticketCount: 1
           });
         }
 
-        responseText = `Exciting! 🎫 I found these ${events.length} upcoming events in Ahmedabad. Would you like to buy a pass?`;
+        responseText = `Exciting! 🎫 I found ${events.length} upcoming event${events.length > 1 ? 's' : ''} in Ahmedabad. Tap **View Tickets** on any event to see tiers and book!`;
         responseCard = {
           type: 'events_list',
           items: eventItems
@@ -544,10 +692,6 @@ router.post('/chat', async (req, res) => {
             storeId: product.store_id
           }))
         };
-      } else {
-        responseText = searchQuery
-          ? `I couldn't find any products matching "${searchQuery}" in nearby stores right now.`
-          : "No products match your query in nearby neighborhood stores right now.";
       }
     } else if (lowerInput.includes('theme') || lowerInput.includes('dark mode') || lowerInput.includes('light mode') || lowerInput.includes('color mode') || lowerInput.includes('language') || lowerInput.includes('english') || lowerInput.includes('gujarati') || lowerInput.includes('hindi') || lowerInput.includes('settings') || lowerInput.includes('profile') || lowerInput.includes('name') || lowerInput.includes('rename') || lowerInput.includes('photo') || lowerInput.includes('picture') || lowerInput.includes('avatar') || lowerInput.includes('image') || lowerInput.includes('logout') || lowerInput.includes('log out') || lowerInput.includes('signout') || lowerInput.includes('sign out') || lowerInput.includes('email') || lowerInput.includes('address') || lowerInput.includes('location') || lowerInput.includes('phone') || lowerInput.includes('number') || lowerInput.includes('wallet') || lowerInput.includes('balance') || lowerInput.includes('recharge') || lowerInput.includes('add money') || lowerInput.includes('credits') || lowerInput.includes('add balance')) {
       if (lowerInput.includes('wallet') || lowerInput.includes('balance') || lowerInput.includes('recharge') || lowerInput.includes('add money') || lowerInput.includes('credits') || lowerInput.includes('add balance')) {
@@ -777,7 +921,72 @@ router.post('/chat', async (req, res) => {
       return res.json({ text: getMockFallbackResponse(latestMessage) });
     }
 
-    // Call live Gemini 1.5 Flash API
+    // Fetch dynamic context from DB
+    let venuesContext = [];
+    let eventsContext = [];
+    let productsContext = [];
+    try {
+      const { data: venues } = await supabase.from('sports_venues').select('id, name, address, sport_types, price_per_hour, rating, images').eq('status', 'approved').limit(100);
+      const { data: events } = await supabase.from('events').select('id, title, venue_name, event_date, banner_url, category').limit(100);
+      const { data: products } = await supabase.from('products').select('id, name, price, store_id, image_url').neq('description', 'Service item auto-registered').limit(100);
+      
+      const retrieved = retrieveRelevantContext(latestMessage, venues || [], events || [], products || []);
+      venuesContext = retrieved.venues;
+      eventsContext = retrieved.events;
+      productsContext = retrieved.products;
+    } catch (_) {}
+
+    const dynamicInstruction = `${SYSTEM_INSTRUCTION}
+
+You must return a JSON object with:
+{
+  "text": "Your reply message in Hinglish/Gujlish. Always include local premium greetings.",
+  "card": null or a card object to render in the chat window.
+}
+
+If the user wants to book or search for a sport venue, even if they made a spelling mistake or entered only a single word (like "boccricket", "badmiton", "cricet", etc.), you must understand they are searching for that sport. Map the typo to the correct concept (e.g. "boccricket" -> "box_cricket") and return a card of type "sports_venues_list" with all matching venues. Never reply with a generic fallback greeting for sports queries:
+{
+  "type": "sports_venues_list",
+  "items": [
+    {
+      "venueId": "UUID of the venue from the list below",
+      "name": "Name of the venue",
+      "address": "Address of the venue",
+      "sports": [{"emoji": "🏸", "label": "badminton"}], // Map all sport_types for this venue. Emoji mapping: box_cricket: 🏏, badminton: 🏸, turf: ⚽, cricket_net: 🎯, pickleball: 🥒, table_tennis: 🏓, padel: 🎾, tennis: 🎾, snooker: 🎱, pool: 🎱, cricket: 🏏
+      "image": "First image URL string from images array, or fallback 'https://images.unsplash.com/photo-1541252260730-0412e8e2108e?w=600&q=80'",
+      "rating": 4.5, // rating float from venue object
+      "minPrice": 400, // minimum price per hour from the venue's price_per_hour JSON
+      "detectedSport": "badminton" // the sport type they wanted to book (e.g. box_cricket, badminton, turf)
+    }
+  ]
+}
+
+If the user wants to buy or order groceries/products (even with spelling mistakes like "mik" instead of "milk", "bred" instead of "bread", etc.), find the matching products from the list below and return a card of type "products_list":
+{
+  "type": "products_list",
+  "items": [
+    {
+      "productId": "UUID of product from the list below",
+      "name": "Name of product",
+      "price": 30, // price number
+      "image": "image_url from the list, or null",
+      "quantity": 1,
+      "storeId": "store_id UUID"
+    }
+  ]
+}
+
+Available approved sports venues:
+${JSON.stringify(venuesContext, null, 2)}
+
+Available upcoming events:
+${JSON.stringify(eventsContext, null, 2)}
+
+Available products in nearby stores:
+${JSON.stringify(productsContext, null, 2)}
+`;
+
+    // Call live Gemini 1.5 Flash API with JSON schema instruction
     const contents = messages
       .filter(m => m.text && (m.sender === 'user' || m.sender === 'ai' || m.sender === 'model'))
       .map(m => ({
@@ -790,19 +999,213 @@ router.post('/chat', async (req, res) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents,
-        systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-        generationConfig: { temperature: 0.7, maxOutputTokens: 300 }
+        systemInstruction: { parts: [{ text: dynamicInstruction }] },
+        generationConfig: { 
+          temperature: 0.7, 
+          maxOutputTokens: 500,
+          responseMimeType: "application/json"
+        }
       })
     });
 
     if (!response.ok) throw new Error('Gemini API returned error');
     const data = await response.json();
-    const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || getMockFallbackResponse(latestMessage);
-    return res.json({ text: replyText });
+    const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    let parsedResult;
+    try {
+      parsedResult = JSON.parse(replyText);
+    } catch (e) {
+      console.warn("Failed to parse Gemini JSON response, returning fallback text:", e.message);
+      parsedResult = { text: replyText || getMockFallbackResponse(latestMessage), card: null };
+    }
+
+    // --- ARCHITECTURAL VALIDATION STEP ---
+    const validatedResult = validateAIResponse(parsedResult, venuesContext, eventsContext, productsContext);
+
+    return res.json({ text: validatedResult.text, card: validatedResult.card || null });
 
   } catch (err) {
     console.error('🔥 AI proxy route error:', err.message);
     return res.json({ text: getMockFallbackResponse(latestMessage) });
+  }
+});
+
+function validateAIResponse(parsedResult, venues, events, products) {
+  if (!parsedResult || typeof parsedResult !== 'object') {
+    return { text: "I'm sorry, I encountered an issue processing that. How can I help you book sports or events?", card: null };
+  }
+  
+  if (!parsedResult.text) {
+    parsedResult.text = "Here is what I found:";
+  }
+
+  if (parsedResult.card) {
+    const card = parsedResult.card;
+    if (card.type === 'sports_venue') {
+      const venueExists = venues.some(v => v.id === card.venueId);
+      if (!venueExists) {
+        const match = venues.find(v => v.name.toLowerCase().includes(String(card.name || '').toLowerCase()));
+        if (match) {
+          card.venueId = match.id;
+          card.name = match.name;
+        } else {
+          parsedResult.card = null;
+        }
+      }
+    } else if (card.type === 'event_pass') {
+      const eventExists = events.some(e => e.id === card.eventId);
+      if (!eventExists) {
+        const match = events.find(e => e.title.toLowerCase().includes(String(card.title || '').toLowerCase()));
+        if (match) {
+          card.eventId = match.id;
+          card.title = match.title;
+        } else {
+          parsedResult.card = null;
+        }
+      }
+    } else if (card.type === 'products_list') {
+      if (!Array.isArray(card.items) || card.items.length === 0) {
+        parsedResult.card = null;
+      } else {
+        card.items = card.items.map(item => {
+          const productExists = products.some(p => p.id === item.productId);
+          if (productExists) return item;
+          const match = products.find(p => p.name.toLowerCase().includes(String(item.name || '').toLowerCase()));
+          if (match) {
+            return {
+              ...item,
+              productId: match.id,
+              name: match.name,
+              price: match.price,
+              storeId: match.store_id
+            };
+          }
+          return null;
+        }).filter(Boolean);
+
+        if (card.items.length === 0) {
+          parsedResult.card = null;
+        }
+      }
+    } else {
+      parsedResult.card = null;
+    }
+  }
+
+  return parsedResult;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/ai/sports-slots — Fetch slot availability for a venue+date+sport
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/sports-slots', async (req, res) => {
+  const { venueId, date, sport } = req.body;
+  if (!venueId || !date) {
+    return res.status(400).json({ success: false, error: 'venueId and date are required' });
+  }
+  try {
+    const BASE_URL = process.env.VITE_API_URL || '';
+    // Reuse existing slots endpoint logic by calling the sports router directly via supabase
+    const { count } = await supabase
+      .from('venue_slots')
+      .select('id', { count: 'exact', head: true })
+      .eq('venue_id', venueId)
+      .eq('slot_date', date);
+
+    // Auto-generate if not present
+    if (count === 0) {
+      const { data: venue } = await supabase.from('sports_venues').select('*').eq('id', venueId).maybeSingle();
+      if (venue) {
+        let openH  = parseInt((venue.open_time  || '06:00').split(':')[0]);
+        let closeH = parseInt((venue.close_time || '22:00').split(':')[0]);
+        if (closeH <= openH) closeH = 24;
+        const dur    = venue.slot_duration_mins || 60;
+        const sports = sport && sport !== 'all' ? [sport] : (venue.sport_types || []);
+        const prices = venue.price_per_hour || {};
+        const slotsToInsert = [];
+        for (const sp of sports) {
+          let h = openH;
+          while (h < closeH) {
+            const startT = `${String(h).padStart(2,'0')}:00`;
+            const endH   = h + Math.floor(dur / 60);
+            const endT   = `${String(endH).padStart(2,'0')}:${String(dur % 60).padStart(2,'0')}`;
+            slotsToInsert.push({ venue_id: venueId, sport_type: sp, slot_date: date, slot_time: startT, slot_end_time: endT, price: prices[sp] || 500, status: 'available' });
+            h += Math.floor(dur / 60);
+          }
+        }
+        if (slotsToInsert.length > 0) {
+          await supabase.from('venue_slots').upsert(slotsToInsert, { onConflict: 'venue_id,sport_type,slot_date,slot_time', ignoreDuplicates: true });
+        }
+      }
+    }
+
+    let query = supabase.from('venue_slots').select('*').eq('venue_id', venueId).eq('slot_date', date).order('slot_time');
+    if (sport && sport !== 'all') query = query.eq('sport_type', sport);
+    const { data: slots, error } = await query;
+    if (error) throw error;
+
+    // Filter out past slots if today
+    const todayStr = new Date().toISOString().split('T')[0];
+    let activeSlots = slots || [];
+    if (date === todayStr) {
+      const now = new Date();
+      const currentTimeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:00`;
+      activeSlots = activeSlots.filter(s => s.slot_time >= currentTimeStr);
+    }
+
+    res.json({ success: true, slots: activeSlots });
+  } catch (err) {
+    console.error('AI sports-slots error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/ai/event-slots — Fetch ticket tiers for an event
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/event-slots', async (req, res) => {
+  const { eventId } = req.body;
+  if (!eventId) return res.status(400).json({ success: false, error: 'eventId is required' });
+  try {
+    const { data: event } = await supabase
+      .from('events')
+      .select('id, title, venue_name, event_date, ends_at, category, banner_url, description')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    const { data: tiers } = await supabase
+      .from('event_ticket_tiers')
+      .select('id, tier_name, price, available_seats, total_seats')
+      .eq('event_id', eventId)
+      .order('price', { ascending: true });
+
+    if (!event) return res.status(404).json({ success: false, error: 'Event not found' });
+
+    res.json({
+      success: true,
+      event: {
+        id: event.id,
+        title: event.title,
+        venue: event.venue_name || 'Ahmedabad',
+        startDatetime: event.event_date,
+        endDatetime: event.ends_at,
+        category: event.category,
+        image: event.banner_url,
+        description: event.description,
+      },
+      tiers: (tiers || []).map(t => ({
+        id: t.id,
+        name: t.tier_name,
+        price: t.price,
+        availableSeats: t.available_seats,
+        totalSeats: t.total_seats,
+        description: t.description,
+      }))
+    });
+  } catch (err) {
+    console.error('AI event-slots error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -817,16 +1220,111 @@ function getMockFallbackResponse(userInput = '') {
     return "Jai Shree Krishna! Radhe Radhe! 🙏 How is everything in Ahmedabad? What can I help you book today?";
   }
   if (lower.includes('kem cho') || lower.includes('kevu')) {
-    return "Maja ma! 🙏 Hoon tamari Ahmedabad neighborhood AI Help Bot chhu. Su madad karu? (I can help you buy grocery, book rides, or home services)";
+    return "Maja ma! 🙏 Hoon tamari AI Help Bot chhu. Su madad karu? (I can help you book sports venues or event passes)";
   }
   if (lower.includes('kaise ho') || lower.includes('namaste')) {
-    return "Namaste! Main bilkul theek hoon! 🙏 Aapki neighborhood helper bot haazir hai. Main rides booking, grocery orders, and plumbing repairs mein madad kar sakti hoon.";
+    return "Namaste! Main bilkul theek hoon! 🙏 Aapki helper bot haazir hai. Main sports venue slots aur event passes book karne mein madad kar sakti hoon.";
   }
   if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey')) {
-    return "Hello! Warm greetings from Passwala. 🙏 I can book local rides 🛵, home maintenance services 🛠️, event passes 🎫, or groceries 🛍️. What are you looking for?";
+    return "Hello! Warm greetings from Passwala. 🙏 I can book sports venues 🏏 or event passes 🎫. What are you looking for?";
   }
   
-  return "Passwala AI Help Bot at your service! 🏙️ I can assist you in ordering groceries 🛍️, booking home services 🛠️, event passes 🎫, or hailing local rides 🛵. How can I help you today?";
+  return "Passwala AI Assistant at your service! 🏙️ I can assist you in booking sports venues 🏏 or buying event passes 🎫. How can I help you today?";
+}
+
+function retrieveRelevantContext(query, venues, events, products) {
+  let q = String(query || '').toLowerCase();
+  
+  const corrections = {
+    'boccricket': 'box_cricket',
+    'bocricet': 'box_cricket',
+    'boxcricet': 'box_cricket',
+    'boxcricket': 'box_cricket',
+    'cricet': 'cricket',
+    'badmiton': 'badminton',
+    'badmintan': 'badminton',
+    'badmitan': 'badminton',
+    'pikleball': 'pickleball',
+    'pikle': 'pickleball',
+    'piklebhal': 'pickleball',
+    'tenis': 'tennis',
+    'futbal': 'football',
+    'footbal': 'football',
+    'trf': 'turf',
+    'turff': 'turf'
+  };
+
+  for (const [wrong, right] of Object.entries(corrections)) {
+    if (q.includes(wrong)) {
+      q += ' ' + right;
+    }
+  }
+
+  const tokens = q.split(/\s+/).filter(t => t.length > 2);
+
+  const scoreItem = (name, tokens) => {
+    let score = 0;
+    const lowerName = name.toLowerCase();
+    for (const token of tokens) {
+      if (lowerName.includes(token)) score += 10;
+      else {
+        let matchCount = 0;
+        for (let i = 0; i < token.length - 1; i++) {
+          const sub = token.substring(i, i + 2);
+          if (lowerName.includes(sub)) {
+            matchCount++;
+          }
+        }
+        if (matchCount >= token.length / 2) {
+          score += 5;
+        }
+      }
+    }
+    return score;
+  };
+
+  const scoredVenues = venues.map(v => {
+    let score = 0;
+    score += scoreItem(v.name, tokens);
+    const sportsString = Array.isArray(v.sport_types) ? v.sport_types.join(' ') : String(v.sport_types || '');
+    score += scoreItem(sportsString, tokens);
+    return { item: v, score };
+  });
+  const topVenues = scoredVenues
+    .filter(x => tokens.length === 0 || x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+    .map(x => x.item);
+
+  const scoredEvents = events.map(e => {
+    let score = 0;
+    score += scoreItem(e.title, tokens);
+    score += scoreItem(e.category || '', tokens);
+    score += scoreItem(e.venue_name || '', tokens);
+    return { item: e, score };
+  });
+  const topEvents = scoredEvents
+    .filter(x => tokens.length === 0 || x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+    .map(x => x.item);
+
+  const scoredProducts = products.map(p => {
+    let score = 0;
+    score += scoreItem(p.name, tokens);
+    return { item: p, score };
+  });
+  const topProducts = scoredProducts
+    .filter(x => tokens.length === 0 || x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+    .map(x => x.item);
+
+  return {
+    venues: topVenues.length > 0 ? topVenues : venues.slice(0, 4),
+    events: topEvents.length > 0 ? topEvents : events.slice(0, 4),
+    products: topProducts.length > 0 ? topProducts : products.slice(0, 4)
+  };
 }
 
 export default router;

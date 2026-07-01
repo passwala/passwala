@@ -94,6 +94,20 @@ const EventCheckout = ({ user: routeUser }) => {
   );
   const [ticketCount, setTicketCount] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [platformFee, setPlatformFee] = useState(5); // default ₹5, overridden by API
+
+  // Fetch real platform fee from admin settings on mount
+  useEffect(() => {
+    fetch(`${BASE_URL}/api/platform-settings`)
+      .then(r => r.json())
+      .then(data => {
+        if (data?.settings?.eventPlatformFee !== undefined) {
+          setPlatformFee(Number(data.settings.eventPlatformFee));
+        }
+      })
+      .catch(() => {}); // keep default on failure
+  }, []);
+
 
   if (!event) {
     return (
@@ -110,7 +124,10 @@ const EventCheckout = ({ user: routeUser }) => {
   // Fix #19: Use shared GST_RATE (mirrors server-side constant)
   const cgstAmount = Number((baseAmount * GST_RATE).toFixed(2));
   const sgstAmount = Number((baseAmount * GST_RATE).toFixed(2));
-  const totalAmount = baseAmount + cgstAmount + sgstAmount;
+  // Platform fee: charged per ticket, set by admin in realtime
+  const platformFeeTotal = Number((platformFee * ticketCount).toFixed(2));
+  const totalAmount = baseAmount + cgstAmount + sgstAmount + platformFeeTotal;
+
 
   // Booking window check for selected tier
   const bookingWindow = checkBookingWindow(selectedTier, event);
@@ -168,6 +185,10 @@ const EventCheckout = ({ user: routeUser }) => {
       }
 
       toast.success('Event Tickets Booked Successfully!');
+
+      // 🔓 Unlock Order History in profile after first booking (launch mode reveal)
+      try { localStorage.setItem('passwala_has_bookings', 'true'); } catch (_) {}
+
       navigate('/events/ticket', { state: { booking: data.booking, event, tier: selectedTier, fromCheckout: true } });
     } catch (err) {
       console.error(err);
@@ -178,9 +199,9 @@ const EventCheckout = ({ user: routeUser }) => {
   };
 
   return (
-    <div style={{ background: 'var(--bg-surface)', minHeight: '100vh', paddingBottom: '100px' }}>
+    <div style={{ background: 'var(--bg-surface)', minHeight: '100vh', paddingBottom: '100px', maxWidth: '600px', margin: '0 auto', borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9', position: 'relative', boxShadow: '0 0 30px rgba(0,0,0,0.05)' }}>
       {/* Fix #18: Add back button to header */}
-      <div style={{ background: 'white', padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: 'var(--shadow-sm)' }}>
+      <div style={{ background: 'white', padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: 'var(--shadow-sm)', boxSizing: 'border-box' }}>
         <button
           onClick={() => navigate(-1)}
           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--secondary)' }}
@@ -305,6 +326,17 @@ const EventCheckout = ({ user: routeUser }) => {
             <span style={{ fontWeight: 600 }}>₹{sgstAmount}</span>
           </div>
 
+          {/* Platform convenience fee — set by admin, fetched in realtime */}
+          {platformFee > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+              <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                Platform Fee (₹{platformFee} × {ticketCount})
+                <span style={{ fontSize: '0.7rem', background: 'rgba(255,118,34,0.1)', color: 'var(--primary)', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>CONVENIENCE</span>
+              </span>
+              <span style={{ fontWeight: 600 }}>₹{platformFeeTotal}</span>
+            </div>
+          )}
+
           <hr style={{ border: 'none', borderTop: '1px dashed var(--border-light)', margin: '1rem 0' }} />
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -316,7 +348,7 @@ const EventCheckout = ({ user: routeUser }) => {
       </div>
 
       {/* Fixed Bottom Bar */}
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', padding: '1rem 1.5rem', boxShadow: '0 -10px 20px rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 100 }}>
+      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '600px', background: 'white', padding: '1rem 1.5rem', boxShadow: '0 -10px 20px rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 100, boxSizing: 'border-box', borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9' }}>
         <div>
           <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>Amount</p>
           <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>₹{totalAmount.toFixed(2)}</h3>

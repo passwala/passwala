@@ -45,6 +45,7 @@ import { createClient } from '@supabase/supabase-js';
 import { toast } from 'react-hot-toast';
 import GoogleMapWrapper from '../utils/GoogleMapWrapper';
 import './AdminPanel.css';
+import { LAUNCH_MODE } from '../launchConfig';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -238,7 +239,7 @@ const DATABASE_SCHEMAS = {
   ticket_bookings: ['user_id', 'route_id', 'vehicle_id', 'pickup_area', 'drop_area', 'total_price', 'seat_count', 'status']
 };
 
-const tabSections = [
+const ALL_TAB_SECTIONS = [
   {
     label: 'Main',
     items: [
@@ -252,6 +253,7 @@ const tabSections = [
   },
   {
     label: 'Services',
+    launchHidden: true, // hidden until services feature launches
     items: [
       { id: 'providers_panel', label: 'Service Providers', icon: Heart, table: 'service_providers' },
       { id: 'services_panel', label: 'Service List', icon: Briefcase, table: 'services' },
@@ -260,6 +262,7 @@ const tabSections = [
   },
   {
     label: 'Marketplace',
+    launchHidden: true, // hidden until shopping feature launches
     items: [
       { id: 'stores_panel', label: 'Stores', icon: ShoppingBag, table: 'stores' },
       { id: 'products_panel', label: 'Products', icon: Package, table: 'products' },
@@ -271,6 +274,7 @@ const tabSections = [
   },
   {
     label: 'Content',
+    launchHidden: true, // hidden until community feature launches
     items: [
       { id: 'community_panel', label: 'Community', icon: MessageSquare, table: 'posts' },
       { id: 'notifications_panel', label: 'Notifications', icon: Bell, table: 'notifications' },
@@ -287,6 +291,8 @@ const tabSections = [
       { id: 'event_approvals_panel', label: 'Event Approvals', icon: ShieldCheck },
       { id: 'event_organizers_panel', label: 'Event Organizers', icon: Users, table: 'service_providers' },
       { id: 'upgrade_requests_panel', label: 'Upgrade Requests', icon: ShieldCheck },
+      { id: 'sports_venues_panel', label: '🏏 Sports Venues', icon: Calendar, table: 'sports_venues' },
+      { id: 'venue_bookings_panel', label: '🎾 Court Bookings', icon: Calendar, table: 'venue_bookings' },
     ]
   },
   {
@@ -298,6 +304,12 @@ const tabSections = [
     ]
   }
 ];
+
+// Filter sidebar sections based on active launch features (code preserved for all sections)
+const tabSections = LAUNCH_MODE
+  ? ALL_TAB_SECTIONS.filter(section => !section.launchHidden)
+  : ALL_TAB_SECTIONS;
+
 
 // Mock data removed as platform is now fully integrated with Supabase.
 
@@ -2976,6 +2988,43 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                   style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.95rem', fontWeight: 600, color: '#0f172a' }}
                 />
                 <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>Flat fare charged for rides under 2 km (overrides per-km rate)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── EVENT TICKET PLATFORM FEE — highlighted card ── */}
+          <div className="glass" style={{ padding: '2rem', borderRadius: '24px', background: 'linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%)', border: '2px solid #fb923c', boxShadow: '0 8px 30px rgba(251,146,60,0.15)', gridColumn: '1 / -1' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div>
+                <h4 style={{ margin: '0 0 4px 0', fontWeight: 900, fontSize: '1.15rem', color: '#c2410c', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  🎟️ Event Ticket — Platform Convenience Fee
+                </h4>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: '#9a3412' }}>
+                  Flat fee charged <strong>per ticket</strong> at checkout — applied on top of ticket price + GST. Set to ₹0 to disable.
+                </p>
+              </div>
+              <div style={{ background: 'rgba(251,146,60,0.12)', border: '1.5px solid #fb923c', borderRadius: '10px', padding: '6px 14px', fontSize: '0.75rem', fontWeight: 800, color: '#c2410c', letterSpacing: '0.05em' }}>
+                LIVE · AFFECTS CHECKOUT
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#c2410c' }}>PLATFORM FEE PER TICKET (₹)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input
+                    type="number"
+                    min={0}
+                    max={500}
+                    step={1}
+                    value={platformSettings.eventPlatformFee ?? 5}
+                    onChange={e => setPlatformSettings({ ...platformSettings, eventPlatformFee: parseInt(e.target.value) || 0 })}
+                    style={{ padding: '12px 18px', borderRadius: '12px', border: '2px solid #fb923c', outline: 'none', fontSize: '1.3rem', fontWeight: 900, color: '#c2410c', background: 'white', width: '120px' }}
+                  />
+                  <div style={{ fontSize: '0.82rem', color: '#9a3412', lineHeight: 1.5 }}>
+                    <div>📌 Currently: <strong>₹{platformSettings.eventPlatformFee ?? 5} per ticket</strong></div>
+                    <div style={{ color: '#6b7280' }}>e.g. 2 tickets → <strong>₹{(platformSettings.eventPlatformFee ?? 5) * 2}</strong> fee added at checkout</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

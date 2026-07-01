@@ -335,9 +335,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start; /* Start from top to prevent top clipping */
+  justify-content: center; /* Centered vertically for premium landing look */
   flex: 1;
-  padding: 50px 32px 40px 24px; /* Ample padding with right-side scrollbar buffer */
+  padding: 50px 32px 40px 24px;
   overflow-y: auto;
   width: 100%;
   position: relative;
@@ -348,12 +348,13 @@
 
 /* Split Dashboard Layout */
 .chat-landing-content-split {
-  display: grid;
-  grid-template-columns: 1.18fr 0.82fr;
-  gap: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   width: 100%;
-  max-width: 1000px;
-  align-items: start;
+  max-width: 680px;
+  margin: 0 auto;
+  align-items: stretch;
   text-align: left;
   box-sizing: border-box;
 }
@@ -377,6 +378,7 @@
   margin-bottom: 28px;
   letter-spacing: -0.03em;
   line-height: 1.2;
+  text-align: center;
 }
 
 /* Minimalist Input Console (White/Light Edition) */
@@ -419,11 +421,12 @@
 
 .chatgpt-style-input {
   flex: 1;
-  border: none;
-  background: transparent;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
   padding: 12px 4px;
   font-size: 0.95rem;
-  outline: none;
   color: #171717;
   font-family: 'Poppins', sans-serif;
   font-weight: 500;
@@ -1033,4 +1036,500 @@
 .chat-landing-container::-webkit-scrollbar-thumb:hover,
 .ai-widget-messages::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 107, 0, 0.4); /* Highlight with subtle theme orange on hover */
+}
+
+/* ══════════════════════════════════════════════════════════════
+   🏏 SPORTS VENUES CARD STYLES
+══════════════════════════════════════════════════════════════ */
+.ai-venues-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.ai-venue-card {
+  background: #ffffff;
+  border: 1px solid rgba(255, 107, 0, 0.18);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-venue-card:hover {
+  box-shadow: 0 4px 20px rgba(255, 107, 0, 0.12);
+  border-color: rgba(255, 107, 0, 0.4);
+}
+
+.ai-venue-img {
+  width: 100%;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 0;
+}
+
+.ai-venue-info {
+  padding: 10px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ai-venue-name {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.ai-venue-addr {
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.ai-venue-sports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.ai-sport-badge {
+  background: rgba(255, 107, 0, 0.08);
+  color: #c05200;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 107, 0, 0.2);
+}
+
+.ai-venue-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.ai-venue-rating {
+  font-size: 0.72rem;
+  color: #f59e0b;
+  font-weight: 700;
+}
+
+.ai-venue-price {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #ff6b00;
+}
+
+.ai-check-slots-btn {
+  margin: 0 12px 10px;
+  background: #ff6b00;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  font-family: 'Poppins', sans-serif;
+}
+
+.ai-check-slots-btn:hover {
+  background: #e05e00;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   📅 SPORTS SLOT PICKER STYLES
+══════════════════════════════════════════════════════════════ */
+.ai-slot-picker-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+  width: 100%;
+}
+
+.ai-date-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.ai-date-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.ai-date-chip {
+  flex-shrink: 0;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  font-family: 'Poppins', sans-serif;
+  white-space: nowrap;
+}
+
+.ai-date-chip.active,
+.ai-date-chip:hover {
+  background: #ff6b00;
+  color: #fff;
+  border-color: #ff6b00;
+}
+
+.ai-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px;
+}
+
+.ai-slot-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: 'Poppins', sans-serif;
+  position: relative;
+}
+
+.ai-slot-chip.available {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+.ai-slot-chip.available:hover {
+  background: #dcfce7;
+  border-color: #22c55e;
+}
+
+.ai-slot-chip.selected {
+  background: rgba(255, 107, 0, 0.08);
+  border-color: #ff6b00;
+  box-shadow: 0 0 0 2px rgba(255, 107, 0, 0.18);
+}
+
+.ai-slot-chip.booked {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.ai-slot-time {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ai-slot-end {
+  font-size: 0.68rem;
+  color: #64748b;
+}
+
+.ai-slot-price {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #ff6b00;
+}
+
+.ai-slot-status-label {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  font-size: 0.6rem;
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.ai-slot-check {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  font-size: 0.7rem;
+  color: #ff6b00;
+  font-weight: 700;
+}
+
+.ai-no-slots {
+  text-align: center;
+  font-size: 0.78rem;
+  color: #ef4444;
+  padding: 12px;
+  margin: 0;
+}
+
+.ai-book-slots-cta {
+  background: linear-gradient(135deg, #ff6b00, #ff9a3d);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 11px 18px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  width: 100%;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  font-family: 'Poppins', sans-serif;
+  margin-top: 2px;
+  box-shadow: 0 4px 14px rgba(255, 107, 0, 0.3);
+}
+
+.ai-book-slots-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(255, 107, 0, 0.4);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   🎫 EVENTS LIST CARD (enhanced)
+══════════════════════════════════════════════════════════════ */
+.ai-event-card {
+  background: #fff;
+  border: 1px solid rgba(255, 107, 0, 0.15);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow 0.2s ease;
+}
+
+.ai-event-card:hover {
+  box-shadow: 0 4px 18px rgba(255, 107, 0, 0.1);
+}
+
+.ai-event-img {
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+}
+
+.ai-event-info {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ai-event-cat-badge {
+  background: rgba(139, 92, 246, 0.1);
+  color: #7c3aed;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 20px;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+.ai-event-date-badge {
+  background: rgba(14, 165, 233, 0.08);
+  color: #0284c7;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 20px;
+  border: 1px solid rgba(14, 165, 233, 0.2);
+}
+
+.ai-event-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.ai-event-venue {
+  font-size: 0.7rem;
+  color: #64748b;
+}
+
+.ai-event-price-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.ai-event-price {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #ff6b00;
+}
+
+.ai-view-tickets-btn {
+  background: #ff6b00;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.73rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  font-family: 'Poppins', sans-serif;
+}
+
+.ai-view-tickets-btn:hover {
+  background: #e05e00;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   🎟️ EVENT TIER PICKER STYLES
+══════════════════════════════════════════════════════════════ */
+.ai-tier-picker-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.ai-tier-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.ai-tier-row:hover {
+  border-color: #ff6b00;
+  background: rgba(255, 107, 0, 0.04);
+}
+
+.ai-tier-row.selected {
+  border-color: #ff6b00;
+  background: rgba(255, 107, 0, 0.07);
+  box-shadow: 0 0 0 2px rgba(255, 107, 0, 0.15);
+}
+
+.ai-tier-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-tier-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ai-tier-seats {
+  font-size: 0.67rem;
+  color: #22c55e;
+  font-weight: 600;
+}
+
+.ai-tier-price {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #ff6b00;
+}
+
+.ai-tier-check {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #ff6b00;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.ai-qty-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.ai-qty-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.ai-qty-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1.5px solid #e2e8f0;
+  background: #f1f5f9;
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  font-family: 'Poppins', sans-serif;
+}
+
+.ai-qty-btn:hover {
+  background: #ff6b00;
+  color: #fff;
+  border-color: #ff6b00;
+}
+
+.ai-qty-val {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0f172a;
+  min-width: 20px;
+  text-align: center;
+}
+
+.ai-confirm-tier-btn {
+  flex: 1;
+  background: linear-gradient(135deg, #ff6b00, #ff9a3d);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  font-family: 'Poppins', sans-serif;
+  box-shadow: 0 3px 12px rgba(255, 107, 0, 0.28);
+}
+
+.ai-confirm-tier-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 18px rgba(255, 107, 0, 0.38);
+}
+
+.ai-confirm-tier-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ai-tier-total {
+  text-align: right;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #0f172a;
+  padding: 4px 0;
 }

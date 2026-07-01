@@ -26,18 +26,49 @@ import './ProfilePages.css';
 import { useTranslation } from '../LanguageContext';
 import { apiFetch } from '../../utils/apiClient';
 import { OrderSkeleton, EventSkeleton } from '../components/Skeletons';
+import { showShoppingUI, isFeatureEnabled } from '../../launchConfig';
 
 const _ = motion;
+
+const SPORT_LABELS = {
+  box_cricket:    'Box Cricket',
+  badminton:      'Badminton',
+  turf:           'Football Turf',
+  cricket_net:    'Cricket Net',
+  pickleball:     'Pickleball',
+  table_tennis:   'Table Tennis',
+  padel:          'Padel',
+  tennis:         'Tennis',
+  snooker:        'Snooker',
+  pool:           'Pool / Billiards',
+  cricket:        'Cricket',
+};
+
+const SPORT_EMOJI = {
+  box_cricket:    '🏏',
+  badminton:      '🏸',
+  turf:           '⚽',
+  cricket_net:    '🎯',
+  pickleball:     '🥒',
+  table_tennis:   '🏓',
+  padel:          '🎾',
+  tennis:         '🎾',
+  snooker:        '🎱',
+  pool:           '🎱',
+  cricket:        '🏏',
+};
 
 const OrderHistory = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'events'
+  const [activeTab, setActiveTab] = useState(showShoppingUI() ? 'orders' : 'events'); // 'orders' | 'events' | 'sports'
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
   const [eventBookings, setEventBookings] = useState([]);
   const [eventLoading, setEventLoading] = useState(false);
+  const [sportBookings, setSportBookings] = useState([]);
+  const [sportLoading, setSportLoading] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(null); // { booking } | null
   const [ratingModal, setRatingModal] = useState(null);     // { order } | null
   const [ratingValue, setRatingValue] = useState(0);
@@ -56,6 +87,7 @@ const OrderHistory = () => {
   useEffect(() => {
     fetchOrders();
     fetchEventBookings();
+    fetchSportBookings();
     loadRatedOrderIds(); // ← pre-load from DB so badges survive refresh
 
     // ⚡ REAL-TIME: Listen for status updates on THIS user's orders only
@@ -94,6 +126,39 @@ const OrderHistory = () => {
       }
     };
   }, []);
+
+  const fetchSportBookings = async () => {
+    setSportLoading(true);
+    try {
+      const savedUser = JSON.parse(localStorage.getItem('passwala_user') || '{}');
+      let resolvedUserId = savedUser.id || savedUser.uid;
+
+      // Resolve UUID if needed
+      if (resolvedUserId && resolvedUserId.length !== 36) {
+        const phoneNo = savedUser.phoneNumber?.replace('+91','') || savedUser.phone?.replace('+91','');
+        const orFilters = [];
+        if (savedUser.uid) orFilters.push(`uid.eq.${savedUser.uid}`);
+        if (savedUser.email) orFilters.push(`email.eq.${savedUser.email}`);
+        if (phoneNo) { orFilters.push(`phone.eq.${phoneNo}`); orFilters.push(`phone.eq.+91${phoneNo}`); }
+        if (orFilters.length > 0) {
+          const { data: usr } = await supabase.from('users').select('id').or(orFilters.join(',')).maybeSingle();
+          resolvedUserId = usr?.id || null;
+        } else resolvedUserId = null;
+      }
+
+      if (!resolvedUserId || resolvedUserId.length !== 36) return;
+
+      const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      const data = await apiFetch(`${apiBase}/api/sports/my-bookings?user_id=${resolvedUserId}`);
+      if (data && data.success) {
+        setSportBookings(data.bookings || []);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch sport bookings:', err);
+    } finally {
+      setSportLoading(false);
+    }
+  };
 
   const fetchEventBookings = async () => {
     setEventLoading(true);
@@ -349,31 +414,15 @@ const OrderHistory = () => {
    */
   const loadRatedOrderIds = async () => {
     try {
-      const savedUser = JSON.parse(localStorage.getItem('passwala_user') || '{}');
-      let resolvedUserId = savedUser.id;
+      const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      const token = await getAuthToken();
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      // Resolve UUID if needed
-      if (!resolvedUserId || resolvedUserId.length !== 36) {
-        const phoneNo = savedUser.phoneNumber?.replace('+91','') || savedUser.phone?.replace('+91','');
-        const orFilters = [];
-        if (savedUser.uid) orFilters.push(`uid.eq.${savedUser.uid}`);
-        if (savedUser.email) orFilters.push(`email.eq.${savedUser.email}`);
-        if (phoneNo) orFilters.push(`phone.eq.${phoneNo}`);
-        if (orFilters.length > 0) {
-          const { data: usr } = await supabase.from('users').select('id').or(orFilters.join(',')).maybeSingle();
-          resolvedUserId = usr?.id || null;
-        }
-      }
-
-      if (!resolvedUserId || resolvedUserId.length !== 36) return;
-
-      const { data: ratings } = await supabase
-        .from('order_ratings')
-        .select('order_id')
-        .eq('user_id', resolvedUserId);
-
-      if (ratings && ratings.length > 0) {
-        setRatedOrderIds(new Set(ratings.map(r => r.order_id)));
+      const res = await fetch(`${apiBase}/api/ratings/rated`, { headers });
+      const data = await res.json();
+      if (data.success && data.ratedIds) {
+        setRatedOrderIds(new Set(data.ratedIds));
       }
     } catch (err) {
       console.warn('[loadRatedOrderIds] Failed:', err);
@@ -403,30 +452,60 @@ const OrderHistory = () => {
       const token = await getAuthToken();
       const apiBase = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
 
-      const res = await fetch(`${apiBase}/api/orders/rate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          orderId: ratingModal.order.id,
-          rating: ratingValue,
-          comment: ratingComment.trim() || null
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        if (res.status === 409) {
-          toast('You already rated this order.');
-          setRatedOrderIds(prev => new Set([...prev, ratingModal.order.id]));
-          setRatingModal(null);
-        } else {
-          throw new Error(data.error || 'Failed to submit rating.');
+      if (ratingModal.type === 'event' || ratingModal.type === 'sports') {
+        const res = await fetch(`${apiBase}/api/ratings/rate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({
+            bookingId: ratingModal.booking.id,
+            rating: ratingValue,
+            comment: ratingComment.trim() || null,
+            businessType: ratingModal.type,
+            vendorId: ratingModal.type === 'sports' ? ratingModal.booking.venue_id : ratingModal.booking.event_id
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          if (res.status === 409) {
+            toast('You already rated this booking.');
+            setRatedOrderIds(prev => new Set([...prev, ratingModal.booking.id]));
+            setRatingModal(null);
+          } else {
+            throw new Error(data.error || 'Failed to submit rating.');
+          }
+          return;
         }
-        return;
+        setRatedOrderIds(prev => new Set([...prev, ratingModal.booking.id]));
+      } else {
+        const res = await fetch(`${apiBase}/api/orders/rate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({
+            orderId: ratingModal.order.id,
+            rating: ratingValue,
+            comment: ratingComment.trim() || null
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          if (res.status === 409) {
+            toast('You already rated this order.');
+            setRatedOrderIds(prev => new Set([...prev, ratingModal.order.id]));
+            setRatingModal(null);
+          } else {
+            throw new Error(data.error || 'Failed to submit rating.');
+          }
+          return;
+        }
+        setRatedOrderIds(prev => new Set([...prev, ratingModal.order.id]));
       }
-      setRatedOrderIds(prev => new Set([...prev, ratingModal.order.id]));
+
       toast.success('Thank you for your feedback! ⭐');
       setRatingModal(null);
       setRatingValue(0);
@@ -788,21 +867,24 @@ const OrderHistory = () => {
         className="profile-sub-page"
       >
         <main className="sub-page-content">
-          {/* Tabs */}
+          {/* Tabs — orders tab hidden in launch mode (code preserved) */}
           <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem', background: '#f1f5f9', padding: '5px', borderRadius: '14px' }}>
-            <button
-              onClick={() => setActiveTab('orders')}
-              style={{
-                flex: 1, padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer',
-                fontWeight: 700, fontSize: '0.875rem',
-                background: activeTab === 'orders' ? 'white' : 'transparent',
-                color: activeTab === 'orders' ? 'var(--primary, #ff6b00)' : '#64748b',
-                boxShadow: activeTab === 'orders' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
-                transition: 'all 0.2s'
-              }}
-            >
-              🛍 {t('orders') || 'Orders'}
-            </button>
+            {/* Orders tab: hidden when shopping feature is not live */}
+            {showShoppingUI() && (
+              <button
+                onClick={() => setActiveTab('orders')}
+                style={{
+                  flex: 1, padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                  fontWeight: 700, fontSize: '0.875rem',
+                  background: activeTab === 'orders' ? 'white' : 'transparent',
+                  color: activeTab === 'orders' ? 'var(--primary, #ff6b00)' : '#64748b',
+                  boxShadow: activeTab === 'orders' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                🛍 {t('orders') || 'Orders'}
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('events')}
               style={{
@@ -822,6 +904,27 @@ const OrderHistory = () => {
                 </span>
               )}
             </button>
+            {(isFeatureEnabled('sports') || sportBookings.length > 0) && (
+              <button
+                onClick={() => setActiveTab('sports')}
+                style={{
+                  flex: 1, padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                  fontWeight: 700, fontSize: '0.875rem',
+                  background: activeTab === 'sports' ? 'white' : 'transparent',
+                  color: activeTab === 'sports' ? 'var(--primary, #ff6b00)' : '#64748b',
+                  boxShadow: activeTab === 'sports' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                  transition: 'all 0.2s',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                }}
+              >
+                🏏 {t('sports_slots') || 'Sports Slots'}
+                {sportBookings.length > 0 && (
+                  <span style={{ background: 'var(--primary, #ff6b00)', color: 'white', borderRadius: '20px', padding: '1px 8px', fontSize: '0.72rem', fontWeight: 800 }}>
+                    {sportBookings.length}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
 
           {/* ORDERS TAB */}
@@ -967,6 +1070,18 @@ const OrderHistory = () => {
                           >
                             <QrCode size={15} /> View Ticket
                           </button>
+                          {/* RATE BUTTON */}
+                          {(booking.status?.toUpperCase() === 'CONFIRMED' || booking.status?.toUpperCase() === 'COMPLETED') && !ratedOrderIds.has(booking.id) && (
+                            <button
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', background: 'linear-gradient(135deg,#fef3c7,#fde68a)', color: '#92400e', border: '1px solid #fbbf24', padding: '10px 14px', borderRadius: '12px', fontWeight: 700, cursor: 'pointer', fontSize: '0.82rem' }}
+                              onClick={(e) => { e.stopPropagation(); setRatingModal({ type: 'event', booking }); setRatingValue(0); setRatingComment(''); }}
+                            >
+                              ⭐ Rate Event
+                            </button>
+                          )}
+                          {ratedOrderIds.has(booking.id) && (
+                            <span style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', color: '#16a34a', fontWeight: 700, marginLeft: '8px' }}>⭐ Rated</span>
+                          )}
                           {/* Cancel button — only if CONFIRMED and event hasn't happened yet */}
                           {booking.status === 'CONFIRMED' && event?.event_date && new Date(event.event_date) > new Date() && (
                             <button
@@ -975,6 +1090,111 @@ const OrderHistory = () => {
                             >
                               ✕ Cancel
                             </button>
+                          )}
+                          <span style={{ display: 'flex', alignItems: 'center', fontSize: '0.72rem', color: '#94a3b8' }}>
+                            {new Date(booking.created_at).toLocaleDateString('en-IN')}
+                          </span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )
+          )}
+
+          {/* SPORTS BOOKINGS TAB */}
+          {activeTab === 'sports' && (isFeatureEnabled('sports') || sportBookings.length > 0) && (
+            sportLoading ? (
+              <EventSkeleton count={2} />
+            ) : sportBookings.length === 0 ? (
+              <div className="empty-state-profile">
+                <Ticket size={48} />
+                <h3>No sports slots yet</h3>
+                <p>When you book slot times, they will appear here.</p>
+                <button onClick={() => navigate('/sports')} className="shop-now-btn">Book Sport Venue</button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {sportBookings.map((booking, i) => {
+                  const venue = booking.sports_venues;
+                  const rawSport = booking.sport_type === 'all' || !booking.sport_type ? (venue?.sport_types?.[0] || 'box_cricket') : booking.sport_type;
+                  const sportLabel = SPORT_LABELS[rawSport] || rawSport;
+                  const sportEmoji = SPORT_EMOJI[rawSport] || '🏅';
+                  return (
+                    <motion.div
+                      key={booking.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      style={{
+                        background: 'white', borderRadius: '20px',
+                        boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
+                        overflow: 'hidden', border: '1px solid #f1f5f9'
+                      }}
+                    >
+                      {/* Banner */}
+                      <div style={{ position: 'relative', height: '100px' }}>
+                        <img
+                          src={(venue?.images || [])[0] || 'https://images.unsplash.com/photo-1541252260730-0412e8e2108e?w=600&q=80'}
+                          alt={venue?.name}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = 'https://images.unsplash.com/photo-1541252260730-0412e8e2108e?w=600&q=80';
+                          }}
+                        />
+                        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(0,0,0,0.05) 0%,rgba(0,0,0,0.7) 100%)' }} />
+                        <div style={{ position: 'absolute', bottom: 10, left: 14, right: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                          <h4 style={{ margin: 0, color: 'white', fontWeight: 800, fontSize: '1.05rem' }}>{venue?.name}</h4>
+                          <span style={{ 
+                            background: booking.status === 'confirmed' || booking.status === 'CONFIRMED' ? '#22c55e' : booking.status === 'completed' || booking.status === 'COMPLETED' ? '#16a34a' : booking.status === 'cancelled' || booking.status === 'CANCELLED' ? '#ef4444' : '#f59e0b', 
+                            color: 'white', padding: '3px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800 
+                          }}>
+                            {booking.status?.toUpperCase() === 'COMPLETED' ? '✅ Completed' : booking.status?.toUpperCase()}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Details */}
+                      <div style={{ padding: '1rem 1.25rem' }}>
+                        <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.75rem' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Calendar size={13} /> {booking.slot_date ? new Date(booking.slot_date + 'T00:00:00').toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : '—'}
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Clock size={13} /> {booking.slot_time ? booking.slot_time.slice(0,5) : '—'} - {booking.slot_end_time ? booking.slot_end_time.slice(0,5) : '—'}
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <MapPin size={13} /> {venue?.address || venue?.city || 'Ahmedabad'}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ fontSize: '0.82rem', color: '#475569' }}>
+                            <span style={{ background: '#f1f5f9', padding: '2px 8px', borderRadius: '8px', fontWeight: 600 }}>{sportEmoji} {sportLabel}</span>
+                          </div>
+                          <span style={{ fontWeight: 800, color: 'var(--primary, #ff6b00)', fontSize: '1rem' }}>₹{booking.total_amount || 0}</span>
+                        </div>
+
+                        <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed #e2e8f0', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => navigate('/sports/ticket', { state: { booking, venue, sport: rawSport } })}
+                            style={{ flex: 1, minWidth: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'var(--primary, #ff6b00)', color: 'white', border: 'none', padding: '10px', borderRadius: '12px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
+                          >
+                            <QrCode size={15} /> View Ticket
+                          </button>
+                          {/* RATE BUTTON */}
+                          {(booking.status?.toUpperCase() === 'CONFIRMED' || booking.status?.toUpperCase() === 'COMPLETED') && !ratedOrderIds.has(booking.id) && (
+                            <button
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', background: 'linear-gradient(135deg,#fef3c7,#fde68a)', color: '#92400e', border: '1px solid #fbbf24', padding: '10px 14px', borderRadius: '12px', fontWeight: 700, cursor: 'pointer', fontSize: '0.82rem' }}
+                              onClick={(e) => { e.stopPropagation(); setRatingModal({ type: 'sports', booking }); setRatingValue(0); setRatingComment(''); }}
+                            >
+                              ⭐ Rate Venue
+                            </button>
+                          )}
+                          {ratedOrderIds.has(booking.id) && (
+                            <span style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', color: '#16a34a', fontWeight: 700, marginLeft: '8px' }}>⭐ Rated</span>
                           )}
                           <span style={{ display: 'flex', alignItems: 'center', fontSize: '0.72rem', color: '#94a3b8' }}>
                             {new Date(booking.created_at).toLocaleDateString('en-IN')}
@@ -1226,10 +1446,18 @@ const OrderHistory = () => {
               <div style={{ background: 'linear-gradient(135deg,#fff7ed,#fffbeb)', padding: '1.4rem 1.5rem 1rem', borderBottom: '1px solid #fde68a' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <h3 style={{ margin: '0 0 4px', fontWeight: 900, fontSize: '1.15rem', color: '#0f172a' }}>{t('rate_order')} ⭐</h3>
+                    <h3 style={{ margin: '0 0 4px', fontWeight: 900, fontSize: '1.15rem', color: '#0f172a' }}>
+                      {ratingModal.type ? `Rate ${ratingModal.type === 'sports' ? 'Venue' : 'Event'}` : t('rate_order')} ⭐
+                    </h3>
                     <p style={{ margin: 0, fontSize: '0.78rem', color: '#92400e', fontWeight: 600 }}>
-                      {t('order_no')} #{ratingModal.order.id?.slice(0,8).toUpperCase()}
-                      {ratingModal.order.stores?.name ? ` · ${ratingModal.order.stores.name}` : ''}
+                      {ratingModal.type ? `Booking ID: #${ratingModal.booking.id?.slice(0,8).toUpperCase()}` : `${t('order_no')} #${ratingModal.order.id?.slice(0,8).toUpperCase()}`}
+                      {ratingModal.type 
+                        ? (ratingModal.type === 'sports'
+                            ? (ratingModal.booking.sports_venues?.name ? ` · ${ratingModal.booking.sports_venues.name}` : '')
+                            : (ratingModal.booking.events?.title ? ` · ${ratingModal.booking.events.title}` : '')
+                          )
+                        : (ratingModal.order.stores?.name ? ` · ${ratingModal.order.stores.name}` : '')
+                      }
                     </p>
                   </div>
                   <button

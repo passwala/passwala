@@ -179,7 +179,6 @@ const Auth = ({ onLogin }) => {
           setWhatsappOtp(data.otp);
           // Auto-fill the 6 OTP boxes so the user can verify in one click
           setOtp(data.otp.split(''));
-          toast.success(`🧪 Dev Mode: OTP auto-filled → ${data.otp}`, { duration: 10000 });
         } else {
           toast.success('OTP sent successfully via WhatsApp!');
         }
@@ -585,6 +584,20 @@ const Auth = ({ onLogin }) => {
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
                 Login via WhatsApp
+              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', margin: '1rem 0', gap: '10px' }}>
+                <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>OR</span>
+                <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
+              </div>
+
+              <button 
+                className="sheet-action-btn" 
+                onClick={() => window.dispatchEvent(new CustomEvent('open-passwala-ai-chat'))}
+                style={{ background: 'linear-gradient(135deg, #ff6b00 0%, #ff8500 100%)', boxShadow: '0 4px 15px rgba(255, 107, 0, 0.25)', marginTop: '0.5rem', gap: '8px' }}
+              >
+                🤖 Ask AI Assistant Chat
               </button>
 
               <div className="policy-agreement-text" style={{ marginTop: '1.25rem', fontSize: '0.75rem', color: '#718096', textAlign: 'center', lineHeight: '1.4' }}>

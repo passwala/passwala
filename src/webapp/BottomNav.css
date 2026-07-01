@@ -90,7 +90,7 @@ body:not(.dark-mode) .bottom-nav-container {
   color: var(--primary);
 }
 
-/* Active indicator dot */
+/* Active indicator dot — hidden in launch mode via component, CSS kept for future */
 .active-indicator {
   position: absolute;
   top: -10px;
@@ -101,6 +101,7 @@ body:not(.dark-mode) .bottom-nav-container {
   background: var(--primary);
   border-radius: 50%;
   box-shadow: 0 0 8px rgba(255, 118, 34, 0.7);
+  display: none;
 }
 
 /* Brand and Profile section: hidden in bottom nav view */

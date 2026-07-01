@@ -105,6 +105,7 @@
     0 40px 100px rgba(0,0,0,.5);
   width: 100%;
   max-width: 480px;
+  max-height: calc(100vh - 32px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -315,6 +316,15 @@
 /* ── Option cards ─────────────────────────────────────────────────────────── */
 .onb-grid { display: grid; gap: 10px; }
 .onb-grid-2 { grid-template-columns: 1fr 1fr; }
+.onb-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+/* If the last card is alone in its row (odd-numbered last child), span full width */
+.onb-grid-2 > button:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  max-width: 60%;
+  margin: 0 auto;
+  width: 100%;
+}
 
 .onb-card-opt {
   position: relative;
@@ -501,12 +511,12 @@
 
 /* Mobile — bottom sheet */
 @media (max-width: 480px) {
-  .onb-overlay { padding: 0; align-items: flex-end; }
+  .onb-overlay { padding: 16px; align-items: center; justify-content: center; }
   .onb-card {
-    border-radius: 26px 26px 0 0;
-    min-height: 70vh; max-height: 92vh; max-width: 100%;
-    padding-bottom: max(20px, env(safe-area-inset-bottom));
-    border-bottom: none; overflow-y: auto;
+    border-radius: 28px;
+    min-height: auto; max-height: calc(100vh - 32px); max-width: 100%;
+    padding-bottom: 24px;
+    border: 1px solid rgba(255,118,34,.22); overflow: hidden;
   }
   .onb-topbar { padding: 16px 14px 0; }
   .onb-body   { padding: 10px 14px 6px; }
@@ -518,6 +528,7 @@
   .onb-q    { font-size: 1.18rem; }
   .onb-sub  { font-size: .83rem; }
   .onb-grid { gap: 8px; }
+  .onb-grid-3 { grid-template-columns: 1fr; }
   .onb-card-opt { padding: 15px 8px 12px; border-radius: 18px; }
   .onb-opt-emoji { font-size: 1.75rem; }
   .onb-opt-label { font-size: .85rem; }

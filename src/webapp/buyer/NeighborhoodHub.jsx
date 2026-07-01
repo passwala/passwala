@@ -8,14 +8,30 @@ import { toast } from 'react-hot-toast';
 import { supabase } from '../../supabase';
 import { useCart } from '../../context/CartContext';
 import './NeighborhoodHub.css';
+import { LAUNCH_MODE, LAUNCH_FEATURES, isFeatureEnabled } from '../../launchConfig';
 
-const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
+
+const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs }) => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { addToCart, setCartOpen } = useCart();
 
   const [activeRideBooking, setActiveRideBooking] = useState(null);
   const [showComingSoon, setShowComingSoon] = useState(false);
+  const [liveEventCount, setLiveEventCount] = useState(null);
+
+  // Fetch real event count for hero stats
+  useEffect(() => {
+    const baseUrl = import.meta.env.VITE_API_URL || '';
+    fetch(`${baseUrl}/api/events/search?category=All&query=&page=1&pageSize=1&showType=all`)
+      .then(r => r.json())
+      .then(data => {
+        if (data?.total !== undefined) setLiveEventCount(data.total);
+        else if (data?.events?.length !== undefined) setLiveEventCount(data.events.length);
+      })
+      .catch(() => {});
+  }, []);
+
 
   useEffect(() => {
     if (!user) return;
@@ -67,6 +83,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
 
   const cards = [
     {
+      id: 'community',
       title: t('community'),
       subtitle: t('tagline'),
       image: "/neighbor.png",
@@ -75,6 +92,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
       tag: t('join_floor_chat')
     },
     {
+      id: 'services',
       title: t('expert_services'),
       subtitle: t('verified_pros'),
       image: "/expert_services.png",
@@ -83,6 +101,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
       tag: t('book_pro')
     },
     {
+      id: 'shopping',
       title: t('near_shops'),
       subtitle: t('best_stores'),
       image: "/near_shops.png",
@@ -91,6 +110,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
       tag: t('order_now')
     },
     {
+      id: 'rides',
       title: t('city_rides'),
       subtitle: t('city_rides_sub'),
       image: "/city_rides.png",
@@ -99,6 +119,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
       tag: t('book_ticket')
     },
     {
+      id: 'events',
       title: t('event_tickets'),
       subtitle: t('event_tickets_sub'),
       image: "/event_tickets.png",
@@ -107,6 +128,17 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
       tag: t('book_now_caps')
     }
   ];
+
+  // Filter cards based on onboarding choices
+  const activePrefs = onboardingPrefs?.use_for;
+  const prefFiltered = Array.isArray(activePrefs) && activePrefs.length > 0
+    ? cards.filter(card => activePrefs.includes(card.id))
+    : cards;
+
+  // Apply Launch Mode filter — hides non-launched features without removing code
+  const allCards = LAUNCH_MODE
+    ? prefFiltered.filter(card => LAUNCH_FEATURES.includes(card.id))
+    : prefFiltered;
 
   // AI Smart Basket logic
   const handleSmartBasket = () => {
@@ -309,94 +341,374 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete }) => {
           </div>
         )}
 
-        <div className="hub-cards-grid">
-          {cards.map((card, i) => (
-            <motion.div 
-              key={i} 
-              onClick={() => {
-                if (card.view === 'NEIGHBORS') {
-                  setShowComingSoon(true);
-                } else {
-                  onNavigate(card.view);
-                }
-              }}
-              whileHover={{ scale: 1.05, translateY: -10 }}
-              initial={{ opacity: 0, x: -20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.1, duration: 0.4 }}
-              className={`hub-card ${card.type}`}
+
+        {/* ── LAUNCH MODE: Hero Feature Showcase ── */}
+        {LAUNCH_MODE && allCards.length === 1 ? (
+          <>
+          <motion.div
+            className="launch-hero-section"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: 'easeOut' }}
+            onClick={() => onNavigate(allCards[0].view)}
+          >
+            {/* Animated background orbs */}
+            <div className="launch-hero-orb orb-1" />
+            <div className="launch-hero-orb orb-2" />
+            <div className="launch-hero-orb orb-3" />
+
+            {/* Top badge */}
+            <motion.div
+              className="launch-hero-badge"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.3 }}
             >
-              <div className="hub-card-text">
-                <span className="hub-card-tag">{card.tag}</span>
-                <h3>{card.title}</h3>
-                <p>{card.subtitle}</p>
-                <div className="card-explore-btn">
-                  Explore <ArrowRight size={14} />
+              <span className="launch-badge-dot" />
+              NOW LIVE IN INDIA
+            </motion.div>
+
+            {/* Main content */}
+            <div className="launch-hero-body">
+              <div className="launch-hero-left">
+                <motion.h1
+                  className="launch-hero-title"
+                  initial={{ opacity: 0, x: -30 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.4, duration: 0.6 }}
+                >
+                  Book Event<br />
+                  <span className="launch-title-gradient">Tickets</span>
+                </motion.h1>
+
+                <motion.p
+                  className="launch-hero-sub"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.55, duration: 0.5 }}
+                >
+                  Concerts, shows, festivals & more — all Ahmedabad events in one place. Skip the queue, book instantly.
+                </motion.p>
+
+                {/* Stats row */}
+                <motion.div
+                  className="launch-hero-stats"
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 }}
+                >
+                  <div className="launch-stat">
+                    <span className="launch-stat-num">
+                      {liveEventCount !== null ? `${liveEventCount}+` : '...'}
+                    </span>
+                    <span className="launch-stat-label">Live Events</span>
+                  </div>
+                  <div className="launch-stat-divider" />
+                  <div className="launch-stat">
+                    <span className="launch-stat-num">🎫</span>
+                    <span className="launch-stat-label">Instant Booking</span>
+                  </div>
+                </motion.div>
+
+                <motion.button
+                  className="launch-hero-cta"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.85 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={(e) => { e.stopPropagation(); onNavigate(allCards[0].view); }}
+                >
+                  Browse Events <ArrowRight size={18} />
+                </motion.button>
+              </div>
+
+              <motion.div
+                className="launch-hero-right"
+                initial={{ opacity: 0, scale: 0.85, rotate: -5 }}
+                animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                transition={{ delay: 0.5, duration: 0.7, type: 'spring' }}
+              >
+                <div className="launch-hero-img-wrap">
+                  <img src="/event_tickets.png" alt="Event Tickets" className="launch-hero-img" />
+                  <div className="launch-img-glow" />
+                </div>
+
+                {/* Floating ticket pill */}
+                <motion.div
+                  className="launch-float-pill"
+                  animate={{ y: [0, -8, 0] }}
+                  transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+                >
+                  🎶 Live Tonight
+                </motion.div>
+              </motion.div>
+            </div>
+          </motion.div>
+
+          {/* ── Sports Venue Booking Card (always visible — new feature) ── */}
+          <motion.div
+            className="launch-hero-section"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: 'easeOut', delay: 0.2 }}
+            onClick={() => onNavigate('SPORTS')}
+          >
+            {/* Animated background orbs */}
+            <div className="launch-hero-orb orb-1" />
+            <div className="launch-hero-orb orb-2" />
+            <div className="launch-hero-orb orb-3" />
+
+            {/* Top badge */}
+            <motion.div
+              className="launch-hero-badge"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.4 }}
+            >
+              <span className="launch-badge-dot" />
+              🆕 NEW FEATURE
+            </motion.div>
+
+            {/* Main content */}
+            <div className="launch-hero-body">
+              <div className="launch-hero-left">
+                <motion.h1
+                  className="launch-hero-title"
+                  initial={{ opacity: 0, x: -30 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.5, duration: 0.6 }}
+                >
+                  Book a<br />
+                  <span className="launch-title-gradient">Sports Court</span>
+                </motion.h1>
+
+                <motion.p
+                  className="launch-hero-sub"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.65, duration: 0.5 }}
+                >
+                  Box Cricket, Badminton, Turf, Pickleball, Tennis & more — instantly book venues in Ahmedabad.
+                </motion.p>
+
+                {/* Stats row */}
+                <motion.div
+                  className="launch-hero-stats"
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.8 }}
+                >
+                  <div className="launch-stat">
+                    <span className="launch-stat-num">24h</span>
+                    <span className="launch-stat-label">Open Slots</span>
+                  </div>
+                  <div className="launch-stat-divider" />
+                  <div className="launch-stat">
+                    <span className="launch-stat-num">🏏</span>
+                    <span className="launch-stat-label">Multi-sports</span>
+                  </div>
+                </motion.div>
+
+                <motion.button
+                  className="launch-hero-cta"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.95 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={(e) => { e.stopPropagation(); onNavigate('SPORTS'); }}
+                >
+                  Book a Slot <ArrowRight size={18} />
+                </motion.button>
+              </div>
+
+              <motion.div
+                className="launch-hero-right"
+                initial={{ opacity: 0, scale: 0.85, rotate: 5 }}
+                animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                transition={{ delay: 0.6, duration: 0.7, type: 'spring' }}
+              >
+                <div className="launch-hero-img-wrap" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div className="lsc-emojis-v2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                    <span style={{ fontSize: '3rem', background: '#fff', padding: '12px', borderRadius: '20px', border: '1.5px solid #ffedd5', boxShadow: '0 8px 24px rgba(255, 118, 34, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s' }}>🏏</span>
+                    <span style={{ fontSize: '3rem', background: '#fff', padding: '12px', borderRadius: '20px', border: '1.5px solid #ffedd5', boxShadow: '0 8px 24px rgba(255, 118, 34, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s' }}>🏸</span>
+                    <span style={{ fontSize: '3rem', background: '#fff', padding: '12px', borderRadius: '20px', border: '1.5px solid #ffedd5', boxShadow: '0 8px 24px rgba(255, 118, 34, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s' }}>⚽</span>
+                    <span style={{ fontSize: '3rem', background: '#fff', padding: '12px', borderRadius: '20px', border: '1.5px solid #ffedd5', boxShadow: '0 8px 24px rgba(255, 118, 34, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s' }}>🏓</span>
+                    <span style={{ fontSize: '3rem', background: '#fff', padding: '12px', borderRadius: '20px', border: '1.5px solid #ffedd5', boxShadow: '0 8px 24px rgba(255, 118, 34, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s' }}>🎾</span>
+                    <span style={{ fontSize: '3rem', background: '#fff', padding: '12px', borderRadius: '20px', border: '1.5px solid #ffedd5', boxShadow: '0 8px 24px rgba(255, 118, 34, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s' }}>🎱</span>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+          </>
+
+        ) : (
+          <>
+            {/* ── Top 3 Service Cards (normal mode) ── */}
+            <div className="hub-cards-grid">
+              {allCards.slice(0, 3).map((card, i) => (
+                <motion.div
+                  key={card.id}
+                  onClick={() => {
+                    if (card.view === 'NEIGHBORS') {
+                      setShowComingSoon(true);
+                    } else {
+                      onNavigate(card.view);
+                    }
+                  }}
+                  whileHover={{ scale: 1.05, translateY: -10 }}
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.1, duration: 0.4 }}
+                  className={`hub-card ${card.type}`}
+                >
+                  <div className="hub-card-text">
+                    <span className="hub-card-tag">{card.tag}</span>
+                    <h3>{card.title}</h3>
+                    <p>{card.subtitle}</p>
+                    <div className="card-explore-btn">
+                      Explore <ArrowRight size={14} />
+                    </div>
+                  </div>
+                  <div className="hub-card-image">
+                    <img src={card.image} alt={card.title} />
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* ── Bottom 2 Service Cards — centered, same card width as top row ── */}
+            {allCards.length > 3 && (
+              <div className="hub-cards-row2">
+                {allCards.slice(3).map((card, i) => (
+                  <motion.div
+                    key={card.id}
+                    onClick={() => {
+                      if (card.view === 'NEIGHBORS') {
+                        setShowComingSoon(true);
+                      } else {
+                        onNavigate(card.view);
+                      }
+                    }}
+                    whileHover={{ scale: 1.05, translateY: -10 }}
+                    initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.1, duration: 0.4 }}
+                    className={`hub-card ${card.type}`}
+                  >
+                    <div className="hub-card-text">
+                      <span className="hub-card-tag">{card.tag}</span>
+                      <h3>{card.title}</h3>
+                      <p>{card.subtitle}</p>
+                      <div className="card-explore-btn">
+                        Explore <ArrowRight size={14} />
+                      </div>
+                    </div>
+                    <div className="hub-card-image">
+                      <img src={card.image} alt={card.title} />
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+
+
+        {/* ── Featured Flash Card — hidden in launch mode, code preserved ── */}
+        {!LAUNCH_MODE && (
+          <motion.div
+            className="hub-featured-card"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            whileHover={{ scale: 1.01 }}
+            onClick={() => toast.success('Flash Deals launching soon! 🔥', { icon: '🏷️' })}
+          >
+            <div className="hub-featured-bg" />
+            <div className="hub-featured-content">
+              <div className="hub-featured-left">
+                <span className="hub-featured-tag">🔥 FLASH DEALS</span>
+                <h2 className="hub-featured-title">Today's Best Deals</h2>
+                <p className="hub-featured-sub">Exclusive offers from stores near you — updated every hour</p>
+                <div className="hub-featured-cta">
+                  Shop Now <ArrowRight size={16} />
                 </div>
               </div>
-              <div className="hub-card-image">
-                <img src={card.image} alt={card.title} />
-              </div>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* AI & Morning Delivery Features Row */}
-        <div className="ai-hub-row">
-           <div className="ai-feature-card glass" onClick={() => toast.success("Coming soon!", { icon: '✨' })}>
-              <div className="ai-icon-box">
-                <Sparkles size={24} color="var(--primary)" />
-              </div>
-              <div className="ai-text">
-                 <h4>AI Smart Basket</h4>
-                 <p>Autofill essentials based on your usage</p>
-              </div>
-           </div>
-           
-           <div className="ai-feature-card glass highlight" onClick={() => toast.success("Coming soon!", { icon: '✨' })}>
-              <div className="ai-icon-box">
-                <Sunrise size={24} color="#f59e0b" />
-              </div>
-              <div className="ai-text">
-                 <h4>Schedule Morning Delivery</h4>
-                 <p>Get Milk & Bread by 7 AM daily</p>
-              </div>
-           </div>
-           
-           <div className="ai-feature-card glass" onClick={() => toast.success("Coming soon!", { icon: '✨' })}>
-              <div className="ai-icon-box">
-                <Users size={24} color="#3b82f6" />
-              </div>
-              <div className="ai-text">
-                 <h4>Apartment Group Order</h4>
-                 <p>Save delivery fees with building neighbors</p>
-              </div>
-           </div>
-        </div>
-
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.3 }}
-          className="hub-banner card-hover"
-        >
-          <div className="banner-bg">
-            <img src="/hub_banner.png" alt="Neighborhood" />
-          </div>
-          <div className="banner-content-hub">
-            <div className="banner-text">
-              <h2>{t('welcome')}</h2>
-              <div className="banner-meta">
-                 <span className="live-status"><div className="live-pulse"></div> {liveStats.shops} NEARBY SHOPS ACTIVE</span>
-                 <span className="separator">•</span>
-                 <span>{liveStats.pro} VERIFIED EXPERTS</span>
+              <div className="hub-featured-emojis">
+                <span className="hub-fe-1">🛒</span>
+                <span className="hub-fe-2">🏷️</span>
+                <span className="hub-fe-3">💸</span>
               </div>
             </div>
-            <button className="post-request-btn" onClick={() => toast.success("Coming soon!", { icon: '✨' })}>
-              POST REQUEST <Plus size={20} />
-            </button>
+          </motion.div>
+        )}
+
+
+        {/* AI & Morning Delivery Features Row — hidden in launch mode, code preserved */}
+        {!LAUNCH_MODE && (
+          <div className="ai-hub-row">
+             <div className="ai-feature-card glass" onClick={() => toast.success("Coming soon!", { icon: '✨' })}>
+                <div className="ai-icon-box">
+                  <Sparkles size={24} color="var(--primary)" />
+                </div>
+                <div className="ai-text">
+                   <h4>AI Smart Basket</h4>
+                   <p>Autofill essentials based on your usage</p>
+                </div>
+             </div>
+             
+             <div className="ai-feature-card glass highlight" onClick={() => toast.success("Coming soon!", { icon: '✨' })}>
+                <div className="ai-icon-box">
+                  <Sunrise size={24} color="#f59e0b" />
+                </div>
+                <div className="ai-text">
+                   <h4>Schedule Morning Delivery</h4>
+                   <p>Get Milk &amp; Bread by 7 AM daily</p>
+                </div>
+             </div>
+             
+             <div className="ai-feature-card glass" onClick={() => toast.success("Coming soon!", { icon: '✨' })}>
+                <div className="ai-icon-box">
+                  <Users size={24} color="#3b82f6" />
+                </div>
+                <div className="ai-text">
+                   <h4>Apartment Group Order</h4>
+                   <p>Save delivery fees with building neighbors</p>
+                </div>
+             </div>
           </div>
-        </motion.div>
+        )}
+
+        {/* Hub welcome banner — hidden in launch mode, code preserved */}
+        {!LAUNCH_MODE && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3 }}
+            className="hub-banner card-hover"
+          >
+            <div className="banner-bg">
+              <img src="/hub_banner.png" alt="Neighborhood" />
+            </div>
+            <div className="banner-content-hub">
+              <div className="banner-text">
+                <h2>{t('welcome')}</h2>
+                <div className="banner-meta">
+                   <span className="live-status"><div className="live-pulse"></div> {liveStats.shops} NEARBY SHOPS ACTIVE</span>
+                   <span className="separator">•</span>
+                   <span>{liveStats.pro} VERIFIED EXPERTS</span>
+                </div>
+              </div>
+              <button className="post-request-btn" onClick={() => toast.success("Coming soon!", { icon: '✨' })}>
+                POST REQUEST <Plus size={20} />
+              </button>
+            </div>
+          </motion.div>
+        )}
       </div>
 
       {/* --- PREMIUM MODALS --- */}

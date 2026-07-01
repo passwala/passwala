@@ -46,7 +46,10 @@ const ALLOWED_ADMIN_TABLES = [
   'ticket_bookings',
   'event_organizer_requests',
   'promo_codes',
-  'promo_redemptions'
+  'promo_redemptions',
+  'sports_venues',
+  'venue_slots',
+  'venue_bookings',
 ];
 
 function base64urlEncode(strOrBuffer) {
@@ -847,6 +850,45 @@ router.delete('/delete', async (req, res) => {
                 await supabase.from('event_bookings').delete().eq('event_id', id);
                 await supabase.from('event_ticket_tiers').delete().eq('event_id', id);
             }
+        } else if (table === 'service_providers') {
+            // When admin deletes a service_provider (event organizer):
+            // cascade-delete all their events and ticket bookings from buyer side
+            const { data: sp } = await supabase
+                .from('service_providers')
+                .select('user_id, category')
+                .eq('id', id)
+                .maybeSingle();
+
+            if (sp?.user_id) {
+                // 1. Get all event IDs created by this organizer
+                const { data: orgEvents } = await supabase
+                    .from('events')
+                    .select('id')
+                    .eq('created_by', sp.user_id);
+
+                const eventIds = orgEvents && orgEvents.length > 0 ? orgEvents.map(e => e.id) : [];
+
+                // 2. Delete event bookings (buyer-side ticket orders)
+                if (eventIds.length > 0) {
+                    await supabase.from('event_bookings').delete().in('event_id', eventIds);
+                    await supabase.from('event_ticket_tiers').delete().in('event_id', eventIds);
+                }
+
+                // 3. Delete the events themselves
+                await supabase.from('events').delete().eq('created_by', sp.user_id);
+            }
+
+            // 4. Also clean up any services/bookings (for service-type providers)
+            const { data: services } = await supabase.from('services').select('id').eq('provider_id', id);
+            if (services && services.length > 0) {
+                const svcIds = services.map(s => s.id);
+                await supabase.from('service_bookings').delete().in('service_id', svcIds);
+                await supabase.from('services').delete().in('id', svcIds);
+            }
+            await supabase.from('service_bookings').delete().eq('provider_id', id);
+
+            // 5. Delete any pending upgrade requests
+            await supabase.from('event_organizer_requests').delete().eq('provider_id', id);
         }
 
         const { data, error } = await supabase.from(table).delete().eq('id', id).select();
@@ -883,7 +925,8 @@ router.get('/settings', async (req, res) => {
             upgradeEventFee: 999,
             upgradeServiceFee: 999,
             upgradeRentalFee: 999,
-            upgradeShopFee: 999
+            upgradeShopFee: 999,
+            eventPlatformFee: 5
         };
         try {
             const fileData = await fs.readFile(settingsPath, 'utf8');
@@ -910,7 +953,7 @@ router.post('/settings', async (req, res) => {
         const feeFields = [
             'upgradeEventFee', 'upgradeServiceFee', 'upgradeRentalFee', 'upgradeShopFee',
             'baseDeliveryFee', 'ridePricePerKm', 'shortRidePrice', 'freeDeliveryThreshold',
-            'maxDeliveryRange'
+            'maxDeliveryRange', 'eventPlatformFee'
         ];
         for (const field of feeFields) {
             if (settings[field] !== undefined) {
