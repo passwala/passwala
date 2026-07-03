@@ -179,7 +179,7 @@ const QRScannerModal = ({ isOpen, onClose, onScan, businessType }) => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       setScanning(false);
     };
-  }, [isOpen]);
+  }, [isOpen, onScan]);
 
 
   if (!isOpen) return null;
@@ -737,6 +737,9 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
     }
 
     if (editingId) {
+      // pricePerHour is declared here (outer scope) so it is accessible in the
+      // setItems() callback below, which runs OUTSIDE the inner if-block.
+      let pricePerHour = {};
       if (storeId || vendorData?.user_id) {
         try {
           const targetTable = businessType === 'shop' ? 'products' : businessType === 'event' ? 'events' : businessType === 'sports' ? 'sports_venues' : 'services';
@@ -905,7 +908,6 @@ export const VendorInventory = ({ vendorData, businessType, storeId }) => {
               }
             }
           } else if (businessType === 'sports') {
-            const pricePerHour = {};
             if (newItem.sports && newItem.sports.length > 0) {
               newItem.sports.forEach(sp => {
                 pricePerHour[sp] = parseFloat(newItem.price) || 400;
@@ -4738,7 +4740,7 @@ export const VendorOrders = ({ storeId, businessType, vendorData }) => {
     } finally {
       setLoading(false);
     }
-  }, [storeId, businessType]);
+  }, [storeId, businessType, vendorData?.user_id]);
 
   React.useEffect(() => {
     fetchOrders(true);

@@ -66,7 +66,8 @@ const SportsCheckout = React.lazy(() => import('./webapp/buyer/sports/SportsChec
 const SportsTicket = React.lazy(() => import('./webapp/buyer/sports/SportsTicket'));
 
 // Dedicated Environment-based Modes (no fragile port fallbacks)
-const appMode = import.meta.env.VITE_APP_MODE || import.meta.env.MODE || 'web';
+const rawMode = import.meta.env.VITE_APP_MODE || import.meta.env.MODE || 'webapp';
+const appMode = ['web', 'webapp', 'vendor', 'rider', 'admin'].includes(rawMode) ? rawMode : 'webapp';
 const isWebMode = appMode === 'web';
 const isWebappMode = appMode === 'webapp';
 const isVendorMode = appMode === 'vendor';
