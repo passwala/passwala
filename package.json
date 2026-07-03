@@ -25,7 +25,9 @@
     "server": "nodemon server/index.js",
     "server:api": "nodemon server/index.js --headless",
     "coming-soon": "node coming-soon/server.js",
-    "test:admin": "node scratch/test_admin_login.js"
+    "test:admin": "node scratch/test_admin_login.js",
+    "start": "node server/index.js",
+    "build:backend": "echo 'No build step required for backend'"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.100.0",
