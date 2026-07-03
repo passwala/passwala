@@ -1,6 +1,7 @@
 // Fix #1: dotenv MUST be imported before any other module that reads process.env.
 // In ESM, static imports are hoisted — supabase.js & notifications.js read process.env
 // at module load time, so dotenv.config() on line 18 is already too late.
+// Render redeployment trigger: sync latest backend endpoints
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
