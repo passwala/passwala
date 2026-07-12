@@ -107,10 +107,22 @@ app.get('/', (req, res) => {
 app.get('/health', async (req, res) => {
   try {
     const start = Date.now();
-    const { error } = await supabase.from('users').select('id').limit(1);
+    const { data, error } = await supabase.from('users').select('id').limit(1);
     const duration = Date.now() - start;
     
-    if (error) throw error;
+    if (error) {
+      return res.status(500).json({ 
+        status: 'unhealthy', 
+        database: 'disconnected',
+        supabaseError: {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        },
+        timestamp: new Date().toISOString()
+      });
+    }
     
     res.json({ 
       status: 'healthy', 
