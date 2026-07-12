@@ -25,6 +25,9 @@ import morgan from 'morgan';
 import { sendNotification } from './utils/notifications.js';
 
 const app = express();
+// Enable trust proxy to correctly obtain client IP address behind reverse proxies (Render, Vercel, etc.)
+app.set('trust proxy', 1);
+
 const PORT = process.env.PORT || 3004;
 const isDev = process.env.NODE_ENV !== 'production';
 
