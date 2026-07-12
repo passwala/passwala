@@ -281,18 +281,28 @@ app.get('/api/ip-location', async (req, res) => {
 });
 
 // Fix #1: Production error logging endpoint — called by App.jsx ErrorBoundary
-// Only logs in production; dev errors are already surfaced in the browser console.
+global.clientErrors = global.clientErrors || [];
+
 app.post('/api/log-error', (req, res) => {
   const { message, stack, component } = req.body || {};
   if (message) {
-    console.error('[ClientError]', {
+    const errorLog = {
       message,
       component: component || 'unknown',
-      // Log only the first line of the stack to avoid verbose noise
-      stack: stack ? stack.split('\n')[0] : undefined
-    });
+      stack: stack || 'no stack',
+      timestamp: new Date().toISOString()
+    };
+    console.error('[ClientError]', errorLog);
+    global.clientErrors.unshift(errorLog);
+    if (global.clientErrors.length > 20) {
+      global.clientErrors.pop();
+    }
   }
-  res.status(204).end(); // No Content — fire-and-forget
+  res.status(204).end();
+});
+
+app.get('/api/client-errors', (req, res) => {
+  res.json({ success: true, errors: global.clientErrors });
 });
 
 // ─── WhatsApp QR Connect Page ───────────────────────────────────────────────
