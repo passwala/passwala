@@ -1,13 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+let supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+let supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Supabase configuration is missing. Real-time data will be disabled.');
+// Fail-safe override for incorrect environment variables (e.g. on Vercel)
+if (!supabaseUrl || supabaseUrl.includes('zfnurseswfdncneueckx') || !supabaseUrl.includes('etwkugpkuhrfryyqmlwx')) {
+  console.warn('⚠️ Client-side Supabase URL is missing or incorrect. Overriding with working production database.');
+  supabaseUrl = 'https://etwkugpkuhrfryyqmlwx.supabase.co';
+  supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV0d2t1Z3BrdWhyZnJ5eXFtbHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MzU0MTEsImV4cCI6MjA5MTQxMTQxMX0.wSUiHr0QSQiFqgGiPgxoIJ2dnRN_zvKTkttlHf94BDE';
 }
 
 export const supabase = createClient(
-  supabaseUrl || 'https://xxxxxxxxxxxxxxxxxxxx.supabase.co', 
-  supabaseAnonKey || 'dummy_anon_key'
+  supabaseUrl, 
+  supabaseAnonKey
 );
