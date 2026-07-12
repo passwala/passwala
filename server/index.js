@@ -119,11 +119,13 @@ app.get('/health', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (err) {
-    console.error('🔥 Database health check failed:', err.message);
+    console.error('🔥 Database health check failed:', err);
     res.status(500).json({ 
       status: 'unhealthy', 
       database: 'disconnected',
       error: err.message,
+      cause: err.cause ? { message: err.cause.message, code: err.cause.code } : null,
+      stack: err.stack,
       timestamp: new Date().toISOString()
     });
   }

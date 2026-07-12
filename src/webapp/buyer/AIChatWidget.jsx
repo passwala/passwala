@@ -1506,37 +1506,39 @@ const AIChatWidget = ({ user, onLogin }) => {
 
   return (
     <>
-      <button
-        className="ai-chat-toggle-btn shadow-lg"
-        onClick={() => setIsOpen(!isOpen)}
-        style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          zIndex: 9999,
-          width: '60px',
-          height: '60px',
-          borderRadius: '50%',
-          backgroundColor: '#ff6b00',
-          border: 'none',
-          color: '#ffffff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          boxShadow: '0 8px 30px rgba(255, 107, 0, 0.4)',
-          transition: 'transform 0.2s ease'
-        }}
-      >
-        {isOpen ? (
-          <X size={26} />
-        ) : (
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <MessageCircle size={26} />
-            <Sparkles size={12} style={{ position: 'absolute', top: -4, right: -4, color: '#fef08a' }} />
-          </div>
-        )}
-      </button>
+      {(user || isOpen) && (
+        <button
+          className="ai-chat-toggle-btn shadow-lg"
+          onClick={() => setIsOpen(!isOpen)}
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            zIndex: 9999,
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            backgroundColor: '#ff6b00',
+            border: 'none',
+            color: '#ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 8px 30px rgba(255, 107, 0, 0.4)',
+            transition: 'transform 0.2s ease'
+          }}
+        >
+          {isOpen ? (
+            <X size={26} />
+          ) : (
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <MessageCircle size={26} />
+              <Sparkles size={12} style={{ position: 'absolute', top: -4, right: -4, color: '#fef08a' }} />
+            </div>
+          )}
+        </button>
+      )}
 
       <AnimatePresence>
         {isOpen && (
