@@ -3,6 +3,9 @@
 // at module load time, so dotenv.config() on line 18 is already too late.
 // Render redeployment trigger: sync latest backend endpoints
 import 'dotenv/config';
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first');
+
 import express from 'express';
 import cors from 'cors';
 import os from 'os';
