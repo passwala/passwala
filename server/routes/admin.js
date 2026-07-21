@@ -1081,6 +1081,15 @@ router.post('/upgrade/approve', async (req, res) => {
 
         const targetConsole = request.target_console || 'event';
 
+        // Check if service provider already exists to preserve category
+        const { data: existingSP } = await supabase
+            .from('service_providers')
+            .select('category')
+            .eq('user_id', request.user_id)
+            .maybeSingle();
+        
+        const existingCategory = existingSP?.category;
+
         if (targetConsole === 'event') {
             // Upsert into service_providers table (used for events category)
             const { error: spError } = await supabase
@@ -1090,7 +1099,7 @@ router.post('/upgrade/approve', async (req, res) => {
                     phone: request.phone,
                     full_name: userRecord?.full_name || 'Vendor Partner',
                     business_name: request.business_name,
-                    category: 'Comedy & Theatre', // Default category
+                    category: existingCategory || 'Comedy & Theatre', // Default category
                     is_verified: true,
                     profile_completed: true
                 }, { onConflict: 'user_id' });
@@ -1111,7 +1120,7 @@ router.post('/upgrade/approve', async (req, res) => {
                     phone: request.phone,
                     full_name: userRecord?.full_name || 'Vendor Partner',
                     business_name: request.business_name,
-                    category: 'Plumbing Services', 
+                    category: existingCategory || 'Plumbing Services', 
                     is_verified: true,
                     profile_completed: true
                 }, { onConflict: 'user_id' });
@@ -1132,7 +1141,7 @@ router.post('/upgrade/approve', async (req, res) => {
                     phone: request.phone,
                     full_name: userRecord?.full_name || 'Vendor Partner',
                     business_name: request.business_name,
-                    category: 'Rental', 
+                    category: existingCategory || 'Rental', 
                     is_verified: true,
                     profile_completed: true
                 }, { onConflict: 'user_id' });

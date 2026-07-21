@@ -12,8 +12,14 @@
 /* ── Hero ──────────────────────────────────────────────── */
 .sh-hero {
   position: relative;
-  padding: 48px 20px 32px;
+  padding: 72px 20px 32px; /* 12px padding + 60px navbar height */
   overflow: hidden;
+}
+
+@media (min-width: 1024px) {
+  .sh-hero {
+    padding-top: 76px; /* 12px padding + 64px navbar height */
+  }
 }
 
 .sh-hero-bg {
@@ -118,8 +124,13 @@
   background: #fff;
   border-bottom: 1px solid #f1f5f9;
   position: sticky;
-  top: 0;
+  top: 60px;
   z-index: 10;
+}
+@media (min-width: 1024px) {
+  .sh-filter-row {
+    top: 64px;
+  }
 }
 
 .sh-filter-scroll {
@@ -219,9 +230,27 @@
 
 /* ── Venue Cards ─────────────────────────────────────── */
 .sh-venue-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 600px) {
+  .sh-venue-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 900px) {
+  .sh-venue-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1200px) {
+  .sh-venue-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
 .sh-venue-card {
@@ -230,6 +259,8 @@
   overflow: hidden;
   box-shadow: 0 2px 16px rgba(0,0,0,0.06);
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
   transition: transform 0.2s, box-shadow 0.2s;
 }
 

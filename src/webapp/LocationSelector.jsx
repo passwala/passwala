@@ -123,7 +123,7 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
             { headers: { 'User-Agent': 'Passwalaa-App/1.0 (contact@passwalaa.com)' } }
           );
           const data = await res.json();
-          const area  = data.address?.suburb || data.address?.neighbourhood || data.address?.residential || data.address?.village || '';
+          const area  = data.address?.suburb || data.address?.neighbourhood || data.address?.city_district || data.address?.residential || data.address?.road || data.address?.village || '';
           const city  = data.address?.city || data.address?.town || data.address?.state_district || '';
           const label = area && city ? `${area}, ${city}` : city || 'Your Location';
           onLocationChange(label, { lat: latitude, lng: longitude });

@@ -918,6 +918,65 @@ router.post('/chat', async (req, res) => {
     // Default chat fallback if no booking keywords matched
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
+      let venues = [];
+      try {
+        const { data } = await supabase.from('sports_venues').select('id, name, address, sport_types, price_per_hour, rating, images').eq('status', 'approved').limit(100);
+        venues = data || [];
+      } catch (err) {
+        console.warn('Fallback venues fetch failed:', err);
+      }
+
+      const normalizedQuery = latestMessage.toLowerCase();
+      const isSportsSearch = /crick|crik|cric|boc|box|turf|trf|badm|pikl|tenn|tenis|snook|pool|bill|tennis/i.test(normalizedQuery);
+      
+      if (isSportsSearch) {
+        let detectedSport = 'cricket';
+        if (/badm/i.test(normalizedQuery)) detectedSport = 'badminton';
+        else if (/turf|foot/i.test(normalizedQuery)) detectedSport = 'turf';
+        else if (/pickle|pikl/i.test(normalizedQuery)) detectedSport = 'pickleball';
+        else if (/tennis|tenis/i.test(normalizedQuery)) detectedSport = 'tennis';
+        else if (/snook|pool/i.test(normalizedQuery)) detectedSport = 'snooker';
+
+        const matchedVenues = venues.filter(v => 
+          Array.isArray(v.sport_types) && v.sport_types.some(s => s.toLowerCase().includes(detectedSport.slice(0, 4)))
+        );
+
+        if (matchedVenues.length > 0) {
+          const items = matchedVenues.map(v => {
+            const emojis = { box_cricket: '🏏', badminton: '🏸', turf: '⚽', cricket_net: '🎯', pickleball: '🥒', table_tennis: '🏓', padel: '🎾', tennis: '🎾', snooker: '🎱', pool: '🎱', cricket: '🏏' };
+            const sportLabels = { box_cricket: 'Box Cricket', badminton: 'Badminton', turf: 'Football Turf', cricket_net: 'Cricket Net', pickleball: 'Pickleball', table_tennis: 'Table Tennis', padel: 'Padel', tennis: 'Tennis', snooker: 'Snooker', pool: 'Pool / Billiards', cricket: 'Cricket' };
+            
+            const sportsList = (v.sport_types || []).map(s => ({
+              emoji: emojis[s] || '🏆',
+              label: sportLabels[s] || s
+            }));
+
+            const priceMap = v.price_per_hour || {};
+            const prices = Object.values(priceMap).map(Number).filter(n => !isNaN(n));
+            const minPrice = prices.length > 0 ? Math.min(...prices) : 400;
+
+            return {
+              venueId: v.id,
+              name: v.name,
+              address: v.address,
+              sports: sportsList,
+              image: Array.isArray(v.images) && v.images.length > 0 ? v.images[0] : 'https://images.unsplash.com/photo-1541252260730-0412e8e2108e?w=600&q=80',
+              rating: v.rating || 4.5,
+              minPrice,
+              detectedSport
+            };
+          });
+
+          return res.json({
+            text: `Har Har Mahadev! 🙏 Here are the sports venues matching your query "${latestMessage}":`,
+            card: {
+              type: 'sports_venues_list',
+              items
+            }
+          });
+        }
+      }
+
       return res.json({ text: getMockFallbackResponse(latestMessage) });
     }
 
@@ -934,7 +993,9 @@ router.post('/chat', async (req, res) => {
       venuesContext = retrieved.venues;
       eventsContext = retrieved.events;
       productsContext = retrieved.products;
-    } catch (_) {}
+    } catch (err) {
+      console.warn('AI context retrieval failed:', err);
+    }
 
     const dynamicInstruction = `${SYSTEM_INSTRUCTION}
 
@@ -1262,21 +1323,45 @@ function retrieveRelevantContext(query, venues, events, products) {
 
   const tokens = q.split(/\s+/).filter(t => t.length > 2);
 
+  // Levenshtein distance helper
+  const getLevenshteinDist = (a, b) => {
+    const tmp = [];
+    let i, j;
+    for (i = 0; i <= a.length; i++) tmp.push([i]);
+    for (j = 1; j <= b.length; j++) tmp[0].push(j);
+    for (i = 1; i <= a.length; i++) {
+      for (j = 1; j <= b.length; j++) {
+        tmp[i][j] = Math.min(
+          tmp[i - 1][j] + 1,
+          tmp[i][j - 1] + 1,
+          tmp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+        );
+      }
+    }
+    return tmp[a.length][b.length];
+  };
+
+  const isFuzzyMatch = (word, token) => {
+    if (word.includes(token) || token.includes(word)) return true;
+    if (Math.abs(word.length - token.length) > 2) return false;
+    const dist = getLevenshteinDist(word, token);
+    const maxAllowedDist = token.length <= 4 ? 1 : 2;
+    return dist <= maxAllowedDist;
+  };
+
   const scoreItem = (name, tokens) => {
     let score = 0;
     const lowerName = name.toLowerCase();
+    const nameWords = lowerName.split(/[\s,.-]+/);
     for (const token of tokens) {
-      if (lowerName.includes(token)) score += 10;
-      else {
-        let matchCount = 0;
-        for (let i = 0; i < token.length - 1; i++) {
-          const sub = token.substring(i, i + 2);
-          if (lowerName.includes(sub)) {
-            matchCount++;
+      if (lowerName.includes(token)) {
+        score += 15;
+      } else {
+        for (const word of nameWords) {
+          if (isFuzzyMatch(word, token)) {
+            score += 8;
+            break;
           }
-        }
-        if (matchCount >= token.length / 2) {
-          score += 5;
         }
       }
     }

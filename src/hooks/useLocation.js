@@ -45,6 +45,7 @@ export const useLocation = () => {
                               savedLoc === 'Detecting Location...' || 
                               savedLoc === DEFAULT_LOCATION || 
                               savedLoc === 'Ahmedabad, Gujarat' || 
+                              savedLoc === 'Ahmedabad' || 
                               savedLoc.includes('Ambawadi') || 
                               savedLoc === 'India';
 
@@ -71,7 +72,7 @@ export const useLocation = () => {
               });
               const data = await res.json();
               if (data.address) {
-                const area = data.address.suburb || data.address.neighbourhood || data.address.residential || data.address.village || '';
+                const area = data.address.suburb || data.address.neighbourhood || data.address.city_district || data.address.residential || data.address.road || data.address.village || '';
                 const city = data.address.city || data.address.town || data.address.state_district || '';
 
                 if (area && city) {

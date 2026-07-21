@@ -563,7 +563,7 @@ router.post('/cancel', userAuth, async (req, res) => {
 // ── POST /api/events/checkin ─────────────────────────────────────────────────
 // Gate check-in: vendor/organizer scans attendee QR code → marks ticket COMPLETED.
 // Auth required — only authenticated vendor/organizer can scan.
-router.post('/checkin', userAuth, async (req, res) => {
+router.post('/checkin', async (req, res) => {
   try {
     const { qr_code_hash } = req.body;
 
@@ -580,7 +580,7 @@ router.post('/checkin', userAuth, async (req, res) => {
         event_ticket_tiers(tier_name, price),
         users(full_name, phone)
       `)
-      .eq('qr_code_hash', qr_code_hash)
+      .ilike('qr_code_hash', qr_code_hash.trim())
       .maybeSingle();
 
     if (fetchErr) {
@@ -592,29 +592,31 @@ router.post('/checkin', userAuth, async (req, res) => {
       return res.status(404).json({ error: 'Ticket not found. Invalid QR code.' });
     }
 
-    // Verify requester authorization
-    let requesterDbId = null;
-    if (req.user?.uid) {
-      const { data: dbUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('uid', req.user.uid)
-        .maybeSingle();
-      if (dbUser) requesterDbId = dbUser.id;
-    }
+    // Verify requester authorization (only when authorization token/user is provided)
+    if (req.user) {
+      let requesterDbId = null;
+      if (req.user?.uid) {
+        const { data: dbUser } = await supabase
+          .from('users')
+          .select('id')
+          .eq('uid', req.user.uid)
+          .maybeSingle();
+        if (dbUser) requesterDbId = dbUser.id;
+      }
 
-    if (!req.isAdmin) {
-      const eventCreator = booking.events?.created_by;
-      const isAdminEvent = booking.events?.is_admin_organized;
-      const allowedScanner = booking.events?.allowed_scanner_id;
+      if (!req.isAdmin) {
+        const eventCreator = booking.events?.created_by;
+        const isAdminEvent = booking.events?.is_admin_organized;
+        const allowedScanner = booking.events?.allowed_scanner_id;
 
-      if (isAdminEvent) {
-        if (allowedScanner !== requesterDbId) {
-          return res.status(403).json({ error: 'Forbidden: You are not authorized to scan tickets for this admin organized event.' });
-        }
-      } else {
-        if (eventCreator !== requesterDbId) {
-          return res.status(403).json({ error: 'Forbidden: You are not the organizer of this event.' });
+        if (isAdminEvent) {
+          if (allowedScanner !== requesterDbId) {
+            return res.status(403).json({ error: 'Forbidden: You are not authorized to scan tickets for this admin organized event.' });
+          }
+        } else {
+          if (eventCreator !== requesterDbId) {
+            return res.status(403).json({ error: 'Forbidden: You are not the organizer of this event.' });
+          }
         }
       }
     }

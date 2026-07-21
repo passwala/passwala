@@ -411,13 +411,65 @@ router.post('/checkin', async (req, res) => {
   try {
     const { data: booking, error } = await supabase
       .from('venue_bookings')
-      .select('*, sports_venues(name)')
+      .select('*')
       .eq('qr_code', qr_code)
       .maybeSingle();
 
     if (error) throw error;
     if (!booking) return res.status(404).json({ success: false, error: 'Invalid QR code' });
-    if (booking.status !== 'confirmed') {
+
+    // Fetch venue name separately to avoid postgrest relationship issues
+    let venueName = '';
+    const { data: venue } = await supabase
+      .from('sports_venues')
+      .select('name')
+      .eq('id', booking.venue_id)
+      .maybeSingle();
+    if (venue) venueName = venue.name;
+
+    const bookingWithVenue = { ...booking, sports_venues: { name: venueName } };
+
+    // Verify booking is for today
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (booking.slot_date !== todayStr) {
+      const formattedDate = new Date(booking.slot_date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+      const todayFormatted = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+      return res.status(400).json({
+        success: false,
+        error: `⛔ Invalid Check-in: This booking is scheduled for ${formattedDate}, not today (${todayFormatted}).`
+      });
+    }
+
+    // Verify booking time is within allowed window (from 5 minutes before slot start time)
+    if (booking.slot_time) {
+      const [hours, minutes] = booking.slot_time.split(':').map(Number);
+      const slotStartTime = new Date(booking.slot_date);
+      slotStartTime.setHours(hours, minutes, 0, 0);
+
+      const now = new Date();
+      // Allow check-in starting 5 minutes before the booking starts
+      const allowedStartTime = new Date(slotStartTime.getTime() - 5 * 60 * 1000);
+
+      if (now < allowedStartTime) {
+        const formattedSlotTime = booking.slot_time.slice(0, 5);
+        const [h, m] = formattedSlotTime.split(':').map(Number);
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const displayH = h % 12 || 12;
+        const displayM = String(m).padStart(2, '0');
+        
+        const [eh, em] = (booking.slot_end_time || '15:00').split(':').map(Number);
+        const endampm = eh >= 12 ? 'PM' : 'AM';
+        const displayEndH = eh % 12 || 12;
+        const displayEndM = String(em).padStart(2, '0');
+
+        return res.status(400).json({
+          success: false,
+          error: `⛔ Too early! Your booking is scheduled for ${displayH}:${displayM} ${ampm} to ${displayEndH}:${displayEndM} ${endampm}. Check-in is only allowed up to 5 minutes before the start time.`
+        });
+      }
+    }
+
+    if (bookingWithVenue.status !== 'confirmed') {
       return res.status(400).json({ success: false, error: `Booking is ${booking.status}` });
     }
     if (booking.checked_in_at) {
@@ -429,7 +481,7 @@ router.post('/checkin', async (req, res) => {
       .update({ status: 'completed', checked_in_at: new Date().toISOString() })
       .eq('id', booking.id);
 
-    res.json({ success: true, message: 'Check-in successful!', booking });
+    res.json({ success: true, message: 'Check-in successful!', booking: bookingWithVenue });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -502,6 +554,9 @@ router.patch('/venues/:id', async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Helper to validate UUID format
+const isUuid = (val) => val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
 // GET /api/sports/vendor-venues — Vendor's own venues
 // ══════════════════════════════════════════════════════════════════════════════
 router.get('/vendor-venues', async (req, res) => {
@@ -509,6 +564,13 @@ router.get('/vendor-venues', async (req, res) => {
     const { owner_id, owner_user_id } = req.query;
     if (!owner_id && !owner_user_id) {
       return res.status(400).json({ success: false, error: 'owner_id or owner_user_id required' });
+    }
+
+    if (owner_id && !isUuid(owner_id)) {
+      return res.json({ success: true, venues: [] });
+    }
+    if (owner_user_id && !isUuid(owner_user_id)) {
+      return res.json({ success: true, venues: [] });
     }
 
     let query = supabase.from('sports_venues').select('*').order('created_at', { ascending: false });
@@ -530,6 +592,10 @@ router.get('/vendor-bookings', async (req, res) => {
   try {
     const { venue_id, date } = req.query;
     if (!venue_id) return res.status(400).json({ success: false, error: 'venue_id required' });
+
+    if (!isUuid(venue_id)) {
+      return res.json({ success: true, bookings: [] });
+    }
 
     let query = supabase
       .from('venue_bookings')

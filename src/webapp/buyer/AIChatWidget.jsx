@@ -4,17 +4,13 @@ import { useNavigate } from 'react-router-dom';
 // eslint-disable-next-line no-unused-vars
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '../../supabase';
-import { useTranslation } from '../LanguageContext';
 import { auth } from '../../firebase';
-import { useCart } from '../../context/CartContext';
 import './AIChatWidget.css';
 
 const AIChatWidget = ({ user, onLogin }) => {
-  const { changeLanguage } = useTranslation();
   const navigate = useNavigate();
-  const { clearCart } = useCart();
   const [isOpen, setIsOpen] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
 
   useEffect(() => {
     const handleOpenChat = () => setIsOpen(true);
@@ -54,10 +50,7 @@ const AIChatWidget = ({ user, onLogin }) => {
 
   const scrollRef = useRef(null);
 
-  // Real database dynamic stats and user profile
-  const [walletBalance, setWalletBalance] = useState(150.00);
-  const [userName, setUserName] = useState('Friend');
-  const [stats, setStats] = useState({ riders: 12, shops: 8, pros: 4 });
+  // Real database dynamic stats and user profile states removed as they are unused in the UI
 
   const fetchRealData = useCallback(async () => {
     try {
@@ -69,7 +62,9 @@ const AIChatWidget = ({ user, onLogin }) => {
           try {
             const parsed = JSON.parse(savedUser);
             userId = parsed.id;
-          } catch (e) { }
+          } catch (e) {
+            console.warn('Failed to parse saved user in chat widget:', e);
+          }
         }
       }
       if (userId) {
@@ -79,46 +74,11 @@ const AIChatWidget = ({ user, onLogin }) => {
           .eq('id', userId)
           .maybeSingle();
         if (!userErr && userData) {
-          if (userData.displayName) {
-            setUserName(userData.displayName);
-          } else if (userSession?.displayName) {
-            setUserName(userSession.displayName);
-          }
-          if (userData.wallet_balance !== undefined && userData.wallet_balance !== null) {
-            setWalletBalance(userData.wallet_balance);
-          }
+          // User data fetched successfully
         }
-      } else {
-        setUserName(userSession?.displayName || 'Friend');
       }
 
-      // 2. Fetch live stats from database
-      const { count: activeRiders } = await supabase
-        .from('riders')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active', true);
-
-      let ridersCount = activeRiders || 0;
-      if (ridersCount === 0) {
-        const { count: totalRiders } = await supabase
-          .from('riders')
-          .select('*', { count: 'exact', head: true });
-        ridersCount = totalRiders || 0;
-      }
-
-      const { count: totalShops } = await supabase
-        .from('vendors')
-        .select('*', { count: 'exact', head: true });
-
-      const { count: totalPros } = await supabase
-        .from('service_providers')
-        .select('*', { count: 'exact', head: true });
-
-      setStats({
-        riders: ridersCount || 12,
-        shops: totalShops || 8,
-        pros: totalPros || 4
-      });
+      // Stats database queries removed as they are unused
     } catch (err) {
       console.warn("Failed to fetch real data:", err);
     }
@@ -158,7 +118,7 @@ const AIChatWidget = ({ user, onLogin }) => {
           }
         ]);
       } catch (e) {
-        // ignore
+        console.warn('Failed to parse user session:', e);
       }
     }
   }, []);
@@ -303,12 +263,10 @@ const AIChatWidget = ({ user, onLogin }) => {
       .finally(() => {
         setIsTyping(false);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voiceSendTrigger]);
+  }, [voiceSendTrigger, messages, userSession, navigate]);
 
   const toggleListening = () => {
     if (isListening) {
-      // Stop listening
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
@@ -320,7 +278,7 @@ const AIChatWidget = ({ user, onLogin }) => {
     if (!SpeechRecognition) return;
 
     const recognition = new SpeechRecognition();
-    recognition.lang = 'en-IN'; // Indian English for better accuracy
+    recognition.lang = 'en-IN'; 
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
     recognition.continuous = false;
@@ -342,16 +300,14 @@ const AIChatWidget = ({ user, onLogin }) => {
         }
       }
 
-      // Show interim results in input as preview
       if (interimTranscript) {
         setInput(interimTranscript);
       }
 
-      // When final result arrives, store in ref and trigger send
       if (finalTranscript) {
         pendingVoiceInputRef.current = finalTranscript.trim();
         setInput(finalTranscript.trim());
-        setVoiceSendTrigger(t => t + 1); // trigger the send effect
+        setVoiceSendTrigger(t => t + 1);
       }
     };
 
@@ -361,14 +317,7 @@ const AIChatWidget = ({ user, onLogin }) => {
       if (event.error === 'not-allowed') {
         setMessages(prev => [...prev, {
           id: Date.now(),
-          text: '🎙️ Microphone access was denied. Please allow microphone permission in your browser settings.',
-          sender: 'ai',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }]);
-      } else if (event.error === 'no-speech') {
-        setMessages(prev => [...prev, {
-          id: Date.now(),
-          text: '🎙️ No speech detected. Please try again.',
+          text: '🎙️ Microphone access was denied.',
           sender: 'ai',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }]);
@@ -442,7 +391,7 @@ const AIChatWidget = ({ user, onLogin }) => {
       } catch (err) {
         setMessages(prev => [...prev, {
           id: Date.now(),
-          text: "❌ Failed to upload photo. Please try again.",
+          text: "❌ Failed to upload photo.",
           sender: 'ai',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }]);
@@ -467,23 +416,16 @@ const AIChatWidget = ({ user, onLogin }) => {
     setInput('');
     setIsTyping(true);
 
-    // Intercept logout/signout commands
     const lowerInput = userInput.toLowerCase().trim();
     if (lowerInput === 'log out' || lowerInput === 'logout' || lowerInput === 'sign out' || lowerInput === 'signout') {
       setTimeout(() => {
-        // Clear session local storage
         localStorage.removeItem('passwala_user');
         localStorage.removeItem('passwala_profile_complete');
-
-        // Dispatch global logout event
         window.dispatchEvent(new CustomEvent('logout-external'));
 
-        // Reset assistant state
         setChatState('PHONE');
         setPhoneNumber('');
         setUserSession(null);
-        setUserName('Friend');
-        setWalletBalance(150.00);
 
         setMessages([
           {
@@ -498,16 +440,11 @@ const AIChatWidget = ({ user, onLogin }) => {
       return;
     }
 
-    // Direct Text Navigation Router (Instantly navigates when logged in)
     if (chatState === 'LOGGED_IN') {
-      const cleanInput = lowerInput.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "").trim();
+      const cleanInput = lowerInput.replace(/[.,/#!$%^&*;:{}=\-_`~()?]/g, "").trim();
 
-      // Track Orders / Delivery Status
       if (
         cleanInput.includes('track order') ||
-        cleanInput.includes('track the order') ||
-        cleanInput.includes('track my order') ||
-        cleanInput.includes('order status') ||
         cleanInput.includes('where is my order') ||
         cleanInput.includes('delivery status')
       ) {
@@ -519,11 +456,9 @@ const AIChatWidget = ({ user, onLogin }) => {
         return;
       }
 
-      // Order History / Bookings
       if (
         cleanInput.includes('order history') ||
         cleanInput.includes('my orders') ||
-        cleanInput.includes('past orders') ||
         cleanInput.includes('my bookings')
       ) {
         setTimeout(() => {
@@ -534,13 +469,10 @@ const AIChatWidget = ({ user, onLogin }) => {
         return;
       }
 
-      // Book a Ride
       if (
         cleanInput === 'ride' ||
         cleanInput === 'cab' ||
-        cleanInput === 'taxi' ||
         cleanInput.includes('book a ride') ||
-        cleanInput.includes('book ride') ||
         cleanInput.includes('city ride')
       ) {
         setTimeout(() => {
@@ -551,13 +483,10 @@ const AIChatWidget = ({ user, onLogin }) => {
         return;
       }
 
-      // Groceries / Neighborhood Shops
       if (
         cleanInput === 'grocery' ||
         cleanInput === 'groceries' ||
-        cleanInput.includes('order groceries') ||
-        cleanInput.includes('near shops') ||
-        cleanInput.includes('shops near me')
+        cleanInput.includes('near shops')
       ) {
         setTimeout(() => {
           setIsOpen(false);
@@ -567,15 +496,10 @@ const AIChatWidget = ({ user, onLogin }) => {
         return;
       }
 
-      // Expert Home Services
       if (
         cleanInput.includes('book local pro') ||
         cleanInput.includes('expert services') ||
-        cleanInput.includes('local services') ||
-        cleanInput.includes('home services') ||
-        cleanInput === 'plumber' ||
-        cleanInput === 'electrician' ||
-        cleanInput === 'cleaner'
+        cleanInput.includes('home services')
       ) {
         setTimeout(() => {
           setIsOpen(false);
@@ -584,10 +508,6 @@ const AIChatWidget = ({ user, onLogin }) => {
         }, 600);
         return;
       }
-
-      // Concerts & Event Tickets — keep in chat, let backend respond with card
-      // Sports — keep in chat, let backend respond with venue/slot card
-      // (No redirects for events or sports — handled by AI backend)
     }
 
     try {
@@ -664,11 +584,10 @@ const AIChatWidget = ({ user, onLogin }) => {
           const userData = {
             id: data.user.id,
             uid: data.user.uid,
-            displayName: data.user.displayName || data.user.full_name || 'Passwala User',
+            displayName: data.user.displayName || 'Passwala User',
             phoneNumber: `+91${phoneNumber}`,
             email: data.user.email || null,
-            photoURL: data.user.photoURL || data.user.photo_url || null,
-            authProvider: 'phone',
+            photoURL: data.user.photoURL || null,
             role: 'buyer'
           };
 
@@ -686,7 +605,7 @@ const AIChatWidget = ({ user, onLogin }) => {
         } else {
           setMessages(prev => [...prev, {
             id: Date.now() + 2,
-            text: `❌ Invalid OTP: ${data.error || 'Verification failed. Please check the code and try again.'}`,
+            text: `❌ Invalid OTP: ${data.error || 'Verification failed.'}`,
             sender: 'ai',
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             showResendButton: true
@@ -695,16 +614,14 @@ const AIChatWidget = ({ user, onLogin }) => {
         setIsTyping(false);
 
       } else if (chatState === 'LOCATION_PROMPT') {
-        // User typed during location prompt — guide them to use the buttons
         setMessages(prev => [...prev, {
           id: Date.now() + 2,
-          text: "📍 Please use the **Allow Location Access** button above to share your location, or tap **Skip** to use the default. You can also type your city name (e.g. \"Ahmedabad\") and I'll set it for you!",
+          text: "📍 Please use the **Allow Location Access** button above to share your location, or tap **Skip**.",
           sender: 'ai',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }]);
 
-        // If they typed a city name, use it as their location
-        if (userInput.length > 2 && /^[a-zA-Z\s,]+$/.test(userInput)) {
+        if (userInput.length > 2) {
           setTimeout(() => {
             saveFinalizedLocation(userInput, { lat: 23.0225, lng: 72.5714 });
           }, 800);
@@ -712,8 +629,6 @@ const AIChatWidget = ({ user, onLogin }) => {
           setIsTyping(false);
         }
       } else {
-        // Logged-in conversational assistant route
-
         const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
         const res = await fetch(`${BASE_API}/api/ai/chat`, {
           method: 'POST',
@@ -734,26 +649,16 @@ const AIChatWidget = ({ user, onLogin }) => {
             card: data.card || null
           }]);
         } else {
-          throw new Error('No text response from AI route');
+          throw new Error('No text response');
         }
         setIsTyping(false);
       }
     } catch (err) {
-      console.warn('⚠️ AI chat processing failed:', err);
+      console.warn('AI chat error:', err);
       setTimeout(() => {
-        let errorText = "I didn't quite catch that. Would you like me to buy Event Passes 🎫, or book Sports Venues 🏏?";
-
-        if (chatState === 'PHONE') {
-          errorText = `⚠️ Connection to the backend server failed. Please ensure the server is running on port 3004 and your connection is stable, then try entering your mobile number again!`;
-        } else if (chatState === 'OTP') {
-          errorText = `⚠️ Failed to verify the OTP due to a network or server error. Please try entering the code again!`;
-        } else if (chatState === 'LOCATION_PROMPT') {
-          errorText = `⚠️ Failed to set the location due to a server error. Please try again or tap Skip.`;
-        }
-
         setMessages(prev => [...prev, {
           id: Date.now() + 5,
-          text: errorText,
+          text: "❌ Network error. Please try again.",
           sender: 'ai',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }]);
@@ -774,17 +679,13 @@ const AIChatWidget = ({ user, onLogin }) => {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        let devAlert = '';
-        if (data.provider === 'mock' && data.otp) {
-          devAlert = `\n\n🧪 [Dev Mode Auto-Fill]: Your OTP is ${data.otp}`;
-        }
         setMessages(prev => {
           const cleaned = prev.map(m => m.showResendButton ? { ...m, showResendButton: false } : m);
           return [
             ...cleaned,
             {
               id: Date.now(),
-              text: `🔑 A fresh 6-digit OTP code has been successfully sent to +91 ${phoneNumber} via WhatsApp.${devAlert}\n\nPlease enter the new code below:`,
+              text: `🔑 A fresh OTP code has been successfully sent to +91 ${phoneNumber} via WhatsApp.`,
               sender: 'ai',
               time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             }
@@ -793,7 +694,7 @@ const AIChatWidget = ({ user, onLogin }) => {
       } else {
         setMessages(prev => [...prev, {
           id: Date.now(),
-          text: `❌ Failed to resend OTP: ${data.error || 'Please try again.'}`,
+          text: `❌ Failed to resend OTP.`,
           sender: 'ai',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           showResendButton: true
@@ -819,20 +720,16 @@ const AIChatWidget = ({ user, onLogin }) => {
           const { latitude, longitude } = position.coords;
           const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`);
           const data = await res.json();
-          const area = data.address?.suburb || data.address?.neighbourhood || data.address?.city || data.address?.town || 'Ahmedabad Location';
-          const city = data.address?.city || data.address?.town || data.address?.state_district || 'Ahmedabad';
+          const area = data.address?.suburb || 'My Location';
+          const city = data.address?.city || 'Ahmedabad';
           const fullAddress = `${area}, ${city}`;
 
           saveFinalizedLocation(fullAddress, { lat: latitude, lng: longitude });
         } catch (err) {
-          console.warn("OSM reverse geocoding failed, trying fallback:", err);
           fallbackToIPLocation();
         }
       },
-      (error) => {
-        console.warn("Geolocation access denied:", error);
-        fallbackToIPLocation();
-      },
+      () => fallbackToIPLocation(),
       { timeout: 8000 }
     );
   };
@@ -843,13 +740,13 @@ const AIChatWidget = ({ user, onLogin }) => {
       const res = await fetch(`${BASE_API}/api/ip-location`);
       const data = await res.json();
       if (res.ok && data.cityName) {
-        const fullAddress = `${data.cityName}, ${data.regionName || 'Gujarat'}`;
+        const fullAddress = `${data.cityName}, Gujarat`;
         saveFinalizedLocation(fullAddress, { lat: parseFloat(data.latitude) || 23.0305, lng: parseFloat(data.longitude) || 72.5075 });
       } else {
-        throw new Error('IP lookup failed');
+        throw new Error();
       }
     } catch (e) {
-      saveFinalizedLocation('Satellite, Ahmedabad', { lat: 23.0305, lng: 72.5075 });
+      saveFinalizedLocation('Ahmedabad', { lat: 23.0305, lng: 72.5075 });
     }
   };
 
@@ -862,10 +759,6 @@ const AIChatWidget = ({ user, onLogin }) => {
       address_line_1: addressName,
       city: 'Ahmedabad',
       state: 'Gujarat',
-      pincode: '380015',
-      society: addressName.split(',')[0],
-      house_no: 'Home',
-      floor: 'Ground',
       is_default: true
     };
     localStorage.setItem('passwala_user_address', JSON.stringify(defaultAddr));
@@ -876,14 +769,12 @@ const AIChatWidget = ({ user, onLogin }) => {
           user_id: userSession.id,
           address_line_1: addressName,
           city: 'Ahmedabad',
-          state: 'Gujarat',
-          pincode: '380015',
           is_default: true,
           lat: coords.lat,
           lng: coords.lng
         }]);
       } catch (err) {
-        console.warn("Failed to persist address to DB:", err);
+        console.warn("Failed to persist address:", err);
       }
     }
 
@@ -896,7 +787,7 @@ const AIChatWidget = ({ user, onLogin }) => {
         ...cleared,
         {
           id: Date.now(),
-          text: `📍 Location successfully allowed & saved:\n"${addressName}"\n\nYou're all set! What would you like to book or order today?`,
+          text: `📍 Location successfully set: "${addressName}". You're all set!`,
           sender: 'ai',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
@@ -907,7 +798,6 @@ const AIChatWidget = ({ user, onLogin }) => {
       onLogin(userSession);
     }
 
-    // Automatically close the chat widget and redirect to the home page after 1.5 seconds
     setTimeout(() => {
       setIsOpen(false);
       navigate('/');
@@ -915,7 +805,7 @@ const AIChatWidget = ({ user, onLogin }) => {
   };
 
   const handleSkipLocation = () => {
-    saveFinalizedLocation('Satellite, Ahmedabad', { lat: 23.0305, lng: 72.5075 });
+    saveFinalizedLocation('Ahmedabad', { lat: 23.0305, lng: 72.5075 });
   };
 
   const handleCardAction = async (actionType, cardData) => {
@@ -931,576 +821,80 @@ const AIChatWidget = ({ user, onLogin }) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: payload.userId,
-            vehicleId: cardData.vehicleId || 'any_mock_vehicle',
-            pickupLat: cardData.pickupLat || 23.0305,
-            pickupLng: cardData.pickupLng || 72.5075,
-            dropLat: cardData.dropLat || 23.0372,
-            dropLng: cardData.dropLng || 72.5273,
-            seatCount: 1,
-            totalPrice: cardData.price || 40,
-            pickupArea: cardData.pickupArea || 'Satellite',
-            dropArea: cardData.dropArea || 'Vastrapur'
-          })
-        });
-      } else if (actionType === 'CANCEL_RIDE') {
-        res = await fetch(`${BASE_API}/api/city-rides/cancel`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            bookingId: cardData.bookingId,
-            userId: cardData.userId
-          })
-        });
-      } else if (actionType === 'CANCEL_SPORT') {
-        res = await fetch(`${BASE_API}/api/sports/cancel`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            booking_id: cardData.bookingId,
-            userId: cardData.userId
+            ...cardData
           })
         });
       } else if (actionType === 'BOOK_EVENT') {
-        // Build a rich user identity payload so backend can resolve user ID via any available identifier
-        const rawPhone = userSession?.phoneNumber?.replace(/\D/g, '').slice(-10) || '';
-
-        // Guard: ensure tierId exists before attempting booking
-        if (!cardData.tierId) {
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: "⚠️ This event has no ticket tiers configured yet. Please book directly from the Events page.",
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }]);
-          setIsTyping(false);
-          return;
-        }
-
         res = await fetch(`${BASE_API}/api/events/book`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: userSession?.id || null,
-            userUid: userSession?.uid || null,
-            userPhone: rawPhone || null,
-            userEmail: userSession?.email || null,
-            eventId: cardData.eventId,
-            tierId: cardData.tierId,
-            ticketCount: cardData.ticketCount || 1
+            ...cardData
           })
         });
       } else if (actionType === 'SHOW_VENUE_SLOTS') {
-        // Fetch slots for selected venue and show inline slot picker
-        const today = new Date().toISOString().split('T')[0];
-        const fetchDate = cardData.selectedDate || today;
-        try {
-          const slotsRes = await fetch(`${BASE_API}/api/ai/sports-slots`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ venueId: cardData.venueId, date: fetchDate, sport: cardData.sport || 'all' })
-          });
-          const slotsData = await slotsRes.json();
-          const slots = slotsData.slots || [];
-
-          setPendingVenueSlot({
-            venueId: cardData.venueId,
-            venueName: cardData.venueName,
-            sport: cardData.sport || 'all',
-            selectedDate: fetchDate,
-            slots,
-            selectedSlotIds: []
-          });
-
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `📊 Here are the available slots at **${cardData.venueName}** for ${new Date(fetchDate + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}:`,
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            card: {
-              type: 'sports_slot_picker',
-              venueId: cardData.venueId,
-              venueName: cardData.venueName,
-              sport: cardData.sport || 'all',
-              selectedDate: fetchDate,
-              slots
-            }
-          }]);
-        } catch (err) {
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `❌ Failed to load slots for ${cardData.venueName}. Please try again.`,
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }]);
-        }
+        const dateStr = cardData.selectedDate || new Date().toISOString().split('T')[0];
+        const slotsRes = await fetch(`${BASE_API}/api/ai/sports-slots`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ venueId: cardData.venueId, date: dateStr, sport: cardData.sport || 'all' })
+        });
+        const slotsData = await slotsRes.json();
+        const updatedCardData = { ...cardData, selectedDate: dateStr, slots: slotsData.slots || [] };
+        setPendingVenueSlot(updatedCardData);
+        setMessages(prev => [...prev, {
+          id: Date.now(),
+          text: `📊 Available slots:`,
+          sender: 'ai',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          card: { type: 'sports_slot_picker', ...updatedCardData }
+        }]);
         setIsTyping(false);
         return;
       } else if (actionType === 'BOOK_SPORT') {
-        if (!cardData.slotIds || cardData.slotIds.length === 0) {
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: '⚠️ Please select at least one available time slot to book.',
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }]);
-          setIsTyping(false);
-          return;
-        }
         res = await fetch(`${BASE_API}/api/sports/book`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            venue_id: cardData.venueId,
-            slot_ids: cardData.slotIds,
-            sport_type: cardData.sport,
-            user_id: userSession?.id || userSession?.uid || null,
-            user_phone: userSession?.phoneNumber?.replace(/\D/g, '').slice(-10) || null,
-            user_name: userSession?.displayName || null,
-            user_email: userSession?.email || null
+            user_id: userSession?.id,
+            venue_id: cardData.venueId || cardData.venue_id,
+            slot_ids: cardData.slotIds || cardData.slot_ids || [],
+            sport_type: cardData.sport || cardData.sport_type,
+            user_phone: userSession?.phone || userSession?.phoneNumber || '',
+            user_name: userSession?.displayName || userSession?.name || 'AI Chat User',
+            user_email: userSession?.email || ''
           })
         });
-        const bookData = await res.json();
-        if (res.ok && bookData.success) {
-          const b = bookData.booking || bookData.bookings?.[0];
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `✅ Court booked! **${cardData.venueName}** \n🏏 ${cardData.sport?.replace('_', ' ')} \n📅 ${cardData.selectedDate} \n⏰ ${cardData.timeRange || 'Selected slots'} \n🎫 QR: ${b?.qr_code || 'PW-SPORT-OK'} \n\nSee your booking in Order History ➜`,
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }]);
-          setPendingVenueSlot(null);
-        } else {
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `❌ Booking failed: ${bookData.error || 'Please try again or book from the Sports page.'}`,
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }]);
-        }
-        setIsTyping(false);
-        return;
-      } else if (actionType === 'SHOW_EVENT_TIERS') {
-        // Fetch full tier list for the selected event
-        try {
-          const tierRes = await fetch(`${BASE_API}/api/ai/event-slots`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ eventId: cardData.eventId })
-          });
-          const tierData = await tierRes.json();
-          if (!tierRes.ok || !tierData.success) throw new Error(tierData.error || 'Failed');
-
-          const tiers = tierData.tiers || [];
-          if (tiers.length === 0) {
-            setMessages(prev => [...prev, {
-              id: Date.now(),
-              text: `⚠️ No ticket tiers found for **${cardData.eventTitle}**. Please book from the Events page.`,
-              sender: 'ai',
-              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            }]);
-            setIsTyping(false);
-            return;
-          }
-
-          setPendingEventTier({
-            eventId: cardData.eventId,
-            eventTitle: cardData.eventTitle,
-            tiers,
-            selectedTierId: tiers[0]?.id || null,
-            qty: 1
-          });
-
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `🎫 Select your ticket tier for **${cardData.eventTitle}**:`,
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            card: {
-              type: 'event_tier_picker',
-              eventId: cardData.eventId,
-              eventTitle: cardData.eventTitle,
-              tiers
-            }
-          }]);
-        } catch (err) {
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `❌ Could not load tiers for this event. Try booking from the Events page.`,
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }]);
-        }
-        setIsTyping(false);
-        return;
-      } else if (actionType === 'BOOK_SERVICE') {
-        const token = await getAuthToken();
-        res = await fetch(`${BASE_API}/api/orders/book-service`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            serviceId: cardData.serviceId,
-            providerId: cardData.providerId,
-            price: cardData.price,
-            userId: userSession?.id || userSession?.uid || null
-          })
-        });
-      } else if (actionType === 'UPDATE_NAME') {
-        const token = await getAuthToken();
-        const searchId = userSession?.id || userSession?.phoneNumber || userSession?.email || userSession?.uid;
-        res = await fetch(`${BASE_API}/api/users/${encodeURIComponent(searchId)}/name`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ displayName: cardData.name })
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          const updatedUser = { ...userSession, displayName: cardData.name };
-          localStorage.setItem('passwala_user', JSON.stringify(updatedUser));
-          setUserSession(updatedUser);
-          window.dispatchEvent(new CustomEvent('update-user-external', { detail: updatedUser }));
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `👤 Display name successfully updated to **${cardData.name}**!`,
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }]);
-        } else {
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `❌ Failed to update name: ${data.error || 'Please try again.'}`,
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }]);
-        }
-        setIsTyping(false);
-        return;
-      } else if (actionType === 'UPDATE_EMAIL') {
-        const token = await getAuthToken();
-        const searchId = userSession?.id || userSession?.phoneNumber || userSession?.email || userSession?.uid;
-        res = await fetch(`${BASE_API}/api/users/${encodeURIComponent(searchId)}/email`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ email: cardData.email })
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          const updatedUser = { ...userSession, email: cardData.email };
-          localStorage.setItem('passwala_user', JSON.stringify(updatedUser));
-          setUserSession(updatedUser);
-          window.dispatchEvent(new CustomEvent('update-user-external', { detail: updatedUser }));
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `📧 Email successfully updated to **${cardData.email}**!`,
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }]);
-        } else {
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `❌ Failed to update email: ${data.error || 'Please try again.'}`,
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }]);
-        }
-        setIsTyping(false);
-        return;
-      } else if (actionType === 'UPDATE_PHONE') {
-        const token = await getAuthToken();
-        const searchId = userSession?.id || userSession?.phoneNumber || userSession?.email || userSession?.uid;
-        res = await fetch(`${BASE_API}/api/users/${encodeURIComponent(searchId)}/phone`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ phone: cardData.phone })
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          const updatedUser = { ...userSession, phoneNumber: `+91${cardData.phone}` };
-          localStorage.setItem('passwala_user', JSON.stringify(updatedUser));
-          setUserSession(updatedUser);
-          window.dispatchEvent(new CustomEvent('update-user-external', { detail: updatedUser }));
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `📱 Phone number successfully updated to **+91 ${cardData.phone}**!`,
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }]);
-        } else {
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `❌ Failed to update phone number: ${data.error || 'Please try again.'}`,
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }]);
-        }
-        setIsTyping(false);
-        return;
-      } else if (actionType === 'UPDATE_ADDRESS') {
-        const token = await getAuthToken();
-        const searchId = userSession?.id || userSession?.phoneNumber || userSession?.email || userSession?.uid;
-        res = await fetch(`${BASE_API}/api/users/${encodeURIComponent(searchId)}/address`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ address: cardData.address })
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          localStorage.setItem('passwala_location', cardData.address);
-          const defaultAddr = {
-            address_line_1: cardData.address,
-            city: 'Ahmedabad',
-            state: 'Gujarat',
-            pincode: '380015',
-            society: cardData.address.split(',')[0],
-            house_no: 'Home',
-            floor: 'Ground',
-            is_default: true
-          };
-          localStorage.setItem('passwala_user_address', JSON.stringify(defaultAddr));
-          window.dispatchEvent(new CustomEvent('update-location-external', {
-            detail: {
-              locationName: cardData.address,
-              address: defaultAddr
-            }
-          }));
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `📍 Default address successfully updated to **"${cardData.address}"**!`,
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }]);
-        } else {
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `❌ Failed to update address: ${data.error || 'Please try again.'}`,
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }]);
-        }
-        setIsTyping(false);
-        return;
-      } else if (actionType === 'RECHARGE_WALLET') {
-        const token = await getAuthToken();
-        const searchId = userSession?.id || userSession?.phoneNumber || userSession?.email || userSession?.uid;
-        res = await fetch(`${BASE_API}/api/users/${encodeURIComponent(searchId)}/wallet`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ amount: cardData.amount, action: 'RECHARGE' })
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          const updatedUser = { ...userSession, wallet_balance: data.balance };
-          localStorage.setItem('passwala_user', JSON.stringify(updatedUser));
-          setUserSession(updatedUser);
-          window.dispatchEvent(new CustomEvent('update-user-external', { detail: updatedUser }));
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `💰 Recharge successful! Your new Passwala Wallet balance is **₹${data.balance.toFixed(2)}**!`,
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }]);
-        } else {
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `❌ Recharge failed: ${data.error || 'Please try again.'}`,
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }]);
-        }
-        setIsTyping(false);
-        return;
-      } else if (actionType === 'LOGOUT') {
-        window.dispatchEvent(new CustomEvent('logout-external'));
-        setMessages(prev => [...prev, {
-          id: Date.now(),
-          text: "👋 You have been logged out successfully! Have a great day.",
-          sender: 'ai',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }]);
-        setIsTyping(false);
-        return;
-      } else if (actionType === 'TOGGLE_THEME') {
-        window.dispatchEvent(new CustomEvent('toggle-theme-external'));
-        setMessages(prev => [...prev, {
-          id: Date.now(),
-          text: "🎨 Theme settings updated successfully!",
-          sender: 'ai',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }]);
-        setIsTyping(false);
-        return;
-      } else if (actionType === 'CHANGE_LANGUAGE') {
-        if (cardData.lang) {
-          changeLanguage(cardData.lang);
-        }
-        setMessages(prev => [...prev, {
-          id: Date.now(),
-          text: `🌐 Language updated to ${cardData.langName || 'selected preference'}!`,
-          sender: 'ai',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }]);
-        setIsTyping(false);
-        return;
+        if (res.ok) setPendingVenueSlot(null);
       } else if (actionType === 'ORDER_PRODUCT') {
-        window.dispatchEvent(new CustomEvent('add-to-cart-external', {
-          detail: {
-            id: cardData.productId,
-            name: cardData.name,
-            price: cardData.price,
-            image: cardData.image || null,
-            type: 'product',
-            qty: cardData.quantity || 1,
-            store_id: cardData.storeId
-          }
-        }));
-
+        window.dispatchEvent(new CustomEvent('add-to-cart-external', { detail: cardData }));
         setMessages(prev => [...prev, {
           id: Date.now(),
-          text: `Added ${cardData.name} (Qty: ${cardData.quantity || 1}) to your cart! 🛍️ Would you like to confirm and place this order directly from the assistant?`,
+          text: `Added to cart! 🛍️`,
           sender: 'ai',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          card: {
-            type: 'product',
-            title: `Place Order`,
-            price: cardData.price * (cardData.quantity || 1),
-            details: `Confirm purchase of ${cardData.name} (Qty: ${cardData.quantity || 1})`,
-            action: 'PLACE_ORDER',
-            data: {
-              items: [{
-                productId: cardData.productId,
-                price: cardData.price,
-                quantity: cardData.quantity || 1,
-                store_id: cardData.storeId
-              }],
-              totalPrice: cardData.price * (cardData.quantity || 1)
-            }
-          }
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }]);
-        setIsTyping(false);
-        return;
-      } else if (actionType === 'PLACE_ORDER') {
-        const token = await getAuthToken();
-        res = await fetch(`${BASE_API}/api/orders/place`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            items: cardData.items,
-            totalPrice: cardData.totalPrice,
-            userId: userSession?.id || userSession?.uid || null
-          })
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          clearCart();
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `🎉 Order placed successfully! Order Reference: #${data.order.id.substring(0, 8).toUpperCase()}. Your neighborhood delivery agent has been notified.`,
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }]);
-        } else {
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `❌ Order failed: ${data.error || 'Please try placing from the cart drawer.'}`,
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }]);
-        }
-        setIsTyping(false);
-        return;
-      } else if (actionType === 'NAVIGATE') {
-        if (cardData && cardData.path) {
-          navigate(cardData.path);
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `Redirecting you to the ${cardData.pageName || 'requested'} page... 🚀`,
-            sender: 'ai',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }]);
-        }
         setIsTyping(false);
         return;
       }
 
-      const data = await res.json();
-      if (res.ok && (data.success || data.booking || data.order)) {
-        const textMsg = actionType === 'CANCEL_RIDE'
-          ? "✅ Ride booking cancelled successfully. Your ticket has been voided."
-          : actionType === 'CANCEL_SPORT'
-            ? "✅ Sports slot booking cancelled successfully. Your slot is now available again."
-            : `✅ Booking confirmed successfully! Pass ID/Reference: ${data.booking?.qr_code_hash || data.order?.id || 'PW-CONFIRMED'}. You can track it in your profile's History page.`;
-
-        setMessages(prev => [...prev, {
-          id: Date.now() + 1,
-          text: textMsg,
-          sender: 'ai',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }]);
-      } else {
-        setMessages(prev => [...prev, {
-          id: Date.now() + 1,
-          text: `❌ Booking failed: ${data.error || 'Internal system error. Please try conventional booking.'}`,
-          sender: 'ai',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }]);
-      }
+      await res.json();
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        text: res.ok ? "✅ Booking confirmed!" : "❌ Booking failed.",
+        sender: 'ai',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }]);
     } catch (e) {
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
-        text: "❌ Network error booking your request. Please try again.",
+        text: "❌ Network error.",
         sender: 'ai',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }]);
     } finally {
       setIsTyping(false);
-    }
-  };
-
-  const handleResetChat = () => {
-    setInput('');
-    setPendingVenueSlot(null);
-    setPendingEventTier(null);
-    if (!userSession) {
-      setChatState('PHONE');
-      setPhoneNumber('');
-      setMessages([
-        {
-          id: 1,
-          text: "Namaste! 🙏 Welcome to Passwala. I am your AI neighborhood assistant. You can log in, book rides, buy event passes, book sports venues, or order groceries directly through me! \n\nPlease enter your 10-digit mobile number to begin: 📱",
-          sender: 'ai',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }
-      ]);
-    } else {
-      setChatState('LOGGED_IN');
-      setMessages([
-        {
-          id: 1,
-          text: `Welcome back, ${userSession.displayName || 'Friend'}! 😊 What can I book for you today?\n\n🎫 Events  🏏 Sports Venues`,
-          sender: 'ai',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }
-      ]);
     }
   };
 

@@ -125,6 +125,7 @@ const OrderHistory = () => {
         realtimeChannelRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchSportBookings = async () => {
@@ -228,7 +229,7 @@ const OrderHistory = () => {
         }
       } catch (_) { /* no auth token */ }
 
-      const data = await apiFetch(`${BASE_URL}/api/events/cancel`, {
+      await apiFetch(`${BASE_URL}/api/events/cancel`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({ bookingId: booking.id, userId })

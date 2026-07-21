@@ -83,7 +83,18 @@ messaging.onBackgroundMessage((payload) => {
         '/api': {
           target: 'http://127.0.0.1:3004',
           changeOrigin: true,
-          secure: false
+          secure: false,
+          configure: (proxy, _options) => {
+            proxy.on('error', (err, req, res) => {
+              if (err.code === 'ECONNREFUSED') {
+                // Send a friendly 503 Service Unavailable instead of showing a scary console traceback
+                res.writeHead(503, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Backend is starting up, please try again in a moment.' }));
+                return;
+              }
+              console.error('Vite Proxy Error:', err);
+            });
+          }
         }
       }
     },

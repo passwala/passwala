@@ -7,6 +7,7 @@ import dns from 'dns';
 dns.setDefaultResultOrder('ipv4first');
 
 import express from 'express';
+import compression from 'compression';
 import cors from 'cors';
 import os from 'os';
 import fs from 'fs/promises';
@@ -28,6 +29,7 @@ import morgan from 'morgan';
 import { sendNotification } from './utils/notifications.js';
 
 const app = express();
+app.use(compression());
 // Enable trust proxy to correctly obtain client IP address behind reverse proxies (Render, Vercel, etc.)
 app.set('trust proxy', 1);
 
@@ -107,7 +109,7 @@ app.get('/', (req, res) => {
 app.get('/health', async (req, res) => {
   try {
     const start = Date.now();
-    const { data, error } = await supabase.from('users').select('id').limit(1);
+    const { error } = await supabase.from('users').select('id').limit(1);
     const duration = Date.now() - start;
     
     if (error) {
@@ -148,7 +150,16 @@ app.use('/api/admin', adminLimiter, adminRoutes);
 
 // PUBLIC: Platform settings (non-sensitive fields only — fees, delivery config, ride pricing)
 // Used by VendorPortal, ride booking, etc. — no auth required
+let cachedPlatformSettings = null;
+let cachedSettingsTimestamp = 0;
+const SETTINGS_CACHE_DURATION = 60 * 1000; // Cache settings for 1 minute
+
 app.get('/api/platform-settings', async (req, res) => {
+  const now = Date.now();
+  if (cachedPlatformSettings && (now - cachedSettingsTimestamp < SETTINGS_CACHE_DURATION)) {
+    return res.json(cachedPlatformSettings);
+  }
+
   const settingsPath = process.cwd().endsWith('server')
     ? path.join(process.cwd(), 'platform_settings.json')
     : path.join(process.cwd(), 'server', 'platform_settings.json');
@@ -173,9 +184,14 @@ app.get('/api/platform-settings', async (req, res) => {
     const publicSettings = { ...defaults };
     const publicKeys = Object.keys(defaults);
     publicKeys.forEach(k => { if (saved[k] !== undefined) publicSettings[k] = saved[k]; });
-    res.json({ success: true, settings: publicSettings });
+    
+    cachedPlatformSettings = { success: true, settings: publicSettings };
+    cachedSettingsTimestamp = now;
+    res.json(cachedPlatformSettings);
   } catch {
-    res.json({ success: true, settings: defaults });
+    cachedPlatformSettings = { success: true, settings: defaults };
+    cachedSettingsTimestamp = now;
+    res.json(cachedPlatformSettings);
   }
 });
 

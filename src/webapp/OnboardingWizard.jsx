@@ -108,7 +108,9 @@ function speak(text) {
     const utt = new SpeechSynthesisUtterance(text);
     utt.lang = 'en-IN'; utt.rate = 0.95; utt.pitch = 1.1;
     window.speechSynthesis.speak(utt);
-  } catch (_) {}
+  } catch (err) {
+    console.warn('Speech synthesis failed:', err);
+  }
 }
 
 const OnboardingWizard = ({ user, onComplete }) => {
@@ -125,22 +127,30 @@ const OnboardingWizard = ({ user, onComplete }) => {
   const current = STEPS[step];
 
   useEffect(() => {
-    if (voiceOn) speak(current.question);
-    setMascotAnim('pop');
-    const t = setTimeout(() => setMascotAnim('float'), 700);
-    return () => clearTimeout(t);
-  }, [step, voiceOn]);
+    if (voiceOn && current?.question) speak(current.question);
+    const popTimer = setTimeout(() => setMascotAnim('pop'), 0);
+    const floatTimer = setTimeout(() => setMascotAnim('float'), 700);
+    return () => {
+      clearTimeout(popTimer);
+      clearTimeout(floatTimer);
+    };
+  }, [step, voiceOn, current]);
 
   useEffect(() => {
     const saved = answers[current.id];
-    if (current.type === 'multi_card') {
-      // Pre-select ALL options by default; restore saved selection if returning to this step
-      const allIds = current.options.map(o => o.id);
-      setSelected(Array.isArray(saved) && saved.length > 0 ? saved : allIds);
-    }
-    else if (current.type === 'single_card') setSelected(saved ? [saved] : []);
-    else setSelected([]);
-  }, [step]);
+    const updateSelection = () => {
+      if (current.type === 'multi_card') {
+        const allIds = (current.options || []).map(o => o.id);
+        setSelected(Array.isArray(saved) && saved.length > 0 ? saved : allIds);
+      } else if (current.type === 'single_card') {
+        setSelected(saved ? [saved] : []);
+      } else {
+        setSelected([]);
+      }
+    };
+    const t = setTimeout(updateSelection, 0);
+    return () => clearTimeout(t);
+  }, [step, answers, current.id, current.options, current.type]);
 
   const goTo = useCallback((target, newAns) => {
     if (transRef.current) return;
@@ -163,7 +173,9 @@ const OnboardingWizard = ({ user, onComplete }) => {
   const handleSkip = () => {
     try {
       localStorage.setItem('passwala_onboarding_done', 'true');
-    } catch (_) {}
+    } catch (err) {
+      console.warn('LocalStorage write failed:', err);
+    }
     if (window.speechSynthesis) window.speechSynthesis.cancel();
     onComplete(answers);
   };
@@ -179,7 +191,9 @@ const OnboardingWizard = ({ user, onComplete }) => {
       try {
         localStorage.setItem('passwala_onboarding_done', 'true');
         localStorage.setItem('passwala_onboarding_prefs', JSON.stringify(newAns));
-      } catch (_) {}
+      } catch (err) {
+        console.warn('LocalStorage write failed:', err);
+      }
       if (voiceOn) window.speechSynthesis?.cancel();
       onComplete(newAns);
     }

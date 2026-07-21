@@ -106,9 +106,11 @@ const VendorPortal = ({ user, onLogout }) => {
   // Onboarding State
   const [onboardingSubStep, setOnboardingSubStep] = useState(() => parseInt(localStorage.getItem('vOnboardingStep') || '1')); 
   const [businessType, setBusinessType] = useState(() => {
-    // In launch mode: always default to 'event' (only event feature is live)
+    const stored = localStorage.getItem('vBusinessType');
+    if (stored) return stored;
+    // In launch mode: default to 'event' if no preference saved
     if (LAUNCH_MODE) return 'event';
-    return localStorage.getItem('vBusinessType') || 'shop';
+    return 'shop';
   });
   const [formData, setFormData] = useState(() => {
     const saved = localStorage.getItem('vFormData');
@@ -2386,8 +2388,8 @@ const VendorPortal = ({ user, onLogout }) => {
             >
               {activeTab === 'dashboard' && renderDashboard()}
               {activeTab === 'profile' && renderProfile()}
-              {activeTab === 'inventory' && <VendorInventory vendorData={vendorData} businessType={businessType} storeId={storeId || vendorData?.id} />}
-              {activeTab === 'orders' && <VendorOrders vendorData={vendorData} businessType={businessType} storeId={storeId || vendorData?.id} />}
+              {activeTab === 'inventory' && <VendorInventory vendorData={vendorData} businessType={businessType} storeId={storeId || vendorData?.id} setActiveTab={setActiveTab} />}
+              {activeTab === 'orders' && <VendorOrders vendorData={vendorData} businessType={businessType} storeId={storeId || vendorData?.id} setPortalActiveTab={setActiveTab} />}
               {activeTab === 'earnings' && <VendorEarnings vendorData={vendorData} businessType={businessType} storeId={storeId || vendorData?.id} />}
               {activeTab === 'reviews' && <VendorReviews vendorData={vendorData} businessType={businessType} storeId={storeId || vendorData?.id} />}
               {activeTab === 'notifications' && <VendorNotifications vendorData={vendorData} businessType={businessType} storeId={storeId || vendorData?.id} />}

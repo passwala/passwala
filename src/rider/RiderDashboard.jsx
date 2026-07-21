@@ -430,10 +430,6 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
     if (!coords || isNaN(coords.lat) || isNaN(coords.lng)) {
       return getRiderLocationCoords();
     }
-    const dist = getStraightLineDistance(coords.lat, coords.lng, 23.0225, 72.5714);
-    if (dist > 50) {
-      return getRiderLocationCoords();
-    }
     return coords;
   }, [getRiderLocationCoords]);
 

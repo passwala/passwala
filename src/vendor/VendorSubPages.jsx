@@ -125,6 +125,7 @@ const QRScannerModal = ({ isOpen, onClose, onScan, businessType }) => {
     };
 
     const startScanLoop = () => {
+      let lastScanTime = 0;
       const tick = () => {
         const video = videoRef.current;
         const canvas = canvasRef.current;
@@ -137,33 +138,51 @@ const QRScannerModal = ({ isOpen, onClose, onScan, businessType }) => {
           return;
         }
 
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const now = Date.now();
+        // Limit scanner analysis to 5-6 runs per second to prevent CPU overload
+        if (now - lastScanTime > 180) {
+          lastScanTime = now;
 
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: 'dontInvert'
-        });
+          // Downscale the camera resolution for faster QR decoding (max 360px dimension)
+          const maxDim = 360;
+          let w = video.videoWidth;
+          let h = video.videoHeight;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
 
-        if (code && code.data) {
-          if (isValidQR(code.data)) {
-            // Valid Passwalaa QR — accept it
-            scanFoundRef.current = true;
-            setScanned(true);
-            setTimeout(() => {
-              onScan(code.data.trim());
-            }, 400);
-            return;
-          } else {
-            // Invalid QR (barcode number etc) — cooldown 1.5s, show message
-            cooldownRef.current = true;
-            setInvalidMsg('Invalid code — show the ticket QR');
-            setTimeout(() => {
-              cooldownRef.current = false;
-              setInvalidMsg('');
-            }, 1500);
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
+          ctx.drawImage(video, 0, 0, w, h);
+
+          const imageData = ctx.getImageData(0, 0, w, h);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'dontInvert'
+          });
+
+          if (code && code.data) {
+            if (isValidQR(code.data)) {
+              scanFoundRef.current = true;
+              setScanned(true);
+              setTimeout(() => {
+                onScan(code.data.trim());
+              }, 300);
+              return;
+            } else {
+              cooldownRef.current = true;
+              setInvalidMsg('Invalid code — show the ticket QR');
+              setTimeout(() => {
+                cooldownRef.current = false;
+                setInvalidMsg('');
+              }, 1500);
+            }
           }
         }
 
@@ -410,7 +429,7 @@ export const ConfirmModal = ({ isOpen, title, message, confirmText, cancelText, 
   return ReactDOM.createPortal(content, document.body);
 };
 
-export const VendorInventory = ({ vendorData, businessType, storeId }) => {
+export const VendorInventory = ({ vendorData, businessType, storeId, setActiveTab }) => {
   const [items, setItems] = React.useState([]);
   const loadedBusinessTypeRef = React.useRef(businessType);
 
@@ -4349,11 +4368,13 @@ function VendorOrderMapWrapper({ order, businessType }) {
   );
 }
 
-export const VendorOrders = ({ storeId, businessType, vendorData }) => {
+export const VendorOrders = ({ storeId, businessType, vendorData, setPortalActiveTab }) => {
   const [activeTab, setActiveTab] = React.useState('active');
   const [orders, setOrders] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [qrScannerOpen, setQrScannerOpen] = React.useState({ open: false, booking: null });
+  const [checkinLoading, setCheckinLoading] = React.useState(false);
+  const [checkinResult, setCheckinResult] = React.useState(null);
   const [confirmDialog, setConfirmDialog] = React.useState({
     isOpen: false,
     title: '',
@@ -4984,9 +5005,12 @@ export const VendorOrders = ({ storeId, businessType, vendorData }) => {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {(() => {
-          const filteredList = orders.filter(o => activeTab === 'active'
-            ? (o.status !== 'DELIVERED' && o.status !== 'CANCELLED' && o.status !== 'COMPLETED')
-            : (o.status === 'DELIVERED' || o.status === 'CANCELLED' || o.status === 'COMPLETED'));
+          const filteredList = orders.filter(o => {
+            const statusUpper = (o.status || '').toUpperCase();
+            return activeTab === 'active'
+              ? (statusUpper !== 'DELIVERED' && statusUpper !== 'CANCELLED' && statusUpper !== 'COMPLETED')
+              : (statusUpper === 'DELIVERED' || statusUpper === 'CANCELLED' || statusUpper === 'COMPLETED');
+          });
           
           if (filteredList.length === 0) {
             return (
@@ -5237,70 +5261,213 @@ export const VendorOrders = ({ storeId, businessType, vendorData }) => {
         onClose={() => setQrScannerOpen({ open: false, booking: null })}
         onScan={async (scannedHash) => {
           if (businessType === 'sports') {
-            const { data, error } = await supabase
-              .from('venue_bookings')
-              .select('id, status, user_name, sport_type, qr_code, slot_date, slot_time')
-              .eq('qr_code', scannedHash)
-              .maybeSingle();
-
-            if (error || !data) {
-              toast.error('❌ Invalid QR — Booking not found');
-              return;
-            }
-
-            if (data.slot_date && data.slot_time) {
-              const [hours, minutes] = data.slot_time.split(':').map(Number);
-              const slotDate = new Date(data.slot_date);
-              slotDate.setHours(hours, minutes, 0, 0);
-
-              const now = new Date();
-              const fifteenMinutesBefore = new Date(slotDate.getTime() - 15 * 60 * 1000);
-
-              if (now < fifteenMinutesBefore) {
-                toast.error(`⚠️ Too early! Booking starts at ${data.slot_time} on ${data.slot_date}`);
-                return;
-              }
-            }
-            if (data.status === 'COMPLETED' || data.status === 'completed') {
-              toast.success(`✅ ${data.user_name || 'Player'} already checked in`);
+            try {
               setQrScannerOpen({ open: false, booking: null });
-              return;
+              setCheckinLoading(true);
+              setCheckinResult(null);
+              const BASE_URL = window.location.protocol === 'https:'
+                ? ''
+                : (window._API_URL || `http://${window.location.hostname}:3004`);
+
+              const { data: { session } } = await supabase.auth.getSession();
+              const token = session?.access_token || '';
+
+              const res = await fetch(`${BASE_URL}/api/sports/checkin`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({ qr_code: scannedHash.trim() })
+              });
+              const data = await res.json();
+
+              if (res.ok && data.success) {
+                const normalizedBooking = {
+                  attendee: data.booking.user_name,
+                  phone: data.booking.user_phone || 'N/A',
+                  event: data.booking.sports_venues?.name || 'Sports Venue',
+                  tier: data.booking.sport_type,
+                  ticket_count: '1 Slot',
+                  invoice: data.booking.invoice_number
+                };
+                setCheckinResult({ success: true, booking: normalizedBooking });
+                fetchOrders();
+              } else if (res.status === 400 && (data.error || '').includes('Already')) {
+                const normalizedBooking = data.booking ? {
+                  attendee: data.booking.user_name,
+                  phone: data.booking.user_phone || 'N/A',
+                  event: data.booking.sports_venues?.name || 'Sports Venue',
+                  tier: data.booking.sport_type,
+                  ticket_count: '1 Slot',
+                  invoice: data.booking.invoice_number
+                } : null;
+                setCheckinResult({ success: false, alreadyUsed: true, error: data.error || 'Already checked in', booking: normalizedBooking });
+              } else {
+                setCheckinResult({ success: false, error: data.error || '❌ Invalid QR — Booking not found' });
+              }
+            } catch (err) {
+              setCheckinResult({ success: false, error: '❌ Check-in failed due to network error' });
+            } finally {
+              setCheckinLoading(false);
             }
-            if (data.status === 'CANCELLED' || data.status === 'cancelled') {
-              toast.error('⛔ This booking has been cancelled');
-              return;
-            }
-            await supabase.from('venue_bookings').update({ status: 'completed', checked_in_at: new Date().toISOString() }).eq('id', data.id);
-            toast.success(`🎉 ${data.user_name || 'Player'} checked in successfully!`);
-            setQrScannerOpen({ open: false, booking: null });
-            fetchOrders();
             return;
           }
 
-          const { data, error } = await supabase
-            .from('event_bookings')
-            .select('id, status, users(full_name, phone), events(title)')
-            .eq('qr_code_hash', scannedHash)
-            .maybeSingle();
-
-          if (error || !data) {
-            toast.error('❌ Invalid QR — Ticket not found');
-            return;
-          }
-          if (data.status === 'COMPLETED') {
-            toast.success(`✅ ${data.users?.full_name || 'Attendee'} already checked in`);
+          try {
             setQrScannerOpen({ open: false, booking: null });
-            return;
+            setCheckinLoading(true);
+            setCheckinResult(null);
+            const BASE_URL = window.location.protocol === 'https:'
+              ? ''
+              : (window._API_URL || `http://${window.location.hostname}:3004`);
+
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token || '';
+
+            const res = await fetch(`${BASE_URL}/api/events/checkin`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+              },
+              body: JSON.stringify({ qr_code_hash: scannedHash.trim() })
+            });
+            const data = await res.json();
+
+            if (res.ok && data.success) {
+              const normalizedBooking = {
+                attendee: data.booking.users?.full_name || 'Attendee',
+                phone: data.booking.users?.phone || 'N/A',
+                event: data.booking.events?.title || 'Event',
+                tier: data.booking.event_ticket_tiers?.tier_name || 'General',
+                ticket_count: data.booking.ticket_count || 1,
+                invoice: data.booking.invoice_number
+              };
+              setCheckinResult({ success: true, booking: normalizedBooking });
+              fetchOrders();
+            } else if (res.status === 400 && (data.error || '').includes('already')) {
+              const normalizedBooking = data.booking ? {
+                attendee: data.booking.users?.full_name || 'Attendee',
+                phone: data.booking.users?.phone || 'N/A',
+                event: data.booking.events?.title || 'Event',
+                tier: data.booking.event_ticket_tiers?.tier_name || 'General',
+                ticket_count: data.booking.ticket_count || 1,
+                invoice: data.booking.invoice_number
+              } : null;
+              setCheckinResult({ success: false, alreadyUsed: true, error: data.error || 'Already checked in', booking: normalizedBooking });
+            } else {
+              setCheckinResult({ success: false, error: data.error || '❌ Invalid QR — Ticket not found' });
+            }
+          } catch (err) {
+            setCheckinResult({ success: false, error: '❌ Check-in failed due to network error' });
+          } finally {
+            setCheckinLoading(false);
           }
-          if (data.status === 'CANCELLED') {
-            toast.error('⛔ This ticket has been cancelled');
-            return;
-          }
-          await updateStatus(data.id, 'COMPLETED');
-          toast.success(`🎉 ${data.users?.full_name || 'Attendee'} checked in for ${data.events?.title || 'the event'}!`);
-          setQrScannerOpen({ open: false, booking: null });
         }}
       />
+
+      {/* Check-in Loading Overlay */}
+      {checkinLoading && ReactDOM.createPortal(
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 999998, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: 'white', borderRadius: '20px', padding: '2rem 3rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
+            <div style={{ width: '40px', height: '40px', border: '4px solid #e2e8f0', borderTop: '4px solid #16a34a', borderRadius: '50%', animation: 'checkin-spin 1s linear infinite' }} />
+            <p style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>Verifying ticket...</p>
+            <style>{`@keyframes checkin-spin { to { transform: rotate(360deg); } }`}</style>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Check-in Result Modal */}
+      {ReactDOM.createPortal(
+        <AnimatePresence>
+          {checkinResult && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 999997, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', backdropFilter: 'blur(6px)' }}
+              onClick={() => setCheckinResult(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.85, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+                style={{ background: 'white', borderRadius: '28px', padding: '2rem', width: '100%', maxWidth: '400px', boxShadow: '0 30px 60px rgba(0,0,0,0.25)' }}
+                onClick={e => e.stopPropagation()}
+              >
+                {/* Result Icon */}
+                <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                  <div style={{
+                    width: '72px', height: '72px', borderRadius: '50%', margin: '0 auto 1rem',
+                    background: checkinResult.success ? '#dcfce7' : checkinResult.alreadyUsed ? '#fef3c7' : '#fee2e2',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: checkinResult.success ? '0 0 30px rgba(34,197,94,0.25)' : 'none'
+                  }}>
+                    <span style={{ fontSize: '2.2rem' }}>
+                      {checkinResult.success ? '✅' : checkinResult.alreadyUsed ? '⚠️' : '❌'}
+                    </span>
+                  </div>
+                  <h2 style={{ margin: '0 0 4px', fontWeight: 900, fontSize: '1.3rem', color: '#0f172a' }}>
+                    {checkinResult.success ? 'Checked In!' : checkinResult.alreadyUsed ? 'Already Used' : 'Check-in Error'}
+                  </h2>
+                  <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>
+                    {checkinResult.success ? 'Entry approved. Attendee may enter.' : checkinResult.error}
+                  </p>
+                </div>
+
+                {/* Attendee Details Card */}
+                {checkinResult.booking && (
+                  <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.5rem', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Attendee</span>
+                      <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '1rem' }}>{checkinResult.booking.attendee}</span>
+                    </div>
+                    {checkinResult.booking.phone && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Phone</span>
+                        <span style={{ fontWeight: 700, color: '#475569' }}>{checkinResult.booking.phone}</span>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Details</span>
+                      <span style={{ fontWeight: 700, color: '#475569', textAlign: 'right', maxWidth: '60%' }}>{checkinResult.booking.event}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Category</span>
+                      <span style={{ fontWeight: 700, color: '#475569' }}>{checkinResult.booking.tier}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Tickets</span>
+                      <span style={{ fontWeight: 900, color: '#ff7622', fontSize: '1rem' }}>{checkinResult.booking.ticket_count}</span>
+                    </div>
+                    {checkinResult.booking.invoice && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Invoice</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#64748b', fontSize: '0.8rem' }}>{checkinResult.booking.invoice}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    onClick={() => { setCheckinResult(null); setQrScannerOpen({ open: true, booking: null }); }}
+                    style={{ flex: 1, padding: '13px', background: '#f1f5f9', border: 'none', borderRadius: '14px', fontWeight: 800, cursor: 'pointer', color: '#475569', fontSize: '0.9rem' }}
+                  >
+                    Scan Next
+                  </button>
+                  <button
+                    onClick={() => setCheckinResult(null)}
+                    style={{ flex: 1, padding: '13px', background: checkinResult.success ? 'linear-gradient(135deg,#16a34a,#15803d)' : '#0f172a', border: 'none', borderRadius: '14px', fontWeight: 800, cursor: 'pointer', color: 'white', fontSize: '0.9rem' }}
+                  >
+                    Done
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 };

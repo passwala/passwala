@@ -470,20 +470,7 @@ const AppContent = ({
 
   const [_isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [showComingSoon, setShowComingSoon] = useState(false);
-  const [isDevModalOpen, setIsDevModalOpen] = useState(false);
-  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const { addToCart } = useCart();
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'd') {
-        e.preventDefault();
-        setIsDevModalOpen(prev => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   useEffect(() => {
     const handleOpenChat = () => setIsAiChatOpen(true);
@@ -630,7 +617,25 @@ const AppContent = ({
                   user={effectiveUser} location={location} onLocationChange={setLocation}
                   isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)}
                   onOpenProfile={() => navigate('/profile')}
-                  onBack={locationPath !== '/' ? () => navigate(-1) : null}
+                  onBack={
+                    locationPath === '/'
+                      ? null
+                      : ['/sports', '/events', '/near-shops', '/expert-services', '/neighbors', '/city-ride', '/profile', '/select-location'].includes(locationPath)
+                        ? () => navigate('/')
+                        : () => {
+                            if (!window.history.state || window.history.state.idx === 0) {
+                              if (locationPath.startsWith('/sports/')) {
+                                navigate('/sports');
+                              } else if (locationPath.startsWith('/events/')) {
+                                navigate('/events');
+                              } else {
+                                navigate('/');
+                              }
+                            } else {
+                              navigate(-1);
+                            }
+                          }
+                  }
                   title={
                     locationPath === '/profile' ? t('profile') :
                       locationPath === '/near-shops' ? t('near_shops') :
@@ -736,7 +741,7 @@ const AppContent = ({
                   <Route path="/events/ticket" element={effectiveUser ? <EventTicket /> : <Navigate to="/" />} />
                   <Route path="/events/:id" element={effectiveUser ? <EventDetails user={effectiveUser} /> : <Navigate to="/" />} />
                   {/* Sports Venue Booking — checkout/ticket BEFORE :id param to avoid collision */}
-                  <Route path="/sports" element={effectiveUser ? <SportsHub user={effectiveUser} /> : <Navigate to="/" />} />
+                  <Route path="/sports" element={effectiveUser ? <SportsHub user={effectiveUser} userCoords={userCoords} /> : <Navigate to="/" />} />
                   <Route path="/sports/checkout" element={effectiveUser ? <SportsCheckout user={effectiveUser} /> : <Navigate to="/" />} />
                   <Route path="/sports/ticket" element={effectiveUser ? <SportsTicket /> : <Navigate to="/" />} />
                   <Route path="/sports/:id" element={effectiveUser ? <VenueDetails user={effectiveUser} /> : <Navigate to="/" />} />

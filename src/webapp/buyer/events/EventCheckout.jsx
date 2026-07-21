@@ -187,7 +187,7 @@ const EventCheckout = ({ user: routeUser }) => {
       toast.success('Event Tickets Booked Successfully!');
 
       // 🔓 Unlock Order History in profile after first booking (launch mode reveal)
-      try { localStorage.setItem('passwala_has_bookings', 'true'); } catch (_) {}
+      try { localStorage.setItem('passwala_has_bookings', 'true'); } catch (err) { console.warn('LocalStorage write failed:', err); }
 
       navigate('/events/ticket', { state: { booking: data.booking, event, tier: selectedTier, fromCheckout: true } });
     } catch (err) {

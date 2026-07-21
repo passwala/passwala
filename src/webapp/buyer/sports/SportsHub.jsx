@@ -29,7 +29,7 @@ const AMENITY_ICONS = {
   'Cafeteria': '☕', 'First Aid': '🩺',
 };
 
-const SportsHub = ({ user }) => {
+const SportsHub = ({ user, userCoords }) => {
   const navigate = useNavigate();
   const [activeSport, setActiveSport] = useState('all');
   const [venues, setVenues] = useState([]);
@@ -43,6 +43,20 @@ const SportsHub = ({ user }) => {
     const t = setTimeout(() => setDebouncedSearch(search), 400);
     return () => clearTimeout(t);
   }, [search]);
+
+  // Haversine helper
+  const getDistance = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
 
   const fetchVenues = useCallback(async () => {
     if (abortRef.current) abortRef.current.abort();
@@ -69,11 +83,11 @@ const SportsHub = ({ user }) => {
 
   useEffect(() => { fetchVenues(); }, [fetchVenues]);
 
-  const getMinPrice = (venue) => {
+  const getMinPrice = useCallback((venue) => {
     const prices = Object.values(venue.price_per_hour || {});
     if (!prices.length) return null;
     return Math.min(...prices);
-  };
+  }, []);
 
   return (
     <div className="sh-root">
@@ -147,9 +161,11 @@ const SportsHub = ({ user }) => {
 
       {/* ── Venue List ── */}
       <div className="sh-body">
+        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginBottom: '1.25rem', paddingLeft: '4px' }}>All Sports Venues</h2>
+        
         {loading ? (
           <div className="sh-loading">
-            {[1,2,3].map(i => (
+            {[1,2,3,4].map(i => (
               <div key={i} className="sh-skeleton-card">
                 <div className="sh-skeleton-img" />
                 <div className="sh-skeleton-body">
@@ -170,7 +186,7 @@ const SportsHub = ({ user }) => {
           <div className="sh-venue-grid">
             <AnimatePresence>
               {venues.map((venue, i) => {
-                const minPrice = getMinPrice(venue);
+                const distance = getDistance(userCoords?.lat, userCoords?.lng, venue.lat, venue.lng);
                 return (
                   <motion.div
                     key={venue.id}
@@ -189,61 +205,30 @@ const SportsHub = ({ user }) => {
                           🏟️
                         </div>
                       )}
-                      {/* Sport pills */}
-                      <div className="sh-venue-sports-row">
-                        {(venue.sport_types || []).slice(0, 3).map(s => {
-                          const sp = SPORT_TYPES.find(t => t.id === s);
-                          return (
-                            <span key={s} className="sh-venue-sport-pill">
-                              {sp?.emoji} {sp?.label || s}
-                            </span>
-                          );
-                        })}
-                        {(venue.sport_types?.length || 0) > 3 && (
-                          <span className="sh-venue-sport-pill">+{venue.sport_types.length - 3}</span>
-                        )}
-                      </div>
                     </div>
 
                     {/* Info */}
-                    <div className="sh-venue-info">
-                      <div className="sh-venue-name-row">
-                        <h3 className="sh-venue-name">{venue.name}</h3>
-                        {venue.rating > 0 && (
-                          <span className="sh-venue-rating">
-                            <Star size={12} fill="currentColor" /> {venue.rating.toFixed(1)}
-                          </span>
-                        )}
+                    <div className="sh-venue-info" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <h3 className="sh-venue-name" style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
+                        {venue.name}
+                      </h3>
+
+                      <div className="sh-venue-location" style={{ fontSize: '0.85rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span>
+                          {distance ? `${distance.toFixed(1)} km • ` : ''}{venue.city || 'Ahmedabad'}
+                        </span>
                       </div>
 
-                      <div className="sh-venue-location">
-                        <MapPin size={13} />
-                        <span>{venue.address || venue.city}</span>
-                      </div>
-
-                      <div className="sh-venue-meta-row">
-                        <div className="sh-venue-hours">
-                          <Clock size={13} />
-                          <span>{(venue.open_time || '06:00').slice(0,5)} – {(venue.close_time || '22:00').slice(0,5)}</span>
-                        </div>
-                        {(venue.amenities || []).slice(0, 2).map(a => (
-                          <span key={a} className="sh-amenity-pill">
-                            {AMENITY_ICONS[a] || '✓'} {a}
-                          </span>
-                        ))}
-                      </div>
-
-                      <div className="sh-venue-footer">
-                        {minPrice && (
-                          <div className="sh-venue-price">
-                            <span className="sh-price-from">From</span>
-                            <span className="sh-price-val">₹{minPrice}</span>
-                            <span className="sh-price-per">/hr</span>
-                          </div>
-                        )}
-                        <button className="sh-book-btn">
-                          Book Now <ChevronRight size={16} />
-                        </button>
+                      {/* Sport type tags */}
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+                        {(venue.sport_types || []).map(s => {
+                          const sp = SPORT_TYPES.find(t => t.id === s);
+                          return (
+                            <span key={s} style={{ fontSize: '0.72rem', background: '#f1f5f9', color: '#475569', padding: '3px 8px', borderRadius: '6px', fontWeight: 600 }}>
+                              {sp?.label || s}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
                   </motion.div>
