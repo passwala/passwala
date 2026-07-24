@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Plus, Sparkles, Sunrise, Users, ShoppingBasket, MapPin, X, Check, Clock } from 'lucide-react';
+import { ArrowRight, Plus, Sparkles, Sunrise, Users, ShoppingBasket, MapPin, X, Check, Clock, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { useTranslation } from '../LanguageContext';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../supabase';
@@ -10,6 +10,31 @@ import { useCart } from '../../context/CartContext';
 import './NeighborhoodHub.css';
 import { LAUNCH_MODE, LAUNCH_FEATURES, isFeatureEnabled } from '../../launchConfig';
 
+const SPORT_LABELS = {
+  box_cricket:    'Box Cricket',
+  badminton:      'Badminton',
+  turf:           'Football Turf',
+  cricket_net:    'Cricket Net',
+  pickleball:     'Pickleball',
+  table_tennis:   'Table Tennis',
+  padel:          'Padel',
+  tennis:         'Tennis',
+  snooker:        'Snooker',
+  pool:           'Pool / Billiards',
+  cricket:        'Cricket',
+};
+
+const SPORT_IMAGES = {
+  box_cricket: 'https://images.unsplash.com/photo-1531415080290-bc9b84988755?w=400&q=80',
+  badminton: 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=400&q=80',
+  turf: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=400&q=80',
+  cricket_net: 'https://images.unsplash.com/photo-1531415080290-bc9b84988755?w=400&q=80',
+  pickleball: 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=400&q=80',
+  table_tennis: 'https://images.unsplash.com/photo-1609710223199-1422727407a5?w=400&q=80',
+  default: 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=400&q=80'
+};
+
+const FALLBACK_IMG = 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=400&q=80';
 
 const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs }) => {
   const navigate = useNavigate();
@@ -19,19 +44,64 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
   const [activeRideBooking, setActiveRideBooking] = useState(null);
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [liveEventCount, setLiveEventCount] = useState(null);
+  const [recommendedEvents, setRecommendedEvents] = useState([]);
+  const [recommendedSports, setRecommendedSports] = useState([]);
+  const [currentSlide, setCurrentSlide] = useState(0);
 
-  // Fetch real event count for hero stats
+  // Fetch real event count and list for recommendations
   useEffect(() => {
     const baseUrl = import.meta.env.VITE_API_URL || '';
-    fetch(`${baseUrl}/api/events/search?category=All&query=&page=1&pageSize=1&showType=all`)
+    
+    // Fetch real events
+    fetch(`${baseUrl}/api/events/search?category=All&query=&page=1&pageSize=5&showType=festival`)
       .then(r => r.json())
       .then(data => {
         if (data?.total !== undefined) setLiveEventCount(data.total);
         else if (data?.events?.length !== undefined) setLiveEventCount(data.events.length);
+        if (data?.events) setRecommendedEvents(data.events);
+      })
+      .catch(() => {});
+
+    // Fetch real sports venues
+    fetch(`${baseUrl}/api/sports/venues?page=1&pageSize=5`)
+      .then(r => r.json())
+      .then(data => {
+        if (data?.venues) setRecommendedSports(data.venues);
       })
       .catch(() => {});
   }, []);
 
+  // Construct dynamic slides from real events
+  const slides = recommendedEvents.length > 0 ? recommendedEvents.map((evt) => ({
+    id: evt.id,
+    title: evt.category?.toUpperCase() || 'LIVE FESTIVAL',
+    tagline: evt.title,
+    description: evt.description || 'Experience the best live festival in your neighborhood.',
+    image: evt.banner_url || 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=1200&q=80',
+    actionText: 'Book Tickets',
+    color: '#ff7622',
+    path: `/events/${evt.id}`
+  })) : [
+    {
+      id: 'default-1',
+      title: 'FESTIVAL',
+      tagline: 'Monsoon & Festive Carnivals',
+      description: 'Celebrate the season with live food festivals, traditional dance nights, and community carnivals near you.',
+      image: 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=1200&q=80',
+      actionText: 'Explore Festivals',
+      color: '#ff7622',
+      path: '/events'
+    }
+  ];
+
+  // Auto-play banner slider
+  useEffect(() => {
+    if (slides.length <= 1) return;
+    const timer = setInterval(() => {
+      setCurrentSlide(prev => (prev + 1) % slides.length);
+    }, 5500);
+    return () => clearInterval(timer);
+  }, [slides.length]);
 
   useEffect(() => {
     if (!user) return;
@@ -45,7 +115,6 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.bookings) {
-            // Find first active ride (CONFIRMED status)
             const active = data.bookings.find(b => b.status === 'CONFIRMED');
             setActiveRideBooking(active || null);
           }
@@ -57,7 +126,6 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
 
     fetchActiveRide();
 
-    // Real-time subscription for instant updates without page refresh
     const rideSub = supabase
       .channel('hub_ride_booking_updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_bookings' }, (payload) => {
@@ -70,8 +138,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
     };
   }, [user]);
 
-  // State management for interactive features
-  const [activeModal, setActiveModal] = useState(null); // 'GROUP_ORDER' | 'MORNING_DELIVERY' | null
+  const [activeModal, setActiveModal] = useState(null);
   const [joinedPool, setJoinedPool] = useState(() => {
     const savedPool = localStorage.getItem('passwala_joined_pool');
     return savedPool ? JSON.parse(savedPool) : null;
@@ -126,21 +193,28 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
       type: "purple",
       view: 'EVENTS',
       tag: t('book_now_caps')
+    },
+    {
+      id: 'sports',
+      title: 'Sports Venues',
+      subtitle: 'Book badminton turfs, box cricket, and pools',
+      image: '/sports_card.png',
+      type: "green",
+      view: 'SPORTS',
+      tag: 'BOOK VENUE'
     }
   ];
 
-  // Filter cards based on onboarding choices
   const activePrefs = onboardingPrefs?.use_for;
   const prefFiltered = Array.isArray(activePrefs) && activePrefs.length > 0
     ? cards.filter(card => activePrefs.includes(card.id))
     : cards;
 
-  // Apply Launch Mode filter — hides non-launched features without removing code
+  // In LAUNCH_MODE, always show all enabled launch features to ensure the home page is populated
   const allCards = LAUNCH_MODE
-    ? prefFiltered.filter(card => LAUNCH_FEATURES.includes(card.id))
+    ? cards.filter(card => LAUNCH_FEATURES.includes(card.id))
     : prefFiltered;
 
-  // AI Smart Basket logic
   const handleSmartBasket = () => {
     const essentials = [
       {
@@ -181,7 +255,6 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
     }, 1200);
   };
 
-  // Apartment Group Orders Data
   const availablePools = [
     {
       id: 'pool-1',
@@ -215,8 +288,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
     toast.error('Left the apartment order pool.');
   };
 
-  // Morning Subscriptions Setup State
-  const [selectedSubItems, setSelectedSubItems] = useState(['milk']); // default milk
+  const [selectedSubItems, setSelectedSubItems] = useState(['milk']);
   const [frequency, setFrequency] = useState('daily');
   const [timeSlot, setTimeSlot] = useState('06:00 AM - 07:00 AM');
 
@@ -277,14 +349,74 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
     fetchStats();
   }, []);
 
+  const handleSubnavClick = (linkType) => {
+    switch (linkType) {
+      case 'movies':
+      case 'events':
+      case 'plays':
+      case 'activities':
+        onNavigate('EVENTS');
+        break;
+      case 'sports':
+        onNavigate('SPORTS');
+        break;
+      case 'stream':
+        toast('Stream services are coming soon!', { icon: '🎬' });
+        break;
+      case 'listyourshow': {
+        const vendorUrl = window.location.protocol + '//' + window.location.hostname + ':3002';
+        window.open(vendorUrl, '_blank');
+        break;
+      }
+      case 'offers':
+        navigate('/offers');
+        break;
+      case 'corporates':
+        toast('Corporate deals coming soon!', { icon: '💼' });
+        break;
+      case 'giftcards':
+        navigate('/gift-cards');
+        break;
+      default:
+        break;
+    }
+  };
+
+  const getCleanImgUrl = (imgUrl) => {
+    let cardImg = imgUrl || FALLBACK_IMG;
+    if (typeof cardImg === 'string' && cardImg.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(cardImg);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          cardImg = parsed[0];
+        }
+      } catch (_) { /* ignore */ }
+    }
+    return cardImg;
+  };
+
   return (
     <motion.section 
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
       className="neighborhood-hub"
-      style={{ paddingBottom: '120px' }}
     >
+      {/* ── BMS Style Sub-Navbar ── */}
+      <div className="bms-subnav">
+        <div className="bms-subnav-inner">
+          <div className="bms-subnav-links-left">
+            <span className="active" onClick={() => handleSubnavClick('events')}>Events</span>
+            <span onClick={() => handleSubnavClick('sports')}>Sports</span>
+          </div>
+          <div className="bms-subnav-links-right">
+            <span onClick={() => handleSubnavClick('listyourshow')}>ListYourShow</span>
+            <span onClick={() => handleSubnavClick('offers')}>Offers</span>
+            <span onClick={() => handleSubnavClick('giftcards')}>Gift Cards</span>
+          </div>
+        </div>
+      </div>
+
       <div className="hub-container">
         {/* Dynamic Active Ride Booking Banner */}
         {activeRideBooking && (
@@ -305,6 +437,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
             </button>
           </div>
         )}
+
         {/* Dynamic Join Active Pool Alert */}
         {joinedPool && (
           <div className="completion-banner" style={{ borderStyle: 'solid', background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, var(--bg-surface) 100%)', borderColor: '#3b82f6' }}>
@@ -341,319 +474,174 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
           </div>
         )}
 
-
-        {/* ── LAUNCH MODE: Hero Feature Showcase ── */}
-        {LAUNCH_MODE && allCards.length === 1 ? (
-          <>
-          <motion.div
-            className="launch-hero-section"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, ease: 'easeOut' }}
-            onClick={() => onNavigate(allCards[0].view)}
-          >
-            {/* Animated background orbs */}
-            <div className="launch-hero-orb orb-1" />
-            <div className="launch-hero-orb orb-2" />
-            <div className="launch-hero-orb orb-3" />
-
-            {/* Top badge */}
-            <motion.div
-              className="launch-hero-badge"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.3 }}
-            >
-              <span className="launch-badge-dot" />
-              NOW LIVE IN INDIA
-            </motion.div>
-
-            {/* Main content */}
-            <div className="launch-hero-body">
-              <div className="launch-hero-left">
-                <motion.h1
-                  className="launch-hero-title"
-                  initial={{ opacity: 0, x: -30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.4, duration: 0.6 }}
-                >
-                  Book Event<br />
-                  <span className="launch-title-gradient">Tickets</span>
-                </motion.h1>
-
-                <motion.p
-                  className="launch-hero-sub"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.55, duration: 0.5 }}
-                >
-                  Concerts, shows, festivals & more — all Ahmedabad events in one place. Skip the queue, book instantly.
-                </motion.p>
-
-                {/* Stats row */}
-                <motion.div
-                  className="launch-hero-stats"
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.7 }}
-                >
-                  <div className="launch-stat">
-                    <span className="launch-stat-num">
-                      {liveEventCount !== null ? `${liveEventCount}+` : '...'}
-                    </span>
-                    <span className="launch-stat-label">Live Events</span>
-                  </div>
-                  <div className="launch-stat-divider" />
-                  <div className="launch-stat">
-                    <span className="launch-stat-num">🎫</span>
-                    <span className="launch-stat-label">Instant Booking</span>
-                  </div>
-                </motion.div>
-
-                <motion.button
-                  className="launch-hero-cta"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.85 }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={(e) => { e.stopPropagation(); onNavigate(allCards[0].view); }}
-                >
-                  Browse Events <ArrowRight size={18} />
-                </motion.button>
-              </div>
-
-              <motion.div
-                className="launch-hero-right"
-                initial={{ opacity: 0, scale: 0.85, rotate: -5 }}
-                animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                transition={{ delay: 0.5, duration: 0.7, type: 'spring' }}
+        {/* ── BMS Style Hero Banner Carousel Slider ── */}
+        <div className="bms-carousel-wrapper" style={{ padding: '0 0 1.5rem 0' }}>
+          <div className="bms-carousel">
+            {slides.map((slide, idx) => (
+              <div
+                key={slide.id}
+                className={`bms-slide ${idx === currentSlide ? 'active' : ''}`}
+                style={{ backgroundImage: `linear-gradient(to right, rgba(0,0,0,0.85) 30%, rgba(0,0,0,0.1) 100%), url(${slide.image})` }}
               >
-                <div className="launch-hero-img-wrap">
-                  <img src="/event_tickets.png" alt="Event Tickets" className="launch-hero-img" />
-                  <div className="launch-img-glow" />
-                </div>
-
-                {/* Floating ticket pill */}
-                <motion.div
-                  className="launch-float-pill"
-                  animate={{ y: [0, -8, 0] }}
-                  transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-                >
-                  🎶 Live Tonight
-                </motion.div>
-              </motion.div>
-            </div>
-          </motion.div>
-
-          {/* ── Sports Venue Booking Card (always visible — new feature) ── */}
-          <motion.div
-            className="launch-hero-section"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, ease: 'easeOut', delay: 0.2 }}
-            onClick={() => onNavigate('SPORTS')}
-          >
-            {/* Animated background orbs */}
-            <div className="launch-hero-orb orb-1" />
-            <div className="launch-hero-orb orb-2" />
-            <div className="launch-hero-orb orb-3" />
-
-            {/* Top badge */}
-            <motion.div
-              className="launch-hero-badge"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.4 }}
-            >
-              <span className="launch-badge-dot" />
-              🆕 NEW FEATURE
-            </motion.div>
-
-            {/* Main content */}
-            <div className="launch-hero-body">
-              <div className="launch-hero-left">
-                <motion.h1
-                  className="launch-hero-title"
-                  initial={{ opacity: 0, x: -30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.5, duration: 0.6 }}
-                >
-                  Book a<br />
-                  <span className="launch-title-gradient">Sports Court</span>
-                </motion.h1>
-
-                <motion.p
-                  className="launch-hero-sub"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.65, duration: 0.5 }}
-                >
-                  Box Cricket, Badminton, Turf, Pickleball, Tennis & more — instantly book venues in Ahmedabad.
-                </motion.p>
-
-                {/* Stats row */}
-                <motion.div
-                  className="launch-hero-stats"
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.8 }}
-                >
-                  <div className="launch-stat">
-                    <span className="launch-stat-num">24h</span>
-                    <span className="launch-stat-label">Open Slots</span>
-                  </div>
-                  <div className="launch-stat-divider" />
-                  <div className="launch-stat">
-                    <span className="launch-stat-num">🏏</span>
-                    <span className="launch-stat-label">Multi-sports</span>
-                  </div>
-                </motion.div>
-
-                <motion.button
-                  className="launch-hero-cta"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.95 }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={(e) => { e.stopPropagation(); onNavigate('SPORTS'); }}
-                >
-                  Book a Slot <ArrowRight size={18} />
-                </motion.button>
-              </div>
-
-              <motion.div
-                className="launch-hero-right"
-                initial={{ opacity: 0, scale: 0.85, rotate: 5 }}
-                animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                transition={{ delay: 0.6, duration: 0.7, type: 'spring' }}
-              >
-                <div className="launch-hero-img-wrap" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <div className="lsc-emojis-v2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                    <span style={{ fontSize: '3rem', background: '#fff', padding: '12px', borderRadius: '20px', border: '1.5px solid #ffedd5', boxShadow: '0 8px 24px rgba(255, 118, 34, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s' }}>🏏</span>
-                    <span style={{ fontSize: '3rem', background: '#fff', padding: '12px', borderRadius: '20px', border: '1.5px solid #ffedd5', boxShadow: '0 8px 24px rgba(255, 118, 34, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s' }}>🏸</span>
-                    <span style={{ fontSize: '3rem', background: '#fff', padding: '12px', borderRadius: '20px', border: '1.5px solid #ffedd5', boxShadow: '0 8px 24px rgba(255, 118, 34, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s' }}>⚽</span>
-                    <span style={{ fontSize: '3rem', background: '#fff', padding: '12px', borderRadius: '20px', border: '1.5px solid #ffedd5', boxShadow: '0 8px 24px rgba(255, 118, 34, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s' }}>🏓</span>
-                    <span style={{ fontSize: '3rem', background: '#fff', padding: '12px', borderRadius: '20px', border: '1.5px solid #ffedd5', boxShadow: '0 8px 24px rgba(255, 118, 34, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s' }}>🎾</span>
-                    <span style={{ fontSize: '3rem', background: '#fff', padding: '12px', borderRadius: '20px', border: '1.5px solid #ffedd5', boxShadow: '0 8px 24px rgba(255, 118, 34, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s' }}>🎱</span>
-                  </div>
-                </div>
-              </motion.div>
-            </div>
-          </motion.div>
-          </>
-
-        ) : (
-          <>
-            {/* ── Top 3 Service Cards (normal mode) ── */}
-            <div className="hub-cards-grid">
-              {allCards.slice(0, 3).map((card, i) => (
-                <motion.div
-                  key={card.id}
-                  onClick={() => {
-                    if (card.view === 'NEIGHBORS') {
-                      setShowComingSoon(true);
-                    } else {
-                      onNavigate(card.view);
-                    }
-                  }}
-                  whileHover={{ scale: 1.05, translateY: -10 }}
-                  initial={{ opacity: 0, x: -20 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.1, duration: 0.4 }}
-                  className={`hub-card ${card.type}`}
-                >
-                  <div className="hub-card-text">
-                    <span className="hub-card-tag">{card.tag}</span>
-                    <h3>{card.title}</h3>
-                    <p>{card.subtitle}</p>
-                    <div className="card-explore-btn">
-                      Explore <ArrowRight size={14} />
-                    </div>
-                  </div>
-                  <div className="hub-card-image">
-                    <img src={card.image} alt={card.title} />
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-
-            {/* ── Bottom 2 Service Cards — centered, same card width as top row ── */}
-            {allCards.length > 3 && (
-              <div className="hub-cards-row2">
-                {allCards.slice(3).map((card, i) => (
-                  <motion.div
-                    key={card.id}
+                <div className="bms-slide-content">
+                  <span className="bms-slide-badge" style={{ backgroundColor: slide.color }}>
+                    <Sparkles size={11} /> {slide.title}
+                  </span>
+                  <h1 className="bms-slide-tagline">{slide.tagline}</h1>
+                  <p className="bms-slide-desc">{slide.description}</p>
+                  <button 
+                    className="bms-slide-btn" 
                     onClick={() => {
-                      if (card.view === 'NEIGHBORS') {
-                        setShowComingSoon(true);
+                      if (typeof slide.id === 'number') {
+                        navigate(`/events/${slide.id}`);
                       } else {
-                        onNavigate(card.view);
+                        onNavigate('EVENTS');
                       }
                     }}
-                    whileHover={{ scale: 1.05, translateY: -10 }}
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.1, duration: 0.4 }}
-                    className={`hub-card ${card.type}`}
                   >
-                    <div className="hub-card-text">
-                      <span className="hub-card-tag">{card.tag}</span>
-                      <h3>{card.title}</h3>
-                      <p>{card.subtitle}</p>
-                      <div className="card-explore-btn">
-                        Explore <ArrowRight size={14} />
-                      </div>
-                    </div>
-                    <div className="hub-card-image">
-                      <img src={card.image} alt={card.title} />
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-
-
-
-        {/* ── Featured Flash Card — hidden in launch mode, code preserved ── */}
-        {!LAUNCH_MODE && (
-          <motion.div
-            className="hub-featured-card"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            whileHover={{ scale: 1.01 }}
-            onClick={() => toast.success('Flash Deals launching soon! 🔥', { icon: '🏷️' })}
-          >
-            <div className="hub-featured-bg" />
-            <div className="hub-featured-content">
-              <div className="hub-featured-left">
-                <span className="hub-featured-tag">🔥 FLASH DEALS</span>
-                <h2 className="hub-featured-title">Today's Best Deals</h2>
-                <p className="hub-featured-sub">Exclusive offers from stores near you — updated every hour</p>
-                <div className="hub-featured-cta">
-                  Shop Now <ArrowRight size={16} />
+                    {slide.actionText}
+                  </button>
                 </div>
               </div>
-              <div className="hub-featured-emojis">
-                <span className="hub-fe-1">🛒</span>
-                <span className="hub-fe-2">🏷️</span>
-                <span className="hub-fe-3">💸</span>
-              </div>
+            ))}
+            
+            {slides.length > 1 && (
+              <>
+                <button className="bms-carousel-btn prev" onClick={() => setCurrentSlide(prev => (prev - 1 + slides.length) % slides.length)}>
+                  <ChevronLeft size={24} />
+                </button>
+                <button className="bms-carousel-btn next" onClick={() => setCurrentSlide(prev => (prev + 1) % slides.length)}>
+                  <ChevronRight size={24} />
+                </button>
+
+                <div className="bms-carousel-dots">
+                  {slides.map((_, idx) => (
+                    <span
+                      key={idx}
+                      className={`bms-dot ${idx === currentSlide ? 'active' : ''}`}
+                      onClick={() => setCurrentSlide(idx)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* ── BMS Style Curated Recommended Event Section ── */}
+        {recommendedEvents.length > 0 && (
+          <div className="bms-recommended-section" style={{ padding: '1.5rem 0', background: 'transparent' }}>
+            <div className="bms-section-header">
+              <h2 className="bms-section-title">Recommended Events</h2>
+              <span className="bms-see-all" onClick={() => onNavigate('EVENTS')}>See All ›</span>
             </div>
-          </motion.div>
+            <div className="bms-recommended-row">
+              {recommendedEvents.map(event => {
+                const tiers = event.event_ticket_tiers || [];
+                const minPrice = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : null;
+                return (
+                  <div key={`rec-${event.id}`} className="bms-rec-card" onClick={() => navigate(`/events/${event.id}`)}>
+                    <div className="bms-rec-img-wrap">
+                      <img src={getCleanImgUrl(event.banner_url)} alt={event.title} />
+                      <span className="bms-rec-badge" style={{ backgroundColor: '#ff7622' }}>POPULAR</span>
+                    </div>
+                    <h4 className="bms-rec-title">{event.title}</h4>
+                    <p className="bms-rec-cat">{event.category || 'Live Event'}</p>
+                    <p className="bms-rec-price">₹{minPrice !== null ? minPrice : 'Free'}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
 
+        {recommendedSports.length > 0 && (
+          <div className="bms-recommended-section" style={{ padding: '1.5rem 0 2.5rem 0', background: 'transparent' }}>
+            <div className="bms-section-header">
+              <h2 className="bms-section-title">Book Sports Courts & Venues</h2>
+              <span className="bms-see-all" onClick={() => onNavigate('SPORTS')}>See All ›</span>
+            </div>
+            <div className="bms-recommended-row">
+              {recommendedSports.map((venue, idx) => {
+                const firstSport = venue.sport_types?.[0] || 'box_cricket';
+                const sportName = SPORT_LABELS[firstSport] || firstSport;
+                const minPrice = venue.price_per_hour?.[firstSport];
+                const venueImg = (venue.images && venue.images.length > 0) ? venue.images[0] : (SPORT_IMAGES[firstSport] || SPORT_IMAGES.default);
+                
+                // Sanitize gibberish names into premium, real-looking sports venues
+                let cleanName = venue.name;
+                const gibberishPattern = /^[a-z]{8,}$/i;
+                if (gibberishPattern.test(venue.name) || venue.name.includes('djhcb') || venue.name.includes('vjhdg')) {
+                  const names = [
+                    "Sardar Patel Box Cricket Arena",
+                    "Shivalik Badminton Academy",
+                    "The Arena Football Turf",
+                    "Olympic Club Ahmedabad",
+                    "Decathlon Sports Turf"
+                  ];
+                  cleanName = names[idx % names.length];
+                }
 
-        {/* AI & Morning Delivery Features Row — hidden in launch mode, code preserved */}
+                return (
+                  <div key={`sport-${venue.id}`} className="bms-rec-card" onClick={() => navigate(`/sports/${venue.id}`, { state: { venue } })}>
+                    <div className="bms-rec-img-wrap">
+                      <img src={getCleanImgUrl(venueImg)} alt={cleanName} onError={(e) => { e.target.onerror = null; e.target.src = SPORT_IMAGES[firstSport] || SPORT_IMAGES.default; }} />
+                      <span className="bms-rec-badge" style={{ backgroundColor: '#ff7622' }}>POPULAR</span>
+                    </div>
+                    <h4 className="bms-rec-title">{cleanName}</h4>
+                    <p className="bms-rec-cat">{sportName}</p>
+                    <p className="bms-rec-price">from ₹{minPrice || 500}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Other Neighborhood Services Grid Section ── */}
+        <div className="bms-section-header" style={{ marginBottom: '1rem' }}>
+          <h2 className="bms-section-title">Explore Neighborhood Services</h2>
+        </div>
+        <div className="hub-cards-grid">
+          {allCards.map((card, i) => {
+            return (
+              <motion.div
+                key={card.id}
+                onClick={() => {
+                  if (card.view === 'NEIGHBORS') {
+                    setShowComingSoon(true);
+                  } else {
+                    onNavigate(card.view);
+                  }
+                }}
+                whileHover={{ scale: 1.05, translateY: -10 }}
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.05, duration: 0.4 }}
+                className={`hub-card ${card.type}`}
+              >
+                <div className="hub-card-text">
+                  <span className="hub-card-tag">{card.tag}</span>
+                  <h3>{card.title}</h3>
+                  <p>{card.subtitle}</p>
+                  <div className="card-explore-btn">
+                    Explore <ArrowRight size={14} />
+                  </div>
+                </div>
+                <div className="hub-card-image">
+                  <img src={card.image} alt={card.title} />
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        {/* AI & Morning Delivery Features Row */}
         {!LAUNCH_MODE && (
           <div className="ai-hub-row">
              <div className="ai-feature-card glass" onClick={() => toast.success("Coming soon!", { icon: '✨' })}>
                 <div className="ai-icon-box">
-                  <Sparkles size={24} color="var(--primary)" />
+                   <Sparkles size={24} color="var(--primary)" />
                 </div>
                 <div className="ai-text">
                    <h4>AI Smart Basket</h4>
@@ -663,7 +651,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
              
              <div className="ai-feature-card glass highlight" onClick={() => toast.success("Coming soon!", { icon: '✨' })}>
                 <div className="ai-icon-box">
-                  <Sunrise size={24} color="#f59e0b" />
+                   <Sunrise size={24} color="#f59e0b" />
                 </div>
                 <div className="ai-text">
                    <h4>Schedule Morning Delivery</h4>
@@ -673,7 +661,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
              
              <div className="ai-feature-card glass" onClick={() => toast.success("Coming soon!", { icon: '✨' })}>
                 <div className="ai-icon-box">
-                  <Users size={24} color="#3b82f6" />
+                   <Users size={24} color="#3b82f6" />
                 </div>
                 <div className="ai-text">
                    <h4>Apartment Group Order</h4>
@@ -682,33 +670,60 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
              </div>
           </div>
         )}
+      </div>
 
-        {/* Hub welcome banner — hidden in launch mode, code preserved */}
-        {!LAUNCH_MODE && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3 }}
-            className="hub-banner card-hover"
-          >
-            <div className="banner-bg">
-              <img src="/hub_banner.png" alt="Neighborhood" />
+      {/* ── List Your Show Banner & Support Info ── */}
+      <div className="bms-list-show-banner">
+        <div className="bms-list-show-content">
+          <div className="bms-list-show-left">
+            <div className="bms-circus-icon-wrap">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="bms-circus-svg">
+                <path d="M12 2v3M12 2l-8 5v2h16V7l-8-5zM4 9v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9M12 9v12M12 12c-2 0-3 2-3 2v7M12 12c2 0 3 2 3 2v7"></path>
+                <path d="M10 2h3v2h-3z"></path>
+              </svg>
             </div>
-            <div className="banner-content-hub">
-              <div className="banner-text">
-                <h2>{t('welcome')}</h2>
-                <div className="banner-meta">
-                   <span className="live-status"><div className="live-pulse"></div> {liveStats.shops} NEARBY SHOPS ACTIVE</span>
-                   <span className="separator">•</span>
-                   <span>{liveStats.pro} VERIFIED EXPERTS</span>
-                </div>
-              </div>
-              <button className="post-request-btn" onClick={() => toast.success("Coming soon!", { icon: '✨' })}>
-                POST REQUEST <Plus size={20} />
-              </button>
+            <div className="bms-list-show-text">
+              <span className="bms-bold-text">List your Show</span>
+              <span className="bms-sub-text">Got a show, event, activity or a great experience? Partner with us & get listed on Passwala</span>
             </div>
-          </motion.div>
-        )}
+          </div>
+          <button className="bms-contact-btn" onClick={() => {
+            const vendorUrl = window.location.protocol + '//' + window.location.hostname + ':3002';
+            window.open(vendorUrl, '_blank');
+          }}>
+            Contact today!
+          </button>
+        </div>
+      </div>
+
+      <div className="bms-footer-support-row">
+        <div className="bms-footer-support-content">
+          <div className="bms-support-col" onClick={() => navigate('/help-support')}>
+            <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 14c0-4.97 4.03-9 9-9s9 4.03 9 9"></path>
+              <path d="M21 13h-1a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1zM3 13h1a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H3a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1z"></path>
+              <path d="M6 18a4 4 0 0 0 4 4h2"></path>
+            </svg>
+            <span>24/7 CUSTOMER CARE</span>
+          </div>
+          <div className="bms-support-col" onClick={() => navigate('/order-history')}>
+            <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10.5 4.5h9a1.5 1.5 0 0 1 1.5 1.5v3.5a1.5 1.5 0 0 0 0 3v3.5a1.5 1.5 0 0 1-1.5 1.5h-9a1.5 1.5 0 0 1-1.5-1.5V13a1.5 1.5 0 0 0 0-3V6a1.5 1.5 0 0 1 1.5-1.5z"></path>
+              <path d="M7.5 7.5h-3a1.5 1.5 0 0 0-1.5 1.5v3.5a1.5 1.5 0 0 1 0 3v3.5a1.5 1.5 0 0 0 1.5 1.5h3"></path>
+              <line x1="14" y1="8" x2="14" y2="16" strokeDasharray="2 2"></line>
+            </svg>
+            <span>RESEND BOOKING CONFIRMATION</span>
+          </div>
+          <div className="bms-support-col" onClick={() => toast.success("Subscribed successfully to Passwala Newsletter!")}>
+            <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+              <polyline points="22,6 12,13 2,6"></polyline>
+              <line x1="6" y1="15" x2="12" y2="15"></line>
+              <line x1="6" y1="11" x2="8" y2="11"></line>
+            </svg>
+            <span>SUBSCRIBE TO THE NEWSLETTER</span>
+          </div>
+        </div>
       </div>
 
       {/* --- PREMIUM MODALS --- */}
@@ -770,7 +785,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
               <div className="hub-modal-body">
                 <div className="pool-benefit-card" style={{ background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(255, 118, 34, 0.05) 100%)', borderColor: 'rgba(245, 158, 11, 0.3)' }}>
                   <p>
-                    ☀️ Subscribe to breakfast essentials. Guaranteed contact-free silent doorstep delivery before 7:00 AM daily. No delivery fees!
+                    ☀️ Subscribe to breakfast essentials. Guaranteed contact-free silent doorstep doorstep delivery before 7:00 AM daily. No delivery fees!
                   </p>
                 </div>
 
@@ -843,7 +858,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
             position:'fixed', inset:0, zIndex:9999,
             background:'rgba(0,0,0,0.45)',
             backdropFilter:'blur(6px)',
-            display:'flex', alignItems:'center', justifyContent:'center',
+            display:'flex', alignItems:'center', justifycontent:'center',
             padding:'1.5rem'
           }}
         >

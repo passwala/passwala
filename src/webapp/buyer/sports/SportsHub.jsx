@@ -83,11 +83,6 @@ const SportsHub = ({ user, userCoords }) => {
 
   useEffect(() => { fetchVenues(); }, [fetchVenues]);
 
-  const getMinPrice = useCallback((venue) => {
-    const prices = Object.values(venue.price_per_hour || {});
-    if (!prices.length) return null;
-    return Math.min(...prices);
-  }, []);
 
   return (
     <div className="sh-root">

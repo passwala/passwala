@@ -429,7 +429,7 @@ export const ConfirmModal = ({ isOpen, title, message, confirmText, cancelText, 
   return ReactDOM.createPortal(content, document.body);
 };
 
-export const VendorInventory = ({ vendorData, businessType, storeId, setActiveTab }) => {
+export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveTab }) => {
   const [items, setItems] = React.useState([]);
   const loadedBusinessTypeRef = React.useRef(businessType);
 
@@ -4368,7 +4368,7 @@ function VendorOrderMapWrapper({ order, businessType }) {
   );
 }
 
-export const VendorOrders = ({ storeId, businessType, vendorData, setPortalActiveTab }) => {
+export const VendorOrders = ({ storeId, businessType, vendorData, _setPortalActiveTab }) => {
   const [activeTab, setActiveTab] = React.useState('active');
   const [orders, setOrders] = React.useState([]);
   const [loading, setLoading] = React.useState(true);

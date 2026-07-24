@@ -64,6 +64,8 @@ const SportsHub = React.lazy(() => import('./webapp/buyer/sports/SportsHub'));
 const VenueDetails = React.lazy(() => import('./webapp/buyer/sports/VenueDetails'));
 const SportsCheckout = React.lazy(() => import('./webapp/buyer/sports/SportsCheckout'));
 const SportsTicket = React.lazy(() => import('./webapp/buyer/sports/SportsTicket'));
+const Offers = React.lazy(() => import('./webapp/buyer/Offers'));
+const GiftCards = React.lazy(() => import('./webapp/buyer/GiftCards'));
 
 // Dedicated Environment-based Modes (no fragile port fallbacks)
 const rawMode = import.meta.env.VITE_APP_MODE || import.meta.env.MODE || 'webapp';
@@ -620,7 +622,7 @@ const AppContent = ({
                   onBack={
                     locationPath === '/'
                       ? null
-                      : ['/sports', '/events', '/near-shops', '/expert-services', '/neighbors', '/city-ride', '/profile', '/select-location'].includes(locationPath)
+                      : ['/sports', '/events', '/near-shops', '/expert-services', '/neighbors', '/city-ride', '/profile', '/select-location', '/offers', '/gift-cards'].includes(locationPath)
                         ? () => navigate('/')
                         : () => {
                             if (!window.history.state || window.history.state.idx === 0) {
@@ -644,10 +646,12 @@ const AppContent = ({
                             locationPath === '/neighbors' ? t('community') :
                               locationPath === '/order-history' ? t('order_history') :
                                 locationPath === '/wallet' ? t('passwala_wallet') :
-                                  locationPath === '/manage-addresses' ? 'My Addresses' :
-                                    locationPath === '/privacy-security' ? t('privacy_security') :
-                                      locationPath === '/help-support' ? t('help_support') :
-                                        locationPath === '/settings' ? t('settings') : null
+                                  locationPath === '/offers' ? 'Coupons & Offers' :
+                                    locationPath === '/gift-cards' ? 'E-Gift Cards' :
+                                      locationPath === '/manage-addresses' ? 'My Addresses' :
+                                        locationPath === '/privacy-security' ? t('privacy_security') :
+                                          locationPath === '/help-support' ? t('help_support') :
+                                            locationPath === '/settings' ? t('settings') : null
                   }
                 />
               )
@@ -748,6 +752,8 @@ const AppContent = ({
                   <Route path="/profile" element={effectiveUser ? <WebappProfile user={effectiveUser} onLogout={handleLogout} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} onUpdateUser={(updated) => setUser(updated)} /> : <Navigate to="/" />} />
                   <Route path="/order-history" element={effectiveUser ? <OrderHistory /> : <Navigate to="/" />} />
                   <Route path="/wallet" element={effectiveUser ? <Wallet user={effectiveUser} /> : <Navigate to="/" />} />
+                  <Route path="/offers" element={effectiveUser ? <Offers /> : <Navigate to="/" />} />
+                  <Route path="/gift-cards" element={effectiveUser ? <GiftCards /> : <Navigate to="/" />} />
                   <Route path="/privacy-security" element={effectiveUser ? <PrivacySecurity /> : <Navigate to="/" />} />
                   <Route path="/help-support" element={effectiveUser ? <HelpSupport /> : <Navigate to="/" />} />
                   <Route path="/settings" element={effectiveUser ? <AppSettings isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/" />} />
