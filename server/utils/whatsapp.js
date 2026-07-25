@@ -7,6 +7,7 @@
  *   'ultramsg'  — WhatsApp via UltraMsg instance
  *   'twilio'    — WhatsApp/SMS via Twilio
  *   'evolution' — Self-hosted Evolution API (requires active WhatsApp session)
+ *   'n8n'       — n8n workflow webhook automation (custom payload)
  *   'mock'      — Console-only fallback (development)
  */
 export async function sendWhatsAppOTP(phone, otp) {
@@ -194,6 +195,38 @@ export async function sendWhatsAppOTP(phone, otp) {
     }
     console.log(`✅ OTP sent via Evolution WhatsApp to ${recipient}`);
     return { success: true, provider: 'evolution' };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Option 6: n8n Workflow Automation Webhook
+  //   Set: WHATSAPP_PROVIDER=n8n
+  //        N8N_WHATSAPP_WEBHOOK_URL=https://your-n8n-instance/webhook/path
+  // ─────────────────────────────────────────────────────────────────────────────
+  if (provider === 'n8n' || (!provider && process.env.N8N_WHATSAPP_WEBHOOK_URL)) {
+    if (!process.env.N8N_WHATSAPP_WEBHOOK_URL) {
+      throw new Error('n8n provider selected but N8N_WHATSAPP_WEBHOOK_URL is not configured.');
+    }
+
+    const url = process.env.N8N_WHATSAPP_WEBHOOK_URL;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        phone: recipient,
+        tenDigit: tenDigit,
+        otp: otp,
+        message: messageText
+      })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`n8n webhook failed: ${errText}`);
+    }
+    console.log(`✅ OTP sent via n8n webhook automation to ${recipient}`);
+    return { success: true, provider: 'n8n' };
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
