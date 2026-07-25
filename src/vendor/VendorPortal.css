@@ -496,10 +496,10 @@ body.dark-mode {
 
 .v-brand-name {
   font-weight: 900;
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   color: var(--v-text-main);
-  letter-spacing: 0.5px;
-  line-height: 1;
+  letter-spacing: 0.2px;
+  line-height: 1.2;
 }
 
 .v-brand-tag {

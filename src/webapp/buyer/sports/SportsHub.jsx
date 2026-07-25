@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Search, Star, Clock, ChevronRight, Zap, Filter, X } from 'lucide-react';
@@ -31,10 +31,14 @@ const AMENITY_ICONS = {
 
 const SportsHub = ({ user, userCoords }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeSport, setActiveSport] = useState('all');
   const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('q') || '';
+  });
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const abortRef = useRef(null);
 
@@ -43,6 +47,12 @@ const SportsHub = ({ user, userCoords }) => {
     const t = setTimeout(() => setDebouncedSearch(search), 400);
     return () => clearTimeout(t);
   }, [search]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    setSearch(params.get('q') || '');
+  }, [location.search]);
+
 
   // Haversine helper
   const getDistance = (lat1, lon1, lat2, lon2) => {
@@ -86,6 +96,21 @@ const SportsHub = ({ user, userCoords }) => {
 
   return (
     <div className="sh-root">
+      {/* ── BMS Style Sub-Navbar ── */}
+      <div className="bms-subnav">
+        <div className="bms-subnav-inner">
+          <div className="bms-subnav-links-left">
+            <span className={window.location.pathname.startsWith('/events') ? 'active' : ''} onClick={() => navigate('/events')}>Events</span>
+            <span className={window.location.pathname.startsWith('/sports') ? 'active' : ''} onClick={() => navigate('/sports')}>Sports</span>
+          </div>
+          <div className="bms-subnav-links-right">
+            <span onClick={() => navigate('/admin/auth')}>ListYourShow</span>
+            <span onClick={() => navigate('/offers')}>Offers</span>
+            <span onClick={() => navigate('/gift-cards')}>Gift Cards</span>
+          </div>
+        </div>
+      </div>
+
       {/* ── Hero Header ── */}
       <div className="sh-hero">
         <div className="sh-hero-bg" />
@@ -114,27 +139,6 @@ const SportsHub = ({ user, userCoords }) => {
             Book cricket, badminton, turf & more — instant confirmation
           </motion.p>
 
-          {/* Search Bar */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="sh-search-bar"
-          >
-            <Search size={18} className="sh-search-icon" />
-            <input
-              type="text"
-              placeholder="Search venues, areas..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="sh-search-input"
-            />
-            {search && (
-              <button className="sh-search-clear" onClick={() => setSearch('')}>
-                <X size={16} />
-              </button>
-            )}
-          </motion.div>
         </div>
       </div>
 

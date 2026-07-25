@@ -1,12 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, 
   MapPin, 
   Bell, 
   Sun,
   Moon,
-  ShoppingBag
+  ShoppingBag,
+  Search
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
@@ -21,16 +22,30 @@ const WebappNavbar = ({ user, onOpenProfile, onBack, title, location }) => {
   const { unreadCount } = useNotifications();
   
   const [showNotifications, setShowNotifications] = useState(false);
+  const [navSearch, setNavSearch] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('q') || '';
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setNavSearch(params.get('q') || '');
+  }, [window.location.search]);
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (navSearch.trim()) {
+      navigate(`/events?q=${encodeURIComponent(navSearch.trim())}`);
+    } else {
+      navigate('/events');
+    }
+  };
+
   
   return (
     <nav className="webapp-navbar glass">
       <div className="navbar-top-main">
         <div className="navbar-left">
-          {onBack && (
-            <button className="nav-back-btn" onClick={onBack} aria-label="Go back">
-               <ArrowLeft size={20} />
-            </button>
-          )}
           
           {!title ? (
             <div className="webapp-brand-group-v3">
@@ -51,6 +66,18 @@ const WebappNavbar = ({ user, onOpenProfile, onBack, title, location }) => {
             <h2 className="navbar-title-text">{title}</h2>
           )}
         </div>
+
+        {/* ── Search Bar ── */}
+        <form className="navbar-search-form" onSubmit={handleSearchSubmit}>
+          <Search size={16} className="navbar-search-icon" />
+          <input
+            type="text"
+            placeholder="Search events, concerts, workshops..."
+            value={navSearch}
+            onChange={(e) => setNavSearch(e.target.value)}
+            className="navbar-search-input"
+          />
+        </form>
 
         <div className="navbar-right-actions">
           {/* Cart icon — hidden in launch mode when shopping is not enabled */}

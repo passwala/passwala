@@ -103,7 +103,10 @@ const VendorAuth = ({ onLogin }) => {
           {/* Brand Logo */}
           <div className="va-new-brand">
             <img src="/logo.png" alt="Passwala Logo" className="va-new-logo" />
-            <span className="va-new-brand-text">Passwala Business Suite</span>
+            <div className="va-new-brand-info" style={{ display: 'flex', flexDirection: 'column' }}>
+              <span className="va-new-brand-text">Passwala Business Suite</span>
+              <span className="va-new-brand-tag" style={{ fontSize: '0.68rem', fontWeight: '800', color: '#ea580c', letterSpacing: '0.12em', marginTop: '2px', textTransform: 'uppercase', lineHeight: '1' }}>PARTNER</span>
+            </div>
           </div>
 
           {/* Heading and Taglines */}

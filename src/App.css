@@ -304,3 +304,101 @@
   from { transform: translateY(24px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
+
+/* ── BookMyShow Redesign Sub-Navbar (Global) ── */
+.bms-subnav {
+  background: #ffffff;
+  border-bottom: 1.5px solid #ffedd5;
+  font-family: 'Inter', sans-serif;
+  margin-top: 0;
+  margin-bottom: 0; /* Let pages configure their own margins */
+}
+
+body.dark-mode .bms-subnav {
+  background: #12141c;
+  border-bottom-color: #2e1d0f;
+}
+
+.bms-subnav-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bms-subnav-links-left {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.bms-subnav-links-left span {
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 6px 0;
+  border-bottom: 2px solid transparent;
+}
+
+body.dark-mode .bms-subnav-links-left span {
+  color: #94a3b8;
+}
+
+.bms-subnav-links-left span:hover,
+.bms-subnav-links-left span.active {
+  color: #ff7622;
+}
+
+.bms-subnav-links-left span.active {
+  border-bottom-color: #ff7622;
+}
+
+.bms-subnav-links-right {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.bms-subnav-links-right span {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+body.dark-mode .bms-subnav-links-right span {
+  color: #64748b;
+}
+
+.bms-subnav-links-right span:hover {
+  color: #ff7622;
+}
+
+/* Responsive subnav overrides */
+@media (max-width: 768px) {
+  .bms-subnav-links-left {
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+    gap: 1rem;
+    flex: 1;
+    margin-right: 1rem;
+    padding-bottom: 2px;
+  }
+  .bms-subnav-links-left::-webkit-scrollbar {
+    display: none;
+  }
+  .bms-subnav-links-left span {
+    flex-shrink: 0;
+  }
+  .bms-subnav-links-right {
+    display: none !important;
+  }
+}
+

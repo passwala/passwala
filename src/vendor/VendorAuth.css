@@ -19,14 +19,20 @@
   justify-content: center;
   align-items: center;
   padding: 40px;
-  background: #ffffff;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
 }
 
 .va-new-form-wrapper {
   width: 100%;
-  max-width: 420px;
+  max-width: 460px;
   display: flex;
   flex-direction: column;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 24px;
+  padding: 40px;
+  box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.05), 0 8px 10px -6px rgba(15, 23, 42, 0.03);
+  box-sizing: border-box;
 }
 
 /* Brand Logo */
@@ -34,7 +40,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 50px;
+  margin-bottom: 30px;
 }
 
 .va-new-logo {
@@ -100,8 +106,8 @@
 .va-new-input-wrapper {
   display: flex;
   align-items: center;
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 12px;
   padding: 0 16px;
   background: #f8fafc;
   transition: all 0.2s ease-in-out;
@@ -110,7 +116,7 @@
 .va-new-focused {
   border-color: #ea580c;
   background: #ffffff;
-  box-shadow: 0 0 0 4px rgba(234, 88, 12, 0.1);
+  box-shadow: 0 0 0 4px rgba(234, 88, 12, 0.15);
 }
 
 .va-new-valid {
@@ -133,9 +139,10 @@
 
 .va-new-input {
   flex: 1;
-  border: none;
-  outline: none;
-  background: transparent;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
   height: 52px;
   font-size: 1rem;
   font-weight: 600;

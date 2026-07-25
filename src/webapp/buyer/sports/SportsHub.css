@@ -12,13 +12,13 @@
 /* ── Hero ──────────────────────────────────────────────── */
 .sh-hero {
   position: relative;
-  padding: 72px 20px 32px; /* 12px padding + 60px navbar height */
+  padding: 12px 20px 32px; /* Cleared duplicate 60px navbar offset */
   overflow: hidden;
 }
 
 @media (min-width: 1024px) {
   .sh-hero {
-    padding-top: 76px; /* 12px padding + 64px navbar height */
+    padding-top: 12px; /* Cleared duplicate 64px navbar offset */
   }
 }
 

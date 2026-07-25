@@ -139,6 +139,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
   }, [user]);
 
   const [activeModal, setActiveModal] = useState(null);
+  const [newsletterEmail, setNewsletterEmail] = useState('');
   const [joinedPool, setJoinedPool] = useState(() => {
     const savedPool = localStorage.getItem('passwala_joined_pool');
     return savedPool ? JSON.parse(savedPool) : null;
@@ -189,7 +190,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
       id: 'events',
       title: t('event_tickets'),
       subtitle: t('event_tickets_sub'),
-      image: "/event_tickets.png",
+      image: "/event_tickets_trans_v3.png",
       type: "purple",
       view: 'EVENTS',
       tag: t('book_now_caps')
@@ -406,8 +407,8 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
       <div className="bms-subnav">
         <div className="bms-subnav-inner">
           <div className="bms-subnav-links-left">
-            <span className="active" onClick={() => handleSubnavClick('events')}>Events</span>
-            <span onClick={() => handleSubnavClick('sports')}>Sports</span>
+            <span className={window.location.pathname.startsWith('/events') ? 'active' : ''} onClick={() => handleSubnavClick('events')}>Events</span>
+            <span className={window.location.pathname.startsWith('/sports') ? 'active' : ''} onClick={() => handleSubnavClick('sports')}>Sports</span>
           </div>
           <div className="bms-subnav-links-right">
             <span onClick={() => handleSubnavClick('listyourshow')}>ListYourShow</span>
@@ -714,7 +715,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
             </svg>
             <span>RESEND BOOKING CONFIRMATION</span>
           </div>
-          <div className="bms-support-col" onClick={() => toast.success("Subscribed successfully to Passwala Newsletter!")}>
+          <div className="bms-support-col" onClick={() => setActiveModal('NEWSLETTER')}>
             <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
               <polyline points="22,6 12,13 2,6"></polyline>
@@ -728,6 +729,54 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
 
       {/* --- PREMIUM MODALS --- */}
       <AnimatePresence>
+        {activeModal === 'NEWSLETTER' && (
+          <div className="hub-modal-overlay">
+            <div className="hub-modal">
+              <div className="hub-modal-header">
+                <h3>Subscribe to the Newsletter</h3>
+                <button className="hub-close-btn" onClick={() => { setActiveModal(null); setNewsletterEmail(''); }}>
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="hub-modal-body">
+                <div className="newsletter-modal-content">
+                  <div className="newsletter-modal-icon">
+                    <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#ff7622" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                      <polyline points="22,6 12,13 2,6"></polyline>
+                    </svg>
+                  </div>
+                  <p>Stay updated with the latest events, concerts, workshops, and sports booking offers in your society!</p>
+                  <div className="newsletter-input-group">
+                    <input
+                      type="email"
+                      placeholder="Enter your email address"
+                      value={newsletterEmail}
+                      onChange={(e) => setNewsletterEmail(e.target.value)}
+                      className="newsletter-modal-input"
+                      autoFocus
+                    />
+                  </div>
+                  <button
+                    className="newsletter-submit-btn"
+                    onClick={() => {
+                      if (newsletterEmail.trim() && newsletterEmail.includes('@')) {
+                        toast.success(`Subscribed successfully with ${newsletterEmail}!`);
+                        setActiveModal(null);
+                        setNewsletterEmail('');
+                      } else {
+                        toast.error("Please enter a valid email address.");
+                      }
+                    }}
+                  >
+                    Subscribe Now
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeModal === 'GROUP_ORDER' && (
           <div className="hub-modal-overlay">
             <div className="hub-modal">

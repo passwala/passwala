@@ -37,3 +37,4 @@ public/firebase-messaging-sw.js
 
 # Server runtime config — admin fees & settings (never override on deploy)
 server/platform_settings.json
+.vercel
