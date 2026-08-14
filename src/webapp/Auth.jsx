@@ -31,11 +31,12 @@ const Auth = ({ onLogin }) => {
   const { requestNotificationPermission } = useNotifications();
   const [step, setStep] = useState(() => {
     if (localStorage.getItem('passwala_user')) return 'WARM_UP';
-    return 'PHONE';
+    return 'EMAIL_LOGIN';
   });
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [timer, setTimer] = useState(0);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  
   const [loading, setLoading] = useState(false);
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
   const [syncedUser, setSyncedUser] = useState(null);
@@ -44,9 +45,6 @@ const Auth = ({ onLogin }) => {
   const [searchResults, setSearchResults] = useState(popularAreas);
   const [activeSlide, setActiveSlide] = useState(0);
   const [rememberMe, setRememberMe] = useState(true);
-  const [loginMethod, setLoginMethod] = useState('SMS'); // 'SMS' or 'WHATSAPP'
-  const [whatsappOtp, setWhatsappOtp] = useState(''); // Store generated mock OTP
-  const canResend = timer === 0;
 
   useEffect(() => {
     const slideInterval = setInterval(() => {
@@ -82,151 +80,61 @@ const Auth = ({ onLogin }) => {
     return () => clearTimeout(notifTimer);
   }, []);
 
-  useEffect(() => {
-    if (step !== 'OTP' || timer <= 0) return;
-    const interval = setInterval(() => setTimer((prev) => prev - 1), 1000);
-    return () => clearInterval(interval);
-  }, [step, timer]);
-
-  const handleOtpChange = (idx, value) => {
-    // If input is cleared (backspace pressed or empty string set)
-    if (value === '') {
-      const newOtp = [...otp];
-      newOtp[idx] = '';
-      setOtp(newOtp);
-      // Shift focus to the previous box
-      if (idx > 0) {
-        const prevInput = document.getElementById(`otp-${idx - 1}`);
-        if (prevInput) prevInput.focus();
-      }
-      return;
-    }
-
-    // Keep only the last character entered
-    const lastChar = value.slice(-1);
-    if (!/^\d$/.test(lastChar)) return;
-
-    const newOtp = [...otp];
-    newOtp[idx] = lastChar;
-    setOtp(newOtp);
-
-    // Shift focus to the next box
-    if (idx < 5) {
-      const nextInput = document.getElementById(`otp-${idx + 1}`);
-      if (nextInput) nextInput.focus();
-    }
-  };
-
-  const handleKeyDown = (idx, e) => {
-    if (e.key === 'Backspace') {
-      const newOtp = [...otp];
-      if (otp[idx] === '') {
-        // If current box is empty, clear the previous box and move focus there
-        if (idx > 0) {
-          newOtp[idx - 1] = '';
-          setOtp(newOtp);
-          const prevInput = document.getElementById(`otp-${idx - 1}`);
-          if (prevInput) prevInput.focus();
-        }
-        e.preventDefault();
-      } else {
-        // If current box has a value, clear it and move focus to previous box
-        newOtp[idx] = '';
-        setOtp(newOtp);
-        if (idx > 0) {
-          const prevInput = document.getElementById(`otp-${idx - 1}`);
-          if (prevInput) prevInput.focus();
-        }
-        e.preventDefault();
-      }
-    }
-  };
-
-  const handlePaste = (e) => {
+  const handleEmailAuth = async (e) => {
     e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').trim();
-    if (/^\d{6}$/.test(pastedData)) {
-      const newOtp = pastedData.split('');
-      setOtp(newOtp);
-      document.getElementById('otp-5').focus();
-    }
-  };
-
-  const handlePhoneLogin = async () => {
-    if (loading || phoneNumber.length !== 10) { toast.error('Enter valid 10-digit number'); return; }
-    const formatPhone = `+91${phoneNumber}`;
-
-    toast.success('Login Successful!');
-    handleQuickLogin({ phoneNumber: formatPhone, uid: `phone-${phoneNumber}` }, 'phone');
-  };
-
-  const handleWhatsAppLogin = async () => {
-    if (loading || phoneNumber.length !== 10) { toast.error('Enter valid 10-digit number'); return; }
+    if (loading || !email || !password) { toast.error('Please enter email and password'); return; }
+    
     setLoading(true);
     try {
-      const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
-      const res = await fetch(`${BASE_API}/api/users/send-whatsapp-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phoneNumber })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setLoginMethod('WHATSAPP');
-        setStep('OTP');
-        setTimer(60);
-        if (data.provider === 'mock' && data.otp) {
-          setWhatsappOtp(data.otp);
-          // Auto-fill the 6 OTP boxes so the user can verify in one click
-          setOtp(data.otp.split(''));
-        } else {
-          toast.success('OTP sent successfully via WhatsApp!');
-        }
+      let authData, authError;
+      if (isSignUp) {
+        const res = await supabase.auth.signUp({ email, password });
+        authData = res.data;
+        authError = res.error;
+        if (authError) throw authError;
+        toast.success('Account created successfully!');
       } else {
-        toast.error(data.error || 'Failed to send WhatsApp OTP');
+        const res = await supabase.auth.signInWithPassword({ email, password });
+        authData = res.data;
+        authError = res.error;
+        if (authError) throw authError;
+        toast.success('Login Successful!');
+      }
+      
+      const user = authData.user;
+      if (user) {
+        handleQuickLogin({
+          email: user.email,
+          uid: user.id,
+          displayName: user.user_metadata?.full_name || user.email.split('@')[0],
+          photoURL: user.user_metadata?.avatar_url
+        }, 'email');
       }
     } catch (err) {
-      toast.error('Network error. Failed to send OTP.');
+      console.error(err);
+      toast.error(err.message || 'Authentication failed');
     } finally {
       setLoading(false);
     }
   };
 
-
-  const handleVerifyOtp = async () => {
+  const handleGoogleLogin = async () => {
     if (loading) return;
-    const otpValue = otp.join('');
-    if (otpValue.length !== 6) { toast.error('Enter 6-digit Code'); return; }
+    setLoading(true);
     try {
-      setLoading(true);
-      if (loginMethod === 'WHATSAPP') {
-        const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
-        const res = await fetch(`${BASE_API}/api/users/verify-whatsapp-otp`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: phoneNumber, otp: otpValue, role: 'BUYER' })
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          toast.success('WhatsApp Identity Verified');
-          handleQuickLogin({ 
-            phoneNumber: `+91${phoneNumber}`, 
-            uid: data.user.uid,
-            displayName: data.user.displayName,
-            email: data.user.email,
-            photoURL: data.user.photoURL
-          }, 'phone');
-        } else {
-          toast.error(data.error || 'Invalid WhatsApp OTP');
-        }
-      } else {
-        toast.success('Identity Verified');
-        const formatPhone = `+91${phoneNumber}`;
-        handleQuickLogin({ phoneNumber: formatPhone, uid: `phone-${phoneNumber}` }, 'phone');
-      }
-    } catch (error) {
-      toast.error('Verification Failed');
-    } finally { setLoading(false); }
+      // Use current origin so it works on https://localhost:3001 and in production
+      const origin = window.location.origin;
+      const redirectTo = `${origin}/auth`;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo }
+      });
+      if (error) throw error;
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Google Login failed');
+      setLoading(false);
+    }
   };
 
   const handleQuickLogin = async (credUser, authProvider) => {
@@ -235,13 +143,13 @@ const Auth = ({ onLogin }) => {
       
       let dbUser = null;
       let dbAddress = null;
-      const cleanPhone = (credUser.phoneNumber || '').replace(/[\s\-().]/g, '').replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, '');
-      if (cleanPhone && supabase) {
+      
+      if (credUser.email && supabase) {
         try {
           const { data: usr } = await supabase
             .from('users')
             .select('*')
-            .or(`uid.eq.${credUser.uid},phone.eq.${cleanPhone}`)
+            .or(`uid.eq.${credUser.uid},email.eq.${credUser.email}`)
             .maybeSingle();
           if (usr) {
             dbUser = usr;
@@ -260,100 +168,59 @@ const Auth = ({ onLogin }) => {
         }
       }
 
-      if (dbUser && dbAddress) {
-        const rawLine = dbAddress.address_line_1 || '';
-        const parts = rawLine.split(', ').map(p => p.trim());
-        let _hName = '';
-        let hNo = 'A-101';
-        let fl = '1st Floor';
-        let soc = dbAddress.city || 'Satellite';
-        if (parts.length === 4) {
-          [_hName, hNo, fl, soc] = parts;
-          fl = fl.replace('Floor ', '');
-        } else if (parts.length === 3) {
-          if (parts[1].startsWith('Floor ')) {
-            [hNo, fl, soc] = parts;
-            fl = fl.replace('Floor ', '');
-          } else {
-            [_hName, hNo, soc] = parts;
-          }
-        } else if (parts.length === 2) {
-          [hNo, soc] = parts;
-        }
-
-        const freshProfile = {
-          fullName: dbUser.full_name,
-          house_no: hNo,
-          floor: fl,
-          society: soc,
-          address: `${hNo}, ${soc}`
-        };
-        localStorage.setItem('local_user_profile', JSON.stringify(freshProfile));
-        localStorage.setItem('passwala_profile_complete', 'true');
-        localStorage.setItem('passwala_user_address', JSON.stringify(dbAddress));
-        if (dbAddress.lat && dbAddress.lng) {
-          localStorage.setItem('passwala_coords', JSON.stringify({ lat: dbAddress.lat, lng: dbAddress.lng }));
-        }
-        localStorage.setItem('passwala_location', soc);
-      }
-
-      const userData = {
-        id: dbUser?.id || null,          // ← always include DB UUID if anon query worked
+      const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      
+      // Setup payload for backend
+      const loginPayload = {
         uid: credUser.uid,
-        displayName: dbUser?.full_name || credUser.displayName || 'Passwalaa User',
-        phoneNumber: credUser.phoneNumber || null,
-        email: dbUser?.email || credUser.email || null,
-        photoURL: dbUser?.photo_url || credUser.photoURL || null,
-        authProvider: authProvider,
-        role: dbUser?.role?.toLowerCase() || 'buyer'
+        email: credUser.email,
+        displayName: credUser.displayName || dbUser?.name || 'Passwala User',
+        photoURL: credUser.photoURL || dbUser?.photo_url,
+        provider: authProvider,
+        role: dbUser?.role || 'BUYER',
+        preferences: dbUser?.preferences || {}
       };
 
-      const API_URL = `${import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`)}/api/users`;
-      let finalUser = userData;
-      try {
-        const res = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(userData)
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.user) {
-            finalUser = {
-              id: data.user.id || userData.id,      // ← server UUID wins, fallback to anon query UUID
-              uid: data.user.uid || userData.uid,
-              displayName: data.user.full_name || userData.displayName,
-              phoneNumber: data.user.phone || userData.phoneNumber,
-              email: data.user.email || userData.email,
-              photoURL: data.user.photo_url || userData.photoURL,
-              authProvider: authProvider,
-              role: data.user.role?.toLowerCase() || 'buyer'
-            };
-          }
+      const res = await fetch(`${BASE_API}/api/users/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(loginPayload)
+      });
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+        const finalUser = data.user || dbUser || loginPayload;
+        localStorage.setItem('passwala_user', JSON.stringify(finalUser));
+        localStorage.setItem('local_user_profile', JSON.stringify(finalUser));
+        
+        if (dbAddress) {
+          localStorage.setItem('passwala_user_address', JSON.stringify(dbAddress));
         }
-      } catch (e) {
-        console.warn("Cloud skip, using client-side defaults:", e);
-        // finalUser = userData (which now has id from dbUser if anon key worked)
+
+        const needsAddress = !dbAddress && (!finalUser.addresses || finalUser.addresses.length === 0);
+        if (needsAddress) {
+          setStep('LOCATION');
+        } else {
+          onLogin(finalUser);
+        }
+      } else {
+        toast.error('Could not sync user profile.');
       }
-
-      const userWithAddress = { ...finalUser, address: '' };
-      localStorage.setItem('passwala_user', JSON.stringify(userWithAddress));
-      setSyncedUser(userWithAddress);
-
-      // Auto-jump to LOCATION request to complete the Zepto-style seamless flow
-      setStep('LOCATION');
     } catch (err) {
-      toast.error("Initialization Failed");
-    } finally { setLoading(false); }
+      console.warn("Fast login failed:", err);
+      // Fallback
+      localStorage.setItem('passwala_user', JSON.stringify(credUser));
+      setStep('LOCATION');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGetLocation = () => {
     if (loading) return;
     setLoading(true);
 
-    // Insecure HTTP contexts do not support navigator.geolocation, fallback to IP location safely
     if (!navigator || !navigator.geolocation) {
-      console.warn("Geolocation is unsupported or restricted (non-HTTPS context). Falling back to IP-based location.");
       fallbackToIP();
       return;
     }
@@ -371,14 +238,12 @@ const Auth = ({ onLogin }) => {
           toast.success(`Located: ${fullAddress}`);
           finalizeLocation(fullAddress, { lat: latitude, lng: longitude });
         } catch (err) {
-          console.warn("Reverse geocoding failed, falling back to IP:", err);
           fallbackToIP();
         } finally {
           setLoading(false);
         }
       },
       (error) => {
-        console.warn("Geolocation permission denied or timed out, falling back to IP:", error);
         fallbackToIP();
       },
       { timeout: 8000 }
@@ -387,7 +252,6 @@ const Auth = ({ onLogin }) => {
 
   const fallbackToIP = async () => {
     try {
-      // Try fetching public geolocation directly from client browser first for real IP
       const directRes = await fetch('https://freeipapi.com/api/json/');
       if (directRes.ok) {
         const data = await directRes.json();
@@ -398,9 +262,7 @@ const Auth = ({ onLogin }) => {
           return;
         }
       }
-    } catch (directErr) {
-      console.warn("Direct IP Geolocation failed, trying backend proxy:", directErr);
-    }
+    } catch (directErr) {}
 
     try {
       const baseUrl = window.location.protocol === 'https:' ? '' : (import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3004`);
@@ -416,7 +278,6 @@ const Auth = ({ onLogin }) => {
         throw new Error('IP failed or is local');
       }
     } catch (e) {
-      console.warn("Location detection failed. Falling back to default location:", e);
       const fallbackAddress = "Ahmedabad, Gujarat";
       toast.success(`Located: ${fallbackAddress}`);
       finalizeLocation(fallbackAddress, { lat: 23.0225, lng: 72.5714 });
@@ -485,192 +346,118 @@ const Auth = ({ onLogin }) => {
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-container">
+    <div className="auth-modern-overlay" style={{
+      minHeight: '100vh', display: 'grid', placeItems: 'center', 
+      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+      padding: '2rem 1rem'
+    }}>
+      <div style={{ width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {/* Back Button Wrapper */}
-        {(step === 'OTP' || step === 'PROFILE') && (
-          <div className="auth-back-btn-wrapper">
-            <button className="auth-back-btn" onClick={() => setStep(step === 'OTP' ? 'PHONE' : 'OTP')}>
+        {(step === 'LOCATION' || step === 'PROFILE') && (
+          <div className="auth-back-btn-wrapper" style={{ width: '100%', marginBottom: '1rem', display: 'flex', justifyContent: 'flex-start' }}>
+            <button className="auth-back-btn" onClick={() => setStep('EMAIL_LOGIN')}>
               <ArrowLeft size={18} />
             </button>
           </div>
         )}
 
-        {/* TOP HALF: THE PREMIUM DARK SLIDER */}
-        <div className="promo-header-section">
-          {/* Brand Logo and Name */}
-          <div className="auth-brand-header" style={{ position: 'absolute', top: '1.5rem', left: '50%', transform: 'translateX(-50%)', zIndex: 20, background: '#ffffff', padding: '6px', borderRadius: '18px', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img src="/logo.png" alt="Passwala Logo" style={{ width: '68px', height: '68px', objectFit: 'contain', borderRadius: '12px' }} />
-          </div>
-
-          {activeSlide === 0 && (
-            <div className="slide-content-wrapper">
-              <h2 className="promo-title-banner">Find the best deal on every meal</h2>
-              <div className="floating-stage">
-                <img src={passwalaDeals} alt="Best Deals" className="slide-premium-img" />
+        {/* MODIFIED THEME: Clean Minimalist Auth Card */}
+        <div className="auth-modern-card" style={{ background: 'transparent', padding: 0 }}>
+          <div className="form-content-sheet-modern" style={{ padding: '1.5rem', borderRadius: '20px' }}>
+            <div className="auth-brand-header-modern" style={{ marginBottom: '1rem' }}>
+              <div style={{
+                width: '48px', height: '48px', background: 'var(--auth-action-color)',
+                borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 0.75rem', color: 'white', fontSize: '1.5rem', fontWeight: 'bold'
+              }}>
+                P
               </div>
+              <h2 style={{ fontSize: '1.3rem' }}>Welcome to Passwala</h2>
+              <p style={{ marginTop: '0.25rem', fontSize: '0.85rem' }}>Your local neighborhood hub</p>
             </div>
-          )}
-          {activeSlide === 1 && (
-            <div className="slide-content-wrapper">
-              <h2 className="promo-title-banner">Expert services in a single tap</h2>
-              <div className="floating-stage">
-                <img src={passwalaServices} alt="Expert Services" className="slide-premium-img" />
+
+            {step === 'WARM_UP' ? (
+              <div style={{ textAlign: 'center', padding: '3rem 0', margin: 'auto' }}>
+                <RefreshCw className="spin" size={44} color="var(--auth-action-color)" />
+                <p style={{ color: '#4a5568', marginTop: '1.5rem', fontWeight: '600', fontSize: '0.95rem' }}>Synchronizing your session...</p>
               </div>
-            </div>
-          )}
-          {activeSlide === 2 && (
-            <div className="slide-content-wrapper">
-              <h2 className="promo-title-banner">Superfast local store logistics</h2>
-              <div className="floating-stage">
-                <img src={passwalaLogistics} alt="Superfast Logistics" className="slide-premium-img" />
-              </div>
-            </div>
-          )}
-
-          {/* Dots Navigation */}
-          <div className="promo-dots-row">
-            <div className={`promo-dot ${activeSlide === 0 ? 'active' : ''}`} onClick={() => setActiveSlide(0)}></div>
-            <div className={`promo-dot ${activeSlide === 1 ? 'active' : ''}`} onClick={() => setActiveSlide(1)}></div>
-            <div className={`promo-dot ${activeSlide === 2 ? 'active' : ''}`} onClick={() => setActiveSlide(2)}></div>
-          </div>
-        </div>
-
-        {/* BOTTOM HALF: THE WHITE ONBOARDING SHEET */}
-        <div className="form-content-sheet">
-          {step === 'WARM_UP' ? (
-            <div style={{ textAlign: 'center', padding: '3rem 0', margin: 'auto' }}>
-              <RefreshCw className="spin" size={44} color="var(--auth-action-color)" />
-              <p style={{ color: '#4a5568', marginTop: '1.5rem', fontWeight: '600', fontSize: '0.95rem' }}>Synchronizing your session...</p>
-            </div>
-          ) : step === 'PHONE' ? (
-            <>
-              <div className="premium-phone-group">
-                {/* Indian flag block */}
-                <div className="country-selector-box" onClick={() => toast.success('Passwala operates exclusively in India 🇮🇳')}>
-                  <span>🇮🇳</span>
-                </div>
-
-                {/* Phone number field */}
-                <div className="phone-field-box">
-                  <span className="phone-prefix">+91</span>
-                  <input
-                    type="tel"
-                    placeholder="Enter Phone Number"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  />
-                </div>
-              </div>
-
-              {/* Remember Login Checkbox */}
-              <div className="remember-login-wrapper" onClick={() => setRememberMe(!rememberMe)}>
-                <div className={`custom-checkbox-box ${rememberMe ? 'checked' : ''}`}>
-                  {rememberMe && (
-                    <svg viewBox="0 0 24 24" fill="none" width="12" height="12">
-                      <path d="M20 6L9 17L4 12" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )}
-                </div>
-                <span className="remember-login-text">Remember my login for faster sign-in</span>
-              </div>
-
-              {/* WhatsApp Login Only */}
-              <button 
-                className="sheet-action-btn" 
-                onClick={handleWhatsAppLogin} 
-                disabled={loading}
-                style={{ background: '#25D366', boxShadow: '0 4px 15px rgba(37, 211, 102, 0.25)', marginTop: '0.5rem', gap: '8px' }}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-                Login via WhatsApp
-              </button>
-
-              <div style={{ display: 'flex', alignItems: 'center', margin: '1rem 0', gap: '10px' }}>
-                <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
-                <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>OR</span>
-                <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
-              </div>
-
-              <button 
-                className="sheet-action-btn" 
-                onClick={() => window.dispatchEvent(new CustomEvent('open-passwala-ai-chat'))}
-                style={{ background: 'linear-gradient(135deg, #ff6b00 0%, #ff8500 100%)', boxShadow: '0 4px 15px rgba(255, 107, 0, 0.25)', marginTop: '0.5rem', gap: '8px' }}
-              >
-                🤖 Ask AI Assistant Chat
-              </button>
-
-              <div className="policy-agreement-text" style={{ marginTop: '1.25rem', fontSize: '0.75rem', color: '#718096', textAlign: 'center', lineHeight: '1.4' }}>
-                By continuing, you agree to our{' '}
-                <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--auth-action-color)', fontWeight: '600', textDecoration: 'underline' }}>Terms of Service</a>
-                {' '}and{' '}
-                <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--auth-action-color)', fontWeight: '600', textDecoration: 'underline' }}>Privacy Policy</a>.
-              </div>
-            </>
-          ) : step === 'OTP' ? (
-            <>
-              <h3 className="sheet-title">Verification Code</h3>
-              <p style={{ fontSize: '0.88rem', color: '#718096', textAlign: 'center', margin: '-0.75rem 0 1.25rem 0' }}>
-                We sent a 6-digit code to +91 {phoneNumber} {loginMethod === 'WHATSAPP' ? 'via WhatsApp' : ''}
-              </p>
-
-              {/* Dev-mode mock OTP banner */}
-              {whatsappOtp && (
-                <div style={{
-                  background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-                  border: '1px solid #f59e0b',
-                  borderRadius: '12px',
-                  padding: '10px 14px',
-                  marginBottom: '1rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  boxShadow: '0 0 18px rgba(245,158,11,0.25)'
-                }}>
-                  <span style={{ fontSize: '1.1rem' }}>🧪</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.68rem', fontWeight: '700', color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Dev Mode — Mock OTP</div>
-                    <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#ffffff', letterSpacing: '0.18em', fontFamily: 'monospace' }}>{whatsappOtp}</div>
+            ) : step === 'EMAIL_LOGIN' ? (
+              <>
+                <form onSubmit={handleEmailAuth} className="email-auth-form" style={{ gap: '0.85rem' }}>
+                  <div className="input-group-modern" style={{ gap: '0.35rem' }}>
+                    <label style={{ fontSize: '0.8rem' }}>Email Address</label>
+                    <input 
+                      type="email" 
+                      placeholder="Enter your email" 
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      style={{ padding: '0.75rem 1rem' }}
+                    />
                   </div>
-                  <button
-                    onClick={() => setOtp(whatsappOtp.split(''))}
-                    style={{ background: '#f59e0b', color: '#1a1a2e', border: 'none', borderRadius: '8px', padding: '5px 10px', fontSize: '0.72rem', fontWeight: '700', cursor: 'pointer' }}
+                  <div className="input-group-modern" style={{ gap: '0.35rem' }}>
+                    <label style={{ fontSize: '0.8rem' }}>Password</label>
+                    <input 
+                      type="password" 
+                      placeholder="Enter your password" 
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      style={{ padding: '0.75rem 1rem' }}
+                    />
+                  </div>
+
+                  <div className="auth-toggle-row" style={{ marginTop: '0' }}>
+                    <span onClick={() => setIsSignUp(!isSignUp)} className="toggle-auth-mode">
+                      {isSignUp ? 'Already have an account? Log in' : "Don't have an account? Sign up"}
+                    </span>
+                  </div>
+
+                  <button 
+                    type="submit"
+                    className="sheet-action-btn-modern" 
+                    disabled={loading}
+                    style={{ background: 'var(--auth-action-color)', marginTop: '0.5rem' }}
                   >
-                    Auto-fill
+                    {loading ? <RefreshCw className="spin" size={20} color="#fff" /> : (isSignUp ? 'Sign Up with Email' : 'Log In with Email')}
                   </button>
-                </div>
-              )}
+                </form>
 
-              <div className="otp-nebula-group" onPaste={handlePaste}>
-                {otp.map((digit, idx) => (
-                  <input
-                    key={idx}
-                    id={`otp-${idx}`}
-                    type="tel"
-                    className="otp-cell"
-                    value={digit}
-                    onChange={(e) => handleOtpChange(idx, e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(idx, e)}
-                  />
-                ))}
-              </div>
+                  <div className="divider-modern" style={{ margin: '1rem 0' }}>
+                    <span>OR</span>
+                  </div>
 
-              <button className="sheet-action-btn" onClick={handleVerifyOtp} disabled={loading}>
-                {loading ? <RefreshCw className="spin" size={20} color="#ffffff" /> : 'Verify & Continue'}
-              </button>
+                  <button 
+                    type="button"
+                    className="sheet-action-btn-modern google-btn" 
+                    onClick={handleGoogleLogin} 
+                    disabled={loading}
+                    style={{ padding: '0.85rem' }}
+                  >
+                    <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                    Continue with Google
+                  </button>
 
-              <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
-                <button
-                  style={{ background: 'none', border: 'none', color: 'var(--auth-action-color)', fontWeight: '700', cursor: 'pointer', fontSize: '0.85rem' }}
-                  onClick={handlePhoneLogin}
-                  disabled={!canResend}
+                <button 
+                  type="button"
+                  className="sheet-action-btn-modern ai-btn" 
+                  onClick={() => {
+                    toast.success("AI Assistant is waking up...");
+                    setTimeout(() => {
+                      toast("I am Passwala AI. How can I help you log in?", { icon: '🤖' });
+                    }, 1500);
+                  }}
+                  style={{ marginTop: '0.5rem', padding: '0.85rem' }}
                 >
-                  {timer > 0 ? `Resend Code in ${timer}s` : 'Resend Code'}
+                  🤖 Ask AI Assistant
                 </button>
-              </div>
-            </>
 
-          ) : null}
+                <div className="policy-agreement-text">
+                  By continuing, you agree to our <a href="/terms">Terms</a> & <a href="/privacy-policy">Privacy</a>.
+                </div>
+              </>
+            ) : null}
+          </div>
         </div>
       </div>
 

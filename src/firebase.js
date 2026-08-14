@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
+import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getMessaging, isSupported } from "firebase/messaging";
 
@@ -33,4 +33,6 @@ export const getMessagingInstance = async () => {
   }
 };
 
-export { RecaptchaVerifier, signInWithPhoneNumber };
+export const googleProvider = new GoogleAuthProvider();
+
+export { RecaptchaVerifier, signInWithPhoneNumber, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword };

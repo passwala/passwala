@@ -195,6 +195,66 @@ export const useAuth = () => {
 
     const isSpecialMode = appMode === 'vendor' || appMode === 'rider' || appMode === 'admin';
 
+    // Handle Supabase Auth (for Email and Google OAuth)
+    // NOTE: After Google OAuth redirect, Supabase fires INITIAL_SESSION (not SIGNED_IN),
+    // so we must handle both events.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const isLoginEvent = event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED';
+      if (isLoginEvent && session?.user) {
+        const u = session.user;
+
+        let finalUser = {
+          uid: u.id,
+          email: u.email,
+          displayName: u.user_metadata?.full_name || u.email?.split('@')[0],
+          photoURL: u.user_metadata?.avatar_url,
+          role: 'BUYER'
+        };
+
+        try {
+          const { data: usr } = await supabase.from('users')
+            .select('id, full_name, role, photo_url')
+            .eq('id', u.id)
+            .maybeSingle();
+
+          if (usr) {
+            finalUser.id = usr.id;
+            finalUser.displayName = usr.full_name || finalUser.displayName;
+            finalUser.photoURL = usr.photo_url || finalUser.photoURL;
+            finalUser.role = usr.role || 'BUYER';
+          }
+
+          const { data: addr } = await supabase.from('addresses').select('*')
+            .eq('user_id', u.id)
+            .order('is_default', { ascending: false })
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (addr && addr.address_line_1) {
+            const parsed = parseAddressLine(addr.address_line_1);
+            addr.house_no = parsed.house_no;
+            addr.floor = parsed.floor;
+            addr.society = addr.society || parsed.society;
+            setUserAddress(addr);
+            localStorage.setItem('passwala_user_address', JSON.stringify(addr));
+            setIsProfileComplete(true);
+            localStorage.setItem('passwala_profile_complete', 'true');
+          }
+        } catch (err) {
+          console.warn("Supabase auth sync failed", err);
+        }
+
+        localStorage.setItem('passwala_user', JSON.stringify(finalUser));
+        setUser(finalUser);
+        setAuthLoading(false);
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setIsProfileComplete(false);
+        setAuthLoading(false);
+      }
+    });
+
     const unsub = onAuthStateChanged(auth, async (u) => {
       const savedUser = localStorage.getItem('passwala_user');
       const manualUser = savedUser ? JSON.parse(savedUser) : null;

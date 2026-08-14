@@ -47,11 +47,28 @@ const WebappNavbar = ({ user, onOpenProfile, onBack, title, location }) => {
       <div className="navbar-top-main">
         <div className="navbar-left">
           
+          {onBack && (
+            <button className="nav-action-btn-v2" onClick={onBack} style={{ marginRight: '12px' }} title="Go Back">
+              <ArrowLeft size={20} />
+            </button>
+          )}
           {!title ? (
             <div className="webapp-brand-group-v3">
-              <img src="/logo.png" alt="Passwala" className="navbar-logo-v3" />
+              <img 
+                src="/logo.png" 
+                alt="Passwala" 
+                className="navbar-logo-v3" 
+                onClick={() => navigate('/')} 
+                style={{ cursor: 'pointer' }} 
+              />
               <div className="brand-text-stack">
-                 <span className="brand-name-navy mobile-hide-text">Passwala</span>
+                 <span 
+                   className="brand-name-navy mobile-hide-text" 
+                   onClick={() => navigate('/')} 
+                   style={{ cursor: 'pointer' }}
+                 >
+                   Passwala
+                 </span>
                  <div 
                    className="brand-tagline-location live-address clickable-location" 
                    onClick={() => navigate('/select-location')}

@@ -614,7 +614,7 @@ const AppContent = ({
                 onJoin={() => navigate('/auth')}
               />
             ) : (
-              (isWebappMode && effectiveUser && isProfileComplete && !showOnboarding) && (
+              (isWebappMode && locationPath !== '/auth' && !(effectiveUser && isProfileComplete && showOnboarding)) && (
                 <WebappNavbar
                   user={effectiveUser} location={location} onLocationChange={setLocation}
                   isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)}
@@ -658,7 +658,7 @@ const AppContent = ({
             )}
 
             {/* 3. Main Content Routes (Leveraging Lazy loading dynamically) */}
-            <main className={isWebappMode ? `webapp-main ${currentView === 'PROFILE' ? 'profile-mode' : ''}` : 'web-marketing-main'}>
+            <main className={isWebappMode ? `webapp-main ${currentView === 'PROFILE' ? 'profile-mode' : ''} ${locationPath === '/auth' ? 'no-padding' : ''}` : 'web-marketing-main'}>
               <Suspense fallback={
                 <div className="flex items-center justify-center min-h-[350px] w-full bg-transparent">
                   <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#6366f1]"></div>
@@ -678,7 +678,6 @@ const AppContent = ({
                   <Route path="/" element={
                     <>
                       {isWebappMode ? (
-                        (isProfileComplete) ? (
                           <NeighborhoodHub
                             user={effectiveUser}
                             setLocation={setLocation}
@@ -687,31 +686,6 @@ const AppContent = ({
                             onboardingPrefs={onboardingPrefs}
                             onNavigate={(v) => navigate(v === 'NEAR_SHOPS' ? '/near-shops' : v === 'EXPERT_SERVICES' ? '/expert-services' : v === 'NEIGHBORS' ? '/neighbors' : v === 'CITY_RIDES' ? '/city-ride' : v === 'EVENTS' ? '/events' : v === 'SPORTS' ? '/sports' : '/')}
                           />
-                        ) : <Auth onLogin={(userData) => {
-                          localStorage.setItem('passwala_user', JSON.stringify(userData));
-                          localStorage.setItem('passwala_profile_complete', 'true');
-
-                          const newLoc = localStorage.getItem('passwala_location') || 'India';
-                          const savedCoords = localStorage.getItem('passwala_coords');
-                          const newCoords = savedCoords ? JSON.parse(savedCoords) : { lat: 20.5937, lng: 78.9629 };
-                          const savedAddr = localStorage.getItem('passwala_user_address');
-                          const newAddr = savedAddr ? JSON.parse(savedAddr) : {
-                            address_line_1: newLoc,
-                            city: 'Ahmedabad',
-                            state: 'Gujarat',
-                            pincode: '380015',
-                            society: newLoc.split(',')[0],
-                            house_no: 'Home',
-                            floor: 'Ground',
-                            is_default: true
-                          };
-
-                          setLocation(newLoc, newCoords);
-                          setUserAddress(newAddr);
-                          setUser(userData);
-                          setIsProfileComplete(true);
-                          navigate('/');
-                        }} />
                       ) : (
                         <>
                           <Hero />
@@ -719,6 +693,34 @@ const AppContent = ({
                         </>
                       )}
                     </>
+                  } />
+
+                  <Route path="/auth" element={
+                    <Auth onLogin={(userData) => {
+                      localStorage.setItem('passwala_user', JSON.stringify(userData));
+                      localStorage.setItem('passwala_profile_complete', 'true');
+
+                      const newLoc = localStorage.getItem('passwala_location') || 'India';
+                      const savedCoords = localStorage.getItem('passwala_coords');
+                      const newCoords = savedCoords ? JSON.parse(savedCoords) : { lat: 20.5937, lng: 78.9629 };
+                      const savedAddr = localStorage.getItem('passwala_user_address');
+                      const newAddr = savedAddr ? JSON.parse(savedAddr) : {
+                        address_line_1: newLoc,
+                        city: 'Ahmedabad',
+                        state: 'Gujarat',
+                        pincode: '380015',
+                        society: newLoc.split(',')[0],
+                        house_no: 'Home',
+                        floor: 'Ground',
+                        is_default: true
+                      };
+
+                      setLocation(newLoc, newCoords);
+                      setUserAddress(newAddr);
+                      setUser(userData);
+                      setIsProfileComplete(true);
+                      navigate('/');
+                    }} />
                   } />
 
                   {/* Public Legal & Policy Routes */}
@@ -730,42 +732,42 @@ const AppContent = ({
 
                   {/* Common Application Routes (Suspended correctly) */}
                   {/* Routes for features — redirected to home if not launched yet */}
-                  <Route path="/near-shops" element={!isFeatureEnabled('shopping') ? <Navigate to="/" /> : (effectiveUser ? <NearShops onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/" />)} />
-                  <Route path="/expert-services" element={!isFeatureEnabled('services') ? <Navigate to="/" /> : (effectiveUser ? <ExpertServices onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/" />)} />
-                  <Route path="/neighbors" element={!isFeatureEnabled('community') ? <Navigate to="/" /> : (effectiveUser ? <NeighborsCommunity onBack={() => navigate('/')} location={location} /> : <Navigate to="/" />)} />
-                  <Route path="/track-orders" element={!isFeatureEnabled('shopping') ? <Navigate to="/" /> : (effectiveUser ? <TrackOrders user={effectiveUser} userCoords={userCoords} onBack={() => navigate('/')} /> : <Navigate to="/" />)} />
-                  <Route path="/city-ride" element={effectiveUser ? <CityTicketBooking user={effectiveUser} userCoords={userCoords} onBack={() => navigate('/')} /> : <Navigate to="/" />} />
-                  <Route path="/ride-checkout" element={effectiveUser ? <RideCheckout /> : <Navigate to="/" />} />
-                  <Route path="/ride-ticket" element={effectiveUser ? <RideTicket /> : <Navigate to="/" />} />
+                  <Route path="/near-shops" element={!isFeatureEnabled('shopping') ? <Navigate to="/" /> : (effectiveUser ? <NearShops onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/auth" />)} />
+                  <Route path="/expert-services" element={!isFeatureEnabled('services') ? <Navigate to="/" /> : (effectiveUser ? <ExpertServices onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/auth" />)} />
+                  <Route path="/neighbors" element={!isFeatureEnabled('community') ? <Navigate to="/" /> : (effectiveUser ? <NeighborsCommunity onBack={() => navigate('/')} location={location} /> : <Navigate to="/auth" />)} />
+                  <Route path="/track-orders" element={!isFeatureEnabled('shopping') ? <Navigate to="/" /> : (effectiveUser ? <TrackOrders user={effectiveUser} userCoords={userCoords} onBack={() => navigate('/')} /> : <Navigate to="/auth" />)} />
+                  <Route path="/city-ride" element={effectiveUser ? <CityTicketBooking user={effectiveUser} userCoords={userCoords} onBack={() => navigate('/')} /> : <Navigate to="/auth" />} />
+                  <Route path="/ride-checkout" element={effectiveUser ? <RideCheckout /> : <Navigate to="/auth" />} />
+                  <Route path="/ride-ticket" element={effectiveUser ? <RideTicket /> : <Navigate to="/auth" />} />
                   {/* IMPORTANT: /events/checkout MUST be defined before /events/:id
                       to prevent React Router from treating 'checkout' as an event ID param.
                       Do NOT reorder these routes. */}
-                  <Route path="/events" element={effectiveUser ? <EventHub onBack={() => navigate('/')} /> : <Navigate to="/" />} />
-                  <Route path="/events/checkout" element={effectiveUser ? <EventCheckout user={effectiveUser} /> : <Navigate to="/" />} />
-                  <Route path="/events/ticket" element={effectiveUser ? <EventTicket /> : <Navigate to="/" />} />
-                  <Route path="/events/:id" element={effectiveUser ? <EventDetails user={effectiveUser} /> : <Navigate to="/" />} />
+                  <Route path="/events" element={effectiveUser ? <EventHub onBack={() => navigate('/')} /> : <Navigate to="/auth" />} />
+                  <Route path="/events/checkout" element={effectiveUser ? <EventCheckout user={effectiveUser} /> : <Navigate to="/auth" />} />
+                  <Route path="/events/ticket" element={effectiveUser ? <EventTicket /> : <Navigate to="/auth" />} />
+                  <Route path="/events/:id" element={effectiveUser ? <EventDetails user={effectiveUser} /> : <Navigate to="/auth" />} />
                   {/* Sports Venue Booking — checkout/ticket BEFORE :id param to avoid collision */}
-                  <Route path="/sports" element={effectiveUser ? <SportsHub user={effectiveUser} userCoords={userCoords} /> : <Navigate to="/" />} />
-                  <Route path="/sports/checkout" element={effectiveUser ? <SportsCheckout user={effectiveUser} /> : <Navigate to="/" />} />
-                  <Route path="/sports/ticket" element={effectiveUser ? <SportsTicket /> : <Navigate to="/" />} />
-                  <Route path="/sports/:id" element={effectiveUser ? <VenueDetails user={effectiveUser} /> : <Navigate to="/" />} />
-                  <Route path="/profile" element={effectiveUser ? <WebappProfile user={effectiveUser} onLogout={handleLogout} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} onUpdateUser={(updated) => setUser(updated)} /> : <Navigate to="/" />} />
-                  <Route path="/order-history" element={effectiveUser ? <OrderHistory /> : <Navigate to="/" />} />
-                  <Route path="/wallet" element={effectiveUser ? <Wallet user={effectiveUser} /> : <Navigate to="/" />} />
-                  <Route path="/offers" element={effectiveUser ? <Offers /> : <Navigate to="/" />} />
-                  <Route path="/gift-cards" element={effectiveUser ? <GiftCards /> : <Navigate to="/" />} />
-                  <Route path="/privacy-security" element={effectiveUser ? <PrivacySecurity /> : <Navigate to="/" />} />
-                  <Route path="/help-support" element={effectiveUser ? <HelpSupport /> : <Navigate to="/" />} />
-                  <Route path="/settings" element={effectiveUser ? <AppSettings isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/" />} />
-                  <Route path="/select-location" element={effectiveUser ? <LocationSelector currentLocation={location} onLocationChange={setLocation} /> : <Navigate to="/" />} />
-                  <Route path="/manage-addresses" element={effectiveUser ? <AddressManager user={effectiveUser} /> : <Navigate to="/" />} />
-                  <Route path="/complete-profile" element={effectiveUser ? <CustomerDetails user={effectiveUser} onComplete={(addr, name) => { setIsProfileComplete(true); setUserAddress(addr); if (name) { setUser(prev => ({ ...prev, displayName: name })); } navigate('/'); }} /> : <Navigate to="/" />} />
+                  <Route path="/sports" element={effectiveUser ? <SportsHub user={effectiveUser} userCoords={userCoords} /> : <Navigate to="/auth" />} />
+                  <Route path="/sports/checkout" element={effectiveUser ? <SportsCheckout user={effectiveUser} /> : <Navigate to="/auth" />} />
+                  <Route path="/sports/ticket" element={effectiveUser ? <SportsTicket /> : <Navigate to="/auth" />} />
+                  <Route path="/sports/:id" element={effectiveUser ? <VenueDetails user={effectiveUser} /> : <Navigate to="/auth" />} />
+                  <Route path="/profile" element={effectiveUser ? <WebappProfile user={effectiveUser} onLogout={handleLogout} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} onUpdateUser={(updated) => setUser(updated)} /> : <Navigate to="/auth" />} />
+                  <Route path="/order-history" element={effectiveUser ? <OrderHistory /> : <Navigate to="/auth" />} />
+                  <Route path="/wallet" element={effectiveUser ? <Wallet user={effectiveUser} /> : <Navigate to="/auth" />} />
+                  <Route path="/offers" element={effectiveUser ? <Offers /> : <Navigate to="/auth" />} />
+                  <Route path="/gift-cards" element={effectiveUser ? <GiftCards /> : <Navigate to="/auth" />} />
+                  <Route path="/privacy-security" element={effectiveUser ? <PrivacySecurity /> : <Navigate to="/auth" />} />
+                  <Route path="/help-support" element={effectiveUser ? <HelpSupport /> : <Navigate to="/auth" />} />
+                  <Route path="/settings" element={effectiveUser ? <AppSettings isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/auth" />} />
+                  <Route path="/select-location" element={<LocationSelector currentLocation={location} onLocationChange={(newLoc, coords) => setLocation(newLoc, coords)} />} />
+                  <Route path="/manage-addresses" element={effectiveUser ? <AddressManager user={effectiveUser} /> : <Navigate to="/auth" />} />
+                  <Route path="/complete-profile" element={effectiveUser ? <CustomerDetails user={effectiveUser} onComplete={(addr, name) => { setIsProfileComplete(true); setUserAddress(addr); if (name) { setUser(prev => ({ ...prev, displayName: name })); } navigate('/'); }} /> : <Navigate to="/auth" />} />
                 </Routes>
               </Suspense>
             </main>
 
             {/* 4. Global Footers/Navs — hidden during onboarding */}
-            {isWebappMode && effectiveUser && isProfileComplete && !showOnboarding && (
+            {isWebappMode && !(effectiveUser && isProfileComplete && showOnboarding) && (
               <BottomNav activeTab={currentView} user={effectiveUser} onTabChange={(v) => {
                 if (v === 'NEIGHBORS') { setShowComingSoon(true); return; }
                 const routeMap = {
