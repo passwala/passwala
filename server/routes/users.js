@@ -342,12 +342,22 @@ router.post('/', authLimiter, async (req, res) => {
     let resultError;
 
     if (existingUser) {
-      // 2. Update existing user (preserve existing fields so frontend default placeholders don't overwrite custom profile data)
+      // 2. Update existing user
+      // IMPORTANT: Replace placeholder values set by coming-soon signup
+      const isPlaceholderName = !existingUser.full_name 
+        || existingUser.full_name === 'Coming Soon Subscriber' 
+        || existingUser.full_name === '';
+      const isPlaceholderPhone = !existingUser.phone 
+        || existingUser.phone.startsWith('CS_') 
+        || existingUser.phone.startsWith('np_');
+
       const updatePayload = {
-        full_name: existingUser.full_name || displayName || null,
+        // Use real name from login if existing name is a placeholder
+        full_name: isPlaceholderName ? (displayName || existingUser.full_name || null) : existingUser.full_name,
         photo_url: existingUser.photo_url || photoURL || null,
         email: existingUser.email || email || null,
-        phone: existingUser.phone || cleanPhone || null,
+        // Use real phone if existing phone is a placeholder
+        phone: isPlaceholderPhone ? (cleanPhone || existingUser.phone || null) : (existingUser.phone || cleanPhone || null),
         role: existingUser.role || (role ? String(role).toUpperCase() : 'BUYER')
       };
       if (token) {

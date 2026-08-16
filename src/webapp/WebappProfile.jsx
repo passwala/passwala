@@ -30,7 +30,15 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
   const { t } = useTranslation();
   const [localPhoto, setLocalPhoto] = React.useState(user?.photoURL);
   const [isEditingName, setIsEditingName] = React.useState(false);
-  const [newName, setNewName] = React.useState(user?.displayName || '');
+  const isPlaceholderName = (n) => !n || n === 'Coming Soon Subscriber' || n === 'Passwala User';
+  const getCleanName = (u) => {
+    if (!u) return '';
+    if (!isPlaceholderName(u.displayName)) return u.displayName || '';
+    // Fall back to email prefix, nicely capitalized
+    if (u.email) return u.email.split('@')[0].replace(/[._0-9]/g, ' ').trim().replace(/\b\w/g, c => c.toUpperCase()).trim();
+    return '';
+  };
+  const [newName, setNewName] = React.useState(getCleanName(user));
   const [isUpdatingName, setIsUpdatingName] = React.useState(false);
   const [isEditingEmail, setIsEditingEmail] = React.useState(false);
   const [newEmail, setNewEmail] = React.useState(user?.email || '');
@@ -67,7 +75,8 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
 
   React.useEffect(() => {
     setLocalPhoto(user?.photoURL);
-    if (user?.displayName) setNewName(user.displayName);
+    const cleanName = getCleanName(user);
+    if (cleanName) setNewName(cleanName);
     if (user?.email) setNewEmail(user.email);
   }, [user]);
 
@@ -259,11 +268,12 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
             <div className="profile-info-content">
               <span className="profile-info-label">Phone Number</span>
               <span className="profile-info-value">
-                {user?.phoneNumber
-                  ? (user.phoneNumber.startsWith('+91') ? user.phoneNumber : `+91 ${user.phoneNumber}`)
-                  : user?.phone
-                  ? `+91 ${user.phone}`
-                  : '—'}
+                {(() => {
+                  const phone = user?.phoneNumber || user?.phone;
+                  // Hide placeholder phones set by coming-soon signup
+                  if (!phone || phone.startsWith('CS_') || phone.startsWith('np_')) return 'Not added';
+                  return phone.startsWith('+91') ? phone : `+91 ${phone}`;
+                })()}
               </span>
             </div>
           </div>

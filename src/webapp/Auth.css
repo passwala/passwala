@@ -1441,6 +1441,7 @@ body.auth-active {
   justify-content: center !important;
   animation: adminCardEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
+}
 
 @keyframes adminCardEntrance {
   from {

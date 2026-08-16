@@ -309,15 +309,7 @@ const AppContent = ({
   const { t, changeLanguage } = useTranslation();
 
   // ── Onboarding Wizard: show by default on first load ──────────────────────
-  const [showOnboarding, setShowOnboarding] = useState(() => {
-    if (!isWebappMode) return false;
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('onboarding') === 'true' || urlParams.get('force_onboarding') === 'true') {
-      localStorage.removeItem('passwala_onboarding_done');
-      return true;
-    }
-    return !localStorage.getItem('passwala_onboarding_done');
-  });
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingPrefs, setOnboardingPrefs] = useState(() => {
     try {
       const saved = localStorage.getItem('passwala_onboarding_prefs');
@@ -334,9 +326,9 @@ const AppContent = ({
     const forceOnboarding = urlParams.get('onboarding') === 'true' || urlParams.get('force_onboarding') === 'true';
     if (forceOnboarding) {
       localStorage.removeItem('passwala_onboarding_done');
-      setShowOnboarding(true);
+      // setShowOnboarding(true); // User requested to hide this feature
     } else if (!localStorage.getItem('passwala_onboarding_done')) {
-      setShowOnboarding(true);
+      // setShowOnboarding(true); // User requested to hide this feature
     }
   }, [effectiveUser]);
 
@@ -734,34 +726,35 @@ const AppContent = ({
                   {/* Routes for features — redirected to home if not launched yet */}
                   <Route path="/near-shops" element={!isFeatureEnabled('shopping') ? <Navigate to="/" /> : (effectiveUser ? <NearShops onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/auth" />)} />
                   <Route path="/expert-services" element={!isFeatureEnabled('services') ? <Navigate to="/" /> : (effectiveUser ? <ExpertServices onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/auth" />)} />
-                  <Route path="/neighbors" element={!isFeatureEnabled('community') ? <Navigate to="/" /> : (effectiveUser ? <NeighborsCommunity onBack={() => navigate('/')} location={location} /> : <Navigate to="/auth" />)} />
-                  <Route path="/track-orders" element={!isFeatureEnabled('shopping') ? <Navigate to="/" /> : (effectiveUser ? <TrackOrders user={effectiveUser} userCoords={userCoords} onBack={() => navigate('/')} /> : <Navigate to="/auth" />)} />
-                  <Route path="/city-ride" element={effectiveUser ? <CityTicketBooking user={effectiveUser} userCoords={userCoords} onBack={() => navigate('/')} /> : <Navigate to="/auth" />} />
-                  <Route path="/ride-checkout" element={effectiveUser ? <RideCheckout /> : <Navigate to="/auth" />} />
-                  <Route path="/ride-ticket" element={effectiveUser ? <RideTicket /> : <Navigate to="/auth" />} />
-                  {/* IMPORTANT: /events/checkout MUST be defined before /events/:id
-                      to prevent React Router from treating 'checkout' as an event ID param.
-                      Do NOT reorder these routes. */}
-                  <Route path="/events" element={effectiveUser ? <EventHub onBack={() => navigate('/')} /> : <Navigate to="/auth" />} />
-                  <Route path="/events/checkout" element={effectiveUser ? <EventCheckout user={effectiveUser} /> : <Navigate to="/auth" />} />
-                  <Route path="/events/ticket" element={effectiveUser ? <EventTicket /> : <Navigate to="/auth" />} />
-                  <Route path="/events/:id" element={effectiveUser ? <EventDetails user={effectiveUser} /> : <Navigate to="/auth" />} />
-                  {/* Sports Venue Booking — checkout/ticket BEFORE :id param to avoid collision */}
-                  <Route path="/sports" element={effectiveUser ? <SportsHub user={effectiveUser} userCoords={userCoords} /> : <Navigate to="/auth" />} />
-                  <Route path="/sports/checkout" element={effectiveUser ? <SportsCheckout user={effectiveUser} /> : <Navigate to="/auth" />} />
-                  <Route path="/sports/ticket" element={effectiveUser ? <SportsTicket /> : <Navigate to="/auth" />} />
-                  <Route path="/sports/:id" element={effectiveUser ? <VenueDetails user={effectiveUser} /> : <Navigate to="/auth" />} />
-                  <Route path="/profile" element={effectiveUser ? <WebappProfile user={effectiveUser} onLogout={handleLogout} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} onUpdateUser={(updated) => setUser(updated)} /> : <Navigate to="/auth" />} />
-                  <Route path="/order-history" element={effectiveUser ? <OrderHistory /> : <Navigate to="/auth" />} />
-                  <Route path="/wallet" element={effectiveUser ? <Wallet user={effectiveUser} /> : <Navigate to="/auth" />} />
-                  <Route path="/offers" element={effectiveUser ? <Offers /> : <Navigate to="/auth" />} />
-                  <Route path="/gift-cards" element={effectiveUser ? <GiftCards /> : <Navigate to="/auth" />} />
-                  <Route path="/privacy-security" element={effectiveUser ? <PrivacySecurity /> : <Navigate to="/auth" />} />
-                  <Route path="/help-support" element={effectiveUser ? <HelpSupport /> : <Navigate to="/auth" />} />
-                  <Route path="/settings" element={effectiveUser ? <AppSettings isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/auth" />} />
+                  <Route path="/near-shops" element={!isFeatureEnabled('shopping') ? <Navigate to="/" replace /> : (effectiveUser ? <NearShops onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/auth" replace />)} />
+                  <Route path="/expert-services" element={!isFeatureEnabled('services') ? <Navigate to="/" replace /> : (effectiveUser ? <ExpertServices onBack={() => navigate('/')} location={location} userCoords={userCoords} /> : <Navigate to="/auth" replace />)} />
+                  <Route path="/neighbors" element={!isFeatureEnabled('community') ? <Navigate to="/" replace /> : (effectiveUser ? <NeighborsCommunity onBack={() => navigate('/')} location={location} /> : <Navigate to="/auth" replace />)} />
+                  <Route path="/track-orders" element={!isFeatureEnabled('shopping') ? <Navigate to="/" replace /> : (effectiveUser ? <TrackOrders user={effectiveUser} userCoords={userCoords} onBack={() => navigate('/')} /> : <Navigate to="/auth" replace />)} />
+                  <Route path="/city-ride" element={effectiveUser ? <CityTicketBooking user={effectiveUser} userCoords={userCoords} onBack={() => navigate('/')} /> : <Navigate to="/auth" replace />} />
+                  <Route path="/ride-checkout" element={effectiveUser ? <RideCheckout /> : <Navigate to="/auth" replace />} />
+                  <Route path="/ride-ticket" element={effectiveUser ? <RideTicket /> : <Navigate to="/auth" replace />} />
+                  <Route path="/rider/auth" element={effectiveUser ? <Navigate to="/rider" replace /> : <RiderAuth onLogin={(userData) => { setUser(userData); localStorage.setItem('passwala_user', JSON.stringify(userData)); }} />} />
+                  <Route path="/vendor/auth" element={effectiveUser ? <Navigate to="/vendor" replace /> : <VendorAuth onLogin={(userData) => { setUser(userData); localStorage.setItem('passwala_user', JSON.stringify(userData)); }} />} />
+                  <Route path="/admin/auth" element={effectiveUser ? <Navigate to="/admin" replace /> : <AdminAuth onLogin={(userData) => { setUser(userData); localStorage.setItem('passwala_user', JSON.stringify(userData)); }} />} />
+                  <Route path="/events" element={effectiveUser ? <EventHub onBack={() => navigate('/')} /> : <Navigate to="/auth" replace />} />
+                  <Route path="/events/checkout" element={effectiveUser ? <EventCheckout user={effectiveUser} /> : <Navigate to="/auth" replace />} />
+                  <Route path="/events/ticket" element={effectiveUser ? <EventTicket /> : <Navigate to="/auth" replace />} />
+                  <Route path="/events/:id" element={effectiveUser ? <EventDetails user={effectiveUser} /> : <Navigate to="/auth" replace />} />
+                  <Route path="/sports" element={effectiveUser ? <SportsHub user={effectiveUser} userCoords={userCoords} /> : <Navigate to="/auth" replace />} />
+                  <Route path="/sports/checkout" element={effectiveUser ? <SportsCheckout user={effectiveUser} /> : <Navigate to="/auth" replace />} />
+                  <Route path="/sports/ticket" element={effectiveUser ? <SportsTicket /> : <Navigate to="/auth" replace />} />
+                  <Route path="/sports/:id" element={effectiveUser ? <VenueDetails user={effectiveUser} /> : <Navigate to="/auth" replace />} />
+                  <Route path="/profile" element={effectiveUser ? <WebappProfile user={effectiveUser} onLogout={handleLogout} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} onUpdateUser={(updated) => setUser(updated)} /> : <Navigate to="/auth" replace />} />
+                  <Route path="/order-history" element={effectiveUser ? <OrderHistory /> : <Navigate to="/auth" replace />} />
+                  <Route path="/wallet" element={effectiveUser ? <Wallet user={effectiveUser} /> : <Navigate to="/auth" replace />} />
+                  <Route path="/offers" element={effectiveUser ? <Offers /> : <Navigate to="/auth" replace />} />
+                  <Route path="/gift-cards" element={effectiveUser ? <GiftCards /> : <Navigate to="/auth" replace />} />
+                  <Route path="/privacy-security" element={effectiveUser ? <PrivacySecurity /> : <Navigate to="/auth" replace />} />
+                  <Route path="/help-support" element={effectiveUser ? <HelpSupport /> : <Navigate to="/auth" replace />} />
+                  <Route path="/settings" element={effectiveUser ? <AppSettings isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} /> : <Navigate to="/auth" replace />} />
                   <Route path="/select-location" element={<LocationSelector currentLocation={location} onLocationChange={(newLoc, coords) => setLocation(newLoc, coords)} />} />
-                  <Route path="/manage-addresses" element={effectiveUser ? <AddressManager user={effectiveUser} /> : <Navigate to="/auth" />} />
-                  <Route path="/complete-profile" element={effectiveUser ? <CustomerDetails user={effectiveUser} onComplete={(addr, name) => { setIsProfileComplete(true); setUserAddress(addr); if (name) { setUser(prev => ({ ...prev, displayName: name })); } navigate('/'); }} /> : <Navigate to="/auth" />} />
+                  <Route path="/manage-addresses" element={effectiveUser ? <AddressManager user={effectiveUser} /> : <Navigate to="/auth" replace />} />
+                  <Route path="/complete-profile" element={effectiveUser ? <CustomerDetails user={effectiveUser} onComplete={(addr, name) => { setIsProfileComplete(true); setUserAddress(addr); if (name) { setUser(prev => ({ ...prev, displayName: name })); } navigate('/'); }} /> : <Navigate to="/auth" replace />} />
                 </Routes>
               </Suspense>
             </main>

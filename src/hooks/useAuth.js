@@ -198,6 +198,13 @@ export const useAuth = () => {
     // Handle Supabase Auth (for Email and Google OAuth)
     // NOTE: After Google OAuth redirect, Supabase fires INITIAL_SESSION (not SIGNED_IN),
     // so we must handle both events.
+    // Ensure authLoading is false if no session exists immediately
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        setAuthLoading(false);
+      }
+    });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       const isLoginEvent = event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED';
       if (isLoginEvent && session?.user) {
@@ -248,7 +255,7 @@ export const useAuth = () => {
         localStorage.setItem('passwala_user', JSON.stringify(finalUser));
         setUser(finalUser);
         setAuthLoading(false);
-      } else if (event === 'SIGNED_OUT') {
+      } else if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !session?.user)) {
         setUser(null);
         setIsProfileComplete(false);
         setAuthLoading(false);

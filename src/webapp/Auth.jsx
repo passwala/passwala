@@ -34,8 +34,8 @@ const Auth = ({ onLogin }) => {
     return 'EMAIL_LOGIN';
   });
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState('');
   
   const [loading, setLoading] = useState(false);
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
@@ -82,33 +82,37 @@ const Auth = ({ onLogin }) => {
 
   const handleEmailAuth = async (e) => {
     e.preventDefault();
-    if (loading || !email || !password) { toast.error('Please enter email and password'); return; }
+    if (loading || !email) { toast.error('Please enter email'); return; }
     
     setLoading(true);
     try {
-      let authData, authError;
-      if (isSignUp) {
-        const res = await supabase.auth.signUp({ email, password });
-        authData = res.data;
-        authError = res.error;
-        if (authError) throw authError;
-        toast.success('Account created successfully!');
+      if (!otpSent) {
+        const { error } = await supabase.auth.signInWithOtp({ email });
+        if (error) throw error;
+        toast.success('OTP sent to your email!');
+        setOtpSent(true);
       } else {
-        const res = await supabase.auth.signInWithPassword({ email, password });
-        authData = res.data;
-        authError = res.error;
-        if (authError) throw authError;
+        if (!otp) { toast.error('Please enter OTP'); return; }
+        const { data, error } = await supabase.auth.verifyOtp({ email, token: otp, type: 'email' });
+        if (error) throw error;
         toast.success('Login Successful!');
-      }
-      
-      const user = authData.user;
-      if (user) {
-        handleQuickLogin({
-          email: user.email,
-          uid: user.id,
-          displayName: user.user_metadata?.full_name || user.email.split('@')[0],
-          photoURL: user.user_metadata?.avatar_url
-        }, 'email');
+        
+        const user = data.user;
+        if (user) {
+          // Derive a clean display name: prefer metadata, else capitalize email prefix
+          const emailPrefix = user.email.split('@')[0];
+          // Convert "karanhdave2k20" → "Karanhdave2k20", handle dots/underscores
+          const cleanName = user.user_metadata?.full_name 
+            || user.user_metadata?.name
+            || emailPrefix.replace(/[._0-9]/g, ' ').trim().replace(/\b\w/g, c => c.toUpperCase()).trim()
+            || emailPrefix;
+          handleQuickLogin({
+            email: user.email,
+            uid: user.id,
+            displayName: cleanName,
+            photoURL: user.user_metadata?.avatar_url
+          }, 'email');
+        }
       }
     } catch (err) {
       console.error(err);
@@ -176,12 +180,12 @@ const Auth = ({ onLogin }) => {
         email: credUser.email,
         displayName: credUser.displayName || dbUser?.name || 'Passwala User',
         photoURL: credUser.photoURL || dbUser?.photo_url,
-        provider: authProvider,
+        authProvider: authProvider,
         role: dbUser?.role || 'BUYER',
         preferences: dbUser?.preferences || {}
       };
 
-      const res = await fetch(`${BASE_API}/api/users/login`, {
+      const res = await fetch(`${BASE_API}/api/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(loginPayload)
@@ -355,7 +359,7 @@ const Auth = ({ onLogin }) => {
         {/* Back Button Wrapper */}
         {(step === 'LOCATION' || step === 'PROFILE') && (
           <div className="auth-back-btn-wrapper" style={{ width: '100%', marginBottom: '1rem', display: 'flex', justifyContent: 'flex-start' }}>
-            <button className="auth-back-btn" onClick={() => setStep('EMAIL_LOGIN')}>
+            <button className="auth-back-btn" onClick={() => setStep('EMAIL_LOGIN')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#64748b', fontWeight: '500' }}>
               <ArrowLeft size={18} />
             </button>
           </div>
@@ -392,25 +396,36 @@ const Auth = ({ onLogin }) => {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      style={{ padding: '0.75rem 1rem' }}
+                      disabled={otpSent}
+                      style={{ padding: '0.75rem 1rem', opacity: otpSent ? 0.6 : 1 }}
                     />
                   </div>
-                  <div className="input-group-modern" style={{ gap: '0.35rem' }}>
-                    <label style={{ fontSize: '0.8rem' }}>Password</label>
-                    <input 
-                      type="password" 
-                      placeholder="Enter your password" 
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      style={{ padding: '0.75rem 1rem' }}
-                    />
-                  </div>
+                  {otpSent && (
+                    <div className="input-group-modern" style={{ gap: '0.35rem' }}>
+                      <label style={{ fontSize: '0.8rem' }}>Enter OTP</label>
+                      <input 
+                        type="text" 
+                        placeholder="Enter OTP code" 
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                        maxLength={8}
+                        required
+                        autoFocus
+                        style={{ padding: '0.75rem 1rem', letterSpacing: '0.2rem', textAlign: 'center', fontSize: '1.2rem', fontWeight: 'bold' }}
+                      />
+                    </div>
+                  )}
 
                   <div className="auth-toggle-row" style={{ marginTop: '0' }}>
-                    <span onClick={() => setIsSignUp(!isSignUp)} className="toggle-auth-mode">
-                      {isSignUp ? 'Already have an account? Log in' : "Don't have an account? Sign up"}
-                    </span>
+                    {otpSent ? (
+                      <span onClick={() => { setOtpSent(false); setOtp(''); }} className="toggle-auth-mode">
+                        Change email address
+                      </span>
+                    ) : (
+                      <span className="toggle-auth-mode" style={{ visibility: 'hidden' }}>
+                        Placeholder
+                      </span>
+                    )}
                   </div>
 
                   <button 
@@ -419,7 +434,7 @@ const Auth = ({ onLogin }) => {
                     disabled={loading}
                     style={{ background: 'var(--auth-action-color)', marginTop: '0.5rem' }}
                   >
-                    {loading ? <RefreshCw className="spin" size={20} color="#fff" /> : (isSignUp ? 'Sign Up with Email' : 'Log In with Email')}
+                    {loading ? <RefreshCw className="spin" size={20} color="#fff" /> : (otpSent ? 'Verify OTP' : 'Send OTP')}
                   </button>
                 </form>
 
