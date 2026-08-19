@@ -154,7 +154,7 @@ export async function sendWhatsAppOTP(phone, otp) {
   //   Set: WHATSAPP_PROVIDER=evolution
   //        EVOLUTION_API_URL, EVOLUTION_INSTANCE, EVOLUTION_API_KEY
   // ─────────────────────────────────────────────────────────────────────────────
-  if (provider === 'evolution' || (!provider && process.env.EVOLUTION_API_URL && process.env.EVOLUTION_INSTANCE && process.env.EVOLUTION_API_KEY)) {
+  if (provider === 'evolution' || provider === 'evolution_v2' || (!provider && process.env.EVOLUTION_API_URL && process.env.EVOLUTION_INSTANCE && process.env.EVOLUTION_API_KEY)) {
     if (!process.env.EVOLUTION_API_URL || !process.env.EVOLUTION_INSTANCE || !process.env.EVOLUTION_API_KEY) {
       throw new Error('Evolution provider selected but EVOLUTION_API_URL, EVOLUTION_INSTANCE, or EVOLUTION_API_KEY is not configured.');
     }
@@ -167,11 +167,18 @@ export async function sendWhatsAppOTP(phone, otp) {
       headers: { apikey: apiKey }
     });
     const stateData = await stateRes.json();
-    const state = stateData?.instance?.state;
+    
+    // Support both Evolution v1 and v2 state formats
+    const state = stateData?.instance?.state || stateData?.state || stateData?.status;
+    
     if (state !== 'open') {
+      let errorMsg = stateData?.response?.message;
+      if (Array.isArray(errorMsg)) errorMsg = errorMsg[0];
+      errorMsg = errorMsg || stateData?.message || stateData?.error || `state: "${state}"`;
+      
       throw new Error(
-        `Evolution WhatsApp instance "${instance}" is not connected (state: "${state}"). ` +
-        `Please scan the QR code at ${baseUrl} to reconnect, or switch to a different WHATSAPP_PROVIDER.`
+        `Evolution WhatsApp instance "${instance}" is not connected (${errorMsg}). ` +
+        `Please verify the instance exists and is connected at ${baseUrl}, or switch to a different WHATSAPP_PROVIDER.`
       );
     }
 

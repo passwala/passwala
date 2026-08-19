@@ -209,7 +209,16 @@ export class ErrorBoundary extends React.Component {
             )}
             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => {
+                  if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                      for(let registration of registrations) { registration.unregister(); }
+                      window.location.reload();
+                    }).catch(() => window.location.reload());
+                  } else {
+                    window.location.reload();
+                  }
+                }}
                 style={{
                   padding: '0.85rem 2rem',
                   background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',

@@ -13,19 +13,7 @@ const VendorAuth = ({ onLogin }) => {
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
-    if (loading) return;
-    const clean = phone.replace(/\D/g, '');
-    if (clean.length !== 10) {
-      toast.error('Enter a valid 10-digit mobile number');
-      return;
-    }
-    setLoading(true);
-    setLoginMethod('SMS');
-    setTimeout(() => {
-      setLoading(false);
-      toast.success('Welcome back to Passwala Partner!');
-      onLogin(clean, { name: 'Vendor Partner' });
-    }, 800);
+    handleWhatsAppLogin();
   };
 
   const handleWhatsAppLogin = async (e) => {

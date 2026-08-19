@@ -95,14 +95,6 @@ const VendorPortal = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('vendorActiveTab') || 'dashboard'); 
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024);
   const mainScrollRef = React.useRef(null);
-
-  useEffect(() => {
-    window.scrollTo(0, 0);
-    if (mainScrollRef.current) {
-      mainScrollRef.current.scrollTo(0, 0);
-    }
-  }, [activeTab]);
-  
   // Onboarding State
   const [onboardingSubStep, setOnboardingSubStep] = useState(() => parseInt(localStorage.getItem('vOnboardingStep') || '1')); 
   const [businessType, setBusinessType] = useState(() => {
@@ -116,6 +108,13 @@ const VendorPortal = ({ user, onLogout }) => {
     const saved = localStorage.getItem('vFormData');
     return saved ? JSON.parse(saved) : { name: '', aadhar_no: '', business_name: '', license_no: '', address: '', lat: '', lng: '' };
   });
+  
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    if (mainScrollRef.current) {
+      mainScrollRef.current.scrollTo(0, 0);
+    }
+  }, [activeTab, onboardingSubStep]);
   
   useEffect(() => {
     safeSetLocalStorage('vOnboardingStep', onboardingSubStep);

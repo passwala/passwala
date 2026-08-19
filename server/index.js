@@ -58,6 +58,16 @@ const allowedOrigins = [
   'http://localhost:3005',
   'http://127.0.0.1:3005',
   'https://localhost:3005',
+  'http://localhost:4000',
+  'https://localhost:4000',
+  'http://localhost:4001',
+  'https://localhost:4001',
+  'http://localhost:4002',
+  'https://localhost:4002',
+  'http://localhost:4003',
+  'https://localhost:4003',
+  'http://localhost:4005',
+  'https://localhost:4005',
   'https://passwala.vercel.app',
   'https://passwala.onrender.com'
 ];

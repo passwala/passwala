@@ -461,9 +461,15 @@ export const useAuth = () => {
       setAuthLoading(false);
     });
 
+    const authSafetyTimer = setTimeout(() => {
+      setAuthLoading(false);
+      setMinSplashDone(true);
+    }, 2500);
+
     return () => {
       unsub();
       clearTimeout(splashTimer);
+      clearTimeout(authSafetyTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
