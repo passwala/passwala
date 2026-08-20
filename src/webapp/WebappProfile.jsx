@@ -177,14 +177,21 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
           },
           body: JSON.stringify({ photoURL: base64String })
         });
-        if (!res.ok) throw new Error('Upload failed');
+        if (!res.ok) {
+          let errorDetail = 'Upload failed';
+          try {
+            const errData = await res.json();
+            errorDetail = errData.error || errData.message || errorDetail;
+          } catch (e) {}
+          throw new Error(errorDetail);
+        }
         const data = await res.json();
         const uploadedPhotoUrl = data.photoURL || base64String;
         setLocalPhoto(uploadedPhotoUrl);
         if (onUpdateUser) onUpdateUser({ ...user, photoURL: uploadedPhotoUrl });
         toast.success('Profile Picture Updated!', { id: 'upload' });
       } catch (err) {
-        toast.error('Upload failed.', { id: 'upload' });
+        toast.error(`Upload failed: ${err.message}`, { id: 'upload' });
       }
     };
     reader.readAsDataURL(file);

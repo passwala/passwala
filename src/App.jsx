@@ -550,14 +550,14 @@ const AppContent = ({
       ) : /* 1. Vendor Mode - Workspace takeover */
         (locationPath === '/vendor' || isVendorMode) ? (
           <VendorErrorBoundary>
-            {(!effectiveUser || (effectiveUser.role !== 'VENDOR' && effectiveUser.role !== 'ADMIN')) ? (
+            {(!effectiveUser || !['VENDOR', 'EVENT_ORGANIZER', 'SERVICE_PROVIDER', 'ADMIN'].includes(effectiveUser.role)) ? (
               <VendorAuth onLogin={(phone, profile) => {
                 const vendorObj = { ...profile, displayName: profile?.name || 'Vendor', phoneNumber: phone, role: 'VENDOR' };
                 setUser(vendorObj);
                 localStorage.setItem('passwala_user', JSON.stringify(vendorObj));
               }} />
             ) : (
-              <RoleGuard allowedRoles={['VENDOR', 'ADMIN']} user={effectiveUser}>
+              <RoleGuard allowedRoles={['VENDOR', 'EVENT_ORGANIZER', 'SERVICE_PROVIDER', 'ADMIN']} user={effectiveUser}>
                 <Suspense fallback={
                   <div className="flex flex-col items-center justify-center h-screen bg-slate-950 text-white">
                     <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#ff7622] mb-4"></div>

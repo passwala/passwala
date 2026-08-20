@@ -2150,7 +2150,7 @@ const VendorPortal = ({ user, onLogout }) => {
 
   if (appStatus === 'onboarding') {
     return (
-      <div className="vendor-portal onboarding-mode">
+      <div className="vendor-portal onboarding-mode" ref={mainScrollRef}>
         {renderOnboarding()}
       </div>
     );

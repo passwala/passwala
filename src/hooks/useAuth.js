@@ -21,7 +21,11 @@ export const useAuth = () => {
         if (parsed) {
           if (isSpecialMode) {
             const expectedRole = appMode === 'rider' ? 'RIDER' : appMode === 'vendor' ? 'VENDOR' : 'ADMIN';
-            if (parsed.role !== expectedRole && parsed.role !== 'ADMIN') {
+            if (appMode === 'vendor') {
+              if (!['VENDOR', 'EVENT_ORGANIZER', 'SERVICE_PROVIDER', 'ADMIN'].includes(parsed.role)) {
+                return null;
+              }
+            } else if (parsed.role !== expectedRole && parsed.role !== 'ADMIN') {
               return null;
             }
           } else {
@@ -269,17 +273,26 @@ export const useAuth = () => {
 
       if (isSpecialMode) {
         const expectedRole = appMode === 'rider' ? 'RIDER' : appMode === 'vendor' ? 'VENDOR' : 'ADMIN';
-        if (!manualUser || (manualUser.role !== expectedRole && manualUser.role !== 'ADMIN')) {
-          setUser(null);
-          setIsProfileComplete(false);
-          setAuthLoading(false);
-          return;
+        if (appMode === 'vendor') {
+          if (!manualUser || !['VENDOR', 'EVENT_ORGANIZER', 'SERVICE_PROVIDER', 'ADMIN'].includes(manualUser.role)) {
+            setUser(null);
+            setIsProfileComplete(false);
+            setAuthLoading(false);
+            return;
+          }
         } else {
-          setUser(manualUser);
-          setIsProfileComplete(wasComplete);
-          setAuthLoading(false);
-          return;
+          if (!manualUser || (manualUser.role !== expectedRole && manualUser.role !== 'ADMIN')) {
+            setUser(null);
+            setIsProfileComplete(false);
+            setAuthLoading(false);
+            return;
+          }
         }
+        
+        setUser(manualUser);
+        setIsProfileComplete(wasComplete);
+        setAuthLoading(false);
+        return;
       }
 
       if (!u) {
@@ -301,6 +314,7 @@ export const useAuth = () => {
                 syncedManualUser.id = usr.id;
                 syncedManualUser.displayName = usr.full_name || manualUser.displayName || syncedManualUser.displayName;
                 syncedManualUser.photoURL = usr.photo_url || manualUser.photoURL || syncedManualUser.photoURL;
+                syncedManualUser.role = usr.role || 'BUYER';
                 
                 // Fetch default address (ordered: default first, then most recent)
                 const { data: addr } = await supabase.from('addresses').select('*')
@@ -362,7 +376,7 @@ export const useAuth = () => {
             phoneNumber: u.phoneNumber,
             displayName: usr.full_name || u.displayName || manualUser?.displayName,
             photoURL: usr.photo_url || u.photoURL || manualUser?.photoURL,
-            role: 'BUYER'
+            role: usr.role || 'BUYER'
           };
 
           // Always fetch the default (or most recent) address from DB on every login

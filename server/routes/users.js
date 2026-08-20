@@ -251,7 +251,7 @@ export const userAuth = async (req, res, next) => {
     const isDirectMatch = 
       (decodedUser.uid && targetIdentifier === decodedUser.uid) ||
       (decodedUser.email && targetIdentifier.toLowerCase() === decodedUser.email.toLowerCase()) ||
-      (decodedUser.phone_number && targetIdentifier.replace(/\D/g, '') === decodedUser.phone_number.replace(/\D/g, ''));
+      (decodedUser.phone_number && normalizePhone(targetIdentifier) === normalizePhone(decodedUser.phone_number));
 
     if (!targetUser) {
       if (isDirectMatch) {
@@ -265,7 +265,7 @@ export const userAuth = async (req, res, next) => {
       isDirectMatch ||
       (decodedUser.uid && decodedUser.uid === targetUser.uid) ||
       (decodedUser.email && targetUser.email && decodedUser.email.toLowerCase() === targetUser.email.toLowerCase()) ||
-      (decodedUser.phone_number && targetUser.phone && decodedUser.phone_number.replace(/\D/g, '') === targetUser.phone.replace(/\D/g, ''));
+      (decodedUser.phone_number && targetUser.phone && normalizePhone(decodedUser.phone_number) === normalizePhone(targetUser.phone));
 
     if (!isOwner) {
       return res.status(403).json({ error: 'Forbidden: You do not own this profile' });
