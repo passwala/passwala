@@ -37,23 +37,23 @@
   --transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Premium Dark Mode Token Overrides (Forced Orange/White Contrast Style) */
+/* Premium Dark Mode Token Overrides */
 body.dark-mode {
-  --bg-main: #ffffff;
-  --bg-soft: #ffffff;
-  --bg-surface: #fff8f5;
-  --bg-card: #ffffff;
-  --text-primary: #121215;
-  --text-secondary: #5a5d64;
-  --text-muted: #8e929c;
-  --border-light: #ffdcd0;
-  --glass-border: rgba(255, 107, 0, 0.08);
-  --glass-bg: rgba(255, 255, 255, 0.85);
-  --primary-light: rgba(255, 107, 0, 0.06);
+  --bg-main: #0f172a;
+  --bg-soft: #1e293b;
+  --bg-surface: #0f172a;
+  --bg-card: #1e293b;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border-light: #334155;
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-bg: rgba(30, 41, 59, 0.85);
+  --primary-light: rgba(255, 107, 0, 0.15);
   --secondary: #ff6b00;
-  --shadow-sm: 0 2px 12px rgba(255, 107, 0, 0.02);
-  --shadow-md: 0 16px 36px rgba(255, 107, 0, 0.05);
-  --shadow-lg: 0 28px 64px rgba(255, 107, 0, 0.09);
+  --shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 16px 36px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 28px 64px rgba(0, 0, 0, 0.4);
 }
 
 * {
