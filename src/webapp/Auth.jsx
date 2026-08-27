@@ -256,8 +256,14 @@ const Auth = ({ onLogin }) => {
     if (loading) return;
     setLoading(true);
     try {
-      // Always redirect back to /auth so the onAuthStateChange listener catches the token
-      const redirectTo = `${window.location.origin}/auth`;
+      // CRITICAL: Always redirect to production URL on mobile.
+      // window.location.origin can return "localhost:3001" on mobile if the
+      // page was opened via a dev server tunnel or shared link.
+      const isProd = window.location.hostname !== 'localhost' && !window.location.hostname.startsWith('192.');
+      const baseUrl = isProd
+        ? 'https://passwala.vercel.app'
+        : window.location.origin;
+      const redirectTo = `${baseUrl}/auth`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -642,7 +648,6 @@ const Auth = ({ onLogin }) => {
                       <div className="input-group-modern" style={{ gap: '0.35rem' }}>
                         <label style={{ fontSize: '0.8rem' }}>
                           {t('auth_whatsapp_otp_label')}
-                          {mockOtp && <span style={{ color: '#25D366', marginLeft: '8px', fontSize: '0.75rem' }}>[Dev: {mockOtp}]</span>}
                         </label>
                         <input 
                           type="text"
@@ -696,19 +701,7 @@ const Auth = ({ onLogin }) => {
                     {t('auth_continue_google')}
                   </button>
 
-                <button 
-                  type="button"
-                  className="sheet-action-btn-modern ai-btn" 
-                  onClick={() => {
-                    toast.success("AI Assistant is waking up...");
-                    setTimeout(() => {
-                      toast("I am Passwala AI. How can I help you log in?", { icon: '🤖' });
-                    }, 1500);
-                  }}
-                  style={{ marginTop: '0.5rem', padding: '0.85rem' }}
-                >
-                  🤖 {t('auth_ask_ai')}
-                </button>
+{/* AI Assistant button intentionally hidden */}
 
                 <div className="policy-agreement-text">
                   {t('auth_terms_text')} <a href="/terms">{t('auth_terms')}</a> & <a href="/privacy-policy">{t('auth_privacy')}</a>.
