@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: #f8fafc;
+  background: var(--bg-surface);
   z-index: 10000;
   display: flex;
   flex-direction: column;
@@ -33,32 +33,32 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #1e293b;
+  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .back-mini-circle:hover {
-  background: #f1f5f9;
+  background: var(--bg-soft);
   transform: translateX(-2px);
 }
 
 .header-title-stack h1 {
   font-size: 1.5rem;
   font-weight: 900;
-  color: #0f172a;
+  color: var(--text-primary);
   margin: 0;
   letter-spacing: -0.5px;
 }
 
 .header-title-stack span {
   font-size: 0.9rem;
-  color: #64748b;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
 .location-search-box {
-  background: #f1f5f9;
+  background: var(--bg-soft);
   border-radius: 16px;
   padding: 0 1.25rem;
   display: flex;
@@ -82,7 +82,7 @@
   outline: none;
   font-size: 1rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-primary);
 }
 
 .location-scroll-content {
@@ -144,19 +144,19 @@
 
 .detect-info strong {
   font-size: 1.1rem;
-  color: #1e293b;
+  color: var(--text-primary);
   margin-bottom: 2px;
 }
 
 .detect-info span {
   font-size: 0.85rem;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .section-label-v3 {
   font-size: 0.8rem;
   font-weight: 800;
-  color: #94a3b8;
+  color: var(--text-muted);
   letter-spacing: 1px;
   margin-bottom: 1.25rem;
   padding-left: 0.5rem;
@@ -182,8 +182,8 @@
 }
 
 .neighborhood-item:hover {
-  background: #f8fafc;
-  border-color: #e2e8f0;
+  background: var(--bg-surface);
+  border-color: var(--border-light);
   transform: scale(1.02);
 }
 
@@ -195,12 +195,12 @@
 .neighborhood-icon-box {
   width: 42px;
   height: 42px;
-  background: #f1f5f9;
+  background: var(--bg-soft);
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #64748b;
+  color: var(--text-secondary);
   transition: all 0.3s ease;
 }
 
@@ -217,12 +217,12 @@
 
 .neighborhood-meta strong {
   font-size: 1.05rem;
-  color: #1e293b;
+  color: var(--text-primary);
 }
 
 .neighborhood-meta span {
   font-size: 0.8rem;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .selection-tick {
@@ -232,7 +232,7 @@
 .no-results-location {
   padding: 3rem 1rem;
   text-align: center;
-  color: #94a3b8;
+  color: var(--text-muted);
   font-style: italic;
 }
 

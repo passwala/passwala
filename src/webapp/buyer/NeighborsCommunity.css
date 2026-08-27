@@ -354,7 +354,7 @@
 
 /* --- LIGHT MODE SPECIFIC --- */
 body:not(.dark-mode) .action-circle {
-  background: #f8fafc;
+  background: var(--bg-surface);
 }
 
 body:not(.dark-mode) .group-circle {
@@ -364,7 +364,7 @@ body:not(.dark-mode) .group-circle {
 
 
 body:not(.dark-mode) .create-post-card {
-  background: #f8fafc;
+  background: var(--bg-surface);
 }
 
 /* New: Community Trust Elements */

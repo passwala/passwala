@@ -89,7 +89,7 @@
   cursor: default;
 }
 .notif-item:hover { background: #f8f9ff; }
-.notif-item--unread { background: #fff8f5; }
+.notif-item--unread { background: var(--bg-surface); }
 .notif-item--unread:hover { background: #fff4ef; }
 
 .notif-icon-wrap {

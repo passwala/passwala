@@ -13,7 +13,7 @@
   --auth-text-dark: #0f172a;
   --auth-text-sub: #475569;
   --auth-text-muted: #94a3b8;
-  --auth-border: #e2e8f0;
+  --auth-border: var(--border-light);
   --auth-input-bg: #ffffff;
   --auth-action-color: #ff7622;
   /* Vibrant Passwala Orange */
@@ -426,7 +426,7 @@ body.auth-active {
 }
 
 .country-selector-box:hover {
-  background: #f8fafc;
+  background: var(--bg-surface);
   border-color: #cbd5e1;
 }
 
@@ -468,7 +468,7 @@ body.auth-active {
 }
 
 .phone-field-box input::placeholder {
-  color: #a0aec0;
+  color: var(--text-muted);
   font-weight: 400;
 }
 
@@ -551,7 +551,7 @@ body.auth-active {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  color: #a0aec0;
+  color: var(--text-muted);
   font-size: 0.78rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -613,7 +613,7 @@ body.auth-active {
 .legal-agreement-footer {
   font-size: 0.75rem;
   line-height: 1.5;
-  color: #718096;
+  color: var(--text-secondary);
   text-align: center;
   max-width: 90%;
   margin: auto auto 0 auto;
@@ -713,7 +713,7 @@ body.auth-active {
 }
 
 .profile-input-box input::placeholder {
-  color: #a0aec0;
+  color: var(--text-muted);
 }
 
 /* Spinner Rotate animation */
@@ -1194,13 +1194,13 @@ body.auth-active {
 }
 
 .notif-btn-deny {
-  background: #f8fafc;
+  background: var(--bg-surface);
   color: var(--auth-text-sub);
   border: 1px solid var(--auth-border);
 }
 
 .notif-btn-deny:hover {
-  background: #f1f5f9;
+  background: var(--bg-soft);
   color: var(--auth-text-dark);
 }
 
@@ -1300,7 +1300,7 @@ body.auth-active {
 .admin-auth-card h2 {
   font-size: 1.85rem !important;
   font-weight: 800 !important;
-  color: #0f172a !important;
+  color: var(--text-primary)!important;
   margin: 0 0 0.5rem 0 !important;
   letter-spacing: -0.5px !important;
   background: linear-gradient(135deg, #0f172a 0%, #475569 100%);
@@ -1310,7 +1310,7 @@ body.auth-active {
 }
 
 .admin-auth-card p {
-  color: #64748b !important;
+  color: var(--text-secondary)!important;
   font-size: 0.95rem !important;
   margin: 0 0 2rem 0 !important;
   font-weight: 500 !important;
@@ -1329,11 +1329,11 @@ body.auth-active {
 .admin-auth-card .input-group input {
   width: 100% !important;
   height: 52px !important;
-  background: #ffffff !important;
+  background: var(--bg-card)!important;
   border: 1.5px solid #cbd5e1 !important;
   border-radius: 12px !important;
   padding: 0 1rem 0 3rem !important;
-  color: #0f172a !important;
+  color: var(--text-primary)!important;
   font-size: 0.95rem !important;
   font-weight: 600 !important;
   outline: none !important;
@@ -1343,12 +1343,12 @@ body.auth-active {
 
 .admin-auth-card .input-group input:focus {
   border-color: #f97316 !important;
-  background: #ffffff !important;
+  background: var(--bg-card)!important;
   box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.15) !important;
 }
 
 .admin-auth-card .input-group input::placeholder {
-  color: #94a3b8 !important;
+  color: var(--text-muted)!important;
   font-weight: 500 !important;
 }
 
@@ -1357,7 +1357,7 @@ body.auth-active {
   left: 1rem;
   top: 50%;
   transform: translateY(-50%);
-  color: #94a3b8;
+  color: var(--text-muted);
   pointer-events: none;
   transition: color 0.25s ease;
 }
@@ -1496,7 +1496,7 @@ body.auth-active {
 .admin-auth-card h2 {
   font-size: 1.85rem !important;
   font-weight: 800 !important;
-  color: #0f172a !important;
+  color: var(--text-primary)!important;
   margin: 0 0 0.5rem 0 !important;
   letter-spacing: -0.5px !important;
   background: linear-gradient(135deg, #0f172a 0%, #475569 100%);
@@ -1506,7 +1506,7 @@ body.auth-active {
 }
 
 .admin-auth-card p {
-  color: #64748b !important;
+  color: var(--text-secondary)!important;
   font-size: 0.95rem !important;
   margin: 0 0 2rem 0 !important;
   font-weight: 500 !important;
@@ -1525,11 +1525,11 @@ body.auth-active {
 .admin-auth-card .input-group input {
   width: 100% !important;
   height: 52px !important;
-  background: #ffffff !important;
+  background: var(--bg-card)!important;
   border: 1.5px solid #cbd5e1 !important;
   border-radius: 12px !important;
   padding: 0 1rem 0 3rem !important;
-  color: #0f172a !important;
+  color: var(--text-primary)!important;
   font-size: 0.95rem !important;
   font-weight: 600 !important;
   outline: none !important;
@@ -1539,12 +1539,12 @@ body.auth-active {
 
 .admin-auth-card .input-group input:focus {
   border-color: #f97316 !important;
-  background: #ffffff !important;
+  background: var(--bg-card)!important;
   box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.15) !important;
 }
 
 .admin-auth-card .input-group input::placeholder {
-  color: #94a3b8 !important;
+  color: var(--text-muted)!important;
   font-weight: 500 !important;
 }
 
@@ -1553,7 +1553,7 @@ body.auth-active {
   left: 1rem;
   top: 50%;
   transform: translateY(-50%);
-  color: #94a3b8;
+  color: var(--text-muted);
   pointer-events: none;
   transition: color 0.25s ease;
 }
@@ -1638,7 +1638,7 @@ body.auth-active {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background-color: #f8fafc;
+  background-color: var(--bg-surface);
   padding: 2rem 1.5rem;
 }
 
@@ -1658,12 +1658,12 @@ body.auth-active {
 .auth-brand-header-modern h2 {
   font-size: 1.5rem;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .auth-brand-header-modern p {
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.9rem;
   margin-top: 0.5rem;
 }
@@ -1692,7 +1692,7 @@ body.auth-active {
 .input-group-modern label {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .input-group-modern input {
@@ -1757,13 +1757,13 @@ body.auth-active {
 
 .divider-modern span {
   font-size: 0.8rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   font-weight: 700;
 }
 
 .sheet-action-btn-modern.google-btn {
   background: var(--bg-card);
-  color: #0f172a;
+  color: var(--text-primary);
   border: 1px solid #e2e8f0;
   box-shadow: 0 2px 8px rgba(0,0,0,0.02);
 }
@@ -1776,7 +1776,7 @@ body.auth-active {
 .policy-agreement-text {
   text-align: center;
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   margin-top: 1.5rem;
 }
 

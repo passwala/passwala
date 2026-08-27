@@ -95,10 +95,10 @@
 .order-id-v2 {
   font-size: 0.75rem;
   font-family: 'Poppins', monospace;
-  background: #f1f5f9;
+  background: var(--bg-soft);
   padding: 4px 10px;
   border-radius: 6px;
-  color: #64748b;
+  color: var(--text-secondary);
   font-weight: 600;
 }
 
@@ -108,7 +108,7 @@
 
 .timeline-progress-bg {
   height: 6px;
-  background: #f1f5f9;
+  background: var(--bg-soft);
   border-radius: 10px;
   margin-bottom: 12px;
   overflow: hidden;
@@ -145,7 +145,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  background: #f8fafc;
+  background: var(--bg-surface);
   border-radius: 16px;
   margin-bottom: 1rem;
 }
@@ -157,7 +157,7 @@
 
 .eta-big span {
   font-size: 0.7rem;
-  color: #64748b;
+  color: var(--text-secondary);
   text-transform: uppercase;
   font-weight: 800;
   letter-spacing: 0.05em;
@@ -165,7 +165,7 @@
 
 .eta-big strong {
   font-size: 1.3rem;
-  color: #1e293b;
+  color: var(--text-primary);
   font-weight: 800;
 }
 
@@ -243,13 +243,13 @@
 
 .past-meta span {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .past-meta p {
   font-size: 0.9rem;
   font-weight: 700;
-  color: #334155;
+  color: var(--text-primary);
 }
 
 .fulfilled-pill-small {
@@ -276,7 +276,7 @@
 /* --- LIVE TRACKING MAP V4 --- */
 .live-tracking-map-v4 {
   margin-top: 1.5rem;
-  background: #f8fafc;
+  background: var(--bg-surface);
   border-radius: 20px;
   overflow: hidden;
   border: 1px solid #e2e8f0;
@@ -285,7 +285,7 @@
 
 .map-canvas-v4 {
   height: 220px;
-  background: #f1f5f9;
+  background: var(--bg-soft);
   position: relative;
   overflow: hidden;
 }
@@ -323,7 +323,7 @@
   top: -22px;
   font-size: 0.7rem;
   font-weight: 800;
-  color: #1e293b;
+  color: var(--text-primary);
   background: var(--bg-card);
   padding: 2px 8px;
   border-radius: 8px;
@@ -381,7 +381,7 @@
 }
 
 .rider-tag strong { font-size: 0.7rem; color: white; }
-.rider-tag span { font-size: 0.6rem; color: #94a3b8; font-weight: 600; }
+.rider-tag span { font-size: 0.6rem; color: var(--text-muted); font-weight: 600; }
 
 .tracking-meta-v4 {
   padding: 1.5rem;
@@ -396,7 +396,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #1e293b;
+  color: var(--text-primary);
   font-size: 1rem;
 }
 
@@ -414,13 +414,13 @@
 
 .eta-status {
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--text-secondary);
   margin-top: 6px;
   font-weight: 500;
 }
 
 .rider-contact-btn {
-  background: #f8fafc;
+  background: var(--bg-surface);
   border: 1.5px solid #e2e8f0;
   padding: 12px 20px;
   border-radius: 14px;
@@ -428,13 +428,13 @@
   align-items: center;
   gap: 10px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .rider-contact-btn:hover {
-  background: #f1f5f9;
+  background: var(--bg-soft);
   border-color: #cbd5e1;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.05);
@@ -473,13 +473,13 @@
 .empty-orders-demo-card h3 {
   font-size: 1.3rem;
   font-weight: 800;
-  color: #1e293b;
+  color: var(--text-primary);
   margin-bottom: 0.5rem;
 }
 
 .empty-orders-demo-card p {
   font-size: 0.85rem;
-  color: #64748b;
+  color: var(--text-secondary);
   max-width: 440px;
   line-height: 1.6;
   margin-bottom: 1.5rem;

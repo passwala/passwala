@@ -270,13 +270,13 @@ body.dark-mode {
   margin: 0 0 5px;
   font-size: 1.6rem;
   font-weight: 900;
-  color: #0f172a;
+  color: var(--text-primary);
   letter-spacing: -0.3px;
 }
 .v-auth-subtitle {
   margin: 0;
   font-size: 0.875rem;
-  color: #64748b;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
@@ -285,7 +285,7 @@ body.dark-mode {
   display: block;
   font-size: 0.78rem;
   font-weight: 700;
-  color: #475569;
+  color: var(--text-secondary);
   margin-bottom: 0.5rem;
   letter-spacing: 0.3px;
 }
@@ -294,7 +294,7 @@ body.dark-mode {
 .v-auth-input-wrap {
   display: flex;
   align-items: center;
-  background: #f8fafc;
+  background: var(--bg-surface);
   border: 1.5px solid #e2e8f0;
   border-radius: 13px;
   padding: 0 14px;
@@ -309,7 +309,7 @@ body.dark-mode {
 .v-auth-prefix {
   font-size: 0.95rem;
   font-weight: 800;
-  color: #334155;
+  color: var(--text-primary);
   padding-right: 10px;
   border-right: 1.5px solid #e2e8f0;
   line-height: 50px;
@@ -324,7 +324,7 @@ body.dark-mode {
   padding: 0 10px;
   font-size: 1rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-primary);
   letter-spacing: 0.5px;
   height: 50px;
   font-family: 'Outfit', 'Inter', sans-serif;
@@ -352,7 +352,7 @@ body.dark-mode {
   gap: 8px;
   transition: all 0.25s ease;
   background: #e9eef5;
-  color: #94a3b8;
+  color: var(--text-muted);
   letter-spacing: 0.2px;
   font-family: 'Outfit', 'Inter', sans-serif;
   margin-bottom: 1.25rem;
@@ -372,7 +372,7 @@ body.dark-mode {
 .v-auth-terms {
   text-align: center;
   font-size: 0.72rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   line-height: 1.6;
   margin: 0;
 }
@@ -695,7 +695,7 @@ body.dark-mode {
 }
 
 .v-btn-outline:hover {
-  background: #f8fafc;
+  background: var(--bg-surface);
   border-color: #cbd5e1;
   transform: translateY(-1px);
 }
@@ -869,8 +869,8 @@ body.dark-mode {
   border-radius: 12px;
   font-size: 0.8rem;
   font-weight: 800;
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--bg-soft);
+  color: var(--text-secondary);
   border: none;
   cursor: pointer;
   transition: all 0.2s;
@@ -878,7 +878,7 @@ body.dark-mode {
 
 .v-card-edit-btn:hover {
   background: #e2e8f0;
-  color: #1e293b;
+  color: var(--text-primary);
 }
 
 .portal-scroll-area {
@@ -1123,7 +1123,7 @@ body.dark-mode {
   transition: all 0.3s ease;
 }
 
-.v-icon-orange { background: #fff7ed; color: #f97316; }
+.v-icon-orange { background: var(--bg-surface); color: #f97316; }
 .v-icon-green { background: #f0fdf4; color: #16a34a; }
 .v-icon-blue { background: #eff6ff; color: #2563eb; }
 .v-icon-purple { background: #f5f3ff; color: #7c3aed; }
@@ -1173,7 +1173,7 @@ body.dark-mode {
   padding: 8px 16px;
   border-radius: 10px;
   border: 1px solid #e2e8f0;
-  background: #f8fafc;
+  background: var(--bg-surface);
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--v-text-main);
@@ -1268,7 +1268,7 @@ body.dark-mode {
 .input-group {
   display: flex;
   align-items: center;
-  background: #f8fafc;
+  background: var(--bg-surface);
   border: 2px solid #f1f5f9;
   border-radius: 12px;
   padding: 0 16px;
@@ -1284,7 +1284,7 @@ body.dark-mode {
 
 .country-code {
   font-weight: 800;
-  color: #64748b;
+  color: var(--text-secondary);
   margin-right: 12px;
   border-right: 1px solid #e2e8f0;
   padding-right: 12px;
@@ -1297,7 +1297,7 @@ body.dark-mode {
   padding: 14px 0;
   font-size: 1rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-primary);
   outline: none;
 }
 
@@ -1329,7 +1329,7 @@ body.dark-mode {
 
 .otp-box:focus {
   border-color: var(--v-primary) !important;
-  background: white !important;
+  background: var(--bg-card)!important;
   transform: translateY(-2px);
   box-shadow: 0 8px 15px -3px rgba(249, 115, 22, 0.15) !important;
 }
@@ -1349,7 +1349,7 @@ body.dark-mode {
 
 .type-card.active {
   border-color: var(--v-primary);
-  background: #fff7ed;
+  background: var(--bg-surface);
 }
 
 /* Mobile Adjustments */
@@ -1370,7 +1370,7 @@ body.dark-mode {
   display: none;
   background: none;
   border: none;
-  color: #64748b;
+  color: var(--text-secondary);
   cursor: pointer;
   align-items: center;
   justify-content: center;
@@ -1415,13 +1415,13 @@ body.dark-mode {
     font-size: 1.75rem;
   }
   .portal-main-area.onboarding-mode {
-    background: white !important;
+    background: var(--bg-card)!important;
   }
   .portal-main-area.onboarding-mode .portal-scroll-area {
     padding: 0 !important;
     align-items: center !important;
     justify-content: flex-start !important;
-    background: white !important;
+    background: var(--bg-card)!important;
   }
   .onboarding-screen {
     padding: 2.25rem 1.25rem 4rem !important; /* Generous bottom spacing and comfortable side paddings */
@@ -1432,7 +1432,7 @@ body.dark-mode {
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
-    background: white !important;
+    background: var(--bg-card)!important;
     display: flex !important;
     flex-direction: column !important;
   }
@@ -1482,7 +1482,7 @@ body.dark-mode {
   font-size: 0.95rem;
   font-family: inherit;
   color: var(--v-text-main);
-  background: #f8fafc;
+  background: var(--bg-surface);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -1494,8 +1494,8 @@ body.dark-mode {
 }
 
 .v-input.v-readonly {
-  background: #f8fafc;
-  color: #64748b;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
   cursor: default;
   border-color: #f1f5f9;
 }
@@ -1609,7 +1609,7 @@ select.v-input:focus {
 }
 
 .v-btn-outline:hover {
-  background: #f8fafc;
+  background: var(--bg-surface);
   border-color: #cbd5e1;
 }
 
@@ -1617,7 +1617,7 @@ select.v-input:focus {
 .v-tab-group {
   display: flex;
   gap: 10px;
-  background: #f1f5f9;
+  background: var(--bg-soft);
   padding: 6px;
   border-radius: 18px;
   width: fit-content;
@@ -1629,7 +1629,7 @@ select.v-input:focus {
   border-radius: 14px;
   border: none;
   background: transparent;
-  color: #64748b;
+  color: var(--text-secondary);
   font-weight: 700;
   font-size: 0.9rem;
   cursor: pointer;
@@ -1638,7 +1638,7 @@ select.v-input:focus {
 
 .v-tab-btn.active {
   background: var(--bg-card);
-  color: #0f172a;
+  color: var(--text-primary);
   box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
@@ -1664,7 +1664,7 @@ select.v-input:focus {
 }
 
 .v-badge-success { background: #dcfce7; color: #166534; }
-.v-badge-warning { background: #fff7ed; color: #9a3412; }
+.v-badge-warning { background: var(--bg-surface); color: #9a3412; }
 .v-badge-info { background: #eff6ff; color: #1e40af; }
 .v-badge-error { background: #fee2e2; color: #991b1b; }
 
@@ -1694,7 +1694,7 @@ select.v-input:focus {
 
 .v-form-header-subtitle {
   margin: 4px 0 0 0;
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 1rem;
   font-weight: 600;
 }
@@ -1724,7 +1724,7 @@ select.v-input:focus {
   text-align: center;
   cursor: pointer;
   border-style: dashed !important;
-  background: #f8fafc !important;
+  background: var(--bg-surface)!important;
   border: 2px dashed #cbd5e1 !important;
   border-radius: 16px;
   transition: all 0.2s ease;
@@ -1732,7 +1732,7 @@ select.v-input:focus {
 
 .v-upload-zone:hover {
   border-color: var(--v-primary) !important;
-  background: #fff7ed !important;
+  background: var(--bg-surface)!important;
 }
 
 /* Medium & Small Screen Adjustments */
@@ -1849,7 +1849,7 @@ select.v-input:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #f8fafc;
+  background: var(--bg-surface);
   padding: 1rem 1.5rem;
   border-radius: 14px;
   border: 1.5px solid #e2e8f0;
@@ -1860,7 +1860,7 @@ select.v-input:focus {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #94a3b8;
+  color: var(--text-muted);
   font-weight: 700;
   font-size: 0.9rem;
 }
@@ -1870,7 +1870,7 @@ select.v-input:focus {
 }
 
 .step-item.active-past {
-  color: #1e293b;
+  color: var(--text-primary);
 }
 
 .step-item .step-number {
@@ -1878,7 +1878,7 @@ select.v-input:focus {
   height: 24px;
   border-radius: 50%;
   background: #e2e8f0;
-  color: #475569;
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1914,7 +1914,7 @@ select.v-input:focus {
 }
 
 .current-selection-badge {
-  background: #fff7ed;
+  background: var(--bg-surface);
   color: #ea580c;
   font-size: 0.75rem;
   font-weight: 800;
@@ -1928,7 +1928,7 @@ select.v-input:focus {
 .change-selection-btn {
   background: none;
   border: none;
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
@@ -1943,12 +1943,12 @@ select.v-input:focus {
 .wizard-title {
   font-size: 1.75rem;
   font-weight: 900;
-  color: #0f172a;
+  color: var(--text-primary);
   margin: 0 0 0.5rem;
 }
 
 .wizard-subtitle {
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.92rem;
   margin: 0;
 }
@@ -1972,7 +1972,7 @@ select.v-input:focus {
 .section-card-header h4 {
   font-size: 1.15rem;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -1987,7 +1987,7 @@ select.v-input:focus {
 }
 
 .section-card-desc {
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.85rem;
   margin: 0 0 0.5rem;
 }
@@ -2017,12 +2017,12 @@ select.v-input:focus {
 
 .visibility-card:hover {
   border-color: #cbd5e1;
-  background: #f8fafc;
+  background: var(--bg-surface);
 }
 
 .visibility-card.selected {
   border-color: #f97316;
-  background: #fff7ed;
+  background: var(--bg-surface);
 }
 
 .visibility-circle {
@@ -2057,12 +2057,12 @@ select.v-input:focus {
 
 .visibility-info strong {
   font-size: 0.9rem;
-  color: #1e293b;
+  color: var(--text-primary);
 }
 
 .visibility-info span {
   font-size: 0.78rem;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .online-checkbox-card {
@@ -2072,7 +2072,7 @@ select.v-input:focus {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  background: #f8fafc;
+  background: var(--bg-surface);
 }
 
 .online-checkbox-card input[type="checkbox"] {
@@ -2092,16 +2092,16 @@ select.v-input:focus {
 
 .online-checkbox-card label strong {
   font-size: 0.9rem;
-  color: #1e293b;
+  color: var(--text-primary);
 }
 
 .online-checkbox-card label span {
   font-size: 0.78rem;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .organizer-info-box {
-  background: #f1f5f9;
+  background: var(--bg-soft);
   border-radius: 12px;
   padding: 1rem;
   display: flex;
@@ -2112,12 +2112,12 @@ select.v-input:focus {
 
 .organizer-info-box strong {
   font-size: 0.85rem;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .organizer-info-box span {
   font-size: 0.78rem;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 /* When and Where */
@@ -2141,12 +2141,12 @@ select.v-input:focus {
 }
 
 .cap-badge {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--bg-soft);
+  color: var(--text-secondary);
 }
 
 .sell-badge {
-  background: #fff7ed;
+  background: var(--bg-surface);
   color: #ea580c;
   border: 1px solid #ffedd5;
 }
@@ -2161,7 +2161,7 @@ select.v-input:focus {
   border: 1.5px solid #e2e8f0;
   border-radius: 14px;
   padding: 1.25rem;
-  background: #f8fafc;
+  background: var(--bg-surface);
 }
 
 .tier-row-header {
@@ -2176,7 +2176,7 @@ select.v-input:focus {
   height: 24px;
   border-radius: 50%;
   background: #e2e8f0;
-  color: #475569;
+  color: var(--text-secondary);
   font-size: 0.8rem;
   font-weight: 800;
   display: flex;
@@ -2185,7 +2185,7 @@ select.v-input:focus {
 }
 
 .tier-badge-type {
-  background: #fff7ed;
+  background: var(--bg-surface);
   color: #f97316;
   font-size: 0.7rem;
   font-weight: 800;
@@ -2199,7 +2199,7 @@ select.v-input:focus {
   margin-left: auto;
   background: none;
   border: none;
-  color: #94a3b8;
+  color: var(--text-muted);
   cursor: pointer;
   padding: 4px;
   border-radius: 6px;
@@ -2224,7 +2224,7 @@ select.v-input:focus {
   padding: 14px;
   border: 2px dashed #cbd5e1;
   background: transparent;
-  color: #64748b;
+  color: var(--text-secondary);
   font-weight: 700;
   border-radius: 12px;
   cursor: pointer;
@@ -2235,7 +2235,7 @@ select.v-input:focus {
 .add-tier-dashed-btn:hover {
   border-color: #f97316;
   color: #f97316;
-  background: #fff7ed;
+  background: var(--bg-surface);
 }
 
 /* Wizard navigation footer */
@@ -2249,8 +2249,8 @@ select.v-input:focus {
 }
 
 .wizard-back-btn {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--bg-soft);
+  color: var(--text-secondary);
   border: none;
   padding: 12px 24px;
   border-radius: 12px;
@@ -2261,7 +2261,7 @@ select.v-input:focus {
 
 .wizard-back-btn:hover {
   background: #e2e8f0;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .wizard-right-actions {
@@ -2272,7 +2272,7 @@ select.v-input:focus {
 
 .save-status-indicator {
   font-size: 0.8rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   font-weight: 500;
   margin-right: 8px;
 }
@@ -2280,7 +2280,7 @@ select.v-input:focus {
 .wizard-save-draft-btn {
   background: transparent;
   border: 1.5px solid #e2e8f0;
-  color: #475569;
+  color: var(--text-secondary);
   padding: 11px 20px;
   border-radius: 12px;
   font-weight: 700;
@@ -2290,7 +2290,7 @@ select.v-input:focus {
 
 .wizard-save-draft-btn:hover {
   border-color: #cbd5e1;
-  background: #f8fafc;
+  background: var(--bg-surface);
 }
 
 .wizard-next-btn, .wizard-publish-btn {
@@ -2333,7 +2333,7 @@ select.v-input:focus {
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid #cbd5e1;
-  background: #f1f5f9;
+  background: var(--bg-soft);
 }
 
 .banner-preview-box img {
@@ -2365,7 +2365,7 @@ select.v-input:focus {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #94a3b8;
+  color: var(--text-muted);
   font-weight: 700;
 }
 
@@ -2391,7 +2391,7 @@ select.v-input:focus {
 .review-title {
   font-size: 1.5rem;
   font-weight: 900;
-  color: #0f172a;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -2401,8 +2401,8 @@ select.v-input:focus {
 }
 
 .review-category-tag {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--bg-soft);
+  color: var(--text-secondary);
   font-size: 0.75rem;
   font-weight: 700;
   padding: 3px 10px;
@@ -2410,7 +2410,7 @@ select.v-input:focus {
 }
 
 .review-visibility-tag {
-  background: #fff7ed;
+  background: var(--bg-surface);
   color: #ea580c;
   font-size: 0.75rem;
   font-weight: 700;
@@ -2423,7 +2423,7 @@ select.v-input:focus {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
-  background: #f8fafc;
+  background: var(--bg-surface);
   padding: 1rem;
   border-radius: 12px;
   border: 1px solid #f1f5f9;
@@ -2437,13 +2437,13 @@ select.v-input:focus {
 
 .review-info-item strong {
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--text-secondary);
   text-transform: uppercase;
 }
 
 .review-info-item span {
   font-size: 0.9rem;
-  color: #1e293b;
+  color: var(--text-primary);
   font-weight: 700;
 }
 
@@ -2455,12 +2455,12 @@ select.v-input:focus {
 
 .review-description-section strong {
   font-size: 0.85rem;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .review-description-section p {
   font-size: 0.9rem;
-  color: #64748b;
+  color: var(--text-secondary);
   line-height: 1.5;
   margin: 0;
 }
@@ -2475,7 +2475,7 @@ select.v-input:focus {
 
 .review-tickets-section strong {
   font-size: 0.85rem;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .review-tiers-list {
@@ -2488,7 +2488,7 @@ select.v-input:focus {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #f8fafc;
+  background: var(--bg-surface);
   padding: 10px 14px;
   border-radius: 10px;
   border: 1px solid #f1f5f9;
@@ -2502,12 +2502,12 @@ select.v-input:focus {
 
 .tier-left strong {
   font-size: 0.85rem;
-  color: #1e293b;
+  color: var(--text-primary);
 }
 
 .tier-left span {
   font-size: 0.72rem;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .tier-price-tag {
@@ -2525,7 +2525,7 @@ select.v-input:focus {
 }
 
 .event-type-subtitle {
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.92rem;
   margin: 0;
 }
@@ -2557,7 +2557,7 @@ select.v-input:focus {
 
 .event-type-card.selected {
   border-color: #f97316;
-  background: #fff7ed;
+  background: var(--bg-surface);
   box-shadow: 0 12px 25px rgba(249, 115, 22, 0.08);
 }
 
@@ -2579,7 +2579,7 @@ select.v-input:focus {
 
 .purple-tint { background: #f5f3ff; }
 .blue-tint { background: #eff6ff; }
-.orange-tint { background: #fff7ed; }
+.orange-tint { background: var(--bg-surface); }
 
 .card-badge-container {
   display: flex;
@@ -2588,8 +2588,8 @@ select.v-input:focus {
 }
 
 .card-badge-most-common {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--bg-soft);
+  color: var(--text-secondary);
   font-size: 0.65rem;
   font-weight: 800;
   padding: 4px 10px;
@@ -2633,13 +2633,13 @@ select.v-input:focus {
 .event-type-card .card-title {
   font-size: 1.15rem;
   font-weight: 850;
-  color: #0f172a;
+  color: var(--text-primary);
   margin: 0 0 0.5rem 0;
 }
 
 .event-type-card .card-desc {
   font-size: 0.85rem;
-  color: #64748b;
+  color: var(--text-secondary);
   line-height: 1.5;
   margin: 0 0 1.25rem 0;
   flex: 1;
@@ -2647,7 +2647,7 @@ select.v-input:focus {
 
 .card-duration-info {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   font-weight: 600;
 }
 
@@ -2666,11 +2666,11 @@ select.v-input:focus {
 
 .event-type-selected-text {
   font-size: 0.9rem;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .event-type-selected-text strong {
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .event-type-continue-btn {

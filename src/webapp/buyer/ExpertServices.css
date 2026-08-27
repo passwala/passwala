@@ -412,7 +412,7 @@
 
 /* --- LIGHT MODE SPECIFIC --- */
 body:not(.dark-mode) .rating-pill {
-  background: #fff9f0;
+  background: var(--bg-surface);
 }
 
 /* Sub-category Styles */

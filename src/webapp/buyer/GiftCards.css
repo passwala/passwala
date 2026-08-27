@@ -186,7 +186,7 @@
 .gc-temp-btn:hover, .gc-temp-btn.active {
   border-color: #ff7622;
   color: #ff7622;
-  background: #fff7f2;
+  background: var(--bg-surface);
 }
 
 .gc-form-col {
@@ -207,13 +207,13 @@
 }
 
 .gc-preset-btn {
-  background: #f8fafc;
+  background: var(--bg-surface);
   border: 1px solid #e2e8f0;
   padding: 10px 4px;
   border-radius: 8px;
   font-weight: 700;
   font-size: 0.85rem;
-  color: #475569;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -293,7 +293,7 @@
   font-size: 0.9rem;
   font-weight: 600;
   outline: none;
-  background: #f8fafc;
+  background: var(--bg-surface);
 }
 
 .gc-input-group textarea {

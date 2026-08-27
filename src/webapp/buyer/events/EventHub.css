@@ -56,7 +56,7 @@
   background: var(--bg-card);
   font-size: 0.78rem;
   font-weight: 700;
-  color: #64748b;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -94,7 +94,7 @@
 .eh-search-bar:focus-within {
   border-color: #ff6b00;
 }
-.eh-search-icon { color: #94a3b8; flex-shrink: 0; }
+.eh-search-icon { color: var(--text-muted); flex-shrink: 0; }
 .eh-search-bar input {
   border: none;
   background: transparent;
@@ -130,7 +130,7 @@
   background: var(--bg-card);
   font-size: 0.8rem;
   font-weight: 600;
-  color: #475569;
+  color: var(--text-secondary);
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.2s;
@@ -191,7 +191,7 @@
   top: 12px;
   left: 12px;
   background: var(--bg-card);
-  color: #0f172a;
+  color: var(--text-primary);
   border-radius: 12px;
   width: 48px;
   height: 50px;
@@ -208,7 +208,7 @@
   font-size: 1.05rem;
   font-weight: 900;
   line-height: 1;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 .eh-date-month {
   font-size: 0.62rem;
@@ -259,7 +259,7 @@
 .eh-card-title {
   font-size: 0.98rem;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--text-primary);
   margin: 0 0 6px 0;
   line-height: 1.35;
   display: -webkit-box;
@@ -270,7 +270,7 @@
 }
 .eh-card-venue {
   font-size: 0.78rem;
-  color: #64748b;
+  color: var(--text-secondary);
   font-weight: 600;
   margin: 0 0 12px 0;
   white-space: nowrap;
@@ -285,7 +285,7 @@
   color: #ff6b00;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  background: #fff7ed;
+  background: var(--bg-surface);
   padding: 4px 10px;
   border-radius: 8px;
   display: inline-block;
@@ -295,7 +295,7 @@
 .eh-card-price {
   font-size: 1.05rem;
   font-weight: 900;
-  color: #0f172a;
+  color: var(--text-primary);
   margin: 0;
 }
 .eh-card-price::before { content: ''; }
@@ -322,7 +322,7 @@
   justify-content: center;
   padding: 5rem 2rem;
   gap: 1rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 0.9rem;
   font-weight: 600;
 }
@@ -342,7 +342,7 @@
   justify-content: center;
   padding: 5rem 2rem;
   gap: 1rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 0.9rem;
   text-align: center;
 }
@@ -363,7 +363,7 @@
 /* ── Result Count ── */
 .eh-result-count {
   font-size: 0.78rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   font-weight: 600;
   padding: 0.25rem 1.25rem 0;
   margin: 0 auto;
@@ -376,7 +376,7 @@
 .eh-search-clear {
   background: none;
   border: none;
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 0.85rem;
   cursor: pointer;
   padding: 0 4px;
@@ -403,7 +403,7 @@
   border-radius: 20px;
   border: 1.5px solid #e2e8f0;
   background: var(--bg-card);
-  color: #475569;
+  color: var(--text-secondary);
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
@@ -418,7 +418,7 @@
   border-radius: 50%;
   border: 1.5px solid #e2e8f0;
   background: var(--bg-card);
-  color: #475569;
+  color: var(--text-secondary);
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
@@ -471,10 +471,10 @@
   padding: 5px 14px;
   border-radius: 14px;
   border: 1.5px solid #e2e8f0;
-  background: #f8fafc;
+  background: var(--bg-surface);
   font-size: 0.75rem;
   font-weight: 700;
-  color: #64748b;
+  color: var(--text-secondary);
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.2s;
@@ -600,14 +600,14 @@
     border: none;
     font-size: 0.9rem;
     font-weight: 700;
-    color: #334155;
+    color: var(--text-primary);
     cursor: pointer;
     padding: 0;
     text-align: left;
   }
 
   .eh-filter-toggle svg {
-    color: #94a3b8;
+    color: var(--text-muted);
   }
 
   .eh-filter-options {
@@ -623,8 +623,8 @@
     font-weight: 600;
     border-radius: 8px;
     border: 1.5px solid #e2e8f0;
-    background: #f8fafc;
-    color: #475569;
+    background: var(--bg-surface);
+    color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.2s;
   }
@@ -645,7 +645,7 @@
     padding: 12px;
     border-radius: 12px;
     border: 1.5px dashed #cbd5e1;
-    background: #f8fafc;
+    background: var(--bg-surface);
     color: #ff6b00;
     font-size: 0.85rem;
     font-weight: 700;
@@ -653,7 +653,7 @@
     transition: all 0.2s;
   }
   .eh-browse-venues-btn:hover {
-    background: #fff8f5;
+    background: var(--bg-surface);
     border-color: #ff6b00;
   }
 }
@@ -712,14 +712,14 @@
 
 .eh-explore-card.active {
   border-color: #ff6b00;
-  background: #fff8f5;
+  background: var(--bg-surface);
   box-shadow: 0 4px 12px rgba(255, 107, 0, 0.08);
 }
 
 .eh-explore-card-label {
   font-size: 0.82rem;
   font-weight: 700;
-  color: #334155;
+  color: var(--text-primary);
   text-align: center;
 }
 

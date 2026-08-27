@@ -21,7 +21,7 @@
 }
 .addr-manager-header p {
   font-size: 0.8rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -32,7 +32,7 @@
   align-items: center;
   gap: 0.8rem;
   padding: 3rem 0;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.85rem;
 }
 .addr-spinner {
@@ -101,14 +101,14 @@
   margin-bottom: 0.8rem;
 }
 .addr-pin-icon {
-  color: #9ca3af;
+  color: var(--text-muted);
   flex-shrink: 0;
   margin-top: 2px;
 }
 .addr-card-body p {
   margin: 0;
   font-size: 0.82rem;
-  color: #374151;
+  color: var(--text-primary);
   line-height: 1.5;
 }
 
@@ -158,7 +158,7 @@
 .addr-empty {
   text-align: center;
   padding: 3rem 1rem;
-  color: #9ca3af;
+  color: var(--text-muted);
 }
 .addr-empty-icon {
   margin: 0 auto 1rem;
@@ -168,12 +168,12 @@
 .addr-empty h3 {
   font-size: 1rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-primary);
   margin-bottom: 0.4rem;
 }
 .addr-empty p {
   font-size: 0.82rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   max-width: 240px;
   margin: 0 auto;
   line-height: 1.55;
@@ -241,7 +241,7 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #374151;
+  color: var(--text-primary);
 }
 
 /* ── Label Picker ────────────────────────────────────────── */
@@ -258,10 +258,10 @@
   padding: 0.4rem 0.75rem;
   border-radius: 10px;
   border: 1.5px solid #e5e7eb;
-  background: #f9fafb;
+  background: var(--bg-surface);
   font-size: 0.78rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.15s;
 }
@@ -279,10 +279,10 @@
   padding: 0.7rem;
   border-radius: 10px;
   border: 1.5px dashed #d1d5db;
-  background: #f9fafb;
+  background: var(--bg-surface);
   font-size: 0.82rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   cursor: pointer;
   margin-bottom: 1rem;
   transition: all 0.18s;
@@ -337,7 +337,7 @@
   flex: 1;
   padding: 0.75rem;
   background: #f3f4f6;
-  color: #374151;
+  color: var(--text-primary);
   font-weight: 600;
   font-size: 0.88rem;
   border: none;
@@ -391,8 +391,8 @@
 .dark .addr-form-close { background: #334155; color: #f1f5f9; }
 .dark .addr-field { background: #0f172a; border-color: #334155; color: #f1f5f9; }
 .dark .addr-field:focus { border-color: #ff7622; }
-.dark .addr-detect-btn { background: #1e293b; border-color: #475569; color: #94a3b8; }
-.dark .addr-label-option { background: #1e293b; border-color: #334155; color: #94a3b8; }
+.dark .addr-detect-btn { background: #1e293b; border-color: #475569; color: var(--text-muted); }
+.dark .addr-label-option { background: #1e293b; border-color: #334155; color: var(--text-muted); }
 .dark .addr-cancel-btn { background: #334155; color: #f1f5f9; }
 
 /* ── Delete Confirm Modal ────────────────────────────────── */
@@ -439,7 +439,7 @@
 
 .addr-confirm-msg {
   font-size: 0.83rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0 0 1.5rem;
   line-height: 1.6;
 }
@@ -453,7 +453,7 @@
   flex: 1;
   padding: 0.75rem;
   background: #f3f4f6;
-  color: #374151;
+  color: var(--text-primary);
   font-weight: 600;
   font-size: 0.88rem;
   border: none;

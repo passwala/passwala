@@ -274,7 +274,7 @@
 }
 .ed2-tier-seats {
   font-size: 0.78rem;
-  color: #64748b;
+  color: var(--text-secondary);
   font-weight: 600;
   margin: 0 0 6px 0;
 }
@@ -580,7 +580,7 @@
 .ed2-book-btn.disabled,
 .ed2-book-btn:disabled {
   background: #d1d5db;
-  color: #9ca3af;
+  color: var(--text-muted);
   box-shadow: none;
   cursor: not-allowed;
   transform: none;

@@ -340,7 +340,7 @@ body.dark-mode .bms-subnav {
 }
 
 .bms-subnav-links-left span {
-  color: #475569;
+  color: var(--text-secondary);
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
@@ -350,7 +350,7 @@ body.dark-mode .bms-subnav {
 }
 
 body.dark-mode .bms-subnav-links-left span {
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .bms-subnav-links-left span:hover,
@@ -369,7 +369,7 @@ body.dark-mode .bms-subnav-links-left span {
 }
 
 .bms-subnav-links-right span {
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
@@ -377,7 +377,7 @@ body.dark-mode .bms-subnav-links-left span {
 }
 
 body.dark-mode .bms-subnav-links-right span {
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .bms-subnav-links-right span:hover {

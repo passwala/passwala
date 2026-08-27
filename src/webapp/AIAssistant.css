@@ -103,13 +103,13 @@
 
 .ai .message-bubble {
   background: var(--bg-card);
-  color: #111;
+  color: var(--text-primary);
   border-top-left-radius: 4px;
 }
 
 .user .message-bubble {
   background: #dcf8c6;
-  color: #111;
+  color: var(--text-primary);
   border-top-right-radius: 4px;
 }
 

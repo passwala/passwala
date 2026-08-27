@@ -205,7 +205,7 @@
 .launch-hero-title {
   font-size: 4rem;
   font-weight: 900;
-  color: #0f172a;
+  color: var(--text-primary);
   line-height: 1.1;
   letter-spacing: -0.02em;
   margin: 0;
@@ -221,7 +221,7 @@
 /* Subtitle */
 .launch-hero-sub {
   font-size: 1.05rem;
-  color: #475569;
+  color: var(--text-secondary);
   line-height: 1.6;
   max-width: 420px;
   margin: 0;
@@ -232,7 +232,7 @@
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  background: #f8fafc;
+  background: var(--bg-surface);
   border: 1.5px solid #e2e8f0;
   border-radius: 16px;
   padding: 1rem 1.5rem;
@@ -249,14 +249,14 @@
 .launch-stat-num {
   font-size: 1.4rem;
   font-weight: 900;
-  color: #0f172a;
+  color: var(--text-primary);
   line-height: 1;
 }
 
 .launch-stat-label {
   font-size: 0.68rem;
   font-weight: 600;
-  color: #64748b;
+  color: var(--text-secondary);
   letter-spacing: 0.05em;
   white-space: nowrap;
 }
@@ -1247,7 +1247,7 @@ body:not(.dark-mode) .hub-card.purple {
 .lsc-title {
   font-size: 1.45rem;
   font-weight: 950;
-  color: #0f172a;
+  color: var(--text-primary);
   margin: 0;
   line-height: 1.2;
   letter-spacing: -0.02em;
@@ -1255,7 +1255,7 @@ body:not(.dark-mode) .hub-card.purple {
 
 .lsc-sub {
   font-size: 0.85rem;
-  color: #475569;
+  color: var(--text-secondary);
   font-weight: 600;
   margin: 0;
   letter-spacing: -0.01em;
@@ -1307,7 +1307,7 @@ body:not(.dark-mode) .hub-card.purple {
 }
 
 .launch-sports-card:hover .lsc-emojis span {
-  background: #fff7f2;
+  background: var(--bg-surface);
   border-color: #ff7622;
   transform: scale(1.12) rotate(6deg);
   box-shadow: 0 8px 20px rgba(255, 118, 34, 0.15);
@@ -1344,7 +1344,7 @@ body:not(.dark-mode) .hub-card.purple {
 }
 
 .bms-subnav-links-left span {
-  color: #475569;
+  color: var(--text-secondary);
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
@@ -1363,7 +1363,7 @@ body:not(.dark-mode) .hub-card.purple {
 }
 
 .bms-subnav-links-right span {
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
@@ -1718,7 +1718,7 @@ body:not(.dark-mode) .hub-card.purple {
 }
 
 .bms-footer-support-row {
-  background: #fff8f5;
+  background: var(--bg-surface);
   width: 100%;
   border-radius: 0;
   margin: 0;

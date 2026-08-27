@@ -56,6 +56,66 @@ body.dark-mode {
   --shadow-lg: 0 28px 64px rgba(0, 0, 0, 0.4);
 }
 
+/* ── Global Dark Mode Catch-All ─────────────────────────────────────────────
+   This forces ALL major layout containers to use CSS variables so no page
+   is left with a white background when dark mode is active.
+   Note: `color: white` on buttons/icons is intentionally excluded.
+────────────────────────────────────────────────────────────────────────────── */
+body.dark-mode,
+body.dark-mode #root,
+body.dark-mode .app-main-layout,
+body.dark-mode .page-container,
+body.dark-mode .webapp-page,
+body.dark-mode .screen,
+body.dark-mode main {
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+}
+
+/* Card / surface level */
+body.dark-mode .card,
+body.dark-mode [class*="card"],
+body.dark-mode [class*="-panel"],
+body.dark-mode [class*="-sheet"],
+body.dark-mode [class*="-modal"],
+body.dark-mode [class*="-drawer"],
+body.dark-mode [class*="-popup"],
+body.dark-mode [class*="-container"],
+body.dark-mode [class*="-section"],
+body.dark-mode [class*="-box"] {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  border-color: var(--border-light);
+}
+
+/* Input fields */
+body.dark-mode input:not([type="range"]),
+body.dark-mode textarea,
+body.dark-mode select {
+  background-color: var(--bg-soft) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-light) !important;
+}
+
+body.dark-mode input::placeholder,
+body.dark-mode textarea::placeholder {
+  color: var(--text-muted) !important;
+}
+
+/* Bottom sheets, drawers (typically fixed-positioned) */
+body.dark-mode [class*="bottom-sheet"],
+body.dark-mode [class*="side-panel"],
+body.dark-mode [class*="sidebar"] {
+  background-color: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Ensure transitions are smooth */
+body.dark-mode * {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+
 * {
   margin: 0;
   padding: 0;
