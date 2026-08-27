@@ -14,12 +14,14 @@ import { useCart } from '../context/CartContext';
 import { useNotifications } from '../context/NotificationContext';
 import NotificationPanel from './NotificationPanel';
 import { showShoppingUI, LAUNCH_MODE } from '../launchConfig';
+import { useTranslation } from './LanguageContext';
 import './WebappNavbar.css';
 
-const WebappNavbar = ({ user, onOpenProfile, onBack, title, location }) => {
+const WebappNavbar = ({ user, onOpenProfile, onBack, title, location, isDarkMode, onToggleTheme }) => {
   const navigate = useNavigate();
   const { totalItems, setCartOpen } = useCart();
   const { unreadCount } = useNotifications();
+  const { currentLanguage, changeLanguage } = useTranslation();
   
   const [showNotifications, setShowNotifications] = useState(false);
   const [navSearch, setNavSearch] = useState(() => {
@@ -118,6 +120,38 @@ const WebappNavbar = ({ user, onOpenProfile, onBack, title, location }) => {
               )}
             </div>
           )}
+          
+          {/* Theme Toggle Button */}
+          <button className="nav-action-btn-v2" onClick={onToggleTheme} title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+
+          {/* Language Selector */}
+          <div className="language-selector-wrapper" style={{ position: 'relative' }}>
+            <select
+              value={currentLanguage}
+              onChange={(e) => changeLanguage(e.target.value)}
+              className="navbar-lang-select"
+              style={{
+                appearance: 'none',
+                background: 'transparent',
+                border: 'none',
+                color: 'inherit',
+                fontSize: '1rem',
+                cursor: 'pointer',
+                padding: '4px 8px',
+                outline: 'none',
+                fontWeight: '600'
+              }}
+              title="Change Language"
+            >
+              <option value="en" style={{ color: '#000' }}>🇺🇸 EN</option>
+              <option value="hi" style={{ color: '#000' }}>🇮🇳 HI</option>
+              <option value="gu" style={{ color: '#000' }}>🇮🇳 GU</option>
+              <option value="mr" style={{ color: '#000' }}>🇮🇳 MR</option>
+              <option value="ta" style={{ color: '#000' }}>🇮🇳 TA</option>
+            </select>
+          </div>
           
           {(title !== 'Profile' && !window.location.pathname.includes('/profile')) && (
             <button 

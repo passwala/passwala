@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
 import { supabase } from '../supabase';
+import { useTranslation } from './LanguageContext';
 import './Auth.css';
 
 
@@ -28,6 +29,7 @@ const popularAreas = [
 ];
 
 const Auth = ({ onLogin }) => {
+  const { t } = useTranslation();
   const { requestNotificationPermission } = useNotifications();
   const [step, setStep] = useState(() => {
     if (localStorage.getItem('passwala_user')) return 'WARM_UP';
@@ -61,20 +63,28 @@ const Auth = ({ onLogin }) => {
   }, []);
 
   useEffect(() => {
-    const saved = localStorage.getItem('local_user_profile');
-    const savedUser = localStorage.getItem('passwala_user');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setSyncedUser(parsed);
-        if (step === 'WARM_UP') onLogin(parsed);
-      } catch (e) { /* Ignore */ }
-    } else if (savedUser && step === 'WARM_UP') {
-      try {
-        const parsedUser = JSON.parse(savedUser);
-        onLogin(parsedUser);
-      } catch (e) { /* Ignore */ }
-    }
+    const checkAuth = () => {
+      const saved = localStorage.getItem('local_user_profile');
+      const savedUser = localStorage.getItem('passwala_user');
+      
+      if (saved && step === 'WARM_UP') {
+        try {
+          const parsed = JSON.parse(saved);
+          setSyncedUser(parsed);
+          onLogin(parsed);
+        } catch (e) { /* Ignore */ }
+      } else if (savedUser && step !== 'LOCATION' && step !== 'PROFILE') {
+        try {
+          const parsedUser = JSON.parse(savedUser);
+          onLogin(parsedUser);
+        } catch (e) { /* Ignore */ }
+      }
+    };
+
+    checkAuth();
+    // Poll to catch async Google OAuth redirect token processing
+    const authInterval = setInterval(checkAuth, 800);
+    return () => clearInterval(authInterval);
   }, [step, onLogin]);
 
   useEffect(() => {
@@ -138,7 +148,7 @@ const Auth = ({ onLogin }) => {
 
     setLoading(true);
     try {
-      const BASE_API = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3004`;
+      const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
       const res = await fetch(`${BASE_API}/api/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -163,7 +173,7 @@ const Auth = ({ onLogin }) => {
 
     setLoading(true);
     try {
-      const BASE_API = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3004`;
+      const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
       const res = await fetch(`${BASE_API}/api/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -441,14 +451,14 @@ const Auth = ({ onLogin }) => {
               }}>
                 P
               </div>
-              <h2 style={{ fontSize: '1.3rem' }}>Welcome to Passwala</h2>
-              <p style={{ marginTop: '0.25rem', fontSize: '0.85rem' }}>Your local neighborhood hub</p>
+              <h2 style={{ fontSize: '1.3rem' }}>{t('auth_welcome')}</h2>
+              <p style={{ marginTop: '0.25rem', fontSize: '0.85rem' }}>{t('auth_tagline')}</p>
             </div>
 
             {step === 'WARM_UP' ? (
               <div style={{ textAlign: 'center', padding: '3rem 0', margin: 'auto' }}>
                 <RefreshCw className="spin" size={44} color="var(--auth-action-color)" />
-                <p style={{ color: '#4a5568', marginTop: '1.5rem', fontWeight: '600', fontSize: '0.95rem' }}>Synchronizing your session...</p>
+                <p style={{ color: '#4a5568', marginTop: '1.5rem', fontWeight: '600', fontSize: '0.95rem' }}>{t('auth_syncing')}</p>
               </div>
             ) : step === 'EMAIL_LOGIN' ? (
               <>
@@ -469,7 +479,7 @@ const Auth = ({ onLogin }) => {
                       boxShadow: loginMode === 'email' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none'
                     }}
                   >
-                    ✉️ Email OTP
+                    ✉️ {t('auth_email_otp')}
                   </button>
                   <button
                     type="button"
@@ -484,7 +494,7 @@ const Auth = ({ onLogin }) => {
                     }}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="#25D366" style={{ marginRight: '4px', verticalAlign: 'middle' }}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M11.999 2C6.477 2 2 6.477 2 12c0 1.989.574 3.842 1.563 5.408L2 22l4.75-1.534A9.96 9.96 0 0011.999 22C17.522 22 22 17.522 22 12S17.522 2 11.999 2zm0 18c-1.795 0-3.467-.5-4.893-1.365l-.351-.208-3.626 1.171.96-3.535-.231-.37A7.966 7.966 0 014 12c0-4.411 3.589-8 7.999-8C16.41 4 20 7.589 20 12s-3.589 8-8.001 8z"/></svg>
-                    WhatsApp OTP
+                    {t('auth_whatsapp_otp')}
                   </button>
                 </div>
 
@@ -492,10 +502,10 @@ const Auth = ({ onLogin }) => {
                 {loginMode === 'email' && (
                   <form onSubmit={handleEmailAuth} className="email-auth-form" style={{ gap: '0.85rem' }}>
                     <div className="input-group-modern" style={{ gap: '0.35rem' }}>
-                      <label style={{ fontSize: '0.8rem' }}>Email Address</label>
+                      <label style={{ fontSize: '0.8rem' }}>{t('auth_email_label')}</label>
                       <input 
                         type="email" 
-                        placeholder="Enter your email" 
+                        placeholder={t('auth_email_placeholder')}
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
@@ -505,10 +515,10 @@ const Auth = ({ onLogin }) => {
                     </div>
                     {otpSent && (
                       <div className="input-group-modern" style={{ gap: '0.35rem' }}>
-                        <label style={{ fontSize: '0.8rem' }}>Enter OTP (sent to email)</label>
+                        <label style={{ fontSize: '0.8rem' }}>{t('auth_otp_label')}</label>
                         <input 
                           type="text" 
-                          placeholder="Enter OTP code" 
+                          placeholder={t('auth_otp_placeholder')}
                           value={otp}
                           onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                           maxLength={8}
@@ -521,19 +531,20 @@ const Auth = ({ onLogin }) => {
                     <div className="auth-toggle-row" style={{ marginTop: '0' }}>
                       {otpSent ? (
                         <span onClick={() => { setOtpSent(false); setOtp(''); }} className="toggle-auth-mode">
-                          Change email address
+                          {t('auth_change_email')}
                         </span>
                       ) : (
                         <span className="toggle-auth-mode" style={{ visibility: 'hidden' }}>Placeholder</span>
                       )}
                     </div>
+
                     <button 
                       type="submit"
                       className="sheet-action-btn-modern" 
                       disabled={loading}
                       style={{ background: 'var(--auth-action-color)', marginTop: '0.5rem' }}
                     >
-                      {loading ? <RefreshCw className="spin" size={20} color="#fff" /> : (otpSent ? 'Verify OTP' : 'Send OTP')}
+                      {loading ? <RefreshCw className="spin" size={20} color="#fff" /> : (otpSent ? t('auth_verify_otp') : t('auth_send_otp'))}
                     </button>
                   </form>
                 )}
@@ -542,7 +553,7 @@ const Auth = ({ onLogin }) => {
                 {loginMode === 'phone' && (
                   <form onSubmit={phoneOtpSent ? handlePhoneVerifyOtp : handlePhoneSendOtp} className="email-auth-form" style={{ gap: '0.85rem' }}>
                     <div className="input-group-modern" style={{ gap: '0.35rem' }}>
-                      <label style={{ fontSize: '0.8rem' }}>Mobile Number</label>
+                      <label style={{ fontSize: '0.8rem' }}>{t('auth_mobile_label')}</label>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <div style={{
                           padding: '0.75rem 0.75rem', background: '#f8fafc', border: '1.5px solid #e2e8f0',
@@ -553,7 +564,7 @@ const Auth = ({ onLogin }) => {
                         </div>
                         <input 
                           type="tel"
-                          placeholder="Enter 10-digit number"
+                          placeholder={t('auth_mobile_placeholder')}
                           value={phone}
                           onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                           required
@@ -567,13 +578,12 @@ const Auth = ({ onLogin }) => {
                     {phoneOtpSent && (
                       <div className="input-group-modern" style={{ gap: '0.35rem' }}>
                         <label style={{ fontSize: '0.8rem' }}>
-                          Enter OTP (sent to WhatsApp)
-                          {/* Dev mock helper */}
+                          {t('auth_whatsapp_otp_label')}
                           {mockOtp && <span style={{ color: '#25D366', marginLeft: '8px', fontSize: '0.75rem' }}>[Dev: {mockOtp}]</span>}
                         </label>
                         <input 
                           type="text"
-                          placeholder="Enter 6-digit OTP"
+                          placeholder={t('auth_whatsapp_otp_placeholder')}
                           value={phoneOtp}
                           onChange={(e) => setPhoneOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                           maxLength={6}
@@ -583,11 +593,10 @@ const Auth = ({ onLogin }) => {
                         />
                       </div>
                     )}
-
                     {phoneOtpSent && (
                       <div className="auth-toggle-row" style={{ marginTop: '0' }}>
                         <span onClick={() => { setPhoneOtpSent(false); setPhoneOtp(''); setMockOtp(''); }} className="toggle-auth-mode">
-                          Change number
+                          {t('auth_change_number')}
                         </span>
                       </div>
                     )}
@@ -601,15 +610,16 @@ const Auth = ({ onLogin }) => {
                       {loading
                         ? <RefreshCw className="spin" size={20} color="#fff" />
                         : phoneOtpSent
-                          ? '✅ Verify OTP'
-                          : <><svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M11.999 2C6.477 2 2 6.477 2 12c0 1.989.574 3.842 1.563 5.408L2 22l4.75-1.534A9.96 9.96 0 0011.999 22C17.522 22 22 17.522 22 12S17.522 2 11.999 2zm0 18c-1.795 0-3.467-.5-4.893-1.365l-.351-.208-3.626 1.171.96-3.535-.231-.37A7.966 7.966 0 014 12c0-4.411 3.589-8 7.999-8C16.41 4 20 7.589 20 12s-3.589 8-8.001 8z"/></svg> Send OTP on WhatsApp</>
+                          ? t('auth_verify_whatsapp_otp')
+                          : <><svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M11.999 2C6.477 2 2 6.477 2 12c0 1.989.574 3.842 1.563 5.408L2 22l4.75-1.534A9.96 9.96 0 0011.999 22C17.522 22 22 17.522 22 12S17.522 2 11.999 2zm0 18c-1.795 0-3.467-.5-4.893-1.365l-.351-.208-3.626 1.171.96-3.535-.231-.37A7.966 7.966 0 014 12c0-4.411 3.589-8 7.999-8C16.41 4 20 7.589 20 12s-3.589 8-8.001 8z"/></svg> {t('auth_send_whatsapp_otp')}</>
                       }
                     </button>
+
                   </form>
                 )}
 
                   <div className="divider-modern" style={{ margin: '1rem 0' }}>
-                    <span>OR</span>
+                    <span>{t('auth_or')}</span>
                   </div>
 
                   <button 
@@ -620,7 +630,7 @@ const Auth = ({ onLogin }) => {
                     style={{ padding: '0.85rem' }}
                   >
                     <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-                    Continue with Google
+                    {t('auth_continue_google')}
                   </button>
 
                 <button 
@@ -634,11 +644,11 @@ const Auth = ({ onLogin }) => {
                   }}
                   style={{ marginTop: '0.5rem', padding: '0.85rem' }}
                 >
-                  🤖 Ask AI Assistant
+                  🤖 {t('auth_ask_ai')}
                 </button>
 
                 <div className="policy-agreement-text">
-                  By continuing, you agree to our <a href="/terms">Terms</a> & <a href="/privacy-policy">Privacy</a>.
+                  {t('auth_terms_text')} <a href="/terms">{t('auth_terms')}</a> & <a href="/privacy-policy">{t('auth_privacy')}</a>.
                 </div>
               </>
             ) : null}
@@ -658,23 +668,23 @@ const Auth = ({ onLogin }) => {
                   <div className="notif-icon-wrapper zepto-icon-hero">
                     <MapPin size={40} color="var(--auth-action-color)" />
                   </div>
-                  <h3>Location permission is off</h3>
-                  <p>Enabling location helps us reach you quickly with accurate delivery</p>
+                  <h3>{t('loc_title')}</h3>
+                  <p>{t('loc_subtitle')}</p>
                 </div>
 
                 <div style={{ width: '100%' }}>
                   <button className="zepto-btn-current-loc" onClick={handleGetLocation}>
                     <div className="left">
                       <Crosshair size={20} color="var(--auth-action-color)" />
-                      <span>Use my Current Location</span>
+                      <span>{t('loc_use_current')}</span>
                     </div>
-                    <div className="right-btn">Enable</div>
+                    <div className="right-btn">{t('loc_enable')}</div>
                   </button>
 
                   <button className="zepto-btn-whatsapp" onClick={() => window.open('https://wa.me/?text=Send%20me%20your%20location', '_blank')}>
                     <div className="left">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#25D366' }}><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-                      <span>Request address from friend</span>
+                      <span>{t('loc_request_friend')}</span>
                     </div>
                     <ChevronRight size={18} color="#cbd5e1" />
                   </button>
@@ -682,14 +692,13 @@ const Auth = ({ onLogin }) => {
 
                 <div className="zepto-address-section" style={{ width: '100%' }}>
                   <div className="zepto-address-header">
-                    <span className="title">Select your address</span>
-                    <span className="see-all">See All &gt;</span>
+                    <span className="title">{t('loc_select_address')}</span>
+                    <span className="see-all">{t('loc_see_all')}</span>
                   </div>
-
 
                   <button className="zepto-search-btn" onClick={() => setShowSearch(true)}>
                     <Search size={18} />
-                    <span>Search your Location</span>
+                    <span>{t('loc_search_btn')}</span>
                   </button>
                 </div>
               </>
@@ -697,14 +706,14 @@ const Auth = ({ onLogin }) => {
               // Search Mode UI
               <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <div className="zepto-location-header" style={{ marginBottom: '1rem' }}>
-                  <h3>Search Location</h3>
-                  <p>Enter your delivery neighborhood to start exploring:</p>
+                  <h3>{t('loc_search_title')}</h3>
+                  <p>{t('loc_search_subtitle')}</p>
                 </div>
 
                 <div className="profile-input-box" style={{ margin: '0', display: 'flex', padding: '4px' }}>
                   <input
                     type="text"
-                    placeholder="Search any city or area..."
+                    placeholder={t('loc_search_placeholder')}
                     value={manualAddress}
                     onChange={(e) => {
                       setManualAddress(e.target.value);
@@ -718,7 +727,7 @@ const Auth = ({ onLogin }) => {
                     disabled={loading}
                     style={{ background: 'var(--auth-action-color)', color: 'white', border: 'none', borderRadius: '8px', padding: '0 16px', fontWeight: 'bold', cursor: 'pointer' }}
                   >
-                    {loading ? '...' : 'Search'}
+                    {loading ? '...' : t('loc_search')}
                   </button>
                 </div>
 
@@ -772,7 +781,7 @@ const Auth = ({ onLogin }) => {
                       ))
                     ) : (
                       <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
-                        No matching areas found
+                        {t('loc_no_areas')}
                       </div>
                     );
                   })()}
@@ -789,9 +798,9 @@ const Auth = ({ onLogin }) => {
                       finalizeLocation(manualAddress, { lat: 23.0225, lng: 72.5714 });
                     }}
                   >
-                    CONFIRM
+                    {t('loc_confirm')}
                   </button>
-                  <button className="notif-btn-deny" onClick={() => setShowSearch(false)}>BACK</button>
+                  <button className="notif-btn-deny" onClick={() => setShowSearch(false)}>{t('loc_back')}</button>
                 </div>
               </div>
             )}
