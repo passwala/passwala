@@ -62,29 +62,45 @@ const Auth = ({ onLogin }) => {
     return () => clearInterval(slideInterval);
   }, []);
 
+  // ── CRITICAL: Supabase Auth State Listener (handles Google OAuth redirect on mobile) ──
   useEffect(() => {
-    const checkAuth = () => {
+    // This is the CORRECT way to handle OAuth callbacks.
+    // On mobile, after Google redirect, Supabase exchanges the URL hash token
+    // and fires this event — no polling needed.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
+        const user = session.user;
+        // Avoid processing if already logged in
+        if (localStorage.getItem('passwala_user')) return;
+
+        const emailPrefix = (user.email || '').split('@')[0];
+        const cleanName = user.user_metadata?.full_name
+          || user.user_metadata?.name
+          || emailPrefix.replace(/[._0-9]/g, ' ').trim().replace(/\b\w/g, c => c.toUpperCase()).trim()
+          || 'Passwala User';
+
+        await handleQuickLogin({
+          email: user.email,
+          uid: user.id,
+          displayName: cleanName,
+          photoURL: user.user_metadata?.avatar_url
+        }, user.app_metadata?.provider || 'google');
+      }
+    });
+
+    // Also check localStorage for already-saved sessions (warm start)
+    const checkLocalAuth = () => {
       const saved = localStorage.getItem('local_user_profile');
       const savedUser = localStorage.getItem('passwala_user');
-      
       if (saved && step === 'WARM_UP') {
-        try {
-          const parsed = JSON.parse(saved);
-          setSyncedUser(parsed);
-          onLogin(parsed);
-        } catch (e) { /* Ignore */ }
+        try { const parsed = JSON.parse(saved); setSyncedUser(parsed); onLogin(parsed); } catch (e) {}
       } else if (savedUser && step !== 'LOCATION' && step !== 'PROFILE') {
-        try {
-          const parsedUser = JSON.parse(savedUser);
-          onLogin(parsedUser);
-        } catch (e) { /* Ignore */ }
+        try { const parsedUser = JSON.parse(savedUser); onLogin(parsedUser); } catch (e) {}
       }
     };
+    checkLocalAuth();
 
-    checkAuth();
-    // Poll to catch async Google OAuth redirect token processing
-    const authInterval = setInterval(checkAuth, 800);
-    return () => clearInterval(authInterval);
+    return () => subscription.unsubscribe();
   }, [step, onLogin]);
 
   useEffect(() => {
@@ -139,29 +155,43 @@ const Auth = ({ onLogin }) => {
     }
   };
 
-  // ── Phone + WhatsApp OTP ──────────────────────────────────────────────────
+  // ── Phone + WhatsApp OTP (works on mobile via Supabase Phone Auth) ──────────
   const handlePhoneSendOtp = async (e) => {
     e.preventDefault();
     if (loading || !phone) { toast.error('Please enter your phone number'); return; }
     const clean = phone.replace(/\D/g, '');
     if (clean.length < 10) { toast.error('Enter a valid 10-digit number'); return; }
+    const fullPhone = `+91${clean}`; // Indian number with country code
 
     setLoading(true);
     try {
-      const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
-      const res = await fetch(`${BASE_API}/api/auth/send-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: clean })
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || 'Failed to send OTP');
-
-      toast.success('OTP sent to your WhatsApp! 📲');
-      setPhoneOtpSent(true);
-      if (data.otp) { setMockOtp(data.otp); } // dev mock
-    } catch (err) {
-      toast.error(err.message || 'Failed to send OTP');
+      // PRIMARY: Use Supabase Phone OTP (works on all devices, no server needed)
+      const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone });
+      if (!error) {
+        toast.success('OTP sent to your WhatsApp / SMS! 📲');
+        setPhoneOtpSent(true);
+        return;
+      }
+      // Supabase phone auth not enabled — fallback to backend API
+      console.warn('Supabase phone OTP failed, trying backend:', error.message);
+      throw error;
+    } catch (supabaseErr) {
+      // FALLBACK: Backend API (Evolution/WhatsApp — requires server to be running)
+      try {
+        const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+        const res = await fetch(`${BASE_API}/api/auth/send-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: clean })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Failed to send OTP');
+        toast.success('OTP sent to your WhatsApp! 📲');
+        setPhoneOtpSent(true);
+        if (data.otp) setMockOtp(data.otp);
+      } catch (apiErr) {
+        toast.error('Could not send OTP. Please try Email OTP instead.');
+      }
     } finally {
       setLoading(false);
     }
@@ -170,27 +200,52 @@ const Auth = ({ onLogin }) => {
   const handlePhoneVerifyOtp = async (e) => {
     e.preventDefault();
     if (loading || !phoneOtp) { toast.error('Please enter the OTP'); return; }
+    const clean = phone.replace(/\D/g, '');
+    const fullPhone = `+91${clean}`;
 
     setLoading(true);
     try {
-      const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
-      const res = await fetch(`${BASE_API}/api/auth/verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone.replace(/\D/g, ''), otp: phoneOtp })
+      // PRIMARY: Verify via Supabase (matches the OTP it sent)
+      const { data, error } = await supabase.auth.verifyOtp({
+        phone: fullPhone,
+        token: phoneOtp,
+        type: 'sms'
       });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || 'Incorrect OTP');
 
-      toast.success('Phone verified! ✅');
-      await handleQuickLogin({
-        phone: data.phone,
-        uid: `phone_${data.phone}`,
-        displayName: `User ${data.phone.slice(-4)}`,
-        email: null
-      }, 'phone');
-    } catch (err) {
-      toast.error(err.message || 'Verification failed');
+      if (!error && data?.user) {
+        toast.success('Phone verified! ✅');
+        const user = data.user;
+        await handleQuickLogin({
+          phone: fullPhone,
+          uid: user.id,
+          displayName: `User ${clean.slice(-4)}`,
+          email: user.email || null
+        }, 'phone');
+        return;
+      }
+      // If Supabase fails, try backend API verification
+      throw error || new Error('Supabase verify failed');
+    } catch (supabaseErr) {
+      // FALLBACK: Backend API verification
+      try {
+        const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+        const res = await fetch(`${BASE_API}/api/auth/verify-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: clean, otp: phoneOtp })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Incorrect OTP');
+        toast.success('Phone verified! ✅');
+        await handleQuickLogin({
+          phone: data.phone,
+          uid: `phone_${data.phone}`,
+          displayName: `User ${data.phone.slice(-4)}`,
+          email: null
+        }, 'phone');
+      } catch (apiErr) {
+        toast.error(apiErr.message || 'Verification failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -201,14 +256,22 @@ const Auth = ({ onLogin }) => {
     if (loading) return;
     setLoading(true);
     try {
-      // Use current origin so it works on https://localhost:3001 and in production
-      const origin = window.location.origin;
-      const redirectTo = `${origin}/auth`;
+      // Always redirect back to /auth so the onAuthStateChange listener catches the token
+      const redirectTo = `${window.location.origin}/auth`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo }
+        options: {
+          redirectTo,
+          // These ensure proper mobile browser handling
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
+        }
       });
       if (error) throw error;
+      // Note: browser will redirect away — setLoading stays true
+      // onAuthStateChange will fire on return and complete the login
     } catch (err) {
       console.error(err);
       toast.error(err.message || 'Google Login failed');
