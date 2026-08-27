@@ -37,6 +37,13 @@ const Auth = ({ onLogin }) => {
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
   
+  // Phone / WhatsApp OTP login
+  const [loginMode, setLoginMode] = useState('email'); // 'email' | 'phone'
+  const [phone, setPhone] = useState('');
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+  const [phoneOtp, setPhoneOtp] = useState('');
+  const [mockOtp, setMockOtp] = useState(''); // dev only
+
   const [loading, setLoading] = useState(false);
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
   const [syncedUser, setSyncedUser] = useState(null);
@@ -121,6 +128,64 @@ const Auth = ({ onLogin }) => {
       setLoading(false);
     }
   };
+
+  // ── Phone + WhatsApp OTP ──────────────────────────────────────────────────
+  const handlePhoneSendOtp = async (e) => {
+    e.preventDefault();
+    if (loading || !phone) { toast.error('Please enter your phone number'); return; }
+    const clean = phone.replace(/\D/g, '');
+    if (clean.length < 10) { toast.error('Enter a valid 10-digit number'); return; }
+
+    setLoading(true);
+    try {
+      const BASE_API = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3004`;
+      const res = await fetch(`${BASE_API}/api/auth/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: clean })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to send OTP');
+
+      toast.success('OTP sent to your WhatsApp! 📲');
+      setPhoneOtpSent(true);
+      if (data.otp) { setMockOtp(data.otp); } // dev mock
+    } catch (err) {
+      toast.error(err.message || 'Failed to send OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePhoneVerifyOtp = async (e) => {
+    e.preventDefault();
+    if (loading || !phoneOtp) { toast.error('Please enter the OTP'); return; }
+
+    setLoading(true);
+    try {
+      const BASE_API = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3004`;
+      const res = await fetch(`${BASE_API}/api/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phone.replace(/\D/g, ''), otp: phoneOtp })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Incorrect OTP');
+
+      toast.success('Phone verified! ✅');
+      await handleQuickLogin({
+        phone: data.phone,
+        uid: `phone_${data.phone}`,
+        displayName: `User ${data.phone.slice(-4)}`,
+        email: null
+      }, 'phone');
+    } catch (err) {
+      toast.error(err.message || 'Verification failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const handleGoogleLogin = async () => {
     if (loading) return;
@@ -387,56 +452,161 @@ const Auth = ({ onLogin }) => {
               </div>
             ) : step === 'EMAIL_LOGIN' ? (
               <>
-                <form onSubmit={handleEmailAuth} className="email-auth-form" style={{ gap: '0.85rem' }}>
-                  <div className="input-group-modern" style={{ gap: '0.35rem' }}>
-                    <label style={{ fontSize: '0.8rem' }}>Email Address</label>
-                    <input 
-                      type="email" 
-                      placeholder="Enter your email" 
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      disabled={otpSent}
-                      style={{ padding: '0.75rem 1rem', opacity: otpSent ? 0.6 : 1 }}
-                    />
-                  </div>
-                  {otpSent && (
+                {/* ── Login Mode Tabs ── */}
+                <div style={{
+                  display: 'flex', borderRadius: '10px', background: '#f1f5f9',
+                  padding: '4px', gap: '4px', marginBottom: '1rem'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => { setLoginMode('email'); setOtpSent(false); setOtp(''); }}
+                    style={{
+                      flex: 1, padding: '0.55rem', border: 'none', borderRadius: '7px',
+                      fontWeight: '600', fontSize: '0.82rem', cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      background: loginMode === 'email' ? 'white' : 'transparent',
+                      color: loginMode === 'email' ? 'var(--auth-action-color)' : '#64748b',
+                      boxShadow: loginMode === 'email' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none'
+                    }}
+                  >
+                    ✉️ Email OTP
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setLoginMode('phone'); setPhoneOtpSent(false); setPhoneOtp(''); }}
+                    style={{
+                      flex: 1, padding: '0.55rem', border: 'none', borderRadius: '7px',
+                      fontWeight: '600', fontSize: '0.82rem', cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      background: loginMode === 'phone' ? 'white' : 'transparent',
+                      color: loginMode === 'phone' ? '#25D366' : '#64748b',
+                      boxShadow: loginMode === 'phone' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none'
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#25D366" style={{ marginRight: '4px', verticalAlign: 'middle' }}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M11.999 2C6.477 2 2 6.477 2 12c0 1.989.574 3.842 1.563 5.408L2 22l4.75-1.534A9.96 9.96 0 0011.999 22C17.522 22 22 17.522 22 12S17.522 2 11.999 2zm0 18c-1.795 0-3.467-.5-4.893-1.365l-.351-.208-3.626 1.171.96-3.535-.231-.37A7.966 7.966 0 014 12c0-4.411 3.589-8 7.999-8C16.41 4 20 7.589 20 12s-3.589 8-8.001 8z"/></svg>
+                    WhatsApp OTP
+                  </button>
+                </div>
+
+                {/* ── Email OTP Form ── */}
+                {loginMode === 'email' && (
+                  <form onSubmit={handleEmailAuth} className="email-auth-form" style={{ gap: '0.85rem' }}>
                     <div className="input-group-modern" style={{ gap: '0.35rem' }}>
-                      <label style={{ fontSize: '0.8rem' }}>Enter OTP</label>
+                      <label style={{ fontSize: '0.8rem' }}>Email Address</label>
                       <input 
-                        type="text" 
-                        placeholder="Enter OTP code" 
-                        value={otp}
-                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                        maxLength={8}
+                        type="email" 
+                        placeholder="Enter your email" 
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         required
-                        autoFocus
-                        style={{ padding: '0.75rem 1rem', letterSpacing: '0.2rem', textAlign: 'center', fontSize: '1.2rem', fontWeight: 'bold' }}
+                        disabled={otpSent}
+                        style={{ padding: '0.75rem 1rem', opacity: otpSent ? 0.6 : 1 }}
                       />
                     </div>
-                  )}
-
-                  <div className="auth-toggle-row" style={{ marginTop: '0' }}>
-                    {otpSent ? (
-                      <span onClick={() => { setOtpSent(false); setOtp(''); }} className="toggle-auth-mode">
-                        Change email address
-                      </span>
-                    ) : (
-                      <span className="toggle-auth-mode" style={{ visibility: 'hidden' }}>
-                        Placeholder
-                      </span>
+                    {otpSent && (
+                      <div className="input-group-modern" style={{ gap: '0.35rem' }}>
+                        <label style={{ fontSize: '0.8rem' }}>Enter OTP (sent to email)</label>
+                        <input 
+                          type="text" 
+                          placeholder="Enter OTP code" 
+                          value={otp}
+                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                          maxLength={8}
+                          required
+                          autoFocus
+                          style={{ padding: '0.75rem 1rem', letterSpacing: '0.2rem', textAlign: 'center', fontSize: '1.2rem', fontWeight: 'bold' }}
+                        />
+                      </div>
                     )}
-                  </div>
+                    <div className="auth-toggle-row" style={{ marginTop: '0' }}>
+                      {otpSent ? (
+                        <span onClick={() => { setOtpSent(false); setOtp(''); }} className="toggle-auth-mode">
+                          Change email address
+                        </span>
+                      ) : (
+                        <span className="toggle-auth-mode" style={{ visibility: 'hidden' }}>Placeholder</span>
+                      )}
+                    </div>
+                    <button 
+                      type="submit"
+                      className="sheet-action-btn-modern" 
+                      disabled={loading}
+                      style={{ background: 'var(--auth-action-color)', marginTop: '0.5rem' }}
+                    >
+                      {loading ? <RefreshCw className="spin" size={20} color="#fff" /> : (otpSent ? 'Verify OTP' : 'Send OTP')}
+                    </button>
+                  </form>
+                )}
 
-                  <button 
-                    type="submit"
-                    className="sheet-action-btn-modern" 
-                    disabled={loading}
-                    style={{ background: 'var(--auth-action-color)', marginTop: '0.5rem' }}
-                  >
-                    {loading ? <RefreshCw className="spin" size={20} color="#fff" /> : (otpSent ? 'Verify OTP' : 'Send OTP')}
-                  </button>
-                </form>
+                {/* ── WhatsApp OTP Form ── */}
+                {loginMode === 'phone' && (
+                  <form onSubmit={phoneOtpSent ? handlePhoneVerifyOtp : handlePhoneSendOtp} className="email-auth-form" style={{ gap: '0.85rem' }}>
+                    <div className="input-group-modern" style={{ gap: '0.35rem' }}>
+                      <label style={{ fontSize: '0.8rem' }}>Mobile Number</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{
+                          padding: '0.75rem 0.75rem', background: '#f8fafc', border: '1.5px solid #e2e8f0',
+                          borderRadius: '10px', fontWeight: '600', fontSize: '0.9rem', color: '#334155',
+                          display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap'
+                        }}>
+                          🇮🇳 +91
+                        </div>
+                        <input 
+                          type="tel"
+                          placeholder="Enter 10-digit number"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                          required
+                          disabled={phoneOtpSent}
+                          maxLength={10}
+                          style={{ padding: '0.75rem 1rem', opacity: phoneOtpSent ? 0.6 : 1, flex: 1 }}
+                        />
+                      </div>
+                    </div>
+
+                    {phoneOtpSent && (
+                      <div className="input-group-modern" style={{ gap: '0.35rem' }}>
+                        <label style={{ fontSize: '0.8rem' }}>
+                          Enter OTP (sent to WhatsApp)
+                          {/* Dev mock helper */}
+                          {mockOtp && <span style={{ color: '#25D366', marginLeft: '8px', fontSize: '0.75rem' }}>[Dev: {mockOtp}]</span>}
+                        </label>
+                        <input 
+                          type="text"
+                          placeholder="Enter 6-digit OTP"
+                          value={phoneOtp}
+                          onChange={(e) => setPhoneOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          maxLength={6}
+                          required
+                          autoFocus
+                          style={{ padding: '0.75rem 1rem', letterSpacing: '0.3rem', textAlign: 'center', fontSize: '1.3rem', fontWeight: 'bold' }}
+                        />
+                      </div>
+                    )}
+
+                    {phoneOtpSent && (
+                      <div className="auth-toggle-row" style={{ marginTop: '0' }}>
+                        <span onClick={() => { setPhoneOtpSent(false); setPhoneOtp(''); setMockOtp(''); }} className="toggle-auth-mode">
+                          Change number
+                        </span>
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      className="sheet-action-btn-modern"
+                      disabled={loading}
+                      style={{ background: '#25D366', marginTop: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                    >
+                      {loading
+                        ? <RefreshCw className="spin" size={20} color="#fff" />
+                        : phoneOtpSent
+                          ? '✅ Verify OTP'
+                          : <><svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M11.999 2C6.477 2 2 6.477 2 12c0 1.989.574 3.842 1.563 5.408L2 22l4.75-1.534A9.96 9.96 0 0011.999 22C17.522 22 22 17.522 22 12S17.522 2 11.999 2zm0 18c-1.795 0-3.467-.5-4.893-1.365l-.351-.208-3.626 1.171.96-3.535-.231-.37A7.966 7.966 0 014 12c0-4.411 3.589-8 7.999-8C16.41 4 20 7.589 20 12s-3.589 8-8.001 8z"/></svg> Send OTP on WhatsApp</>
+                      }
+                    </button>
+                  </form>
+                )}
 
                   <div className="divider-modern" style={{ margin: '1rem 0' }}>
                     <span>OR</span>
@@ -472,6 +642,7 @@ const Auth = ({ onLogin }) => {
                 </div>
               </>
             ) : null}
+
           </div>
         </div>
       </div>

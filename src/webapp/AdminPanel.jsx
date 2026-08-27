@@ -197,7 +197,7 @@ const ActivityFeed = ({ onLogout }) => {
 const TABLE_SCHEMAS = {
   users: { phone: '', full_name: '', email: '', role: 'BUYER', photo_url: '', is_suspended: false },
   admins: { username: '', password_hash: '', role: 'SUPERADMIN' },
-  vendors: { phone: '', full_name: '', name: '', user_id: '', business_name: '', aadhar_no: '', license_no: '', address: '', category: '', is_verified: false, profile_completed: false },
+  vendors: { vendor_type: '', phone: '', full_name: '', name: '', user_id: '', business_name: '', aadhar_no: '', license_no: '', address: '', category: '', is_verified: false, profile_completed: false },
   riders: { phone: '', full_name: '', user_id: '', vehicle_no: '', license_no: '', id_proof: '', is_active: false, is_verified: false, rating: 0, total_deliveries: 0 },
   service_providers: { phone: '', full_name: '', user_id: '', business_name: '', aadhar_no: '', license_no: '', is_verified: false },
   services: { provider_id: '', category_id: '', title: '', description: '', price: 0, duration_minutes: 0 },
@@ -236,70 +236,72 @@ const DATABASE_SCHEMAS = {
   event_bookings: ['user_id', 'event_id', 'tier_id', 'ticket_count', 'total_amount', 'status'],
   city_routes: ['start_area', 'end_area', 'distance_km', 'base_price', 'is_active'],
   city_vehicles: ['driver_id', 'vehicle_type', 'license_plate', 'total_seats', 'available_seats', 'is_active'],
-  ticket_bookings: ['user_id', 'route_id', 'vehicle_id', 'pickup_area', 'drop_area', 'total_price', 'seat_count', 'status']
+  ticket_bookings: ['user_id', 'route_id', 'vehicle_id', 'pickup_area', 'drop_area', 'total_price', 'seat_count', 'status'],
+  sports_venues: ['owner_id', 'name', 'address', 'lat', 'lng', 'is_active', 'rating'],
+  venue_bookings: ['user_id', 'venue_id', 'total_amount', 'status', 'scheduled_at']
 };
 
 const ALL_TAB_SECTIONS = [
   {
     label: 'Main',
     items: [
-      { id: 'dashboard_panel', label: 'Dashboard', icon: BarChart3 },
-      { id: 'people_map_panel', label: 'People Map', icon: Map, table: 'users' },
+      // { id: 'dashboard_panel', label: 'Dashboard', icon: BarChart3 },
+      // { id: 'people_map_panel', label: 'People Map', icon: Map, table: 'users' },
       { id: 'users_panel', label: 'Users', icon: Users, table: 'users' },
       { id: 'coming_soon_panel', label: 'Coming Soon', icon: Clock, table: 'users' },
       { id: 'vendors_panel', label: 'Vendors', icon: ShoppingBag, table: 'vendors' },
-      { id: 'riders_panel', label: 'Riders', icon: Truck, table: 'riders' },
+      // { id: 'riders_panel', label: 'Riders', icon: Truck, table: 'riders' },
     ]
   },
   {
     label: 'Services',
     launchHidden: true, // hidden until services feature launches
     items: [
-      { id: 'providers_panel', label: 'Service Providers', icon: Heart, table: 'service_providers' },
-      { id: 'services_panel', label: 'Service List', icon: Briefcase, table: 'services' },
-      { id: 'bookings_panel', label: 'Bookings', icon: Calendar, table: 'service_bookings' },
+      // { id: 'providers_panel', label: 'Service Providers', icon: Heart, table: 'service_providers' },
+      // { id: 'services_panel', label: 'Service List', icon: Briefcase, table: 'services' },
+      // { id: 'bookings_panel', label: 'Bookings', icon: Calendar, table: 'service_bookings' },
     ]
   },
   {
     label: 'Marketplace',
     launchHidden: true, // hidden until shopping feature launches
     items: [
-      { id: 'stores_panel', label: 'Stores', icon: ShoppingBag, table: 'stores' },
-      { id: 'products_panel', label: 'Products', icon: Package, table: 'products' },
-      { id: 'orders_panel', label: 'Product Orders', icon: ShoppingBag, table: 'orders' },
-      { id: 'payments_panel', label: 'Payments', icon: CreditCard, table: 'service_bookings' },
-      { id: 'deals_panel', label: 'Deals & Offers', icon: Tag, table: 'deals' },
-      { id: 'promo_codes_panel', label: 'Promo Codes', icon: Tag },
+      // { id: 'stores_panel', label: 'Stores', icon: ShoppingBag, table: 'stores' },
+      // { id: 'products_panel', label: 'Products', icon: Package, table: 'products' },
+      // { id: 'orders_panel', label: 'Product Orders', icon: ShoppingBag, table: 'orders' },
+      // { id: 'payments_panel', label: 'Payments', icon: CreditCard, table: 'service_bookings' },
+      // { id: 'deals_panel', label: 'Deals & Offers', icon: Tag, table: 'deals' },
+      // { id: 'promo_codes_panel', label: 'Promo Codes', icon: Tag },
     ]
   },
   {
     label: 'Content',
     launchHidden: true, // hidden until community feature launches
     items: [
-      { id: 'community_panel', label: 'Community', icon: MessageSquare, table: 'posts' },
-      { id: 'notifications_panel', label: 'Notifications', icon: Bell, table: 'notifications' },
+      // { id: 'community_panel', label: 'Community', icon: MessageSquare, table: 'posts' },
+      // { id: 'notifications_panel', label: 'Notifications', icon: Bell, table: 'notifications' },
     ]
   },
   {
     label: 'City & Events',
     items: [
-      { id: 'city_routes_panel', label: 'City Routes', icon: Navigation, table: 'city_routes' },
-      { id: 'city_vehicles_panel', label: 'City Vehicles', icon: Truck, table: 'city_vehicles' },
-      { id: 'ticket_bookings_panel', label: 'Ride Bookings', icon: MapPin, table: 'ticket_bookings' },
+      // { id: 'city_routes_panel', label: 'City Routes', icon: Navigation, table: 'city_routes' },
+      // { id: 'city_vehicles_panel', label: 'City Vehicles', icon: Truck, table: 'city_vehicles' },
+      // { id: 'ticket_bookings_panel', label: 'Ride Bookings', icon: MapPin, table: 'ticket_bookings' },
       { id: 'events_panel', label: 'Events', icon: Sparkles, table: 'events' },
-      { id: 'event_bookings_panel', label: 'Event Bookings', icon: Calendar, table: 'event_bookings' },
-      { id: 'event_approvals_panel', label: 'Event Approvals', icon: ShieldCheck },
-      { id: 'event_organizers_panel', label: 'Event Organizers', icon: Users, table: 'service_providers' },
-      { id: 'upgrade_requests_panel', label: 'Upgrade Requests', icon: ShieldCheck },
+      // { id: 'event_bookings_panel', label: 'Event Bookings', icon: Calendar, table: 'event_bookings' },
+      // { id: 'event_approvals_panel', label: 'Event Approvals', icon: ShieldCheck },
+      // { id: 'event_organizers_panel', label: 'Event Organizers', icon: Users, table: 'service_providers' },
+      // { id: 'upgrade_requests_panel', label: 'Upgrade Requests', icon: ShieldCheck },
       { id: 'sports_venues_panel', label: '🏏 Sports Venues', icon: Calendar, table: 'sports_venues' },
-      { id: 'venue_bookings_panel', label: '🎾 Court Bookings', icon: Calendar, table: 'venue_bookings' },
+      // { id: 'venue_bookings_panel', label: '🎾 Court Bookings', icon: Calendar, table: 'venue_bookings' },
     ]
   },
   {
     label: 'System',
     items: [
-      { id: 'areas_panel', label: 'Service Areas', icon: MapPin, table: 'service_areas' },
-      { id: 'reports_panel', label: 'Reports', icon: TrendingUp },
+      // { id: 'areas_panel', label: 'Service Areas', icon: MapPin, table: 'service_areas' },
+      // { id: 'reports_panel', label: 'Reports', icon: TrendingUp },
       { id: 'settings_panel', label: 'Settings', icon: Settings },
     ]
   }
@@ -1498,12 +1500,12 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
     const currentTable = TABS.find(t => t.id === activeAdminTab)?.table || activeAdminTab;
 
     // ── Try backend API (up to 2 attempts) ──────────────────────────────────
-    const tryBackendFetch = async () => {
+    const tryBackendFetch = async (targetTable) => {
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
           const adminKey = sessionStorage.getItem('admin_token') || '';
           if (!adminKey) return null; // No token — skip backend
-          const res = await fetchWithTimeout(`${API_URL}/api/admin/fetch?table=${currentTable}`, {
+          const res = await fetchWithTimeout(`${API_URL}/api/admin/fetch?table=${targetTable}`, {
             headers: { 'x-admin-key': adminKey }
           });
           if (res.status === 401) {
@@ -1524,11 +1526,11 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
     };
 
     // ── Try Supabase direct (anon key, works for public/no-RLS tables) ──────
-    const trySupabaseFetch = async () => {
+    const trySupabaseFetch = async (targetTable) => {
       if (!adminSupabase) return null;
       try {
         const { data, error } = await adminSupabase
-          .from(currentTable)
+          .from(targetTable)
           .select('*')
           .order('created_at', { ascending: false })
           .limit(500);
@@ -1545,7 +1547,24 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
 
     try {
       // 1. Try backend API first (has service-role access, no RLS)
-      const backendData = await tryBackendFetch();
+      let backendData;
+      if (currentTable === 'vendors') {
+        const vData = await tryBackendFetch('vendors');
+        if (vData === 'logout') return;
+        const spData = await tryBackendFetch('service_providers');
+        if (spData === 'logout') return;
+        
+        let merged = [];
+        if (vData && Array.isArray(vData)) {
+          merged = merged.concat(vData.map(v => ({ ...v, vendor_type: 'Shop' })));
+        }
+        if (spData && Array.isArray(spData)) {
+          merged = merged.concat(spData.map(sp => ({ ...sp, vendor_type: sp.category || (sp.users && sp.users.role === 'EVENT_ORGANIZER' ? 'Event' : 'Service') })));
+        }
+        backendData = merged.length > 0 ? merged : null;
+      } else {
+        backendData = await tryBackendFetch(currentTable);
+      }
       if (backendData === 'logout') return;
 
       if (backendData !== null) {
@@ -1570,7 +1589,21 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
 
       // 2. Backend failed — try Supabase direct
       console.warn('Backend API unavailable, trying Supabase direct...');
-      const supabaseData = await trySupabaseFetch();
+      let supabaseData;
+      if (currentTable === 'vendors') {
+        const vData = await trySupabaseFetch('vendors');
+        const spData = await trySupabaseFetch('service_providers');
+        let merged = [];
+        if (vData && Array.isArray(vData)) {
+          merged = merged.concat(vData.map(v => ({ ...v, vendor_type: 'Shop' })));
+        }
+        if (spData && Array.isArray(spData)) {
+          merged = merged.concat(spData.map(sp => ({ ...sp, vendor_type: sp.category || (sp.users && sp.users.role === 'EVENT_ORGANIZER' ? 'Event' : 'Service') })));
+        }
+        supabaseData = merged.length > 0 ? merged : null;
+      } else {
+        supabaseData = await trySupabaseFetch(currentTable);
+      }
 
       if (supabaseData !== null && supabaseData.length >= 0) {
         // Supabase direct succeeded

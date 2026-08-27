@@ -23,6 +23,7 @@ import eventRoutes from './routes/events.js';
 import promoRoutes from './routes/promo.js';
 import sportsRoutes from './routes/sports.js';
 import ratingsRoutes from './routes/ratings.js';
+import authRoutes from './routes/auth.js';
 import { apiLimiter, adminLimiter } from './utils/rateLimiter.js';
 import supabase from './supabase.js';
 import morgan from 'morgan';
@@ -218,6 +219,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/promo', promoRoutes);
 app.use('/api/sports', sportsRoutes);
 app.use('/api/ratings', ratingsRoutes);
+app.use('/api/auth', authRoutes);
 
 // Fix #13: Bounded route cache with max 500 entries to prevent memory leak
 const ROUTE_CACHE_MAX = 500;

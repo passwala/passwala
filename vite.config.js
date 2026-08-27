@@ -68,13 +68,13 @@ messaging.onBackgroundMessage((payload) => {
   return {
     plugins: [
       react(),
-      mkcert() // 🔒 Trusted HTTPS for local network — enables GPS on phone (navigator.geolocation requires secure context)
+      // mkcert() // 🔒 Trusted HTTPS for local network — enables GPS on phone (navigator.geolocation requires secure context)
     ],
     cacheDir: `node_modules/.vite/${mode || 'default'}`,
     server: {
       port,
       host: '0.0.0.0',  // accessible on all interfaces — laptop & phone on same WiFi
-      https: true,      // 🔒 Required for GPS on phone — install rootCA on phone (see Desktop/passwala-rootCA.crt)
+      // https: true,      // 🔒 Required for GPS on phone — install rootCA on phone (see Desktop/passwala-rootCA.crt)
       cors: true,
       strictPort: true,
       allowedHosts: true,
