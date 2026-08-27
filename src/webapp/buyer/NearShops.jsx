@@ -433,7 +433,7 @@ const NearShops = ({ location, userCoords }) => {
                          bottom: '12px',
                          right: '12px',
                          zIndex: 1000,
-                         background: 'white',
+                         background: 'var(--bg-card)',
                          border: '1.5px solid #e2e8f0',
                          borderRadius: '50%',
                          width: '40px',
@@ -528,7 +528,7 @@ const NearShops = ({ location, userCoords }) => {
                initial={{ opacity: 0 }}
                animate={{ opacity: 1 }}
                className="no-shops-found"
-               style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748b' }}
+               style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-secondary)' }}
              >
                 <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛍️</div>
                 <h4 style={{ fontWeight: 800, color: '#0f172a' }}>{t('no_shops_found')}</h4>
@@ -552,16 +552,16 @@ const NearShops = ({ location, userCoords }) => {
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
             style={{
               position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-              background: '#f8fafc', zIndex: 2500, overflowY: 'auto'
+              background: 'var(--bg-surface)', zIndex: 2500, overflowY: 'auto'
             }}
           >
-            <div style={{ position: 'sticky', top: 0, background: 'white', padding: '1rem', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', zIndex: 10 }}>
+            <div style={{ position: 'sticky', top: 0, background: 'var(--bg-card)', padding: '1rem', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', zIndex: 10 }}>
                <button onClick={() => setSelectedShop(null)} style={{ background: 'none', border: 'none', padding: '0.5rem', cursor: 'pointer' }}>
                  <ArrowLeft size={24} color="#0f172a" />
                </button>
                <div style={{ flex: 1 }}>
                  <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800 }}>{selectedShop.name}</h2>
-                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                     {selectedShop.type === 'SERVICES' 
                       ? t('service_portfolio') 
                       : selectedShop.distance === 'N/A'
@@ -620,8 +620,8 @@ const NearShops = ({ location, userCoords }) => {
                
                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '1rem' }}>
                   {shopCatalog.map(product => (
-                    <div key={product.id} style={{ background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
-                       <div style={{ width: '100%', height: '120px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div key={product.id} style={{ background: 'var(--bg-card)', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
+                       <div style={{ width: '100%', height: '120px', background: 'var(--bg-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                          {product.image ? (
                            <img src={product.image} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                          ) : (
@@ -631,7 +631,7 @@ const NearShops = ({ location, userCoords }) => {
                        <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
                           <div>
                             <h4 style={{ margin: '0 0 0.25rem 0', fontWeight: 700, fontSize: '0.95rem' }}>{product.name}</h4>
-                            <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.75rem', color: '#64748b', lineHeight: 1.3 }}>{product.detail}</p>
+                            <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.3 }}>{product.detail}</p>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
                              <span style={{ fontWeight: 800, color: '#0f172a' }}>₹{product.price}</span>
@@ -642,7 +642,7 @@ const NearShops = ({ location, userCoords }) => {
                                     display: 'flex', 
                                     alignItems: 'center', 
                                     gap: '10px', 
-                                    background: 'white', 
+                                    background: 'var(--bg-card)', 
                                     border: '1.5px solid var(--primary)',
                                     borderRadius: '10px', 
                                     padding: '4px 8px',
@@ -731,3 +731,4 @@ const NearShops = ({ location, userCoords }) => {
 };
 
 export default NearShops;
+

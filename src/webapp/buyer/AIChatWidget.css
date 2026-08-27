@@ -36,7 +36,7 @@
 .chat-sidebar {
   width: 260px;
   height: 100%;
-  background: #ffffff; /* Clean white */
+  background: var(--bg-card); /* Clean white */
   border: 1px solid #e5e5e5;
   border-radius: 20px;
   display: flex;
@@ -51,7 +51,7 @@
 
 /* Sidebar Menu Toggle Button (Premium Rounded Border styling matching user request) */
 .sidebar-menu-toggle-btn {
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1.5px solid #171717;
   color: #171717;
   cursor: pointer;
@@ -156,7 +156,7 @@
   justify-content: space-between;
   width: 100%;
   padding: 12px 16px;
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1.5px solid #ff6b00;
   border-radius: 10px;
   color: #ff6b00;
@@ -248,7 +248,7 @@
 .chat-main-panel {
   flex: 1;
   height: 100%;
-  background-color: #ffffff; /* Pure clean white */
+  background-color: var(--bg-card); /* Pure clean white */
   border: 1px solid #e5e5e5;
   border-radius: 20px;
   display: flex;
@@ -268,7 +268,7 @@
   padding: 0 24px;
   flex-shrink: 0;
   z-index: 10;
-  background: #ffffff;
+  background: var(--bg-card);
 }
 
 .header-title-dropdown {
@@ -343,7 +343,7 @@
   position: relative;
   z-index: 1;
   box-sizing: border-box;
-  background-color: #ffffff;
+  background-color: var(--bg-card);
 }
 
 /* Split Dashboard Layout */
@@ -397,7 +397,7 @@
 
 .chat-input-wrapper-chatgpt:focus-within {
   border-color: #ff6b00;
-  background: #ffffff;
+  background: var(--bg-card);
   box-shadow: 0 4px 20px rgba(255, 107, 0, 0.08);
 }
 
@@ -506,7 +506,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 18px;
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1px solid #e5e5e5;
   border-radius: 100px;
   color: #525252;
@@ -555,7 +555,7 @@
 
 /* ── Live Neighborhood Deck ── */
 .neighborhood-live-deck {
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1px solid #e5e5e5;
   border-radius: 20px;
   padding: 24px;
@@ -661,7 +661,7 @@
 }
 
 .wallet-quick-topup {
-  background: #ffffff;
+  background: var(--bg-card);
   color: #ff6b00;
   border: none;
   padding: 6px 12px;
@@ -746,7 +746,7 @@
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1px solid #f0f0f0;
 }
 
@@ -783,7 +783,7 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
-  background-color: #ffffff;
+  background-color: var(--bg-card);
 }
 
 .messages-inner-centered {
@@ -921,7 +921,7 @@
 .active-chat-input-bar-container {
   border-top: 1px solid #e5e5e5;
   padding: 16px 24px 24px;
-  background-color: #ffffff;
+  background-color: var(--bg-card);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1049,7 +1049,7 @@
 }
 
 .ai-venue-card {
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1px solid rgba(255, 107, 0, 0.18);
   border-radius: 14px;
   overflow: hidden;
@@ -1300,7 +1300,7 @@
    🎫 EVENTS LIST CARD (enhanced)
 ══════════════════════════════════════════════════════════════ */
 .ai-event-card {
-  background: #fff;
+  background: var(--bg-card);
   border: 1px solid rgba(255, 107, 0, 0.15);
   border-radius: 14px;
   overflow: hidden;
@@ -1533,3 +1533,4 @@
   color: #0f172a;
   padding: 4px 0;
 }
+

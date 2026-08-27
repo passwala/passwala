@@ -644,7 +644,7 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor, user }) => {
 
             {/* Tab Switched Header (Visible only when not viewing a specific chat thread) */}
             {(!selectedVendor || activeTab === 'AI') && (
-              <div className="chat-tabs-bar" style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '5px 10px', background: '#f8fafc' }}>
+              <div className="chat-tabs-bar" style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '5px 10px', background: 'var(--bg-surface)' }}>
                 <button 
                   onClick={() => setActiveTab('AI')}
                   style={{
@@ -755,11 +755,11 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor, user }) => {
                 </>
               ) : (
                 /* Threads List View */
-                <div className="chat-threads-list" style={{ flex: 1, overflowY: 'auto', background: '#f8fafc' }}>
+                <div className="chat-threads-list" style={{ flex: 1, overflowY: 'auto', background: 'var(--bg-surface)' }}>
                   {chatThreads.length === 0 ? (
-                    <div className="empty-threads-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '20px', textAlign: 'center', color: '#64748b' }}>
+                    <div className="empty-threads-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                       <MessageSquare size={48} style={{ opacity: 0.3, marginBottom: '15px' }} />
-                      <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#334155', margin: 0 }}>No direct chats yet</h4>
+                      <h4 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>No direct chats yet</h4>
                       <p style={{ fontSize: '0.8rem', marginTop: '5px', lineHeight: '1.4' }}>Click the chat button next to any service provider on the Local Experts page to start chatting with them directly!</p>
                     </div>
                   ) : (
@@ -773,7 +773,7 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor, user }) => {
                           alignItems: 'center',
                           padding: '15px',
                           borderBottom: '1px solid #e2e8f0',
-                          background: 'white',
+                          background: 'var(--bg-card)',
                           cursor: 'pointer',
                           transition: 'background 0.2s'
                         }}
@@ -787,11 +787,11 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor, user }) => {
                         )}
                         <div style={{ flex: 1, overflow: 'hidden' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                            <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: '#1e293b' }}>{thread.vendorName}</h4>
+                            <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{thread.vendorName}</h4>
                             <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{thread.timestamp}</span>
                           </div>
                           <span style={{ fontSize: '0.75rem', color: '#0f766e', display: 'block', margin: '2px 0' }}>{thread.vendorTitle}</span>
-                          <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{thread.lastMessage}</p>
+                          <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{thread.lastMessage}</p>
                         </div>
                       </div>
                     ))
@@ -807,3 +807,4 @@ const AIAssistant = ({ isOpen, onClose, onRegisterVendor, user }) => {
 };
 
 export default AIAssistant;
+

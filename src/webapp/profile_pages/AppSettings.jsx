@@ -129,7 +129,7 @@ const AppSettings = ({ isDarkMode, onToggleTheme }) => {
         <div className="profile-menu-container glass">
            <div className="profile-menu-item" onClick={() => toast('Passwala v2.0.4. (Built with React & Supabase)')}>
               <div className="menu-item-left">
-                 <div className="menu-icon-box" style={{ background: 'rgba(100, 116, 139, 0.08)', color: '#64748b' }}><Info size={20} /></div>
+                 <div className="menu-icon-box" style={{ background: 'rgba(100, 116, 139, 0.08)', color: 'var(--text-secondary)' }}><Info size={20} /></div>
                  <div className="menu-text">
                     <strong>App Version</strong>
                     <span>v2.0.4 Premium</span>
@@ -151,7 +151,7 @@ const AppSettings = ({ isDarkMode, onToggleTheme }) => {
               toast.success('System cache cleared successfully!');
             }}>
                <div className="menu-item-left">
-                  <div className="menu-icon-box" style={{ background: 'rgba(100, 116, 139, 0.08)', color: '#64748b' }}><Database size={20} /></div>
+                  <div className="menu-icon-box" style={{ background: 'rgba(100, 116, 139, 0.08)', color: 'var(--text-secondary)' }}><Database size={20} /></div>
                   <div className="menu-text">
                      <strong>Cache Management</strong>
                      <span>Clear cached data</span>
@@ -170,3 +170,4 @@ const AppSettings = ({ isDarkMode, onToggleTheme }) => {
 };
 
 export default AppSettings;
+

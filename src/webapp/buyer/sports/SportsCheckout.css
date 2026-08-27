@@ -15,7 +15,7 @@
 .sc-header {
   display: flex; align-items: center; gap: 14px;
   padding: 20px 16px 16px;
-  background: #fff; border-bottom: 1px solid #f1f5f9;
+  background: var(--bg-card); border-bottom: 1px solid #f1f5f9;
   position: sticky; top: 0; z-index: 10;
   max-width: 600px;
   width: 100%;
@@ -33,7 +33,7 @@
 .sc-body { flex: 1; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
 
 /* Venue Card */
-.sc-venue-card { background: #fff; border-radius: 20px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
+.sc-venue-card { background: var(--bg-card); border-radius: 20px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
 
 .sc-venue-header { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 16px; }
 
@@ -60,7 +60,7 @@
 .sc-detail-val { font-size: 0.9rem; font-weight: 700; color: #1e293b; }
 
 /* Amount Card */
-.sc-amount-card { background: #fff; border-radius: 20px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
+.sc-amount-card { background: var(--bg-card); border-radius: 20px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
 
 .sc-amount-title { font-size: 1rem; font-weight: 800; color: #1e293b; margin: 0 0 16px; }
 
@@ -86,7 +86,7 @@
 
 /* Footer */
 .sc-footer {
-  background: #fff; border-top: 1px solid #f1f5f9;
+  background: var(--bg-card); border-top: 1px solid #f1f5f9;
   padding: 16px 20px;
   display: flex; align-items: center; justify-content: space-between;
   position: sticky; bottom: 0;
@@ -118,3 +118,4 @@
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
+

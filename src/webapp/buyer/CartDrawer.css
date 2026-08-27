@@ -14,7 +14,7 @@
   width: 380px;
   max-width: 95vw;
   height: 100vh;
-  background: #fff;
+  background: var(--bg-card);
   box-shadow: -8px 0 40px rgba(0,0,0,0.15);
   z-index: 3200;
   display: flex;
@@ -197,7 +197,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  background: #fff;
+  background: var(--bg-card);
   border-radius: 8px;
   padding: 4px 8px;
 }
@@ -241,7 +241,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  background: #ffffff;
+  background: var(--bg-card);
   z-index: 10;
 }
 .cart-total {
@@ -407,7 +407,7 @@
 
 .order-confirm-modal-v4 {
   position: relative;
-  background: white;
+  background: var(--bg-card);
   width: 100%;
   max-width: 400px;
   border-radius: 28px;
@@ -499,7 +499,7 @@
   padding: 14px;
   border-radius: 14px;
   border: 1px solid #e2e8f0;
-  background: white;
+  background: var(--bg-card);
   color: #64748b;
   font-weight: 700;
   cursor: pointer;
@@ -571,7 +571,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #ffffff;
+  background: var(--bg-card);
   padding: 10px 14px;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
@@ -739,7 +739,7 @@
   padding: 14px 16px;
   border-radius: 16px;
   border: 1.5px solid #e2e8f0;
-  background: #ffffff;
+  background: var(--bg-card);
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   text-align: left;
@@ -830,7 +830,7 @@
 .gokwik-modal-card {
   width: 100%;
   max-width: 440px;
-  background: #ffffff;
+  background: var(--bg-card);
   border-radius: 24px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
   overflow: hidden;
@@ -970,7 +970,7 @@
   border-radius: 12px;
   padding: 0 16px;
   height: 52px;
-  background: #ffffff;
+  background: var(--bg-card);
   transition: border-color 0.2s;
   margin-bottom: 18px;
 }
@@ -1143,4 +1143,5 @@
   from { transform: translateY(40px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
+
 

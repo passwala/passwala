@@ -212,9 +212,9 @@ const GoogleMapWrapper = ({
 
   if (keyMissing) {
     return (
-      <div style={{ ...style, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', borderRadius: 12, flexDirection: 'column', gap: 8 }}>
+      <div style={{ ...style, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-surface)', borderRadius: 12, flexDirection: 'column', gap: 8 }}>
         <span style={{ fontSize: 28 }}>🗺️</span>
-        <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>Map preview unavailable</span>
+        <span style={{ color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600 }}>Map preview unavailable</span>
         <span style={{ color: '#94a3b8', fontSize: 11 }}>Add VITE_GOOGLE_MAPS_API_KEY to .env</span>
       </div>
     );
@@ -222,7 +222,7 @@ const GoogleMapWrapper = ({
 
   if (!isLoaded) {
     return (
-      <div style={{ ...style, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', color: '#64748b' }}>
+      <div style={{ ...style, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-surface)', color: 'var(--text-secondary)' }}>
         <div className="flex flex-col items-center gap-2">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#ff6b00]"></div>
           <span className="text-sm font-semibold">Loading map...</span>
@@ -235,3 +235,4 @@ const GoogleMapWrapper = ({
 };
 
 export default GoogleMapWrapper;
+

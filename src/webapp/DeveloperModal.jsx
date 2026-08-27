@@ -526,7 +526,7 @@ export default function DeveloperModal({ isOpen, onClose, user }) {
                   {apiResponse ? (
                     <pre style={{ margin: 0 }}>{JSON.stringify(apiResponse, null, 2)}</pre>
                   ) : (
-                    <span style={{ color: '#64748b' }}>No request sent yet. Click 'Send' to dispatch.</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>No request sent yet. Click 'Send' to dispatch.</span>
                   )}
                 </div>
               </div>
@@ -592,7 +592,7 @@ export default function DeveloperModal({ isOpen, onClose, user }) {
                 minHeight: '300px'
               }}>
                 {dbLoading ? (
-                  <span style={{ color: '#64748b' }}>Loading table records...</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Loading table records...</span>
                 ) : (
                   <pre style={{ margin: 0 }}>{JSON.stringify(dbData, null, 2)}</pre>
                 )}
@@ -735,7 +735,7 @@ export default function DeveloperModal({ isOpen, onClose, user }) {
                   gap: '4px'
                 }}>
                   {mockLog.length === 0 ? (
-                    <span style={{ color: '#64748b' }}>No logs yet. Trigger a simulation to see logs.</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>No logs yet. Trigger a simulation to see logs.</span>
                   ) : (
                     mockLog.map((log, idx) => <span key={idx}>{log}</span>)
                   )}
@@ -749,3 +749,4 @@ export default function DeveloperModal({ isOpen, onClose, user }) {
     </div>
   );
 }
+

@@ -75,11 +75,11 @@
   cursor: pointer;
   transition: all 0.2s;
 }
-.vd-img-dot.active { background: #fff; width: 18px; border-radius: 99px; }
+.vd-img-dot.active { background: var(--bg-card); width: 18px; border-radius: 99px; }
 
 /* ── Info Card ──────────────────────────────────────── */
 .vd-info-card {
-  background: #fff;
+  background: var(--bg-card);
   margin: -24px auto 0;
   max-width: 1168px;
   width: calc(100% - 32px);
@@ -134,7 +134,7 @@
   margin: 20px auto 0;
   max-width: 1168px;
   width: calc(100% - 32px);
-  background: #fff;
+  background: var(--bg-card);
   border-radius: 20px;
   padding: 20px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.04);
@@ -251,7 +251,7 @@
   bottom: 24px;
   margin: 24px auto 0;
   width: calc(100% - 32px); max-width: 480px;
-  background: #ffffff;
+  background: var(--bg-card);
   border-radius: 20px;
   padding: 16px 20px;
   display: flex; align-items: center; justify-content: space-between;
@@ -275,3 +275,4 @@
   box-shadow: 0 4px 16px rgba(249,115,22,0.4);
 }
 .vd-book-bar-btn:active { transform: scale(0.97); }
+

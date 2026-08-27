@@ -178,11 +178,11 @@ const ActivityFeed = ({ onLogout }) => {
     };
   }, [fetchRecent]);
 
-  if (loading) return <div style={{ padding: '1rem', color: '#64748b' }}>Syncing feed...</div>;
+  if (loading) return <div style={{ padding: '1rem', color: 'var(--text-secondary)' }}>Syncing feed...</div>;
 
   return (
     <div className="activity-list">
-      {recent.length === 0 ? <p style={{ padding: '1rem', color: '#64748b' }}>No recent activity.</p> :
+      {recent.length === 0 ? <p style={{ padding: '1rem', color: 'var(--text-secondary)' }}>No recent activity.</p> :
         recent.map(b => (
           <div className="trend-item" key={b.id} style={{ borderLeft: '3px solid #6366f1', paddingLeft: '10px', marginBottom: '8px' }}>
             <strong>New Order:</strong> <span>#{b.id.substring(0, 6)} (₹{b.total_amount || 0})</span>
@@ -435,14 +435,14 @@ const EventApprovalsPanel = ({ API_URL }) => {
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
         <div>
           <h1 className="admin-hero-title" style={{ marginBottom: '0.25rem' }}>Event Approvals</h1>
-          <p style={{ color: '#64748b', margin: 0 }}>
+          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
             Review and approve events before they go live to buyers.
           </p>
         </div>
         <span style={{ marginLeft: 'auto', background: '#ff6b00', color: '#fff', borderRadius: '20px', padding: '4px 14px', fontWeight: 700, fontSize: '0.85rem' }}>
           {events.length} Pending
         </span>
-        <button onClick={fetchPending} style={{ background: '#f1f5f9', border: 'none', borderRadius: '10px', padding: '8px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>
+        <button onClick={fetchPending} style={{ background: 'var(--bg-surface)', border: 'none', borderRadius: '10px', padding: '8px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>
           ↻ Refresh
         </button>
       </div>
@@ -450,10 +450,10 @@ const EventApprovalsPanel = ({ API_URL }) => {
       {loading ? (
         <div style={{ textAlign: 'center', padding: '4rem', color: '#94a3b8' }}>Loading pending events...</div>
       ) : events.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '4rem 2rem', background: '#f8fafc', borderRadius: '20px', border: '2px dashed #e2e8f0' }}>
+        <div style={{ textAlign: 'center', padding: '4rem 2rem', background: 'var(--bg-surface)', borderRadius: '20px', border: '2px dashed #e2e8f0' }}>
           <ShieldCheck size={48} color="#22c55e" style={{ marginBottom: '1rem' }} />
           <h3 style={{ color: '#166534', margin: '0 0 0.5rem' }}>All Clear!</h3>
-          <p style={{ color: '#64748b', margin: 0 }}>No events are pending approval right now.</p>
+          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>No events are pending approval right now.</p>
         </div>
       ) : (
         <div style={{ display: 'grid', gap: '1.5rem' }}>
@@ -462,7 +462,7 @@ const EventApprovalsPanel = ({ API_URL }) => {
               ? Math.min(...event.event_ticket_tiers.map(t => t.price))
               : 0;
             return (
-              <div key={event.id} style={{ background: '#fff', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.07)', border: '1px solid #e2e8f0', display: 'flex', gap: 0 }}>
+              <div key={event.id} style={{ background: 'var(--bg-card)', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.07)', border: '1px solid #e2e8f0', display: 'flex', gap: 0 }}>
                 {/* Banner */}
                 <div style={{ width: '200px', minWidth: '200px', height: '160px', background: '#1e293b', flexShrink: 0, position: 'relative' }}>
                   {event.banner_url && (() => {
@@ -487,7 +487,7 @@ const EventApprovalsPanel = ({ API_URL }) => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                       <h3 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{event.title}</h3>
-                      <span style={{ background: '#f1f5f9', color: '#475569', borderRadius: '8px', padding: '2px 10px', fontSize: '0.75rem', fontWeight: 600 }}>{event.category}</span>
+                      <span style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '2px 10px', fontSize: '0.75rem', fontWeight: 600 }}>{event.category}</span>
                       <span style={{ 
                         background: (event.show_type === 'festival' || event.show_type === 'tour') ? 'linear-gradient(135deg,#db2777,#ec4899)'
                           : event.show_type === 'multiple' ? 'linear-gradient(135deg,#7c3aed,#4f46e5)'
@@ -504,23 +504,23 @@ const EventApprovalsPanel = ({ API_URL }) => {
                     <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#ff6b00' }}>from ₹{minPrice}</span>
                   </div>
 
-                  <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0', lineHeight: 1.5 }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0.25rem 0', lineHeight: 1.5 }}>
                     {event.description?.slice(0, 120)}{event.description?.length > 120 ? '...' : ''}
                   </p>
 
                   {event.showsList && event.showsList.length > 1 ? (
-                    <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '10px 14px', margin: '4px 0', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>📅 Scheduled Slots ({event.showsList.length}):</span>
+                    <div style={{ background: 'var(--bg-surface)', borderRadius: '12px', padding: '10px 14px', margin: '4px 0', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>📅 Scheduled Slots ({event.showsList.length}):</span>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                         {event.showsList.map((slot, idx) => (
-                          <div key={slot.id || idx} style={{ fontSize: '0.72rem', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '4px 8px', color: '#1e293b' }}>
+                          <div key={slot.id || idx} style={{ fontSize: '0.72rem', background: 'var(--bg-card)', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '4px 8px', color: 'var(--text-primary)' }}>
                             <strong>Slot {idx + 1}:</strong> {formatDate(slot.event_date)} at 📍 {slot.venue_name || 'Venue'}
                           </div>
                         ))}
                       </div>
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
+                    <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                       <span>📅 {formatDate(event.event_date)}</span>
                       <span>📍 {event.venue_name}</span>
                       <span>🎟 {event.event_ticket_tiers?.length || 0} tier(s)</span>
@@ -622,14 +622,14 @@ const UpgradeRequestsPanel = ({ API_URL }) => {
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
         <div>
           <h1 className="admin-hero-title" style={{ marginBottom: '0.25rem' }}>Upgrade Requests</h1>
-          <p style={{ color: '#64748b', margin: 0 }}>
+          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
             Approve shop vendors requesting to unlock Event Organizer privileges.
           </p>
         </div>
         <span style={{ marginLeft: 'auto', background: '#ff6b00', color: '#fff', borderRadius: '20px', padding: '4px 14px', fontWeight: 700, fontSize: '0.85rem' }}>
           {pendingCount} Pending
         </span>
-        <button onClick={fetchRequests} style={{ background: '#f1f5f9', border: 'none', borderRadius: '10px', padding: '8px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>
+        <button onClick={fetchRequests} style={{ background: 'var(--bg-surface)', border: 'none', borderRadius: '10px', padding: '8px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>
           ↻ Refresh
         </button>
       </div>
@@ -637,20 +637,20 @@ const UpgradeRequestsPanel = ({ API_URL }) => {
       {loading ? (
         <div style={{ textAlign: 'center', padding: '4rem', color: '#94a3b8' }}>Loading requests...</div>
       ) : requests.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '4rem 2rem', background: '#f8fafc', borderRadius: '20px', border: '2px dashed #e2e8f0' }}>
+        <div style={{ textAlign: 'center', padding: '4rem 2rem', background: 'var(--bg-surface)', borderRadius: '20px', border: '2px dashed #e2e8f0' }}>
           <ShieldCheck size={48} color="#22c55e" style={{ marginBottom: '1rem' }} />
           <h3 style={{ color: '#166534', margin: '0 0 0.5rem' }}>All Clear!</h3>
-          <p style={{ color: '#64748b', margin: 0 }}>No upgrade requests found in the system.</p>
+          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>No upgrade requests found in the system.</p>
         </div>
       ) : (
         <div style={{ display: 'grid', gap: '1.5rem' }}>
           {requests.map(req => (
-            <div key={req.id} style={{ background: '#fff', borderRadius: '20px', padding: '1.5rem', boxShadow: '0 2px 12px rgba(0,0,0,0.07)', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div key={req.id} style={{ background: 'var(--bg-card)', borderRadius: '20px', padding: '1.5rem', boxShadow: '0 2px 12px rgba(0,0,0,0.07)', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                   <h3 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{req.business_name}</h3>
-                  <p style={{ color: '#64748b', fontSize: '0.85rem', margin: 0 }}>
-                    Vendor User ID: <span style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>{req.user_id}</span>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
+                    Vendor User ID: <span style={{ fontFamily: 'monospace', background: 'var(--bg-surface)', padding: '2px 6px', borderRadius: '4px' }}>{req.user_id}</span>
                   </p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
@@ -666,31 +666,31 @@ const UpgradeRequestsPanel = ({ API_URL }) => {
                   }}>
                     {req.request_status}
                   </span>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                     Payment: <span style={{ fontWeight: 700, color: req.payment_status === 'PAID' ? '#22c55e' : '#f59e0b' }}>{req.payment_status}</span> (₹{req.payment_amount})
                   </div>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', background: '#f8fafc', padding: '1rem', borderRadius: '12px', fontSize: '0.85rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', background: 'var(--bg-surface)', padding: '1rem', borderRadius: '12px', fontSize: '0.85rem' }}>
                 <div>
-                  <span style={{ color: '#64748b', display: 'block' }}>Requested Console</span>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Requested Console</span>
                   <strong style={{ color: '#ff6b00', textTransform: 'uppercase' }}>{req.target_console || 'event'}</strong>
                 </div>
                 <div>
-                  <span style={{ color: '#64748b', display: 'block' }}>Aadhaar Card No.</span>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Aadhaar Card No.</span>
                   <strong style={{ color: '#0f172a' }}>{req.aadhar_no || '—'}</strong>
                 </div>
                 <div>
-                  <span style={{ color: '#64748b', display: 'block' }}>Phone Contact</span>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Phone Contact</span>
                   <strong style={{ color: '#0f172a' }}>{req.phone || '—'}</strong>
                 </div>
                 <div>
-                  <span style={{ color: '#64748b', display: 'block' }}>Payment ID</span>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Payment ID</span>
                   <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>{req.payment_id || '—'}</strong>
                 </div>
                 <div>
-                  <span style={{ color: '#64748b', display: 'block' }}>Submitted At</span>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Submitted At</span>
                   <strong style={{ color: '#0f172a' }}>{formatDate(req.created_at)}</strong>
                 </div>
               </div>
@@ -775,21 +775,21 @@ const PromoCodesPanel = ({ supabase: sb }) => {
     else toast.error('Delete failed');
   };
 
-  const inputStyle = { width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.85rem', outline: 'none', background: '#f8fafc', boxSizing: 'border-box' };
-  const labelStyle = { fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '4px', display: 'block' };
+  const inputStyle = { width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.85rem', outline: 'none', background: 'var(--bg-surface)', boxSizing: 'border-box' };
+  const labelStyle = { fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' };
 
   return (
     <div style={{ padding: '0 0 4rem 0' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
         <div>
           <h1 className="admin-hero-title" style={{ marginBottom: '0.25rem' }}>Promo Codes</h1>
-          <p style={{ color: '#64748b', margin: 0 }}>Create and manage discount codes for buyers at checkout.</p>
+          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Create and manage discount codes for buyers at checkout.</p>
         </div>
         <span style={{ marginLeft: 'auto', background: '#ff6b00', color: '#fff', borderRadius: '20px', padding: '4px 14px', fontWeight: 700, fontSize: '0.85rem' }}>{codes.filter(c => c.is_active).length} Active</span>
       </div>
 
       {/* CREATE FORM */}
-      <form onSubmit={handleCreate} style={{ background: 'white', borderRadius: '20px', padding: '1.5rem', boxShadow: '0 2px 12px rgba(0,0,0,0.07)', border: '1px solid #e2e8f0', marginBottom: '2rem' }}>
+      <form onSubmit={handleCreate} style={{ background: 'var(--bg-card)', borderRadius: '20px', padding: '1.5rem', boxShadow: '0 2px 12px rgba(0,0,0,0.07)', border: '1px solid #e2e8f0', marginBottom: '2rem' }}>
         <h3 style={{ margin: '0 0 1.25rem', fontWeight: 800, fontSize: '1rem', color: '#0f172a' }}>➕ Create New Code</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
           <div>
@@ -833,17 +833,17 @@ const PromoCodesPanel = ({ supabase: sb }) => {
 
       {/* CODES TABLE */}
       {loading ? <div style={{ textAlign: 'center', padding: '4rem', color: '#94a3b8' }}>Loading codes...</div> : codes.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '4rem 2rem', background: '#f8fafc', borderRadius: '20px', border: '2px dashed #e2e8f0' }}>
+        <div style={{ textAlign: 'center', padding: '4rem 2rem', background: 'var(--bg-surface)', borderRadius: '20px', border: '2px dashed #e2e8f0' }}>
           <Tag size={48} color="#94a3b8" style={{ marginBottom: '1rem' }} />
-          <h3 style={{ color: '#64748b' }}>No promo codes yet</h3>
+          <h3 style={{ color: 'var(--text-secondary)' }}>No promo codes yet</h3>
         </div>
       ) : (
         <div style={{ display: 'grid', gap: '0.75rem' }}>
           {codes.map(c => (
-            <div key={c.id} style={{ background: 'white', borderRadius: '16px', padding: '1rem 1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+            <div key={c.id} style={{ background: 'var(--bg-card)', borderRadius: '16px', padding: '1rem 1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: '120px' }}>
                 <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '1rem', color: '#0f172a', letterSpacing: '0.05em' }}>{c.code}</span>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
                   {c.type === 'flat' ? `₹${c.value} off` : `${c.value}% off${c.max_discount ? ` (max ₹${c.max_discount})` : ''}`}
                   {c.min_order > 0 ? ` · min ₹${c.min_order}` : ''}
                   {c.max_uses ? ` · ${c.used_count}/${c.max_uses} used` : ` · ${c.used_count} used`}
@@ -854,7 +854,7 @@ const PromoCodesPanel = ({ supabase: sb }) => {
                 <span style={{ padding: '3px 12px', borderRadius: '20px', fontWeight: 700, fontSize: '0.75rem', background: c.is_active ? '#dcfce7' : '#fee2e2', color: c.is_active ? '#16a34a' : '#dc2626' }}>
                   {c.is_active ? 'ACTIVE' : 'PAUSED'}
                 </span>
-                <button onClick={() => toggleActive(c.id, c.is_active)} style={{ padding: '6px 14px', border: '1.5px solid #e2e8f0', background: 'white', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.78rem', color: '#475569' }}>
+                <button onClick={() => toggleActive(c.id, c.is_active)} style={{ padding: '6px 14px', border: '1.5px solid #e2e8f0', background: 'var(--bg-card)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                   {c.is_active ? 'Pause' : 'Activate'}
                 </button>
                 <button onClick={() => deleteCode(c.id)} style={{ padding: '6px 10px', border: 'none', background: '#fee2e2', borderRadius: '8px', cursor: 'pointer', color: '#dc2626' }}>
@@ -2547,15 +2547,15 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
           <div>
             <h1 className="admin-hero-title" style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>Live Community Locator</h1>
-            <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '4px' }}>Real-time Google Maps tracking of Users, Riders, and Merchant Partners across Ahmedabad.</p>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '4px' }}>Real-time Google Maps tracking of Users, Riders, and Merchant Partners across Ahmedabad.</p>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             <button 
               type="button"
               onClick={fetchPeopleMapData}
               style={{ 
-                background: '#f1f5f9', 
-                color: '#475569', 
+                background: 'var(--bg-surface)', 
+                color: 'var(--text-secondary)', 
                 border: 'none', 
                 padding: '12px', 
                 borderRadius: '12px', 
@@ -2575,7 +2575,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
 
         {/* Filters and Search Row */}
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-          <div style={{ flex: '1', minWidth: '280px', maxWidth: '400px', margin: 0, background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', display: 'flex', alignItems: 'center', padding: '10px 14px' }}>
+          <div style={{ flex: '1', minWidth: '280px', maxWidth: '400px', margin: 0, background: 'var(--bg-card)', border: '1px solid #e2e8f0', borderRadius: '12px', display: 'flex', alignItems: 'center', padding: '10px 14px' }}>
             <Search size={18} color="#64748b" style={{ marginRight: '8px' }} />
             <input 
               type="text" 
@@ -2635,10 +2635,10 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
         {/* Main interactive map split layout */}
         <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap-reverse' }}>
           {/* Map Column */}
-          <div style={{ flex: '1', minWidth: '320px', background: 'white', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.04)' }}>
+          <div style={{ flex: '1', minWidth: '320px', background: 'var(--bg-card)', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.04)' }}>
             <div style={{ height: '550px', width: '100%', position: 'relative' }}>
               {mapLoading ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748b' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)' }}>
                   <p style={{ fontWeight: 600 }}>Syncing map coordinates...</p>
                 </div>
               ) : (
@@ -2664,10 +2664,10 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
 
           {/* Sidebar Column */}
           <div style={{ width: '320px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '1rem', boxShadow: '0 4px 15px rgba(0,0,0,0.04)', maxHeight: '550px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ background: 'var(--bg-card)', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '1rem', boxShadow: '0 4px 15px rgba(0,0,0,0.04)', maxHeight: '550px', display: 'flex', flexDirection: 'column' }}>
               <div style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem', marginBottom: '0.75rem' }}>
                 <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>Active Members ({filteredPeople.length})</h3>
-                <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b' }}>Click target to track position on Map.</p>
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Click target to track position on Map.</p>
               </div>
 
               <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
@@ -2697,7 +2697,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                       </div>
                       <div>
                         <h4 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>{person.name.replace(' (Simulated)', '')}</h4>
-                        <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b' }}>{person.role} • {person.status}</p>
+                        <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{person.role} • {person.status}</p>
                       </div>
                     </div>
                     <button type="button" style={{ background: 'none', border: 'none', color: '#ff7622', cursor: 'pointer' }}>
@@ -2782,8 +2782,8 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
           <ActivityFeed onLogout={onLogout} />
         </div>
 
-        <div className="notification-preview" style={{ marginTop: '1.5rem', padding: '1rem', background: '#f8fafc', borderRadius: '12px' }}>
-          <h5 style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', marginBottom: '8px' }}>SYSTEM ALERTS</h5>
+        <div className="notification-preview" style={{ marginTop: '1.5rem', padding: '1rem', background: 'var(--bg-surface)', borderRadius: '12px' }}>
+          <h5 style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', marginBottom: '8px' }}>SYSTEM ALERTS</h5>
           <div style={{ fontSize: '0.8rem', color: '#0f172a', fontWeight: 600 }}>
             ⚠️ Server load increased by 12% in last 10 mins.
           </div>
@@ -2798,7 +2798,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h1 className="admin-hero-title" style={{ margin: 0 }}>Business Performance & Analytics</h1>
-            <p style={{ color: '#64748b', margin: 0 }}>Comprehensive performance reporting and metric evaluations.</p>
+            <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Comprehensive performance reporting and metric evaluations.</p>
           </div>
           <button 
             onClick={downloadAdminSalesReport}
@@ -2841,7 +2841,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', marginBottom: '2.5rem' }}>
-          <div className="glass" style={{ padding: '2rem', borderRadius: '24px', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.02)' }}>
+          <div className="glass" style={{ padding: '2rem', borderRadius: '24px', background: 'var(--bg-card)', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.02)' }}>
             <h4 style={{ margin: '0 0 1.5rem 0', fontWeight: 800, fontSize: '1.1rem', color: '#0f172a' }}>Weekly Revenue Trend</h4>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', height: '180px', paddingTop: '10px' }}>
               {(stats?.weeklyRevenue || [
@@ -2856,16 +2856,16 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                 const maxVal = stats?.weeklyRevenue ? Math.max(...stats.weeklyRevenue.map(d => d.val), 1) : 120;
                 return (
                 <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: '8px' }}>
-                  <div style={{ position: 'relative', width: '28px', height: '120px', background: '#f1f5f9', borderRadius: '8px', overflow: 'hidden' }}>
+                  <div style={{ position: 'relative', width: '28px', height: '120px', background: 'var(--bg-surface)', borderRadius: '8px', overflow: 'hidden' }}>
                     <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${(item.val / maxVal) * 100}%`, background: 'linear-gradient(to top, #6366f1, #818cf8)', borderRadius: '8px', transition: 'height 1s ease' }}></div>
                   </div>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>{item.label}</span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>{item.label}</span>
                 </div>
               )})}
             </div>
           </div>
 
-          <div className="glass" style={{ padding: '2rem', borderRadius: '24px', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.02)' }}>
+          <div className="glass" style={{ padding: '2rem', borderRadius: '24px', background: 'var(--bg-card)', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.02)' }}>
             <h4 style={{ margin: '0 0 1.5rem 0', fontWeight: 800, fontSize: '1.1rem', color: '#0f172a' }}>Sales by Category</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', justifyContent: 'center', height: '180px' }}>
               {(stats?.salesByCategory || [
@@ -2874,11 +2874,11 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                 { name: 'Food Delivery', percent: 0, color: '#f59e0b' }
               ]).map((cat, idx) => (
                 <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                     <span>{cat.name}</span>
                     <span>{cat.percent}%</span>
                   </div>
-                  <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ height: '8px', background: 'var(--bg-surface)', borderRadius: '4px', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${cat.percent}%`, background: cat.color, borderRadius: '4px' }}></div>
                   </div>
                 </div>
@@ -2929,16 +2929,16 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
     return (
       <div className="settings-container animate-fade-in" style={{ padding: '1rem 0' }}>
         <h1 className="admin-hero-title">Platform Preferences</h1>
-        <p style={{ color: '#64748b', marginBottom: '2rem' }}>Configure global settings, thresholds, and developer preferences.</p>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Configure global settings, thresholds, and developer preferences.</p>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem' }}>
-          <div className="glass" style={{ padding: '2rem', borderRadius: '24px', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.02)' }}>
+          <div className="glass" style={{ padding: '2rem', borderRadius: '24px', background: 'var(--bg-card)', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.02)' }}>
             <h4 style={{ margin: '0 0 1.5rem 0', fontWeight: 800, fontSize: '1.1rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Settings size={20} color="#6366f1" /> General Settings
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>PLATFORM NAME</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)' }}>PLATFORM NAME</label>
                 <input
                   type="text"
                   value={platformSettings.appName}
@@ -2947,7 +2947,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>SUPPORT EMAIL</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)' }}>SUPPORT EMAIL</label>
                 <input
                   type="email"
                   value={platformSettings.supportEmail}
@@ -2957,8 +2957,8 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0' }}>
                 <div>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>Maintenance Mode</span>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b' }}>Restrict user portal access during updates</p>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>Maintenance Mode</span>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Restrict user portal access during updates</p>
                 </div>
                 <input
                   type="checkbox"
@@ -2970,13 +2970,13 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
             </div>
           </div>
 
-          <div className="glass" style={{ padding: '2rem', borderRadius: '24px', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.02)' }}>
+          <div className="glass" style={{ padding: '2rem', borderRadius: '24px', background: 'var(--bg-card)', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.02)' }}>
             <h4 style={{ margin: '0 0 1.5rem 0', fontWeight: 800, fontSize: '1.1rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <MapPin size={20} color="#f97316" /> Logistics & Fees
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>MAX DELIVERY RANGE (KM)</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)' }}>MAX DELIVERY RANGE (KM)</label>
                 <input
                   type="number"
                   value={platformSettings.maxDeliveryRange}
@@ -2985,7 +2985,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>BASE DELIVERY FEE (₹)</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)' }}>BASE DELIVERY FEE (₹)</label>
                 <input
                   type="number"
                   value={platformSettings.baseDeliveryFee}
@@ -2994,7 +2994,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>FREE DELIVERY THRESHOLD (₹)</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)' }}>FREE DELIVERY THRESHOLD (₹)</label>
                 <input
                   type="number"
                   value={platformSettings.freeDeliveryThreshold}
@@ -3003,7 +3003,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>RIDE PRICE PER KM (₹)</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)' }}>RIDE PRICE PER KM (₹)</label>
                 <input
                   type="number"
                   value={platformSettings.ridePricePerKm !== undefined ? platformSettings.ridePricePerKm : 8}
@@ -3012,7 +3012,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>SHORT RIDE PRICE — 1–2 KM (₹)</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)' }}>SHORT RIDE PRICE — 1–2 KM (₹)</label>
                 <input
                   type="number"
                   min={0}
@@ -3051,7 +3051,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                     step={1}
                     value={platformSettings.eventPlatformFee ?? 5}
                     onChange={e => setPlatformSettings({ ...platformSettings, eventPlatformFee: parseInt(e.target.value) || 0 })}
-                    style={{ padding: '12px 18px', borderRadius: '12px', border: '2px solid #fb923c', outline: 'none', fontSize: '1.3rem', fontWeight: 900, color: '#c2410c', background: 'white', width: '120px' }}
+                    style={{ padding: '12px 18px', borderRadius: '12px', border: '2px solid #fb923c', outline: 'none', fontSize: '1.3rem', fontWeight: 900, color: '#c2410c', background: 'var(--bg-card)', width: '120px' }}
                   />
                   <div style={{ fontSize: '0.82rem', color: '#9a3412', lineHeight: 1.5 }}>
                     <div>📌 Currently: <strong>₹{platformSettings.eventPlatformFee ?? 5} per ticket</strong></div>
@@ -3063,11 +3063,11 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
           </div>
 
           {/* Account Upgrades */}
-          <div className="glass" style={{ padding: '2rem', borderRadius: '24px', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.02)', gridColumn: '1 / -1' }}>
+          <div className="glass" style={{ padding: '2rem', borderRadius: '24px', background: 'var(--bg-card)', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.02)', gridColumn: '1 / -1' }}>
             <h4 style={{ margin: '0 0 0.5rem 0', fontWeight: 800, fontSize: '1.1rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <UserPlus size={20} color="#8b5cf6" /> Console Upgrade Fees
             </h4>
-            <p style={{ margin: '0 0 1.5rem', fontSize: '0.82rem', color: '#64748b' }}>
+            <p style={{ margin: '0 0 1.5rem', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
               Set the one-time fee charged to a vendor when they request each additional console type. Each console type has its own independent fee.
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
@@ -3081,7 +3081,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                   type="number" min={0}
                   value={platformSettings.upgradeEventFee ?? 999}
                   onChange={e => setPlatformSettings({ ...platformSettings, upgradeEventFee: parseInt(e.target.value) || 0 })}
-                  style={{ padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #fed7aa', outline: 'none', fontSize: '1rem', fontWeight: 700, color: '#0f172a', background: 'white' }}
+                  style={{ padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #fed7aa', outline: 'none', fontSize: '1rem', fontWeight: 700, color: '#0f172a', background: 'var(--bg-card)' }}
                 />
                 <span style={{ fontSize: '0.7rem', color: '#9a3412', fontWeight: 600 }}>Charged when requesting Event Console</span>
               </div>
@@ -3095,7 +3095,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                   type="number" min={0}
                   value={platformSettings.upgradeServiceFee ?? 999}
                   onChange={e => setPlatformSettings({ ...platformSettings, upgradeServiceFee: parseInt(e.target.value) || 0 })}
-                  style={{ padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #c7d2fe', outline: 'none', fontSize: '1rem', fontWeight: 700, color: '#0f172a', background: 'white' }}
+                  style={{ padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #c7d2fe', outline: 'none', fontSize: '1rem', fontWeight: 700, color: '#0f172a', background: 'var(--bg-card)' }}
                 />
                 <span style={{ fontSize: '0.7rem', color: '#3730a3', fontWeight: 600 }}>Charged when requesting Profession Console</span>
               </div>
@@ -3111,7 +3111,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                   type="number" min={0}
                   value={platformSettings.upgradeShopFee ?? 999}
                   onChange={e => setPlatformSettings({ ...platformSettings, upgradeShopFee: parseInt(e.target.value) || 0 })}
-                  style={{ padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #bbf7d0', outline: 'none', fontSize: '1rem', fontWeight: 700, color: '#0f172a', background: 'white' }}
+                  style={{ padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #bbf7d0', outline: 'none', fontSize: '1rem', fontWeight: 700, color: '#0f172a', background: 'var(--bg-card)' }}
                 />
                 <span style={{ fontSize: '0.7rem', color: '#166534', fontWeight: 600 }}>Charged when requesting Store Console</span>
               </div>
@@ -3120,14 +3120,14 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
           </div>
 
 
-          <div className="glass" style={{ padding: '2rem', borderRadius: '24px', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.02)', gridColumn: '1 / -1' }}>
+          <div className="glass" style={{ padding: '2rem', borderRadius: '24px', background: 'var(--bg-card)', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.02)', gridColumn: '1 / -1' }}>
             <h4 style={{ margin: '0 0 1.5rem 0', fontWeight: 800, fontSize: '1.1rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <ShieldCheck size={20} color="#10b981" /> System Controls & Maintenance
             </h4>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>Local Application Cache</span>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748b', maxWidth: '500px' }}>
+                <span style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>Local Application Cache</span>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)', maxWidth: '500px' }}>
                   If you are experiencing state desynchronization or offline lag, you can purge the admin dashboard cache and force a complete server-side pull.
                 </p>
               </div>
@@ -3140,7 +3140,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
                 </button>
                 <button
                   onClick={handleClearCache}
-                  style={{ background: '#f1f5f9', color: '#475569', border: 'none', padding: '14px 28px', borderRadius: '14px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
+                  style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)', border: 'none', padding: '14px 28px', borderRadius: '14px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
                 >
                   Clear Admin Cache
                 </button>
@@ -3248,7 +3248,7 @@ const AdminPanel = ({ onLogout, location, setLocation }) => {
               {activeAdminTab === 'dashboard_panel' ? (
                 <>
                   <h1 className="admin-hero-title">Platform Intelligence</h1>
-                  <p style={{ color: '#64748b', marginBottom: '2rem' }}>Overview of your entire business ecosystem.</p>
+                  <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Overview of your entire business ecosystem.</p>
                   {renderDashboard()}
                 </>
               ) : activeAdminTab === 'people_map_panel' ? (
@@ -3294,7 +3294,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
                   <div className="table-header-row">
                     <div>
                       <h2 className="table-title">{currentTab.label}</h2>
-                      <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Manage and monitor entries in real-time.</p>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Manage and monitor entries in real-time.</p>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <span className="count-chip">{getFilteredDataLength()} Total Records</span>
@@ -3691,7 +3691,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
                         
                         <div className="schedule-slots-list" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                           {(formData.schedule_slots || []).map((slot, index) => (
-                            <div key={slot.id || index} style={{ border: '1px solid #e2e8f0', borderRadius: '16px', padding: '1rem', background: '#f8fafc', position: 'relative' }}>
+                            <div key={slot.id || index} style={{ border: '1px solid #e2e8f0', borderRadius: '16px', padding: '1rem', background: 'var(--bg-surface)', position: 'relative' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', fontWeight: 'bold', fontSize: '0.85rem', color: '#ff6b00' }}>
                                 <span>Show #{index + 1}</span>
                                 {formData.schedule_slots.length > 1 && (
@@ -3833,14 +3833,14 @@ CREATE TABLE IF NOT EXISTS service_areas (
                                 <div className="form-field">
                                   <label>Quantity *</label>
                                   {(formData.schedule_slots && formData.schedule_slots.length > 1) ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
-                                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Seats per Show Date</span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--bg-surface)', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
+                                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Seats per Show Date</span>
                                       {(formData.schedule_slots || []).map((slot, sIdx) => {
                                         const dateStr = slot.date ? new Date(slot.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : `Show #${sIdx + 1}`;
                                         const slotCap = tier.slot_capacities?.[slot.id] !== undefined ? tier.slot_capacities[slot.id] : (tier.total_seats || '100');
                                         return (
                                           <div key={slot.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                                            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>{dateStr}:</span>
+                                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{dateStr}:</span>
                                             <input
                                               type="number"
                                               className="v-input"
@@ -3941,7 +3941,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
                           {bannerUrls.map((url, idx) => (
                             <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                               <div style={{ flex: 1 }}>
-                                <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>Image URL #{idx + 1}</label>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Image URL #{idx + 1}</label>
                                 <input 
                                   type="text" 
                                   placeholder="https://example.com/image.jpg" 
@@ -3964,7 +3964,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
                           <button 
                             type="button" 
                             onClick={handleAddBannerUrl}
-                            style={{ padding: '10px 16px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', width: 'fit-content' }}
+                            style={{ padding: '10px 16px', background: 'var(--bg-surface)', color: 'var(--text-secondary)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', width: 'fit-content' }}
                           >
                             + Add Another Image URL
                           </button>
@@ -4065,7 +4065,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
                             <strong>📅 Scheduled Shows ({(formData.schedule_slots || []).length})</strong>
                             <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.5rem' }}>
                               {(formData.schedule_slots || []).map((s, idx) => (
-                                <div key={s.id || idx} style={{ padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between' }}>
+                                <div key={s.id || idx} style={{ padding: '8px 12px', background: 'var(--bg-surface)', borderRadius: '8px', fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between' }}>
                                   <span>Show #{idx + 1}: {s.date} ({s.starts} - {s.ends})</span>
                                   <strong>📍 {s.venue_name}</strong>
                                 </div>
@@ -4306,7 +4306,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
                         </div>
                         <div className="schedule-slots-list" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                           {(formData.schedule_slots || []).map((slot, index) => (
-                            <div key={slot.id || index} style={{ border: '1px solid #e2e8f0', borderRadius: '16px', padding: '1rem', background: '#f8fafc' }}>
+                            <div key={slot.id || index} style={{ border: '1px solid #e2e8f0', borderRadius: '16px', padding: '1rem', background: 'var(--bg-surface)' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', fontWeight: 'bold', fontSize: '0.85rem', color: '#ff6b00' }}>
                                 <span>Stop #{index + 1}</span>
                                 {formData.schedule_slots.length > 1 && (
@@ -4519,7 +4519,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
                           {bannerUrls.map((url, idx) => (
                             <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                               <div style={{ flex: 1 }}>
-                                <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>Image URL #{idx + 1}</label>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Image URL #{idx + 1}</label>
                                 <input 
                                   type="text" 
                                   placeholder="https://example.com/image.jpg" 
@@ -4542,7 +4542,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
                           <button 
                             type="button" 
                             onClick={handleAddBannerUrl}
-                            style={{ padding: '10px 16px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', width: 'fit-content' }}
+                            style={{ padding: '10px 16px', background: 'var(--bg-surface)', color: 'var(--text-secondary)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', width: 'fit-content' }}
                           >
                             + Add Another Image URL
                           </button>
@@ -4633,7 +4633,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
                             <strong>📅 Tour Stops / Venues ({(formData.schedule_slots || []).length})</strong>
                             <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.5rem' }}>
                               {(formData.schedule_slots || []).map((s, idx) => (
-                                <div key={s.id || idx} style={{ padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between' }}>
+                                <div key={s.id || idx} style={{ padding: '8px 12px', background: 'var(--bg-surface)', borderRadius: '8px', fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between' }}>
                                   <span>Stop #{idx + 1}: {s.venue_name}</span>
                                   <strong>📍 {s.date} ({s.starts} - {s.ends})</strong>
                                 </div>
@@ -5097,7 +5097,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
                           {bannerUrls.map((url, idx) => (
                             <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                               <div style={{ flex: 1 }}>
-                                <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>Image URL #{idx + 1}</label>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Image URL #{idx + 1}</label>
                                 <input 
                                   type="text" 
                                   placeholder="https://example.com/image.jpg" 
@@ -5120,7 +5120,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
                           <button 
                             type="button" 
                             onClick={handleAddBannerUrl}
-                            style={{ padding: '10px 16px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', width: 'fit-content' }}
+                            style={{ padding: '10px 16px', background: 'var(--bg-surface)', color: 'var(--text-secondary)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', width: 'fit-content' }}
                           >
                             + Add Another Image URL
                           </button>
@@ -5358,7 +5358,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
                         type="button" 
                         className="event-type-back-btn" 
                         onClick={() => setEventWizardStep(1)}
-                        style={{ flex: 1, padding: '14px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontWeight: 'bold', cursor: 'pointer', color: '#64748b' }}
+                        style={{ flex: 1, padding: '14px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: 'var(--bg-surface)', fontWeight: 'bold', cursor: 'pointer', color: 'var(--text-secondary)' }}
                       >
                         Back
                       </button>
@@ -5517,7 +5517,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
             <div className="modal-header" style={{ borderBottom: 'none', paddingBottom: 0 }}>
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Trash2 color="#ef4444" size={24} /> Confirm Deletion</h3>
             </div>
-            <div style={{ padding: '1.5rem', color: '#64748b', fontSize: '0.9rem', lineHeight: '1.5' }}>
+            <div style={{ padding: '1.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5' }}>
               Are you sure you want to permanently delete this {currentTab.label.replace(/s$/, '')}? <br /><br />
               <strong style={{ color: '#0f172a' }}>This action cannot be undone.</strong>
             </div>
@@ -5525,7 +5525,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
               <button
                 type="button"
                 onClick={() => setDeleteConfirmId(null)}
-                style={{ padding: '10px 16px', borderRadius: '8px', fontWeight: 600, color: '#475569', background: '#f1f5f9', border: 'none', cursor: 'pointer' }}>
+                style={{ padding: '10px 16px', borderRadius: '8px', fontWeight: 600, color: 'var(--text-secondary)', background: 'var(--bg-surface)', border: 'none', cursor: 'pointer' }}>
                 Cancel
               </button>
               <button
@@ -5546,7 +5546,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
             <div className="modal-header" style={{ borderBottom: 'none', paddingBottom: 0 }}>
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Trash2 color="#ef4444" size={24} /> Confirm Deep Purge</h3>
             </div>
-            <div style={{ padding: '1.5rem', color: '#64748b', fontSize: '0.9rem', lineHeight: '1.5' }}>
+            <div style={{ padding: '1.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5' }}>
               This will:<br /><br />
               • <strong style={{ color: '#ef4444' }}>Permanently delete</strong> all REJECTED events (and their bookings/tiers).<br />
               • <strong style={{ color: '#22c55e' }}>Restore</strong> any events stuck in PENDING_APPROVAL back to UPCOMING so buyers can see them.<br /><br />
@@ -5556,7 +5556,7 @@ CREATE TABLE IF NOT EXISTS service_areas (
               <button
                 type="button"
                 onClick={() => setShowPurgeConfirm(false)}
-                style={{ padding: '10px 16px', borderRadius: '8px', fontWeight: 600, color: '#475569', background: '#f1f5f9', border: 'none', cursor: 'pointer' }}>
+                style={{ padding: '10px 16px', borderRadius: '8px', fontWeight: 600, color: 'var(--text-secondary)', background: 'var(--bg-surface)', border: 'none', cursor: 'pointer' }}>
                 Cancel
               </button>
               <button
@@ -5574,3 +5574,4 @@ CREATE TABLE IF NOT EXISTS service_areas (
 };
 
 export default AdminPanel;
+

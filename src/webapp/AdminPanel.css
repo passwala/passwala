@@ -50,7 +50,7 @@
 .admin-logo-box {
   width: 44px;
   height: 44px;
-  background: white;
+  background: var(--bg-card);
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -225,7 +225,7 @@
 
 .mobile-menu-toggle {
   display: none;
-  background: white;
+  background: var(--bg-card);
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 6px;
@@ -362,7 +362,7 @@
 }
 
 .stat-card {
-  background: white;
+  background: var(--bg-card);
   padding: 1.5rem;
   border-radius: 12px;
   box-shadow: var(--card-shadow);
@@ -404,7 +404,7 @@
 
 /* Activity Feed */
 .recent-activity {
-  background: white;
+  background: var(--bg-card);
   border-radius: 12px;
   padding: 1.5rem;
   box-shadow: var(--card-shadow);
@@ -467,7 +467,7 @@
 }
 
 .admin-table-container {
-  background: white;
+  background: var(--bg-card);
   border-radius: 16px;
   box-shadow: var(--card-shadow);
   border: 1px solid #e2e8f0;
@@ -643,7 +643,7 @@
 }
 
 .admin-modal {
-  background: white;
+  background: var(--bg-card);
   width: 100%;
   max-width: 600px;
   border-radius: 20px;
@@ -697,7 +697,7 @@
   border: 1.5px solid #e2e8f0;
   font-size: 0.9rem;
   outline: none;
-  background: white;
+  background: var(--bg-card);
   transition: all 0.2s;
 }
 
@@ -844,7 +844,7 @@
   gap: 1rem;
 }
 .event-type-card {
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1.5px solid #e2e8f0;
   border-radius: 16px;
   padding: 1.5rem;
@@ -1001,7 +1001,7 @@
   flex-direction: column;
   gap: 1.5rem;
   padding: 0.5rem;
-  background: #ffffff;
+  background: var(--bg-card);
 }
 
 .wizard-stepper-bar {
@@ -1113,7 +1113,7 @@
 }
 
 .wizard-section-card {
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1.5px solid #e2e8f0;
   border-radius: 16px;
   padding: 1.5rem;
@@ -1205,7 +1205,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: white;
+  background: var(--bg-card);
 }
 
 .visibility-info {
@@ -1695,4 +1695,5 @@
     grid-template-columns: 1fr;
   }
 }
+
 

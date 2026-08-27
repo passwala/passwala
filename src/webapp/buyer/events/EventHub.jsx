@@ -443,7 +443,7 @@ const EventHub = () => {
                         <div style={{ marginTop: 'auto', paddingTop: '10px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             {minPrice !== null ? (
-                              <span className="eh-card-price">₹{minPrice}<span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b', marginLeft: '2px' }}>{t('onwards')}</span></span>
+                              <span className="eh-card-price">₹{minPrice}<span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)', marginLeft: '2px' }}>{t('onwards')}</span></span>
                             ) : (
                               <span className="eh-card-price" style={{ color: '#16a34a' }}>{t('free')}</span>
                             )}
@@ -521,3 +521,4 @@ const EventHub = () => {
 };
 
 export default EventHub;
+

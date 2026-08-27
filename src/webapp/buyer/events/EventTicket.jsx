@@ -320,7 +320,7 @@ const EventTicket = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-main)', paddingBottom: '2rem' }}>
       {/* Fix #5: Ticket page header (redundant back button removed, top navbar provides it) */}
-      <div style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white', position: 'relative', borderBottom: '1px solid var(--border-light)' }}>
+      <div style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-card)', position: 'relative', borderBottom: '1px solid var(--border-light)' }}>
         <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>Your Ticket</h2>
       </div>
 
@@ -361,7 +361,7 @@ const EventTicket = () => {
 
         {/* Ticket Card */}
         <div style={{
-          background: 'white', width: '100%', maxWidth: '400px',
+          background: 'var(--bg-card)', width: '100%', maxWidth: '400px',
           borderRadius: '24px', boxShadow: 'var(--shadow-lg)',
           overflow: 'hidden', position: 'relative'
         }}>
@@ -389,7 +389,7 @@ const EventTicket = () => {
           </div>
 
           {/* Info */}
-          <div style={{ padding: '1.5rem', background: 'white', borderBottom: '2px dashed var(--border-light)', position: 'relative' }}>
+          <div style={{ padding: '1.5rem', background: 'var(--bg-card)', borderBottom: '2px dashed var(--border-light)', position: 'relative' }}>
             <div style={{ position: 'absolute', bottom: '-15px', left: '-15px', width: '30px', height: '30px', background: 'var(--bg-main)', borderRadius: '50%' }} />
             <div style={{ position: 'absolute', bottom: '-15px', right: '-15px', width: '30px', height: '30px', background: 'var(--bg-main)', borderRadius: '50%' }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -412,7 +412,7 @@ const EventTicket = () => {
 
           {/* QR Code */}
           <div style={{ padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#fafafa' }}>
-            <div style={{ background: 'white', padding: '15px', borderRadius: '16px', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ background: 'var(--bg-card)', padding: '15px', borderRadius: '16px', boxShadow: 'var(--shadow-sm)' }}>
               <QRCode value={booking.qr_code_hash} size={150} />
             </div>
             <p style={{ margin: '15px 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)', letterSpacing: '2px' }}>
@@ -435,7 +435,7 @@ const EventTicket = () => {
             onClick={handleDownloadInvoice}
             style={{
               width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              gap: '8px', background: 'white', border: '1px solid var(--border-light)',
+              gap: '8px', background: 'var(--bg-card)', border: '1px solid var(--border-light)',
               padding: '1rem', borderRadius: '14px', fontWeight: 700,
               cursor: 'pointer', color: 'var(--secondary)', fontSize: '0.95rem'
             }}
@@ -461,3 +461,4 @@ const EventTicket = () => {
 };
 
 export default EventTicket;
+

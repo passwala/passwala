@@ -311,7 +311,7 @@
 
 /* ── BookMyShow Redesign Sub-Navbar (Global) ── */
 .bms-subnav {
-  background: #ffffff;
+  background: var(--bg-card);
   border-bottom: 1.5px solid #ffedd5;
   font-family: 'Inter', sans-serif;
   margin-top: 0;
@@ -405,4 +405,5 @@ body.dark-mode .bms-subnav-links-right span {
     display: none !important;
   }
 }
+
 

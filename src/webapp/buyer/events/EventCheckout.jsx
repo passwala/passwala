@@ -201,7 +201,7 @@ const EventCheckout = ({ user: routeUser }) => {
   return (
     <div style={{ background: 'var(--bg-surface)', minHeight: '100vh', paddingBottom: '100px', maxWidth: '600px', margin: '0 auto', borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9', position: 'relative', boxShadow: '0 0 30px rgba(0,0,0,0.05)' }}>
       {/* Fix #18: Add back button to header */}
-      <div style={{ background: 'white', padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: 'var(--shadow-sm)', boxSizing: 'border-box' }}>
+      <div style={{ background: 'var(--bg-card)', padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: 'var(--shadow-sm)', boxSizing: 'border-box' }}>
         <button
           onClick={() => navigate(-1)}
           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--secondary)' }}
@@ -235,7 +235,7 @@ const EventCheckout = ({ user: routeUser }) => {
       <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         
         {/* Event Summary */}
-        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: 'var(--shadow-sm)' }}>
+        <div style={{ background: 'var(--bg-card)', padding: '1.5rem', borderRadius: '20px', boxShadow: 'var(--shadow-sm)' }}>
           <h3 style={{ margin: '0 0 0.5rem 0', fontWeight: 800, color: 'var(--secondary)' }}>{event.title}</h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px' }}>
             <Calendar size={16} /> {new Date(event.event_date).toLocaleString('en-IN')}
@@ -246,7 +246,7 @@ const EventCheckout = ({ user: routeUser }) => {
         </div>
 
         {/* Tier Selection */}
-        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: 'var(--shadow-sm)' }}>
+        <div style={{ background: 'var(--bg-card)', padding: '1.5rem', borderRadius: '20px', boxShadow: 'var(--shadow-sm)' }}>
           <h4 style={{ margin: '0 0 1rem 0', color: 'var(--text-secondary)' }}>Select Category</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {event.event_ticket_tiers?.map(tier => {
@@ -306,7 +306,7 @@ const EventCheckout = ({ user: routeUser }) => {
         </div>
 
         {/* Invoice Summary */}
-        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: 'var(--shadow-sm)' }}>
+        <div style={{ background: 'var(--bg-card)', padding: '1.5rem', borderRadius: '20px', boxShadow: 'var(--shadow-sm)' }}>
           <h4 style={{ margin: '0 0 1rem 0', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Receipt size={18} /> Tax Invoice Summary
           </h4>
@@ -348,7 +348,7 @@ const EventCheckout = ({ user: routeUser }) => {
       </div>
 
       {/* Fixed Bottom Bar */}
-      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '600px', background: 'white', padding: '1rem 1.5rem', boxShadow: '0 -10px 20px rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 100, boxSizing: 'border-box', borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9' }}>
+      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '600px', background: 'var(--bg-card)', padding: '1rem 1.5rem', boxShadow: '0 -10px 20px rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 100, boxSizing: 'border-box', borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9' }}>
         <div>
           <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>Amount</p>
           <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>₹{totalAmount.toFixed(2)}</h3>
@@ -377,3 +377,4 @@ const EventCheckout = ({ user: routeUser }) => {
 };
 
 export default EventCheckout;
+

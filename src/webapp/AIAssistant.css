@@ -14,7 +14,7 @@
   max-width: calc(100vw - 4rem);
   height: 600px;
   max-height: calc(100vh - 12rem);
-  background: white;
+  background: var(--bg-card);
   border-radius: 32px;
   display: flex;
   flex-direction: column;
@@ -102,7 +102,7 @@
 }
 
 .ai .message-bubble {
-  background: white;
+  background: var(--bg-card);
   color: #111;
   border-top-left-radius: 4px;
 }
@@ -134,7 +134,7 @@
 
 .ai-chat-input {
   padding: 1.5rem 2rem;
-  background: white;
+  background: var(--bg-card);
   border-top: 1px solid rgba(0, 0, 0, 0.05);
   display: flex;
   gap: 1rem;
@@ -183,3 +183,4 @@
     border-radius: 0;
   }
 }
+

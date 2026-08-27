@@ -97,7 +97,7 @@ body.dark-mode {
 .rider-auth-banner-icon {
   width: 64px;
   height: 64px;
-  background: white;
+  background: var(--bg-card);
   border-radius: 16px;
   margin: 0 auto 1rem auto;
   display: flex;
@@ -186,7 +186,7 @@ body.dark-mode {
 .rider-input-wrapper input.rider-input:focus {
   border-color: var(--rider-primary);
   box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.15);
-  background-color: #ffffff;
+  background-color: var(--bg-card);
 }
 
 .rider-input-otp {
@@ -207,7 +207,7 @@ body.dark-mode {
 .rider-input-otp:focus {
   border-color: var(--rider-primary);
   box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.15);
-  background-color: #ffffff;
+  background-color: var(--bg-card);
 }
 
 .rider-btn-primary {
@@ -783,7 +783,7 @@ body.dark-mode {
   width: 24px;
   left: 4px;
   bottom: 4px;
-  background-color: white;
+  background-color: var(--bg-card);
   transition: .4s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 50%;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -951,7 +951,7 @@ input:checked+.rider-slider:before {
 }
 
 .rider-btn-sso.google {
-  background: #ffffff;
+  background: var(--bg-card);
   border: 2px solid #e2e8f0;
   color: var(--rider-text);
   margin-top: 1rem;
@@ -1027,7 +1027,7 @@ input:checked+.rider-slider:before {
 .rider-input:focus {
   border-color: var(--rider-primary) !important;
   box-shadow: 0 0 0 4px rgba(255, 107, 0, 0.12), 0 4px 10px rgba(255, 107, 0, 0.04) !important;
-  background-color: #ffffff !important;
+  background-color: var(--bg-card) !important;
 }
 
 /* Dark Mode overrides for Rider Portal */
@@ -1154,7 +1154,7 @@ body.dark-mode .rider-floating-badge {
   .rider-promo-logo-wrapper {
     width: 72px;
     height: 72px;
-    background: #ffffff;
+    background: var(--bg-card);
     border-radius: 20px;
     display: flex;
     align-items: center;
@@ -1351,7 +1351,7 @@ body.dark-mode .rider-floating-badge {
   .rider-input:focus {
     border-color: var(--rider-primary) !important;
     box-shadow: 0 0 0 5px rgba(255, 107, 0, 0.12) !important;
-    background-color: #ffffff !important;
+    background-color: var(--bg-card) !important;
   }
 
   .rider-btn-primary {
@@ -1562,7 +1562,7 @@ body.dark-mode .rider-floating-badge {
     height: 40px;
     border-radius: 12px;
     overflow: hidden;
-    background: white;
+    background: var(--bg-card);
     border: 1px solid var(--rider-border);
     display: flex;
     align-items: center;

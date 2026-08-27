@@ -25,7 +25,7 @@ function DocumentsSubpage({ user, onBack }) {
   return (
     <div className="rider-screen" style={{ animation: 'slideUp 0.3s ease-out' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-        <button onClick={onBack} style={{ background: 'white', border: '1px solid var(--rider-border)', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: 'var(--rider-shadow)' }}>
+        <button onClick={onBack} style={{ background: 'var(--bg-card)', border: '1px solid var(--rider-border)', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: 'var(--rider-shadow)' }}>
           <ArrowLeft size={20} />
         </button>
         <h2 className="rider-title" style={{ margin: 0 }}>My Documents</h2>
@@ -59,7 +59,7 @@ function DocumentsSubpage({ user, onBack }) {
             <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.75rem', color: 'var(--rider-text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>License Image</p>
             <p style={{ margin: 0, fontWeight: 700, fontSize: '0.875rem' }}>Uploaded Successfully</p>
           </div>
-          <div style={{ width: '40px', height: '40px', background: 'white', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--rider-shadow)' }}>
+          <div style={{ width: '40px', height: '40px', background: 'var(--bg-card)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--rider-shadow)' }}>
             <ImageIcon size={20} color="var(--rider-primary)" />
           </div>
         </div>
@@ -72,7 +72,7 @@ function VehicleSubpage({ user, onBack }) {
   return (
     <div className="rider-screen" style={{ animation: 'slideUp 0.3s ease-out' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-        <button onClick={onBack} style={{ background: 'white', border: '1px solid var(--rider-border)', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: 'var(--rider-shadow)' }}>
+        <button onClick={onBack} style={{ background: 'var(--bg-card)', border: '1px solid var(--rider-border)', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: 'var(--rider-shadow)' }}>
           <ArrowLeft size={20} />
         </button>
         <h2 className="rider-title" style={{ margin: 0 }}>Vehicle Details</h2>
@@ -100,7 +100,7 @@ function NotificationsSubpage({ onBack }) {
   return (
     <div className="rider-screen" style={{ animation: 'slideUp 0.3s ease-out' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-        <button onClick={onBack} style={{ background: 'white', border: '1px solid var(--rider-border)', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: 'var(--rider-shadow)' }}>
+        <button onClick={onBack} style={{ background: 'var(--bg-card)', border: '1px solid var(--rider-border)', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: 'var(--rider-shadow)' }}>
           <ArrowLeft size={20} />
         </button>
         <h2 className="rider-title" style={{ margin: 0 }}>Notifications</h2>
@@ -121,7 +121,7 @@ function HelpSupportSubpage({ onBack }) {
   return (
     <div className="rider-screen" style={{ animation: 'slideUp 0.3s ease-out' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-        <button onClick={onBack} style={{ background: 'white', border: '1px solid var(--rider-border)', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: 'var(--rider-shadow)' }}>
+        <button onClick={onBack} style={{ background: 'var(--bg-card)', border: '1px solid var(--rider-border)', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: 'var(--rider-shadow)' }}>
           <ArrowLeft size={20} />
         </button>
         <h2 className="rider-title" style={{ margin: 0 }}>Help & Support</h2>
@@ -159,13 +159,13 @@ function AboutSubpage({ onBack, onNavigate }) {
   return (
     <div className="rider-screen" style={{ animation: 'slideUp 0.3s ease-out' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-        <button onClick={onBack} style={{ background: 'white', border: '1px solid var(--rider-border)', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: 'var(--rider-shadow)' }}>
+        <button onClick={onBack} style={{ background: 'var(--bg-card)', border: '1px solid var(--rider-border)', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: 'var(--rider-shadow)' }}>
           <ArrowLeft size={20} />
         </button>
         <h2 className="rider-title" style={{ margin: 0 }}>About Passwala</h2>
       </div>
 
-      <div style={{ textAlign: 'center', padding: '2rem 1rem', background: 'white', borderRadius: '24px', boxShadow: 'var(--rider-shadow)', border: '1px solid var(--rider-border)' }}>
+      <div style={{ textAlign: 'center', padding: '2rem 1rem', background: 'var(--bg-card)', borderRadius: '24px', boxShadow: 'var(--rider-shadow)', border: '1px solid var(--rider-border)' }}>
         <div style={{ width: '80px', height: '80px', background: 'linear-gradient(135deg, #fb923c, #ef4444)', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto', boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.4)' }}>
           <Bike size={40} color="white" />
         </div>
@@ -199,13 +199,13 @@ function LegalDocumentSubpage({ type, onBack }) {
   return (
     <div className="rider-screen" style={{ animation: 'slideUp 0.3s ease-out' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-        <button onClick={onBack} style={{ background: 'white', border: '1px solid var(--rider-border)', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: 'var(--rider-shadow)' }}>
+        <button onClick={onBack} style={{ background: 'var(--bg-card)', border: '1px solid var(--rider-border)', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: 'var(--rider-shadow)' }}>
           <ArrowLeft size={20} />
         </button>
         <h2 className="rider-title" style={{ margin: 0 }}>{isTerms ? 'Terms of Service' : 'Privacy Policy'}</h2>
       </div>
 
-      <div className="rider-card" style={{ padding: '1.5rem', maxHeight: '65vh', overflowY: 'auto', background: 'white', borderRadius: '24px', border: '1px solid var(--rider-border)' }}>
+      <div className="rider-card" style={{ padding: '1.5rem', maxHeight: '65vh', overflowY: 'auto', background: 'var(--bg-card)', borderRadius: '24px', border: '1px solid var(--rider-border)' }}>
         {isTerms ? (
           <div style={{ fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--rider-text)' }}>
             <h3 style={{ fontSize: '0.95rem', fontWeight: 800, margin: '0 0 0.5rem 0' }}>1. Partner Agreement</h3>
@@ -292,7 +292,7 @@ function MyBookingsSubpage({ user, riderId, onBack }) {
   }, [user, riderId]);
 
   const statusColor = (s) => {
-    if (!s) return { bg: '#f1f5f9', color: '#64748b' };
+    if (!s) return { bg: '#f1f5f9', color: 'var(--text-secondary)' };
     const u = s.toUpperCase();
     if (u === 'CONFIRMED' || u === 'DELIVERED' || u === 'COMPLETED') return { bg: 'rgba(16,185,129,0.1)', color: '#10b981' };
     if (u === 'CANCELLED') return { bg: 'rgba(239,68,68,0.1)', color: '#ef4444' };
@@ -307,7 +307,7 @@ function MyBookingsSubpage({ user, riderId, onBack }) {
   return (
     <div className="rider-screen" style={{ animation: 'slideUp 0.3s ease-out' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.25rem' }}>
-        <button onClick={onBack} style={{ background: 'white', border: '1px solid var(--rider-border)', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: 'var(--rider-shadow)' }}>
+        <button onClick={onBack} style={{ background: 'var(--bg-card)', border: '1px solid var(--rider-border)', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: 'var(--rider-shadow)' }}>
           <ArrowLeft size={20} />
         </button>
         <h2 className="rider-title" style={{ margin: 0 }}>My Bookings</h2>
@@ -334,7 +334,7 @@ function MyBookingsSubpage({ user, riderId, onBack }) {
         </div>
       ) : tab === 'rides' ? (
         rides.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem 1rem', background: 'white', borderRadius: 20, border: '1px solid var(--rider-border)' }}>
+          <div style={{ textAlign: 'center', padding: '3rem 1rem', background: 'var(--bg-card)', borderRadius: 20, border: '1px solid var(--rider-border)' }}>
             <Bike size={40} color="#e2e8f0" style={{ margin: '0 auto 0.75rem' }} />
             <p style={{ fontWeight: 700, color: 'var(--rider-text)' }}>No ride bookings yet</p>
             <p style={{ fontSize: '0.8rem', color: 'var(--rider-text-secondary)' }}>Ride bookings assigned to your vehicle will appear here.</p>
@@ -344,7 +344,7 @@ function MyBookingsSubpage({ user, riderId, onBack }) {
             {rides.map(b => {
               const sc = statusColor(b.status);
               return (
-                <div key={b.id} style={{ background: 'white', borderRadius: 18, border: '1px solid var(--rider-border)', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                <div key={b.id} style={{ background: 'var(--bg-card)', borderRadius: 18, border: '1px solid var(--rider-border)', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                   <div style={{ padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <IndianRupee size={13} color="#ff7622" />
@@ -379,7 +379,7 @@ function MyBookingsSubpage({ user, riderId, onBack }) {
         )
       ) : (
         orders.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem 1rem', background: 'white', borderRadius: 20, border: '1px solid var(--rider-border)' }}>
+          <div style={{ textAlign: 'center', padding: '3rem 1rem', background: 'var(--bg-card)', borderRadius: 20, border: '1px solid var(--rider-border)' }}>
             <Package size={40} color="#e2e8f0" style={{ margin: '0 auto 0.75rem' }} />
             <p style={{ fontWeight: 700, color: 'var(--rider-text)' }}>No deliveries yet</p>
             <p style={{ fontSize: '0.8rem', color: 'var(--rider-text-secondary)' }}>Completed delivery orders will appear here.</p>
@@ -390,7 +390,7 @@ function MyBookingsSubpage({ user, riderId, onBack }) {
               const order = d.orders;
               const sc = statusColor(order?.status || d.status);
               return (
-                <div key={d.id} style={{ background: 'white', borderRadius: 18, border: '1px solid var(--rider-border)', padding: '0.9rem 1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                <div key={d.id} style={{ background: 'var(--bg-card)', borderRadius: 18, border: '1px solid var(--rider-border)', padding: '0.9rem 1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <Package size={14} color="#ff7622" />
@@ -483,7 +483,7 @@ function RiderProfile({ user, onLogout, stats, riderId }) {
       {/* Header Profile Info */}
       <div className="rider-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: 0, width: '100%', height: '6rem', background: 'linear-gradient(90deg, #fb923c, #ef4444)', zIndex: 0 }}></div>
-        <div style={{ position: 'relative', zIndex: 10, width: '6rem', height: '6rem', background: 'white', borderRadius: '50%', padding: '4px', boxShadow: 'var(--rider-shadow)', marginBottom: '0.75rem', marginTop: '1rem' }}>
+        <div style={{ position: 'relative', zIndex: 10, width: '6rem', height: '6rem', background: 'var(--bg-card)', borderRadius: '50%', padding: '4px', boxShadow: 'var(--rider-shadow)', marginBottom: '0.75rem', marginTop: '1rem' }}>
           <img src={user?.photo || user?.photoURL || 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png'} alt="avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', background: 'var(--rider-primary-light)', objectFit: 'cover' }} />
         </div>
         <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, position: 'relative', zIndex: 10 }}>{user?.displayName || 'Passwala Partner'}</h3>
@@ -522,7 +522,7 @@ function RiderProfile({ user, onLogout, stats, riderId }) {
       </div>
 
       {/* Details List */}
-      <div style={{ background: 'white', borderRadius: '24px', border: '1px solid var(--rider-border)', overflow: 'hidden', boxShadow: 'var(--rider-shadow)' }}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: '24px', border: '1px solid var(--rider-border)', overflow: 'hidden', boxShadow: 'var(--rider-shadow)' }}>
         <MenuItem icon={<BookOpen />} title="My Bookings" subtitle="View ride bookings & delivery orders" onClick={() => setActiveSubpage('bookings')} highlight />
         <MenuItem icon={<Bike />} title="Vehicle Details" subtitle={user?.vehicleNo || 'Two-Wheeler'} onClick={() => setActiveSubpage('vehicle')} />
         <MenuItem icon={<FileText />} title="Documents" subtitle={`${user?.licenseNo || 'Driving License'}, ${formatIdProofForDisplay(user?.idProof) || 'Aadhar Card'} (Verified)`} onClick={() => setActiveSubpage('documents')} />
@@ -566,7 +566,7 @@ function RiderProfile({ user, onLogout, stats, riderId }) {
       {showDeleteModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem', backdropFilter: 'blur(4px)' }} onClick={() => setShowDeleteModal(false)}>
           <div
-            style={{ background: 'white', borderRadius: '16px', padding: '2rem', maxWidth: '400px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', textAlign: 'center', animation: 'scaleIn 0.2s ease-out' }}
+            style={{ background: 'var(--bg-card)', borderRadius: '16px', padding: '2rem', maxWidth: '400px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', textAlign: 'center', animation: 'scaleIn 0.2s ease-out' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--rider-danger-light)', color: 'var(--rider-danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto' }}>
@@ -614,3 +614,4 @@ function MenuItem({ icon, title, subtitle, onClick, highlight }) {
 }
 
 export default RiderProfile;
+

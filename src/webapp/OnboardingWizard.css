@@ -421,7 +421,7 @@
 .onb-knob {
   position: absolute; top: 3px; left: 3px;
   width: 22px; height: 22px;
-  background: #fff; border-radius: 50%;
+  background: var(--bg-card); border-radius: 50%;
   box-shadow: 0 1px 5px rgba(0,0,0,.5);
   transition: transform .28s cubic-bezier(.34,1.56,.64,1); display: block;
 }
@@ -561,3 +561,4 @@
   .onb-footer { padding: 4px 14px 0; }
   .onb-cta { padding: 12px; }
 }
+

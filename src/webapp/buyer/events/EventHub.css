@@ -16,7 +16,7 @@
 
 /* ── Top Bar ── */
 .eh-topbar {
-  background: white;
+  background: var(--bg-card);
   position: sticky;
   top: 60px;
   z-index: 50;
@@ -53,7 +53,7 @@
   padding: 6px 14px;
   border-radius: 20px;
   border: 1.5px solid #e2e8f0;
-  background: white;
+  background: var(--bg-card);
   font-size: 0.78rem;
   font-weight: 700;
   color: #64748b;
@@ -74,7 +74,7 @@
 
 /* ── Search ── */
 .eh-search-wrap {
-  background: white;
+  background: var(--bg-card);
 }
 .eh-search-inner {
   padding: 0.75rem 1.25rem;
@@ -109,7 +109,7 @@
 
 /* ── Category Chips ── */
 .eh-cats {
-  background: white;
+  background: var(--bg-card);
   border-bottom: 1px solid #efefef;
 }
 .eh-cats-inner {
@@ -127,7 +127,7 @@
   padding: 6px 16px;
   border-radius: 20px;
   border: 1.5px solid #e2e8f0;
-  background: white;
+  background: var(--bg-card);
   font-size: 0.8rem;
   font-weight: 600;
   color: #475569;
@@ -154,7 +154,7 @@
 
 /* ── Event Card ── */
 .eh-card {
-  background: white;
+  background: var(--bg-card);
   border-radius: 20px;
   overflow: hidden;
   cursor: pointer;
@@ -190,7 +190,7 @@
   position: absolute;
   top: 12px;
   left: 12px;
-  background: white;
+  background: var(--bg-card);
   color: #0f172a;
   border-radius: 12px;
   width: 48px;
@@ -351,7 +351,7 @@
   padding: 8px 20px;
   border-radius: 20px;
   border: 1.5px solid #ff6b00;
-  background: white;
+  background: var(--bg-card);
   color: #ff6b00;
   font-size: 0.82rem;
   font-weight: 700;
@@ -402,7 +402,7 @@
   padding: 8px 16px;
   border-radius: 20px;
   border: 1.5px solid #e2e8f0;
-  background: white;
+  background: var(--bg-card);
   color: #475569;
   font-size: 0.82rem;
   font-weight: 700;
@@ -417,7 +417,7 @@
   height: 36px;
   border-radius: 50%;
   border: 1.5px solid #e2e8f0;
-  background: white;
+  background: var(--bg-card);
   color: #475569;
   font-size: 0.82rem;
   font-weight: 700;
@@ -452,7 +452,7 @@
 
 /* ── Show Type Filters ── */
 .eh-show-types-bar {
-  background: white;
+  background: var(--bg-card);
   border-bottom: 1px solid #efefef;
 }
 .eh-show-types-inner {
@@ -543,7 +543,7 @@
     display: block;
     width: 280px;
     flex-shrink: 0;
-    background: white;
+    background: var(--bg-card);
     border-radius: 16px;
     padding: 1.5rem;
     height: fit-content;
@@ -660,7 +660,7 @@
 
 /* Explore Events Categories Section */
 .eh-explore-section {
-  background: white;
+  background: var(--bg-card);
   padding: 1.5rem 1.25rem;
   border-bottom: 1px solid #efefef;
 }
@@ -689,7 +689,7 @@
 }
 
 .eh-explore-card {
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1.5px solid #e2e8f0;
   border-radius: 16px;
   padding: 12px 10px;
@@ -761,4 +761,5 @@
     font-size: 1.8rem;
   }
 }
+
 

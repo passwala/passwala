@@ -406,7 +406,7 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
       {/* Top Header */}
       <header className="rider-header" style={{ borderBottom: 'none', background: 'transparent', padding: '1.25rem 1rem' }}>
         <div className="rider-header-profile">
-          <div className="rider-header-avatar" style={{ background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 10px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+          <div className="rider-header-avatar" style={{ background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 10px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
              <img src={user?.photoURL || user?.photo || "/logo.png"} alt="Rider Profile" style={{ width: (user?.photoURL || user?.photo) ? '100%' : '26px', height: (user?.photoURL || user?.photo) ? '100%' : '26px', objectFit: (user?.photoURL || user?.photo) ? 'cover' : 'contain' }} />
           </div>
           <div>
@@ -443,7 +443,7 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
                   <span className="rider-pulse-dot"></span> Online
               </span>
             ) : (
-              <span style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#94a3b8' }}></div> Offline
               </span>
             )}
@@ -622,7 +622,7 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
           padding: '1.5rem'
         }}>
           <div style={{
-            background: 'white',
+            background: 'var(--bg-card)',
             borderRadius: '24px',
             padding: '2rem',
             maxWidth: '420px',
@@ -647,12 +647,12 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
             <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.75rem 0' }}>
               Background Location Tracking Disclosure
             </h3>
-            <p style={{ fontSize: '0.875rem', color: '#475569', lineHeight: 1.6, margin: '0 0 1.5rem 0', textAlign: 'left' }}>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.6, margin: '0 0 1.5rem 0', textAlign: 'left' }}>
               Passwala Rider collects location data to track your coordinates and display live delivery routes to customers in real-time, <strong>even when the app is closed or not in use</strong>, while you are set to <strong>Online</strong>.
             </p>
-            <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '1rem', marginBottom: '1.5rem', textAlign: 'left' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Features requiring background location:</div>
-              <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.8rem', color: '#475569', lineHeight: 1.5 }}>
+            <div style={{ background: 'var(--bg-surface)', borderRadius: '16px', padding: '1rem', marginBottom: '1.5rem', textAlign: 'left' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Features requiring background location:</div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                 <li>Real-time order tracking for customers</li>
                 <li>Optimal delivery route recommendations</li>
                 <li>Accurate estimation of delivery payouts and times</li>
@@ -666,8 +666,8 @@ function RiderPortal({ user, onLogout, location, setLocation, userCoords }) {
                   padding: '0.75rem',
                   borderRadius: '12px',
                   border: '1px solid #cbd5e1',
-                  background: 'white',
-                  color: '#475569',
+                  background: 'var(--bg-card)',
+                  color: 'var(--text-secondary)',
                   fontWeight: 700,
                   cursor: 'pointer'
                 }}
@@ -722,3 +722,4 @@ function NavItem({ icon, label, isActive, onClick }) {
 }
 
 export default RiderPortal;
+

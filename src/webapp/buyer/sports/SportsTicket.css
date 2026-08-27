@@ -36,7 +36,7 @@
 /* Ticket Card */
 .st-ticket {
   margin: -32px 16px 0;
-  background: #fff; border-radius: 24px;
+  background: var(--bg-card); border-radius: 24px;
   overflow: hidden;
   box-shadow: 0 8px 40px rgba(0,0,0,0.12);
   position: relative; z-index: 2;
@@ -61,7 +61,7 @@
 
 .st-invoice-badge {
   margin-left: auto;
-  background: #fff; color: #f97316;
+  background: var(--bg-card); color: #f97316;
   font-size: 0.75rem; font-weight: 800;
   padding: 4px 10px; border-radius: 99px;
   border: 1.5px solid #fed7aa;
@@ -109,7 +109,7 @@
 .st-qr-wrap {
   width: 160px; height: 160px; border-radius: 16px;
   border: 3px solid #f1f5f9; padding: 8px;
-  background: #fff;
+  background: var(--bg-card);
 }
 
 .st-qr-img { width: 100%; height: 100%; }
@@ -155,3 +155,4 @@
   background: linear-gradient(135deg, #f97316, #ea580c);
   color: #fff; box-shadow: 0 4px 16px rgba(249,115,22,0.35);
 }
+

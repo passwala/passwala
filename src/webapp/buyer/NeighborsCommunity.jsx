@@ -46,7 +46,7 @@ const NeighborsCommunity = ({ onBack, location }) => {
   const [groups, setGroups] = useState([
     { id: 1, name: 'Join', icon: <Plus size={24} />, isAction: true },
     { id: 2, name: 'Greenwood', initial: 'G', color: '#ff7622' },
-    { id: 3, name: 'Local Safety', initial: 'L', color: '#64748b' },
+    { id: 3, name: 'Local Safety', initial: 'L', color: 'var(--text-secondary)' },
     { id: 4, name: 'Pet Lovers', initial: 'P', color: '#ffb800' },
     { id: 5, name: 'Market', initial: 'M', color: '#ff7622' }
   ]);
@@ -391,3 +391,4 @@ const NeighborsCommunity = ({ onBack, location }) => {
 };
 
 export default NeighborsCommunity;
+

@@ -1223,9 +1223,9 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                      <div>
                         <h4>{isService ? (firstItem.provider || firstItem.store || t('service_expert')) : (order.stores?.name || firstItem.store || t('partner'))}</h4>
                         <p>{firstItem.name} {itemCount > 1 ? `+ ${itemCount - 1} ${t('more')}` : ''}</p>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
                           <MapPin size={12} color="#94a3b8" />
-                          <span>{isService ? t('service_location') : t('delivery_location')}: <strong style={{ color: '#475569' }}>{order.addresses?.society || 'Thaltej'}</strong></span>
+                          <span>{isService ? t('service_location') : t('delivery_location')}: <strong style={{ color: 'var(--text-secondary)' }}>{order.addresses?.society || 'Thaltej'}</strong></span>
                         </div>
                      </div>
                  </div>
@@ -1254,7 +1254,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                 </div>
                 
                 {/* Floating Overlay Info */}
-                <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'white', padding: '8px 12px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 10 }}>
+                <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'var(--bg-card)', padding: '8px 12px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 10 }}>
                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: riderCoords ? '#22c55e' : '#94a3b8', animation: riderCoords ? 'pulse 2s infinite' : 'none' }}></div>
                    <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>
                      {['DELIVERED', 'COMPLETED'].includes(order.status) ? (isService ? t('service_completed') : t('delivered')) :
@@ -1289,7 +1289,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                     </button>
                   )}
                   
-                  <button className="rider-contact-btn" style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedOrderDetails(order); }}>
+                  <button className="rider-contact-btn" style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)', border: '1px solid #e2e8f0' }} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedOrderDetails(order); }}>
                     {t('details')}
                   </button>
                 </div>
@@ -1306,8 +1306,8 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
         })}
         {!loading && activeOrders.filter(o => !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status)).length === 0 && rideBookings.filter(b => b.status === 'CONFIRMED').length === 0 && (
           <div className="empty-orders-placeholder-card" style={{ border: 'none', background: 'transparent', boxShadow: 'none' }}>
-            <div className="placeholder-icon" style={{ background: '#f1f5f9', color: '#94a3b8' }}>📦</div>
-            <h3 style={{ color: '#64748b' }}>{t('no_active_orders')}</h3>
+            <div className="placeholder-icon" style={{ background: 'var(--bg-surface)', color: '#94a3b8' }}>📦</div>
+            <h3 style={{ color: 'var(--text-secondary)' }}>{t('no_active_orders')}</h3>
             <p style={{ color: '#94a3b8' }}>{t('no_active_orders_sub')}</p>
           </div>
         )}
@@ -1344,7 +1344,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                       <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
                         {booking.seat_count} {t('seats')} • ₹{booking.total_price}
                       </p>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
                         <MapPin size={12} color="#f97316" />
                         <span>{booking.pickup_area} → {booking.drop_area}</span>
                       </div>
@@ -1355,7 +1355,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
 
                 {/* Vehicle plate + license */}
                 {booking.city_vehicles?.license_plate && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: '#f8fafc', borderRadius: 12, margin: '0 0 12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: 'var(--bg-surface)', borderRadius: 12, margin: '0 0 12px' }}>
                     <Navigation size={14} color="#f97316" />
                     <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Vehicle: {booking.city_vehicles.license_plate}</span>
                     <span style={{ marginLeft: 'auto', fontSize: '0.75rem', background: booking.driverLocation ? '#dcfce7' : '#f1f5f9', color: booking.driverLocation ? '#16a34a' : '#94a3b8', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}>
@@ -1369,7 +1369,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                   <div style={{ position: 'relative', width: '100%', height: '100%', isolation: 'isolate' }}>
                     <RideTrackingMap booking={booking} />
                   </div>
-                  <div style={{ position: 'absolute', top: 10, right: 10, background: 'white', padding: '6px 12px', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: 6, zIndex: 10 }}>
+                  <div style={{ position: 'absolute', top: 10, right: 10, background: 'var(--bg-card)', padding: '6px 12px', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: 6, zIndex: 10 }}>
                     <div style={{ width: 8, height: 8, borderRadius: '50%', background: booking.driverLocation ? '#22c55e' : '#f97316', animation: 'pulse 2s infinite' }} />
                     <span style={{ fontSize: '0.72rem', fontWeight: 700 }}>
                       {booking.driverLocation ? t('driver_en_route') : t('preparing_ride')}
@@ -1447,7 +1447,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                           {tier?.tier_name || 'General'} × {booking.ticket_count} • ₹{booking.total_amount}
                         </p>
                         {evDate && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
                             📅 {evDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} • 📍 {ev?.venue_name || 'Venue TBA'}
                           </div>
                         )}
@@ -1530,20 +1530,20 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
             className="past-order-modal-content"
-            style={{ maxWidth: '350px', margin: 'auto', borderRadius: '24px', padding: '24px', textAlign: 'center', background: '#fff', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}
+            style={{ maxWidth: '350px', margin: 'auto', borderRadius: '24px', padding: '24px', textAlign: 'center', background: 'var(--bg-card)', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}
             onClick={e => e.stopPropagation()}
           >
             <div style={{ background: '#fef2f2', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: '#ef4444' }}>
               <X size={32} />
             </div>
             <h3 style={{ margin: '0 0 12px 0', fontSize: '1.25rem', color: '#0f172a' }}>{t('cancel_order_confirm_title')}</h3>
-            <p style={{ margin: '0 0 24px 0', color: '#64748b', fontSize: '0.95rem', lineHeight: 1.5 }}>
+            <p style={{ margin: '0 0 24px 0', color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.5 }}>
               {t('cancel_order_confirm_desc')}
             </p>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
               <button 
                 onClick={() => setCancelPromptId(null)}
-                style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '12px', fontWeight: 600, cursor: 'pointer' }}
+                style={{ flex: 1, padding: '12px', background: 'var(--bg-surface)', color: 'var(--text-secondary)', border: 'none', borderRadius: '12px', fontWeight: 600, cursor: 'pointer' }}
               >
                 {t('no_keep_it')}
               </button>
@@ -1593,20 +1593,20 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                     <Download size={15} /> {t('invoice')}
                   </button>
                 )}
-                <button onClick={() => setSelectedOrderDetails(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <button onClick={() => setSelectedOrderDetails(null)} style={{ background: 'var(--bg-surface)', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <X size={20} />
                 </button>
               </div>
             </div>
             
             <div className="past-order-modal-body">
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', background: '#f8fafc', padding: '16px', borderRadius: '16px' }}>
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', background: 'var(--bg-surface)', padding: '16px', borderRadius: '16px' }}>
                 <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4f46e5' }}>
                   <Store size={24} />
                 </div>
                 <div>
-                  <h4 style={{ margin: 0, fontSize: '1rem', color: '#1e293b' }}>{selectedOrderDetails.stores?.name || selectedOrderDetails.items?.[0]?.store || t('partner')}</h4>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)' }}>{selectedOrderDetails.stores?.name || selectedOrderDetails.items?.[0]?.store || t('partner')}</h4>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Clock size={14} /> {['DELIVERED', 'COMPLETED'].includes(selectedOrderDetails.status) ? 'Delivered on' : 'Ordered on'} {new Date(selectedOrderDetails.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                   </p>
                 </div>
@@ -1614,32 +1614,32 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
 
               {/* Address Section */}
               <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   {(selectedOrderDetails.items?.[0]?.type === 'service' || (selectedOrderDetails.stores && !selectedOrderDetails.stores.vendor_id)) ? t('service_address') : t('delivery_address')}
                 </h4>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', background: 'var(--bg-surface)', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
                   <MapPin size={20} color="#4f46e5" style={{ marginTop: '2px', flexShrink: 0 }} />
                   <div>
-                    <div style={{ color: '#1e293b', fontWeight: 700, fontSize: '0.95rem' }}>{selectedOrderDetails.addresses?.society || 'Thaltej'}</div>
-                    <div style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '4px', lineHeight: 1.4 }}>{selectedOrderDetails.addresses?.address_line_1 || ''}</div>
+                    <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.95rem' }}>{selectedOrderDetails.addresses?.society || 'Thaltej'}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '4px', lineHeight: 1.4 }}>{selectedOrderDetails.addresses?.address_line_1 || ''}</div>
                   </div>
                 </div>
               </div>
 
               <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{t('items_summary')}</h4>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{t('items_summary')}</h4>
                 <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
                   {(selectedOrderDetails.items || []).map((item, idx) => (
-                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', borderBottom: idx !== (selectedOrderDetails.items || []).length - 1 ? '1px solid #e2e8f0' : 'none', background: '#fff' }}>
-                      <span style={{ color: '#334155', fontWeight: 500 }}>{item.qty || item.quantity || 1}x {item.name || item.products?.name || 'Item'}</span>
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', borderBottom: idx !== (selectedOrderDetails.items || []).length - 1 ? '1px solid #e2e8f0' : 'none', background: 'var(--bg-card)' }}>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{item.qty || item.quantity || 1}x {item.name || item.products?.name || 'Item'}</span>
                       <span style={{ color: '#0f172a', fontWeight: 600 }}>₹{item.price_at_purchase || item.price || 0}</span>
                     </div>
                   ))}
                   {(!selectedOrderDetails.items || selectedOrderDetails.items.length === 0) && (
-                    <div style={{ padding: '12px 16px', color: '#64748b' }}>{t('details_not_available')}</div>
+                    <div style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{t('details_not_available')}</div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', background: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
-                    <span style={{ color: '#64748b', fontWeight: 600 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--bg-surface)', borderTop: '1px solid #e2e8f0' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>
                       {selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? t('total_refunded_paytm') : t('total_paid')}
                     </span>
                     <span style={{ color: selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? '#ef4444' : '#10b981', fontWeight: 800, fontSize: '1.1rem' }}>₹{selectedOrderDetails.total_price || selectedOrderDetails.total_amount}</span>
@@ -1648,14 +1648,14 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
               </div>
 
               <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{t('payment_info')}</h4>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: '#f1f5f9', borderRadius: '12px' }}>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{t('payment_info')}</h4>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: 'var(--bg-surface)', borderRadius: '12px' }}>
                   <CreditCard size={20} color="#64748b" />
                   <div>
-                    <div style={{ color: '#334155', fontWeight: 600 }}>
+                    <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
                       {selectedOrderDetails.status?.toUpperCase() === 'CANCELLED' ? t('refunded_to_paytm') : (selectedOrderDetails.payment_method || t('paid_online'))}
                     </div>
-                    <div style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '2px' }}>{t('transaction_id')}: {selectedOrderDetails.id?.split('-')[0] || ''}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '2px' }}>{t('transaction_id')}: {selectedOrderDetails.id?.split('-')[0] || ''}</div>
                   </div>
                   <div style={{ 
                     marginLeft: 'auto', 
@@ -1724,7 +1724,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
             <motion.div
               initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 280, damping: 26 }}
-              style={{ background: 'white', borderRadius: '28px 28px 0 0', padding: '0', width: '100%', maxWidth: '480px', boxShadow: '0 -12px 50px rgba(0,0,0,0.22)', overflow: 'hidden' }}
+              style={{ background: 'var(--bg-card)', borderRadius: '28px 28px 0 0', padding: '0', width: '100%', maxWidth: '480px', boxShadow: '0 -12px 50px rgba(0,0,0,0.22)', overflow: 'hidden' }}
               onClick={e => e.stopPropagation()}
             >
               {/* ── Header band */}
@@ -1739,7 +1739,7 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
                   </div>
                   <button
                     onClick={() => { setRatingModal(null); setRatingValue(0); setHoverRating(0); setRatingComment(''); }}
-                    style={{ background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', flexShrink: 0 }}
+                    style={{ background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', flexShrink: 0 }}
                   >
                     <X size={18} />
                   </button>
@@ -1847,3 +1847,4 @@ const TrackOrders = ({ onBack, user, userCoords }) => {
 };
 
 export default TrackOrders;
+

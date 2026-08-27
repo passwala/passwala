@@ -252,7 +252,7 @@ class AdminErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <div style={{ padding: '2rem', background: '#fff1f2', color: '#9f1239', minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', fontFamily: 'sans-serif' }}>
-          <div style={{ background: 'white', padding: '2.5rem', borderRadius: '16px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', maxWidth: '500px', width: '100%', textAlign: 'center' }}>
+          <div style={{ background: 'var(--bg-card)', padding: '2.5rem', borderRadius: '16px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', maxWidth: '500px', width: '100%', textAlign: 'center' }}>
             <span style={{ fontSize: '3rem' }}>🔒</span>
             <h2 style={{ marginTop: '1rem', fontSize: '1.5rem', fontWeight: 'bold' }}>Admin Console Error</h2>
             <p style={{ color: '#4b5563', margin: '0.75rem 0' }}>An unexpected error crashed the Admin sub-tree. Please contact the security team if this persists.</p>
@@ -273,7 +273,7 @@ class VendorErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <div style={{ padding: '2rem', background: '#fff7ed', color: '#c2410c', minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', fontFamily: 'sans-serif' }}>
-          <div style={{ background: 'white', padding: '2.5rem', borderRadius: '16px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', maxWidth: '500px', width: '100%', textAlign: 'center' }}>
+          <div style={{ background: 'var(--bg-card)', padding: '2.5rem', borderRadius: '16px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', maxWidth: '500px', width: '100%', textAlign: 'center' }}>
             <span style={{ fontSize: '3rem' }}>🏪</span>
             <h2 style={{ marginTop: '1rem', fontSize: '1.5rem', fontWeight: 'bold' }}>Vendor Workspace Error</h2>
             <p style={{ color: '#4b5563', margin: '0.75rem 0' }}>Your store management page encountered an error. Don't worry, your orders are safe.</p>
@@ -294,7 +294,7 @@ class RiderErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <div style={{ padding: '2rem', background: '#f0fdf4', color: '#15803d', minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', fontFamily: 'sans-serif' }}>
-          <div style={{ background: 'white', padding: '2.5rem', borderRadius: '16px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', maxWidth: '500px', width: '100%', textAlign: 'center' }}>
+          <div style={{ background: 'var(--bg-card)', padding: '2.5rem', borderRadius: '16px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', maxWidth: '500px', width: '100%', textAlign: 'center' }}>
             <span style={{ fontSize: '3rem' }}>🛵</span>
             <h2 style={{ marginTop: '1rem', fontSize: '1.5rem', fontWeight: 'bold' }}>Rider Dashboard Error</h2>
             <p style={{ color: '#4b5563', margin: '0.75rem 0' }}>The delivery dashboard crashed. Your active navigation and order progress are recorded.</p>
@@ -836,7 +836,7 @@ const AppContent = ({
                   }}>Coming Soon</div>
 
                   <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.5rem' }}>Community Hub 🏘️</h2>
-                  <p style={{ fontSize: '0.9rem', color: '#64748b', lineHeight: 1.6, margin: '0 0 1.75rem' }}>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.6, margin: '0 0 1.75rem' }}>
                     Connect with your neighbors, join local groups, share updates &amp; discover what&apos;s happening around you — <strong style={{ color: '#ff7622' }}>launching very soon!</strong>
                   </p>
 
@@ -1016,3 +1016,4 @@ function App() {
 }
 
 export default App
+

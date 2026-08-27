@@ -310,7 +310,7 @@
 }
 
 .neighborhood-check-badge {
-  background: white;
+  background: var(--bg-card);
   width: 20px;
   height: 20px;
   border-radius: 50%;
@@ -534,3 +534,4 @@
     min-height: 560px;
   }
 }
+

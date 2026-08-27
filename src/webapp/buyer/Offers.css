@@ -10,7 +10,7 @@
   align-items: center;
   gap: 1rem;
   padding: 1.25rem 1.5rem;
-  background: #ffffff;
+  background: var(--bg-card);
   border-bottom: 1px solid var(--glass-border);
   position: sticky;
   top: 0;
@@ -128,7 +128,7 @@
 }
 
 .coupon-card {
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1px solid var(--glass-border);
   border-radius: 16px;
   display: flex;
@@ -287,3 +287,4 @@
     justify-content: center;
   }
 }
+

@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: white; /* Light mode default */
+  background: var(--bg-card); /* Light mode default */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -86,3 +86,4 @@
     font-size: 0.85rem;
   }
 }
+

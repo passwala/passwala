@@ -39,7 +39,7 @@
 .banner-icon-box {
   width: 50px;
   height: 50px;
-  background: white;
+  background: var(--bg-card);
   border-radius: 14px;
   display: grid;
   place-items: center;
@@ -1138,7 +1138,7 @@ body:not(.dark-mode) .hub-card.purple {
 }
 
 .hub-featured-cta:hover {
-  background: #fff;
+  background: var(--bg-card);
   transform: scale(1.04);
 }
 
@@ -1295,7 +1295,7 @@ body:not(.dark-mode) .hub-card.purple {
 .lsc-emojis span {
   width: 44px; 
   height: 44px;
-  background: #ffffff;
+  background: var(--bg-card);
   border-radius: 14px;
   display: flex; 
   align-items: center; 
@@ -1320,7 +1320,7 @@ body:not(.dark-mode) .hub-card.purple {
 /* ── BookMyShow Redesign Styles for NeighborhoodHub ── */
 
 .bms-subnav {
-  background: #ffffff;
+  background: var(--bg-card);
   border-bottom: 1.5px solid #ffedd5;
   font-family: 'Inter', sans-serif;
   margin-top: 0;
@@ -1518,7 +1518,7 @@ body:not(.dark-mode) .hub-card.purple {
 }
 
 .bms-dot.active {
-  background: #ffffff;
+  background: var(--bg-card);
   transform: scale(1.2);
 }
 
@@ -1698,7 +1698,7 @@ body:not(.dark-mode) .hub-card.purple {
 }
 
 .bms-contact-btn {
-  background: #ffffff;
+  background: var(--bg-card);
   color: #ff5e00;
   border: none;
   padding: 10px 24px;
@@ -1851,6 +1851,7 @@ body:not(.dark-mode) .hub-card.purple {
 .newsletter-submit-btn:active {
   transform: translateY(0);
 }
+
 
 
 

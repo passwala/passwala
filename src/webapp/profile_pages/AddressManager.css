@@ -55,7 +55,7 @@
 
 /* ── Address Card ────────────────────────────────────────── */
 .addr-card {
-  background: #ffffff;
+  background: var(--bg-card);
   border-radius: 16px;
   padding: 1rem 1.1rem;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
@@ -212,7 +212,7 @@
 
 .addr-form-sheet {
   width: 100%;
-  background: #fff;
+  background: var(--bg-card);
   border-radius: 24px 24px 0 0;
   padding: 1.4rem 1.2rem 2rem;
   max-height: 92vh;
@@ -321,7 +321,7 @@
 }
 .addr-field:focus {
   border-color: #ff7622;
-  background: #fff;
+  background: var(--bg-card);
 }
 .addr-select {
   appearance: none;
@@ -409,7 +409,7 @@
 }
 
 .addr-confirm-modal {
-  background: #fff;
+  background: var(--bg-card);
   border-radius: 24px;
   padding: 2rem 1.5rem 1.5rem;
   max-width: 320px;
@@ -493,4 +493,5 @@
 .dark .addr-confirm-title { color: #f1f5f9; }
 .dark .addr-confirm-cancel { background: #334155; color: #f1f5f9; }
 .dark .addr-confirm-cancel:hover { background: #475569; }
+
 

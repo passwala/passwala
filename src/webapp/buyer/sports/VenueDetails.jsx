@@ -330,14 +330,14 @@ const VenueDetails = ({ user }) => {
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: '1.5rem',
-          background: '#f8fafc',
+          background: 'var(--bg-surface)',
           padding: '12px 20px',
           borderRadius: '16px',
           border: '1px solid #e2e8f0'
         }}>
           <div>
             <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>Duration</h3>
-            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Duration of the slots</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Duration of the slots</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', background: '#0f172a', borderRadius: '12px', padding: '4px' }}>
             <button 
@@ -480,3 +480,4 @@ const VenueDetails = ({ user }) => {
 };
 
 export default VenueDetails;
+

@@ -1141,7 +1141,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress, user }) => {
                       style={{
                         flex: 1, padding: '9px 12px', borderRadius: '10px', border: '1.5px solid #e2e8f0',
                         fontSize: '0.85rem', fontWeight: 600, letterSpacing: '0.05em',
-                        outline: 'none', background: '#f8fafc', textTransform: 'uppercase'
+                        outline: 'none', background: 'var(--bg-surface)', textTransform: 'uppercase'
                       }}
                     />
                     <button
@@ -1162,11 +1162,11 @@ const CartDrawer = ({ location, isProfileComplete, userAddress, user }) => {
 
               {/* Price Breakdown */}
               <div className="price-breakdown-v3" style={{ borderTop: '1px dashed #e2e8f0', borderBottom: '1px dashed #e2e8f0', padding: '12px 0', margin: '12px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748b' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                   <span>Item Subtotal</span>
                   <span>₹{totalPrice.toFixed(2)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748b' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                   <span>Delivery Partner Fee</span>
                   <span style={{ color: '#10b981', fontWeight: 600 }}>FREE</span>
                 </div>
@@ -1275,7 +1275,7 @@ const CartDrawer = ({ location, isProfileComplete, userAddress, user }) => {
                          );
                        })
                      ) : (
-                       <p style={{ textAlign: 'center', color: '#64748b', fontSize: '0.85rem', margin: '20px 0' }}>No other saved addresses found.</p>
+                       <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '20px 0' }}>No other saved addresses found.</p>
                      )}
                   </div>
                   
@@ -1545,3 +1545,4 @@ const CartDrawer = ({ location, isProfileComplete, userAddress, user }) => {
 };
 
 export default CartDrawer;
+

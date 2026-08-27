@@ -161,7 +161,7 @@ function RiderEarnings({ _user, riderId, isOnline, sessionStartTime }) {
          return (
            <div className="rider-card" style={{ background: 'var(--rider-primary-light)', borderColor: 'var(--rider-primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <div style={{ background: 'white', padding: '0.5rem', borderRadius: '12px', color: 'var(--rider-primary)' }}>
+                  <div style={{ background: 'var(--bg-card)', padding: '0.5rem', borderRadius: '12px', color: 'var(--rider-primary)' }}>
                      <Crown size={24} />
                   </div>
                   <div>
@@ -171,7 +171,7 @@ function RiderEarnings({ _user, riderId, isOnline, sessionStartTime }) {
                      </p>
                   </div>
               </div>
-              <div style={{ color: 'var(--rider-primary)', fontWeight: 700, background: 'white', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', boxShadow: 'var(--rider-shadow)' }}>
+              <div style={{ color: 'var(--rider-primary)', fontWeight: 700, background: 'var(--bg-card)', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', boxShadow: 'var(--rider-shadow)' }}>
                  {completedCount}/{targetCount}
               </div>
            </div>
@@ -249,7 +249,7 @@ function RiderEarnings({ _user, riderId, isOnline, sessionStartTime }) {
                 ))}
             </div>
          ) : (
-             <div style={{ textAlign: 'center', padding: '2rem 1rem', background: 'white', borderRadius: '16px', border: '1px solid var(--rider-border)' }}>
+             <div style={{ textAlign: 'center', padding: '2rem 1rem', background: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--rider-border)' }}>
                 <Clock size={32} color="#d1d5db" style={{ margin: '0 auto 0.5rem auto' }} />
                 <p style={{ fontWeight: 600, color: 'var(--rider-text-secondary)', margin: 0 }}>No deliveries yet.</p>
                 <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: '0.25rem 0 0 0' }}>
@@ -263,3 +263,4 @@ function RiderEarnings({ _user, riderId, isOnline, sessionStartTime }) {
 }
 
 export default RiderEarnings;
+

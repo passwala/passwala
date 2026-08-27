@@ -145,11 +145,11 @@ const WebappNavbar = ({ user, onOpenProfile, onBack, title, location, isDarkMode
               }}
               title="Change Language"
             >
-              <option value="en" style={{ color: '#000' }}>🇺🇸 EN</option>
-              <option value="hi" style={{ color: '#000' }}>🇮🇳 HI</option>
-              <option value="gu" style={{ color: '#000' }}>🇮🇳 GU</option>
-              <option value="mr" style={{ color: '#000' }}>🇮🇳 MR</option>
-              <option value="ta" style={{ color: '#000' }}>🇮🇳 TA</option>
+              <option value="en" style={{ color: 'var(--text-primary)' }}>🇺🇸 EN</option>
+              <option value="hi" style={{ color: 'var(--text-primary)' }}>🇮🇳 HI</option>
+              <option value="gu" style={{ color: 'var(--text-primary)' }}>🇮🇳 GU</option>
+              <option value="mr" style={{ color: 'var(--text-primary)' }}>🇮🇳 MR</option>
+              <option value="ta" style={{ color: 'var(--text-primary)' }}>🇮🇳 TA</option>
             </select>
           </div>
           
@@ -190,3 +190,4 @@ const WebappNavbar = ({ user, onOpenProfile, onBack, title, location, isDarkMode
 };
 
 export default WebappNavbar;
+

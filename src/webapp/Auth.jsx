@@ -497,7 +497,7 @@ const Auth = ({ onLogin }) => {
         {/* Back Button Wrapper */}
         {(step === 'LOCATION' || step === 'PROFILE') && (
           <div className="auth-back-btn-wrapper" style={{ width: '100%', marginBottom: '1rem', display: 'flex', justifyContent: 'flex-start' }}>
-            <button className="auth-back-btn" onClick={() => setStep('EMAIL_LOGIN')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#64748b', fontWeight: '500' }}>
+            <button className="auth-back-btn" onClick={() => setStep('EMAIL_LOGIN')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontWeight: '500' }}>
               <ArrowLeft size={18} />
             </button>
           </div>
@@ -527,7 +527,7 @@ const Auth = ({ onLogin }) => {
               <>
                 {/* ── Login Mode Tabs ── */}
                 <div style={{
-                  display: 'flex', borderRadius: '10px', background: '#f1f5f9',
+                  display: 'flex', borderRadius: '10px', background: 'var(--bg-surface)',
                   padding: '4px', gap: '4px', marginBottom: '1rem'
                 }}>
                   <button
@@ -619,8 +619,8 @@ const Auth = ({ onLogin }) => {
                       <label style={{ fontSize: '0.8rem' }}>{t('auth_mobile_label')}</label>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <div style={{
-                          padding: '0.75rem 0.75rem', background: '#f8fafc', border: '1.5px solid #e2e8f0',
-                          borderRadius: '10px', fontWeight: '600', fontSize: '0.9rem', color: '#334155',
+                          padding: '0.75rem 0.75rem', background: 'var(--bg-surface)', border: '1.5px solid #e2e8f0',
+                          borderRadius: '10px', fontWeight: '600', fontSize: '0.9rem', color: 'var(--text-primary)',
                           display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap'
                         }}>
                           🇮🇳 +91
@@ -801,7 +801,7 @@ const Auth = ({ onLogin }) => {
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '6px',
-                  background: '#f8fafc',
+                  background: 'var(--bg-surface)',
                   padding: '8px',
                   borderRadius: '12px',
                   border: '1px solid #e2e8f0',
@@ -822,7 +822,7 @@ const Auth = ({ onLogin }) => {
                             toast.success(`Location set to ${area.name.split(',')[0]}`);
                           }}
                           style={{
-                            background: 'white',
+                            background: 'var(--bg-card)',
                             border: '1px solid #e2e8f0',
                             borderRadius: '8px',
                             padding: '8px 12px',
@@ -832,7 +832,7 @@ const Auth = ({ onLogin }) => {
                             cursor: 'pointer',
                             fontSize: '0.85rem',
                             fontWeight: '600',
-                            color: '#334155',
+                            color: 'var(--text-primary)',
                             transition: 'all 0.2s',
                             textAlign: 'left',
                             width: '100%'
@@ -893,5 +893,6 @@ const Auth = ({ onLogin }) => {
 };
 
 export default Auth;
+
 
 

@@ -107,7 +107,7 @@
 
 /* ── Tags Row ── */
 .ed2-tags-row {
-  background: white;
+  background: var(--bg-card);
   border-bottom: 1px solid var(--ed-border);
 }
 .ed2-tags-inner {
@@ -446,7 +446,7 @@
 .ed2-similar-card {
   flex: 0 0 160px;
   scroll-snap-align: start;
-  background: white;
+  background: var(--bg-card);
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid var(--ed-border);
@@ -479,7 +479,7 @@
 .ed2-sticky-card {
   flex-shrink: 0;
   width: 290px;
-  background: white;
+  background: var(--bg-card);
   border-radius: 18px;
   border: 2px solid var(--ed-primary-border);
   padding: 1.5rem;
@@ -593,7 +593,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: white;
+  background: var(--bg-card);
   padding: 12px 20px;
   box-shadow: 0 -4px 20px rgba(255,107,0,0.12);
   z-index: 100;
@@ -628,3 +628,4 @@
   .ed2-guide-value { font-size: 0.72rem; }
   .ed2-similar-card { flex: 0 0 140px; }
 }
+

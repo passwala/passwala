@@ -47,7 +47,7 @@ export const OrderSkeleton = ({ count = 3 }) => {
   return (
     <div className="skeleton-list" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {Array.from({ length: count }).map((_, idx) => (
-        <div key={idx} className="skeleton-card order-skeleton" style={{ padding: '16px', background: 'white', borderRadius: '20px', border: '1px solid #f1f5f9' }}>
+        <div key={idx} className="skeleton-card order-skeleton" style={{ padding: '16px', background: 'var(--bg-card)', borderRadius: '20px', border: '1px solid #f1f5f9' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <div>
               <SkeletonBlock width="120px" height="18px" style={{ marginBottom: '6px' }} />
@@ -72,7 +72,7 @@ export const EventSkeleton = ({ count = 2 }) => {
   return (
     <div className="skeleton-list" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {Array.from({ length: count }).map((_, idx) => (
-        <div key={idx} className="skeleton-card event-skeleton" style={{ background: 'white', borderRadius: '20px', overflow: 'hidden', border: '1px solid #f1f5f9' }}>
+        <div key={idx} className="skeleton-card event-skeleton" style={{ background: 'var(--bg-card)', borderRadius: '20px', overflow: 'hidden', border: '1px solid #f1f5f9' }}>
           <SkeletonBlock height="100px" borderRadius="0" />
           <div style={{ padding: '16px' }}>
             <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
@@ -93,3 +93,4 @@ export const EventSkeleton = ({ count = 2 }) => {
     </div>
   );
 };
+

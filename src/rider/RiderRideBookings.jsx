@@ -107,7 +107,7 @@ function RiderRideBookings({ user, riderId }) {
     if (s === 'CONFIRMED') return { bg: 'rgba(255,118,34,0.1)', color: '#ff7622' };
     if (s === 'COMPLETED') return { bg: 'rgba(16,185,129,0.1)', color: '#10b981' };
     if (s === 'CANCELLED') return { bg: 'rgba(239,68,68,0.1)', color: '#ef4444' };
-    return { bg: '#f1f5f9', color: '#64748b' };
+    return { bg: '#f1f5f9', color: 'var(--text-secondary)' };
   };
 
   const formatTime = (iso) => {
@@ -181,7 +181,7 @@ function RiderRideBookings({ user, riderId }) {
           <p style={{ color: 'var(--rider-text-secondary)', fontWeight: 600, fontSize: '0.875rem' }}>Loading bookings…</p>
         </div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '3rem 1rem', background: 'white', borderRadius: 20, border: '1px solid var(--rider-border)' }}>
+        <div style={{ textAlign: 'center', padding: '3rem 1rem', background: 'var(--bg-card)', borderRadius: 20, border: '1px solid var(--rider-border)' }}>
           <Bike size={48} color="#e2e8f0" style={{ margin: '0 auto 1rem' }} />
           <p style={{ fontWeight: 700, color: 'var(--rider-text)', marginBottom: '0.4rem' }}>No ride bookings yet</p>
           <p style={{ fontSize: '0.8rem', color: 'var(--rider-text-secondary)' }}>Bookings from customers will appear here once your vehicle is matched.</p>
@@ -191,7 +191,7 @@ function RiderRideBookings({ user, riderId }) {
           {filtered.map(b => {
             const sc = statusColor(b.status);
             return (
-              <div key={b.id} style={{ background: 'white', borderRadius: 20, border: '1px solid var(--rider-border)', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+              <div key={b.id} style={{ background: 'var(--bg-card)', borderRadius: 20, border: '1px solid var(--rider-border)', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                 {/* Card Header */}
                 <div style={{ padding: '0.85rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -234,7 +234,7 @@ function RiderRideBookings({ user, riderId }) {
                   <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid #f1f5f9', display: 'flex', gap: '0.75rem' }}>
                     <button
                       onClick={() => handleCancel(b.id)}
-                      style={{ flex: 1, padding: '0.65rem', borderRadius: 12, border: '1.5px solid #ef4444', background: 'white', color: '#ef4444', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                      style={{ flex: 1, padding: '0.65rem', borderRadius: 12, border: '1.5px solid #ef4444', background: 'var(--bg-card)', color: '#ef4444', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                     >
                       <XCircle size={15} /> Cancel
                     </button>
@@ -256,3 +256,4 @@ function RiderRideBookings({ user, riderId }) {
 }
 
 export default RiderRideBookings;
+

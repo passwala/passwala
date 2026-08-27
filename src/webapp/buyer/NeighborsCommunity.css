@@ -358,7 +358,7 @@ body:not(.dark-mode) .action-circle {
 }
 
 body:not(.dark-mode) .group-circle {
-  background: white;
+  background: var(--bg-card);
 }
 
 
@@ -409,3 +409,4 @@ body:not(.dark-mode) .create-post-card {
   border-radius: 10px !important;
   border: 1px dashed var(--primary) !important;
 }
+

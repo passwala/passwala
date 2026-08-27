@@ -231,7 +231,7 @@ const QRScannerModal = ({ isOpen, onClose, onScan, businessType }) => {
             </div>
             <div>
               <h3 style={{ margin: 0, color: 'white', fontWeight: 800, fontSize: '1.05rem' }}>Scan QR to Check In</h3>
-              <p style={{ margin: 0, color: '#64748b', fontSize: '0.78rem' }}>Point camera at attendee's ticket QR</p>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.78rem' }}>Point camera at attendee's ticket QR</p>
             </div>
           </div>
           <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', borderRadius: '10px', width: '34px', height: '34px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -280,7 +280,7 @@ const QRScannerModal = ({ isOpen, onClose, onScan, businessType }) => {
           {/* ✅ QR Detected — green flash */}
           {scanned && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px', background: 'rgba(22,163,74,0.85)', transition: 'all 0.3s' }}>
-              <div style={{ width: '64px', height: '64px', background: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 30px rgba(34,197,94,0.6)' }}>
+              <div style={{ width: '64px', height: '64px', background: 'var(--bg-card)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 30px rgba(34,197,94,0.6)' }}>
                 <span style={{ fontSize: '2rem' }}>✓</span>
               </div>
               <span style={{ color: 'white', fontWeight: 800, fontSize: '1rem', letterSpacing: '0.5px' }}>QR Detected!</span>
@@ -305,7 +305,7 @@ const QRScannerModal = ({ isOpen, onClose, onScan, businessType }) => {
         </div>
 
         {/* Tip */}
-        <p style={{ color: '#475569', fontSize: '0.72rem', textAlign: 'center', margin: '1rem 0 0 0', lineHeight: 1.5 }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.72rem', textAlign: 'center', margin: '1rem 0 0 0', lineHeight: 1.5 }}>
           📱 Ask attendee to open <strong style={{ color: '#94a3b8' }}>Order History → {businessType === 'sports' ? 'Sports Slots' : 'My Events'} → View Ticket</strong>
         </p>
 
@@ -353,7 +353,7 @@ export const ConfirmModal = ({ isOpen, title, message, confirmText, cancelText, 
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: 'spring', duration: 0.4 }}
             style={{
-              background: 'white',
+              background: 'var(--bg-card)',
               borderRadius: '24px',
               padding: '2rem',
               width: '100%',
@@ -389,7 +389,7 @@ export const ConfirmModal = ({ isOpen, title, message, confirmText, cancelText, 
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.5px' }}>{title}</h3>
-              <p style={{ margin: 0, fontSize: '0.95rem', color: '#64748b', fontWeight: 600, lineHeight: 1.5 }}>{message}</p>
+              <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-secondary)', fontWeight: 600, lineHeight: 1.5 }}>{message}</p>
             </div>
             
             <div style={{ display: 'flex', gap: '1rem', width: '100%', marginTop: '0.5rem' }}>
@@ -1508,7 +1508,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
       {/* Check-in Loading Overlay */}
       {checkinLoading && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 999998, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
-          <div style={{ background: 'white', borderRadius: '20px', padding: '2rem 3rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: '20px', padding: '2rem 3rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
             <div style={{ width: '40px', height: '40px', border: '4px solid #e2e8f0', borderTop: '4px solid #16a34a', borderRadius: '50%', animation: 'checkin-spin 1s linear infinite' }} />
             <p style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>Verifying ticket...</p>
             <style>{`@keyframes checkin-spin { to { transform: rotate(360deg); } }`}</style>
@@ -1527,7 +1527,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
             <motion.div
               initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.85, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-              style={{ background: 'white', borderRadius: '28px', padding: '2rem', width: '100%', maxWidth: '400px', boxShadow: '0 30px 60px rgba(0,0,0,0.25)' }}
+              style={{ background: 'var(--bg-card)', borderRadius: '28px', padding: '2rem', width: '100%', maxWidth: '400px', boxShadow: '0 30px 60px rgba(0,0,0,0.25)' }}
               onClick={e => e.stopPropagation()}
             >
               {/* Result Icon */}
@@ -1545,14 +1545,14 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                 <h2 style={{ margin: '0 0 4px', fontWeight: 900, fontSize: '1.3rem', color: '#0f172a' }}>
                   {checkinResult.success ? 'Checked In!' : checkinResult.alreadyUsed ? 'Already Used' : 'Invalid Ticket'}
                 </h2>
-                <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>
+                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                   {checkinResult.success ? 'Entry approved. Attendee may enter.' : checkinResult.error}
                 </p>
               </div>
 
               {/* Attendee Details Card */}
               {checkinResult.booking && (
-                <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.5rem', border: '1px solid #e2e8f0' }}>
+                <div style={{ background: 'var(--bg-surface)', borderRadius: '16px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.5rem', border: '1px solid #e2e8f0' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Attendee</span>
                     <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '1rem' }}>{checkinResult.booking.attendee}</span>
@@ -1560,16 +1560,16 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                   {checkinResult.booking.phone && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Phone</span>
-                      <span style={{ fontWeight: 700, color: '#475569' }}>{checkinResult.booking.phone}</span>
+                      <span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>{checkinResult.booking.phone}</span>
                     </div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Event</span>
-                    <span style={{ fontWeight: 700, color: '#475569', textAlign: 'right', maxWidth: '60%' }}>{checkinResult.booking.event}</span>
+                    <span style={{ fontWeight: 700, color: 'var(--text-secondary)', textAlign: 'right', maxWidth: '60%' }}>{checkinResult.booking.event}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Tier</span>
-                    <span style={{ fontWeight: 700, color: '#475569' }}>{checkinResult.booking.tier}</span>
+                    <span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>{checkinResult.booking.tier}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Tickets</span>
@@ -1578,7 +1578,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                   {checkinResult.booking.invoice && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Invoice</span>
-                      <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#64748b', fontSize: '0.8rem' }}>{checkinResult.booking.invoice}</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{checkinResult.booking.invoice}</span>
                     </div>
                   )}
                 </div>
@@ -1587,7 +1587,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button
                   onClick={() => { setCheckinResult(null); setShowQrScanner(true); }}
-                  style={{ flex: 1, padding: '13px', background: '#f1f5f9', border: 'none', borderRadius: '14px', fontWeight: 800, cursor: 'pointer', color: '#475569', fontSize: '0.9rem' }}
+                  style={{ flex: 1, padding: '13px', background: 'var(--bg-surface)', border: 'none', borderRadius: '14px', fontWeight: 800, cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.9rem' }}
                 >
                   Scan Next
                 </button>
@@ -1637,7 +1637,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                 flexDirection: 'column',
                 borderRadius: '28px',
                 overflow: 'hidden',
-                background: 'white'
+                background: 'var(--bg-card)'
               }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -1658,7 +1658,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                     </h3>
                     <p className="v-form-header-subtitle">Create a professional listing to attract more local orders.</p>
                   </div>
-                  <button type="button" onClick={() => setShowForm(false)} className="v-action-btn delete" style={{ background: '#f1f5f9', color: '#64748b' }}><X size={20} /></button>
+                  <button type="button" onClick={() => setShowForm(false)} className="v-action-btn delete" style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)' }}><X size={20} /></button>
                 </div>
 
                 {businessType === 'event' ? (
@@ -1897,7 +1897,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                 {(newItem.schedule_slots || []).map((slot, index) => (
-                                  <div key={slot.id || index} style={{ border: '1px solid #e2e8f0', borderRadius: '16px', padding: '1.25rem', background: '#f8fafc' }}>
+                                  <div key={slot.id || index} style={{ border: '1px solid #e2e8f0', borderRadius: '16px', padding: '1.25rem', background: 'var(--bg-surface)' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', fontWeight: 'bold', fontSize: '0.85rem', color: '#ea580c' }}>
                                       <span>Show #{index + 1}</span>
                                       {newItem.schedule_slots.length > 1 && (
@@ -2016,14 +2016,14 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                                       <div className="v-form-group">
                                         <label>Quantity *</label>
                                         {(newItem.schedule_slots && newItem.schedule_slots.length > 1) ? (
-                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
-                                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Seats per Show Date</span>
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--bg-surface)', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
+                                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Seats per Show Date</span>
                                             {(newItem.schedule_slots || []).map((slot, sIdx) => {
                                               const dateStr = slot.date ? new Date(slot.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : `Show #${sIdx + 1}`;
                                               const slotCap = tier.slot_capacities?.[slot.id] !== undefined ? tier.slot_capacities[slot.id] : (tier.total_seats || '100');
                                               return (
                                                 <div key={slot.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                                                  <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>{dateStr}:</span>
+                                                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{dateStr}:</span>
                                                   <input
                                                     type="number"
                                                     className="v-input"
@@ -2097,7 +2097,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                             <div className="wizard-section-card">
                               <div className="section-card-header">
                                 <h4>Visual Cover Photo & Gallery Images</h4>
-                                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Upload one or multiple images</span>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Upload one or multiple images</span>
                               </div>
                               <div className="v-form-group">
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
@@ -2110,7 +2110,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                                           position: 'absolute',
                                           top: '4px',
                                           right: '4px',
-                                          background: 'white',
+                                          background: 'var(--bg-card)',
                                           border: 'none',
                                           borderRadius: '50%',
                                           width: '24px',
@@ -2144,7 +2144,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                                       alignItems: 'center',
                                       justifyContent: 'center',
                                       cursor: 'pointer',
-                                      background: '#f8fafc',
+                                      background: 'var(--bg-surface)',
                                       gap: '4px',
                                       transition: 'border-color 0.2s'
                                     }}
@@ -2175,7 +2175,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                                       }}
                                     />
                                     <Camera size={24} color="#64748b" />
-                                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 'bold' }}>Add Image</span>
+                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>Add Image</span>
                                   </label>
                                 </div>
                               </div>
@@ -2244,7 +2244,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                                   <strong>📅 Scheduled Shows ({(newItem.schedule_slots || []).length})</strong>
                                   <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.5rem' }}>
                                     {(newItem.schedule_slots || []).map((s, idx) => (
-                                      <div key={s.id || idx} style={{ padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between' }}>
+                                      <div key={s.id || idx} style={{ padding: '8px 12px', background: 'var(--bg-surface)', borderRadius: '8px', fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between' }}>
                                         <span>Show #{idx + 1}: {s.date} ({s.starts} - {s.ends})</span>
                                         <strong>📍 {s.venue_name}</strong>
                                       </div>
@@ -2424,7 +2424,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                 {(newItem.schedule_slots || []).map((slot, index) => (
-                                  <div key={slot.id || index} style={{ border: '1px solid #e2e8f0', borderRadius: '16px', padding: '1.25rem', background: '#f8fafc' }}>
+                                  <div key={slot.id || index} style={{ border: '1px solid #e2e8f0', borderRadius: '16px', padding: '1.25rem', background: 'var(--bg-surface)' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', fontWeight: 'bold', fontSize: '0.85rem', color: '#ea580c' }}>
                                       <span>Stop #{index + 1}</span>
                                       {newItem.schedule_slots.length > 1 && (
@@ -2541,14 +2541,14 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                                       <div className="v-form-group">
                                         <label>Quantity *</label>
                                         {(newItem.schedule_slots && newItem.schedule_slots.length > 1) ? (
-                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
-                                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Seats per Show Date</span>
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--bg-surface)', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
+                                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Seats per Show Date</span>
                                             {(newItem.schedule_slots || []).map((slot, sIdx) => {
                                               const dateStr = slot.date ? new Date(slot.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : `Show #${sIdx + 1}`;
                                               const slotCap = tier.slot_capacities?.[slot.id] !== undefined ? tier.slot_capacities[slot.id] : (tier.total_seats || '100');
                                               return (
                                                 <div key={slot.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                                                  <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>{dateStr}:</span>
+                                                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{dateStr}:</span>
                                                   <input
                                                     type="number"
                                                     className="v-input"
@@ -2634,7 +2634,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                                           position: 'absolute',
                                           top: '4px',
                                           right: '4px',
-                                          background: 'white',
+                                          background: 'var(--bg-card)',
                                           border: 'none',
                                           borderRadius: '50%',
                                           width: '24px',
@@ -2667,7 +2667,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                                       alignItems: 'center',
                                       justifyContent: 'center',
                                       cursor: 'pointer',
-                                      background: '#f8fafc',
+                                      background: 'var(--bg-surface)',
                                       gap: '4px',
                                       transition: 'border-color 0.2s'
                                     }}
@@ -2696,7 +2696,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                                       }}
                                     />
                                     <Camera size={24} color="#64748b" />
-                                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 'bold' }}>Add Image</span>
+                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>Add Image</span>
                                   </label>
                                 </div>
                               </div>
@@ -2757,7 +2757,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                                   <strong>📅 Tour Stops / Venues ({(newItem.schedule_slots || []).length})</strong>
                                   <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.5rem' }}>
                                     {(newItem.schedule_slots || []).map((s, idx) => (
-                                      <div key={s.id || idx} style={{ padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between' }}>
+                                      <div key={s.id || idx} style={{ padding: '8px 12px', background: 'var(--bg-surface)', borderRadius: '8px', fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between' }}>
                                         <span>Stop #{idx + 1}: {s.venue_name}</span>
                                         <strong>📍 {s.date} ({s.starts} - {s.ends})</strong>
                                       </div>
@@ -2981,14 +2981,14 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                                       <div className="v-form-group">
                                         <label>Quantity *</label>
                                         {(newItem.schedule_slots && newItem.schedule_slots.length > 1) ? (
-                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
-                                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Seats per Show Date</span>
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--bg-surface)', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
+                                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Seats per Show Date</span>
                                             {(newItem.schedule_slots || []).map((slot, sIdx) => {
                                               const dateStr = slot.date ? new Date(slot.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : `Show #${sIdx + 1}`;
                                               const slotCap = tier.slot_capacities?.[slot.id] !== undefined ? tier.slot_capacities[slot.id] : (tier.total_seats || '100');
                                               return (
                                                 <div key={slot.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                                                  <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>{dateStr}:</span>
+                                                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{dateStr}:</span>
                                                   <input
                                                     type="number"
                                                     className="v-input"
@@ -3071,7 +3071,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                                           position: 'absolute',
                                           top: '4px',
                                           right: '4px',
-                                          background: 'white',
+                                          background: 'var(--bg-card)',
                                           border: 'none',
                                           borderRadius: '50%',
                                           width: '24px',
@@ -3104,7 +3104,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                                       alignItems: 'center',
                                       justifyContent: 'center',
                                       cursor: 'pointer',
-                                      background: '#f8fafc',
+                                      background: 'var(--bg-surface)',
                                       gap: '4px',
                                       transition: 'border-color 0.2s'
                                     }}
@@ -3133,7 +3133,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                                       }}
                                     />
                                     <Camera size={24} color="#64748b" />
-                                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 'bold' }}>Add Image</span>
+                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>Add Image</span>
                                   </label>
                                 </div>
                               </div>
@@ -3303,25 +3303,25 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
 
                   {/* Slots Generator / Manager */}
                   {newItem.sports && newItem.sports.length > 0 && (
-                    <div className="v-form-group" style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                    <div className="v-form-group" style={{ background: 'var(--bg-surface)', padding: '1.5rem', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
                       <h4 style={{ margin: '0 0 12px 0', fontWeight: 900, color: '#0f172a' }}>📅 Manage Time Slots</h4>
                       
                       {/* Generator Row */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', alignItems: 'end', marginBottom: '1.5rem', background: 'white', padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', alignItems: 'end', marginBottom: '1.5rem', background: 'var(--bg-card)', padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
                         <div>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Date</span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Date</span>
                           <input type="date" id="gen-date" className="v-input" defaultValue={new Date().toISOString().split('T')[0]} style={{ outline: 'none' }} />
                         </div>
                         <div>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Start Time</span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Start Time</span>
                           <input type="time" id="gen-start" className="v-input" defaultValue="06:00" style={{ outline: 'none' }} />
                         </div>
                         <div>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '4px', fontWeight: 800 }}>End Time</span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px', fontWeight: 800 }}>End Time</span>
                           <input type="time" id="gen-end" className="v-input" defaultValue="22:00" style={{ outline: 'none' }} />
                         </div>
                         <div>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Price per Hour</span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Price per Hour</span>
                           <input type="number" id="gen-price" className="v-input" defaultValue="400" style={{ outline: 'none' }} />
                         </div>
                         <button
@@ -3370,17 +3370,17 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                       {/* Slots List */}
                       <div style={{ maxHeight: '250px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {(!newItem.slots || newItem.slots.length === 0) ? (
-                          <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', background: 'white', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                          <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', background: 'var(--bg-card)', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
                             No slots generated yet. Use the generator above to add multiple slots.
                           </div>
                         ) : (
                           newItem.slots.map((slot, index) => (
-                            <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 2fr 1.5fr 1fr', gap: '12px', alignItems: 'center', background: 'white', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                              <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.85rem' }}>📅 {slot.date}</span>
+                            <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 2fr 1.5fr 1fr', gap: '12px', alignItems: 'center', background: 'var(--bg-card)', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                              <span style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.85rem' }}>📅 {slot.date}</span>
                               <span style={{ fontWeight: 800, color: 'var(--v-primary)', fontSize: '0.85rem' }}>
                                 {slot.sport === 'box_cricket' ? 'Box Cricket' : slot.sport === 'turf' ? 'Football Turf' : slot.sport.charAt(0).toUpperCase() + slot.sport.slice(1)}
                               </span>
-                              <span style={{ fontWeight: 700, color: '#475569', fontSize: '0.85rem' }}>⏰ {slot.start_time} - {slot.end_time}</span>
+                              <span style={{ fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>⏰ {slot.start_time} - {slot.end_time}</span>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 900 }}>₹</span>
                                 <input
@@ -3419,7 +3419,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                           <img src={img} alt={`Preview ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           <button
                             type="button"
-                            style={{ position: 'absolute', top: '4px', right: '4px', background: 'white', border: 'none', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.15)', cursor: 'pointer', zIndex: 10, outline: 'none' }}
+                            style={{ position: 'absolute', top: '4px', right: '4px', background: 'var(--bg-card)', border: 'none', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.15)', cursor: 'pointer', zIndex: 10, outline: 'none' }}
                             onClick={() => {
                               setNewItem({ ...newItem, images: newItem.images.filter((_, i) => i !== idx) });
                             }}
@@ -3429,7 +3429,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                         </div>
                       ))}
                       {(!newItem.images || newItem.images.length < 5) && (
-                        <label style={{ height: '90px', border: '2px dashed #cbd5e1', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#f8fafc', gap: '4px' }}>
+                        <label style={{ height: '90px', border: '2px dashed #cbd5e1', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'var(--bg-surface)', gap: '4px' }}>
                           <input 
                             type="file" 
                             hidden 
@@ -3453,7 +3453,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                             }} 
                           />
                           <Camera size={20} color="#94a3b8" />
-                          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Add Photo</span>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-secondary)' }}>Add Photo</span>
                         </label>
                       )}
                     </div>
@@ -3464,7 +3464,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                     style={{ 
                       padding: '1.5rem 0 0 0', 
                       borderTop: '1px solid #f1f5f9', 
-                      background: 'white',
+                      background: 'var(--bg-card)',
                       display: 'flex',
                       justifyContent: 'flex-end',
                       gap: '1rem'
@@ -3532,25 +3532,25 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
 
                   {/* Slots Generator / Manager */}
                   {newItem.sports && newItem.sports.length > 0 && (
-                    <div className="v-form-group" style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                    <div className="v-form-group" style={{ background: 'var(--bg-surface)', padding: '1.5rem', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
                       <h4 style={{ margin: '0 0 12px 0', fontWeight: 900, color: '#0f172a' }}>📅 Manage Time Slots</h4>
                       
                       {/* Generator Row */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', alignItems: 'end', marginBottom: '1.5rem', background: 'white', padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', alignItems: 'end', marginBottom: '1.5rem', background: 'var(--bg-card)', padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
                         <div>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Date</span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Date</span>
                           <input type="date" id="gen-date" className="v-input" defaultValue={new Date().toISOString().split('T')[0]} style={{ outline: 'none' }} />
                         </div>
                         <div>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Start Time</span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Start Time</span>
                           <input type="time" id="gen-start" className="v-input" defaultValue="06:00" style={{ outline: 'none' }} />
                         </div>
                         <div>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '4px', fontWeight: 800 }}>End Time</span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px', fontWeight: 800 }}>End Time</span>
                           <input type="time" id="gen-end" className="v-input" defaultValue="22:00" style={{ outline: 'none' }} />
                         </div>
                         <div>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Price per Hour</span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Price per Hour</span>
                           <input type="number" id="gen-price" className="v-input" defaultValue="400" style={{ outline: 'none' }} />
                         </div>
                         <button
@@ -3593,17 +3593,17 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                       {/* Slots List */}
                       <div style={{ maxHeight: '250px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {(!newItem.slots || newItem.slots.length === 0) ? (
-                          <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', background: 'white', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                          <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', background: 'var(--bg-card)', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
                             No slots generated yet. Use the generator above to add multiple slots.
                           </div>
                         ) : (
                           newItem.slots.map((slot, index) => (
-                            <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 2fr 1.5fr 1fr', gap: '12px', alignItems: 'center', background: 'white', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                              <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.85rem' }}>📅 {slot.date}</span>
+                            <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 2fr 1.5fr 1fr', gap: '12px', alignItems: 'center', background: 'var(--bg-card)', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                              <span style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.85rem' }}>📅 {slot.date}</span>
                               <span style={{ fontWeight: 800, color: 'var(--v-primary)', fontSize: '0.85rem' }}>
                                 {slot.sport === 'box_cricket' ? 'Box Cricket' : slot.sport === 'turf' ? 'Football Turf' : slot.sport.charAt(0).toUpperCase() + slot.sport.slice(1)}
                               </span>
-                              <span style={{ fontWeight: 700, color: '#475569', fontSize: '0.85rem' }}>⏰ {slot.start_time} - {slot.end_time}</span>
+                              <span style={{ fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>⏰ {slot.start_time} - {slot.end_time}</span>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 900 }}>₹</span>
                                 <input
@@ -3642,7 +3642,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                           <img src={img} alt={`Preview ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           <button
                             type="button"
-                            style={{ position: 'absolute', top: '4px', right: '4px', background: 'white', border: 'none', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.15)', cursor: 'pointer', zIndex: 10, outline: 'none' }}
+                            style={{ position: 'absolute', top: '4px', right: '4px', background: 'var(--bg-card)', border: 'none', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.15)', cursor: 'pointer', zIndex: 10, outline: 'none' }}
                             onClick={() => {
                               setNewItem({ ...newItem, images: newItem.images.filter((_, i) => i !== idx) });
                             }}
@@ -3652,7 +3652,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                         </div>
                       ))}
                       {(!newItem.images || newItem.images.length < 5) && (
-                        <label style={{ height: '90px', border: '2px dashed #cbd5e1', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#f8fafc', gap: '4px' }}>
+                        <label style={{ height: '90px', border: '2px dashed #cbd5e1', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'var(--bg-surface)', gap: '4px' }}>
                           <input 
                             type="file" 
                             hidden 
@@ -3676,7 +3676,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                             }} 
                           />
                           <Camera size={20} color="#94a3b8" />
-                          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Add Photo</span>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-secondary)' }}>Add Photo</span>
                         </label>
                       )}
                     </div>
@@ -3687,7 +3687,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                     style={{ 
                       padding: '1.5rem 0 0 0', 
                       borderTop: '1px solid #f1f5f9', 
-                      background: 'white',
+                      background: 'var(--bg-card)',
                       display: 'flex',
                       justifyContent: 'flex-end',
                       gap: '1rem'
@@ -3800,12 +3800,12 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                             {newItem.image ? (
                               <div style={{ position: 'relative', width: '220px', height: '150px', margin: '0 auto' }}>
                                 <img src={newItem.image} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '16px' }} />
-                                <div style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setNewItem(prev => ({ ...prev, image: null })); }}><Trash2 size={16} color="#ef4444" /></div>
+                                <div style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'var(--bg-card)', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setNewItem(prev => ({ ...prev, image: null })); }}><Trash2 size={16} color="#ef4444" /></div>
                               </div>
                             ) : (
                               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                                 <Camera size={40} color="#cbd5e1" style={{ marginBottom: '1rem' }} />
-                                <p style={{ margin: 0, fontWeight: 800, color: '#1e293b' }}>Click to upload cover photo</p>
+                                <p style={{ margin: 0, fontWeight: 800, color: 'var(--text-primary)' }}>Click to upload cover photo</p>
                                 <p style={{ margin: '4px 0 0 0', color: '#94a3b8', fontSize: '0.85rem' }}>High-res photos increase conversion by 40%</p>
                               </div>
                             )}
@@ -3819,7 +3819,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                       style={{ 
                         padding: '1.5rem 3rem 2.5rem 3rem', 
                         borderTop: '1px solid #f1f5f9', 
-                        background: 'white',
+                        background: 'var(--bg-card)',
                         display: 'flex',
                         justifyContent: 'flex-end',
                         gap: '1rem'
@@ -4001,7 +4001,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                        const pct = show.total_seats > 0 ? (show.available_seats / show.total_seats) * 100 : 0;
                        return (
                          <div key={show.id || idx} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: '#475569' }}>
+                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
                              <span style={{ fontWeight: 600 }}>📅 {showDateStr}</span>
                               <span style={{
                                 fontWeight: 700,
@@ -4034,7 +4034,7 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
                   ) : (
                     <>
                       {businessType === 'event' && item.event_date && (
-                        <p style={{ margin: '4px 0 6px 0', fontSize: '0.75rem', color: '#64748b', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        <p style={{ margin: '4px 0 6px 0', fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                           <span>📅 {(() => {
                             try {
                               const formattedStr = typeof item.event_date === 'string' ? item.event_date.replace(' ', 'T') : item.event_date;
@@ -4078,12 +4078,12 @@ export const VendorInventory = ({ vendorData, businessType, storeId, _setActiveT
 
                 <div className="v-card-footer">
                   <div className="v-price-tag">
-                    {businessType === 'event' && <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600, marginRight: '2px' }}>from</span>}
+                    {businessType === 'event' && <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 600, marginRight: '2px' }}>from</span>}
                     <span className="v-price-currency">₹</span>
                     <span className="v-price-amount">{item.price}</span>
                   </div>
                   {item.is_admin_organized ? (
-                    <button disabled style={{ background: '#cbd5e1', color: '#64748b', cursor: 'not-allowed', boxShadow: 'none' }} className="v-card-edit-btn">
+                    <button disabled style={{ background: '#cbd5e1', color: 'var(--text-secondary)', cursor: 'not-allowed', boxShadow: 'none' }} className="v-card-edit-btn">
                       Admin Event
                     </button>
                   ) : (
@@ -4355,9 +4355,9 @@ function VendorOrderMapWrapper({ order, businessType }) {
       <VendorOrderTrackingMap order={order} riderCoords={riderCoords} businessType={businessType} />
 
       {/* Floating Info Overlay */}
-      <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'white', padding: '6px 12px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 10 }}>
+      <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'var(--bg-card)', padding: '6px 12px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 10 }}>
         <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: riderCoords ? '#22c55e' : '#94a3b8', animation: riderCoords ? 'pulse 2s infinite' : 'none' }}></div>
-        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155' }}>
+        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>
           {businessType === 'service'
             ? (['ACCEPTED', 'PREPARING', 'SHIPPED', 'DISPATCHED'].includes(order.status) ? 'Service in progress' : order.status === 'DELIVERED' ? 'Service completed' : 'Waiting for confirmation')
             : ((riderCoords || ['ACCEPTED', 'PREPARING', 'DISPATCHED', 'SHIPPED'].includes(order.status)) ? 'Rider / Order In Progress' : (order.rider_id ? 'Rider Assigned' : 'Waiting for Rider Assignment'))
@@ -4938,8 +4938,8 @@ export const VendorOrders = ({ storeId, businessType, vendorData, _setPortalActi
       <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}>
         <Clock size={48} color="var(--v-primary)" opacity={0.5} />
       </motion.div>
-      <p style={{ marginTop: '2rem', fontWeight: 900, color: '#1e293b', fontSize: '1.25rem', letterSpacing: '-0.5px' }}>Syncing Order Station...</p>
-      <p style={{ marginTop: '0.5rem', color: '#64748b', fontWeight: 600 }}>Connecting to secure fulfillment cloud</p>
+      <p style={{ marginTop: '2rem', fontWeight: 900, color: 'var(--text-primary)', fontSize: '1.25rem', letterSpacing: '-0.5px' }}>Syncing Order Station...</p>
+      <p style={{ marginTop: '0.5rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Connecting to secure fulfillment cloud</p>
     </div>
   );
 
@@ -5014,8 +5014,8 @@ export const VendorOrders = ({ storeId, businessType, vendorData, _setPortalActi
           
           if (filteredList.length === 0) {
             return (
-              <div style={{ padding: '8rem 2rem', textAlign: 'center', background: 'white', borderRadius: '40px', border: '2px dashed #e2e8f0' }}>
-                <div style={{ width: '100px', height: '100px', background: '#f8fafc', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem auto' }}>
+              <div style={{ padding: '8rem 2rem', textAlign: 'center', background: 'var(--bg-card)', borderRadius: '40px', border: '2px dashed #e2e8f0' }}>
+                <div style={{ width: '100px', height: '100px', background: 'var(--bg-surface)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem auto' }}>
                   {businessType === 'event' ? (
                     <Calendar size={48} color="#cbd5e1" />
                   ) : businessType === 'service' ? (
@@ -5024,8 +5024,8 @@ export const VendorOrders = ({ storeId, businessType, vendorData, _setPortalActi
                     <Package size={48} color="#cbd5e1" />
                   )}
                 </div>
-                <h3 style={{ fontWeight: 950, color: '#1e293b', fontSize: '1.5rem', letterSpacing: '-0.5px' }}>{businessType === 'event' ? 'No Ticket Sales' : businessType === 'service' ? 'No Bookings' : 'Station Idle'}</h3>
-                <p style={{ color: '#64748b', margin: '0.75rem 0 2rem 0', fontWeight: 600 }}>{businessType === 'event' ? 'No tickets have been booked for your events yet. New sales will appear here instantly.' : businessType === 'service' ? 'Your service station is ready to receive bookings. New bookings will trigger a priority alert.' : 'Your store is ready to receive missions. New orders will trigger a priority alert.'}</p>
+                <h3 style={{ fontWeight: 950, color: 'var(--text-primary)', fontSize: '1.5rem', letterSpacing: '-0.5px' }}>{businessType === 'event' ? 'No Ticket Sales' : businessType === 'service' ? 'No Bookings' : 'Station Idle'}</h3>
+                <p style={{ color: 'var(--text-secondary)', margin: '0.75rem 0 2rem 0', fontWeight: 600 }}>{businessType === 'event' ? 'No tickets have been booked for your events yet. New sales will appear here instantly.' : businessType === 'service' ? 'Your service station is ready to receive bookings. New bookings will trigger a priority alert.' : 'Your store is ready to receive missions. New orders will trigger a priority alert.'}</p>
                 <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: '#f0fdf4', color: '#16a34a', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 900, marginBottom: '1rem' }}>
                     <div className="v-pulse-dot" style={{ background: '#16a34a' }}></div>
@@ -5061,7 +5061,7 @@ export const VendorOrders = ({ storeId, businessType, vendorData, _setPortalActi
                         </div>
                       )}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.9rem', fontWeight: 700 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: 700 }}>
                       <Clock size={16} /> Received at {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </div>
@@ -5078,30 +5078,30 @@ export const VendorOrders = ({ storeId, businessType, vendorData, _setPortalActi
                   <div>
                     <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{businessType === 'event' ? 'Ticket Holder' : isService ? 'Customer Profile' : 'Customer Entity'}</p>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: '40px', height: '40px', background: '#f8fafc', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#475569', border: '1px solid #e2e8f0' }}>
+                      <div style={{ width: '40px', height: '40px', background: 'var(--bg-surface)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: 'var(--text-secondary)', border: '1px solid #e2e8f0' }}>
                         {(order.users?.full_name || 'U').charAt(0)}
                       </div>
                       <div>
-                        <span style={{ fontWeight: 850, color: '#1e293b', display: 'block', fontSize: '1rem' }}>{order.users?.full_name || 'Verified User'}</span>
-                        <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>{order.users?.phone || 'Premium Member'}</span>
+                        <span style={{ fontWeight: 850, color: 'var(--text-primary)', display: 'block', fontSize: '1rem' }}>{order.users?.full_name || 'Verified User'}</span>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{order.users?.phone || 'Premium Member'}</span>
                       </div>
                     </div>
                   </div>
 
                   <div>
                     <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{businessType === 'event' ? 'Delivery Mode' : isService ? 'Service Address' : 'Destination Node'}</p>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', color: '#1e293b' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', color: 'var(--text-primary)' }}>
                       <MapPin size={18} color="var(--v-primary)" style={{ marginTop: '2px', flexShrink: 0 }} />
                       <span style={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.4 }}>{order.addresses?.society || 'Geo-location Pending'}</span>
                     </div>
                   </div>
                 </div>
 
-                <div style={{ background: '#f8fafc', borderRadius: '20px', padding: '1.5rem', marginBottom: '2rem', border: '1px solid #f1f5f9' }}>
+                <div style={{ background: 'var(--bg-surface)', borderRadius: '20px', padding: '1.5rem', marginBottom: '2rem', border: '1px solid #f1f5f9' }}>
                   <p style={{ margin: '0 0 12px 0', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase' }}>{businessType === 'event' ? 'Ticket Manifest' : isService ? 'Booked Services' : 'Inventory Manifest'}</p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                     {order.order_items?.map((item, idx) => (
-                      <div key={idx} style={{ background: 'white', border: '1px solid #e2e8f0', padding: '6px 14px', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                      <div key={idx} style={{ background: 'var(--bg-card)', border: '1px solid #e2e8f0', padding: '6px 14px', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
                         <span style={{ color: 'var(--v-primary)' }}>{item.quantity}x</span>
                         {item.products?.name}
                       </div>
@@ -5201,7 +5201,7 @@ export const VendorOrders = ({ storeId, businessType, vendorData, _setPortalActi
                           </motion.button>
                         ) : (
                           <div
-                            style={{ flex: 1, padding: '16px', background: '#f1f5f9', color: '#64748b', borderRadius: '14px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e2e8f0' }}
+                            style={{ flex: 1, padding: '16px', background: 'var(--bg-surface)', color: 'var(--text-secondary)', borderRadius: '14px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e2e8f0' }}
                           >
                             Out for Delivery by Rider
                           </div>
@@ -5370,7 +5370,7 @@ export const VendorOrders = ({ storeId, businessType, vendorData, _setPortalActi
       {/* Check-in Loading Overlay */}
       {checkinLoading && ReactDOM.createPortal(
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 999998, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
-          <div style={{ background: 'white', borderRadius: '20px', padding: '2rem 3rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: '20px', padding: '2rem 3rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
             <div style={{ width: '40px', height: '40px', border: '4px solid #e2e8f0', borderTop: '4px solid #16a34a', borderRadius: '50%', animation: 'checkin-spin 1s linear infinite' }} />
             <p style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>Verifying ticket...</p>
             <style>{`@keyframes checkin-spin { to { transform: rotate(360deg); } }`}</style>
@@ -5391,7 +5391,7 @@ export const VendorOrders = ({ storeId, businessType, vendorData, _setPortalActi
               <motion.div
                 initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.85, opacity: 0 }}
                 transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-                style={{ background: 'white', borderRadius: '28px', padding: '2rem', width: '100%', maxWidth: '400px', boxShadow: '0 30px 60px rgba(0,0,0,0.25)' }}
+                style={{ background: 'var(--bg-card)', borderRadius: '28px', padding: '2rem', width: '100%', maxWidth: '400px', boxShadow: '0 30px 60px rgba(0,0,0,0.25)' }}
                 onClick={e => e.stopPropagation()}
               >
                 {/* Result Icon */}
@@ -5409,14 +5409,14 @@ export const VendorOrders = ({ storeId, businessType, vendorData, _setPortalActi
                   <h2 style={{ margin: '0 0 4px', fontWeight: 900, fontSize: '1.3rem', color: '#0f172a' }}>
                     {checkinResult.success ? 'Checked In!' : checkinResult.alreadyUsed ? 'Already Used' : 'Check-in Error'}
                   </h2>
-                  <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>
+                  <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                     {checkinResult.success ? 'Entry approved. Attendee may enter.' : checkinResult.error}
                   </p>
                 </div>
 
                 {/* Attendee Details Card */}
                 {checkinResult.booking && (
-                  <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.5rem', border: '1px solid #e2e8f0' }}>
+                  <div style={{ background: 'var(--bg-surface)', borderRadius: '16px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.5rem', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Attendee</span>
                       <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '1rem' }}>{checkinResult.booking.attendee}</span>
@@ -5424,16 +5424,16 @@ export const VendorOrders = ({ storeId, businessType, vendorData, _setPortalActi
                     {checkinResult.booking.phone && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Phone</span>
-                        <span style={{ fontWeight: 700, color: '#475569' }}>{checkinResult.booking.phone}</span>
+                        <span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>{checkinResult.booking.phone}</span>
                       </div>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Details</span>
-                      <span style={{ fontWeight: 700, color: '#475569', textAlign: 'right', maxWidth: '60%' }}>{checkinResult.booking.event}</span>
+                      <span style={{ fontWeight: 700, color: 'var(--text-secondary)', textAlign: 'right', maxWidth: '60%' }}>{checkinResult.booking.event}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Category</span>
-                      <span style={{ fontWeight: 700, color: '#475569' }}>{checkinResult.booking.tier}</span>
+                      <span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>{checkinResult.booking.tier}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Tickets</span>
@@ -5442,7 +5442,7 @@ export const VendorOrders = ({ storeId, businessType, vendorData, _setPortalActi
                     {checkinResult.booking.invoice && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Invoice</span>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#64748b', fontSize: '0.8rem' }}>{checkinResult.booking.invoice}</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{checkinResult.booking.invoice}</span>
                       </div>
                     )}
                   </div>
@@ -5451,7 +5451,7 @@ export const VendorOrders = ({ storeId, businessType, vendorData, _setPortalActi
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button
                     onClick={() => { setCheckinResult(null); setQrScannerOpen({ open: true, booking: null }); }}
-                    style={{ flex: 1, padding: '13px', background: '#f1f5f9', border: 'none', borderRadius: '14px', fontWeight: 800, cursor: 'pointer', color: '#475569', fontSize: '0.9rem' }}
+                    style={{ flex: 1, padding: '13px', background: 'var(--bg-surface)', border: 'none', borderRadius: '14px', fontWeight: 800, cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.9rem' }}
                   >
                     Scan Next
                   </button>
@@ -5555,7 +5555,7 @@ export const VendorEarnings = ({ storeId, vendorData, businessType }) => {
           <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #f1f5f9', display: 'flex', gap: '1rem' }}>
             <div style={{ flex: 1 }}>
               <span style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 800 }}>PROJECTED</span>
-              <span style={{ fontWeight: 900, color: '#1e293b' }}>₹{(earnings * 1.2).toFixed(0)}</span>
+              <span style={{ fontWeight: 900, color: 'var(--text-primary)' }}>₹{(earnings * 1.2).toFixed(0)}</span>
             </div>
             <div style={{ flex: 1, textAlign: 'right' }}>
               <span style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 800 }}>GROWTH</span>
@@ -5580,7 +5580,7 @@ export const VendorEarnings = ({ storeId, vendorData, businessType }) => {
           <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #f1f5f9', display: 'flex', gap: '1rem' }}>
             <div style={{ flex: 1 }}>
               <span style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 800 }}>{businessType === 'event' ? 'AVG TICKET' : 'AVG ORDER'}</span>
-              <span style={{ fontWeight: 900, color: '#1e293b' }}>₹{orderCount > 0 ? (earnings / orderCount).toFixed(0) : 0}</span>
+              <span style={{ fontWeight: 900, color: 'var(--text-primary)' }}>₹{orderCount > 0 ? (earnings / orderCount).toFixed(0) : 0}</span>
             </div>
             <div style={{ flex: 1, textAlign: 'right' }}>
               <span style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 800 }}>SUCCESS</span>
@@ -5590,15 +5590,15 @@ export const VendorEarnings = ({ storeId, vendorData, businessType }) => {
         </motion.div>
       </div>
 
-      <div className="v-data-card" style={{ padding: '4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white', minHeight: '400px', flexDirection: 'column' }}>
-        <div style={{ position: 'relative', width: '100%', maxWidth: '600px', height: '240px', background: '#f8fafc', borderRadius: '32px', border: '2px dashed #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <div className="v-data-card" style={{ padding: '4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-card)', minHeight: '400px', flexDirection: 'column' }}>
+        <div style={{ position: 'relative', width: '100%', maxWidth: '600px', height: '240px', background: 'var(--bg-surface)', borderRadius: '32px', border: '2px dashed #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 20% 20%, rgba(249, 115, 22, 0.05) 0%, transparent 50%)' }}></div>
           <div style={{ textAlign: 'center', position: 'relative', zIndex: 1 }}>
-            <div style={{ width: '64px', height: '64px', background: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)' }}>
+            <div style={{ width: '64px', height: '64px', background: 'var(--bg-card)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)' }}>
               <IndianRupee size={32} color="var(--v-primary)" opacity={0.4} />
             </div>
-            <h3 style={{ fontWeight: 900, color: '#1e293b', fontSize: '1.25rem' }}>{loading ? "Analytics Engine Initializing..." : "Operational Data Synchronized"}</h3>
-            <p style={{ margin: '0.5rem 0 0 0', color: '#64748b', fontWeight: 600, fontSize: '0.95rem' }}>Your revenue trends and payout windows are up to date.</p>
+            <h3 style={{ fontWeight: 900, color: 'var(--text-primary)', fontSize: '1.25rem' }}>{loading ? "Analytics Engine Initializing..." : "Operational Data Synchronized"}</h3>
+            <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.95rem' }}>Your revenue trends and payout windows are up to date.</p>
           </div>
         </div>
       </div>
@@ -5683,9 +5683,9 @@ export const VendorWallet = ({ storeId }) => {
               </div>
               <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '1rem' }}>Primary Payout Node</span>
             </div>
-            <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
-              <p style={{ margin: 0, fontSize: '1rem', color: '#1e293b', fontWeight: 850 }}>HDFC BANK LTD</p>
-              <p style={{ margin: '4px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600 }}>Account Ending In: •••• 4289</p>
+            <div style={{ padding: '1rem', background: 'var(--bg-surface)', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+              <p style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 850 }}>HDFC BANK LTD</p>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Account Ending In: •••• 4289</p>
             </div>
             <button style={{ width: '100%', marginTop: '1.25rem', padding: '12px', borderRadius: '12px', background: 'none', border: '1px solid #e2e8f0', color: 'var(--v-primary)', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>Manage Bank Accounts</button>
           </div>
@@ -5699,11 +5699,11 @@ export const VendorWallet = ({ storeId }) => {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             {transactions.length === 0 ? (
-              <div style={{ padding: '5rem 2rem', textAlign: 'center', background: '#f8fafc', borderRadius: '24px', border: '1px dashed #e2e8f0' }}>
-                <div style={{ width: '64px', height: '64px', background: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto' }}>
+              <div style={{ padding: '5rem 2rem', textAlign: 'center', background: 'var(--bg-surface)', borderRadius: '24px', border: '1px dashed #e2e8f0' }}>
+                <div style={{ width: '64px', height: '64px', background: 'var(--bg-card)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto' }}>
                   <ArrowUpRight size={28} color="#cbd5e1" />
                 </div>
-                <p style={{ margin: 0, fontWeight: 800, color: '#1e293b' }}>No activity recorded</p>
+                <p style={{ margin: 0, fontWeight: 800, color: 'var(--text-primary)' }}>No activity recorded</p>
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>Your fulfillment earnings will populate this ledger.</p>
               </div>
             ) : transactions.map((tx, i) => (
@@ -5712,14 +5712,14 @@ export const VendorWallet = ({ storeId }) => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
                 key={i}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem', borderRadius: '20px', background: '#f8fafc', border: '1px solid #f1f5f9', transition: 'all 0.2s' }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem', borderRadius: '20px', background: 'var(--bg-surface)', border: '1px solid #f1f5f9', transition: 'all 0.2s' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
                   <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: tx.type === 'credit' ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.02)' }}>
                     {tx.type === 'credit' ? <ArrowDownRight size={22} color="#16a34a" /> : <ArrowUpRight size={22} color="#ef4444" />}
                   </div>
                   <div>
-                    <p style={{ margin: 0, fontWeight: 900, color: '#1e293b', fontSize: '0.95rem' }}>{tx.label}</p>
+                    <p style={{ margin: 0, fontWeight: 900, color: 'var(--text-primary)', fontSize: '0.95rem' }}>{tx.label}</p>
                     <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#94a3b8', fontWeight: 700 }}>{tx.date}</p>
                   </div>
                 </div>
@@ -5733,7 +5733,7 @@ export const VendorWallet = ({ storeId }) => {
             ))}
           </div>
           {transactions.length > 5 && (
-            <button style={{ width: '100%', marginTop: '2rem', background: 'white', border: '1px solid #e2e8f0', padding: '14px', borderRadius: '16px', fontWeight: 900, color: '#64748b', cursor: 'pointer', fontSize: '0.9rem' }}>Load Extensive History</button>
+            <button style={{ width: '100%', marginTop: '2rem', background: 'var(--bg-card)', border: '1px solid #e2e8f0', padding: '14px', borderRadius: '16px', fontWeight: 900, color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.9rem' }}>Load Extensive History</button>
           )}
         </div>
       </div>
@@ -5777,7 +5777,7 @@ export const VendorReviews = ({ storeId, businessType }) => {
           <p className="v-hero-subtitle">Monitor your ratings and build trust with your neighborhood</p>
         </div>
 
-        <div style={{ textAlign: 'right', background: 'white', padding: '1.5rem 2.5rem', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px -10px rgba(0,0,0,0.05)' }}>
+        <div style={{ textAlign: 'right', background: 'var(--bg-card)', padding: '1.5rem 2.5rem', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px -10px rgba(0,0,0,0.05)' }}>
           <p style={{ margin: '0 0 4px 0', fontSize: '0.85rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Partner Score</p>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', justifyContent: 'flex-end' }}>
             <span style={{ fontSize: '3rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-1px' }}>4.9</span>
@@ -5791,12 +5791,12 @@ export const VendorReviews = ({ storeId, businessType }) => {
 
       <div className="v-grid-auto">
         {reviews.length === 0 ? (
-          <div style={{ gridColumn: '1 / -1', background: 'white', padding: '6rem 2rem', borderRadius: '40px', textAlign: 'center', border: '2px dashed #e2e8f0' }}>
-            <div style={{ width: '80px', height: '80px', background: '#f8fafc', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem auto' }}>
+          <div style={{ gridColumn: '1 / -1', background: 'var(--bg-card)', padding: '6rem 2rem', borderRadius: '40px', textAlign: 'center', border: '2px dashed #e2e8f0' }}>
+            <div style={{ width: '80px', height: '80px', background: 'var(--bg-surface)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem auto' }}>
               <Star size={40} color="#cbd5e1" />
             </div>
-            <h3 style={{ fontWeight: 950, color: '#1e293b', fontSize: '1.5rem' }}>Awaiting Feedback</h3>
-            <p style={{ color: '#64748b', fontWeight: 600, maxWidth: '400px', margin: '0.5rem auto' }}>Once you complete your first few orders, your verified customer reviews will appear here.</p>
+            <h3 style={{ fontWeight: 950, color: 'var(--text-primary)', fontSize: '1.5rem' }}>Awaiting Feedback</h3>
+            <p style={{ color: 'var(--text-secondary)', fontWeight: 600, maxWidth: '400px', margin: '0.5rem auto' }}>Once you complete your first few orders, your verified customer reviews will appear here.</p>
           </div>
         ) : reviews.map((rev, i) => (
           <motion.div
@@ -5809,7 +5809,7 @@ export const VendorReviews = ({ storeId, businessType }) => {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ width: '60px', height: '60px', borderRadius: '20px', background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 950, color: '#475569', fontSize: '1.25rem', border: '2px solid white', boxShadow: '0 8px 20px -6px rgba(0,0,0,0.1)' }}>
+                <div style={{ width: '60px', height: '60px', borderRadius: '20px', background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 950, color: 'var(--text-secondary)', fontSize: '1.25rem', border: '2px solid white', boxShadow: '0 8px 20px -6px rgba(0,0,0,0.1)' }}>
                   {rev.avatar}
                 </div>
                 <div>
@@ -5824,7 +5824,7 @@ export const VendorReviews = ({ storeId, businessType }) => {
               </div>
             </div>
 
-            <p style={{ margin: 0, fontSize: '1.05rem', color: '#334155', lineHeight: 1.7, fontWeight: 600, fontStyle: 'italic' }}>
+            <p style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text-primary)', lineHeight: 1.7, fontWeight: 600, fontStyle: 'italic' }}>
               "{rev.comment}"
             </p>
 
@@ -5930,10 +5930,10 @@ export const VendorNotifications = ({ storeId, businessType }) => {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         {notifications.length === 0 ? (
-          <div style={{ background: 'white', padding: '8rem 2rem', borderRadius: '40px', textAlign: 'center', border: '2px dashed #e2e8f0' }}>
+          <div style={{ background: 'var(--bg-card)', padding: '8rem 2rem', borderRadius: '40px', textAlign: 'center', border: '2px dashed #e2e8f0' }}>
             <Bell size={64} color="#cbd5e1" style={{ margin: '0 auto 2rem auto', opacity: 0.5 }} />
-            <h3 style={{ fontWeight: 950, color: '#1e293b', fontSize: '1.5rem' }}>All Caught Up</h3>
-            <p style={{ color: '#64748b', margin: '0.75rem 0', fontWeight: 600 }}>Your inbox is clean. New operational updates will appear here.</p>
+            <h3 style={{ fontWeight: 950, color: 'var(--text-primary)', fontSize: '1.5rem' }}>All Caught Up</h3>
+            <p style={{ color: 'var(--text-secondary)', margin: '0.75rem 0', fontWeight: 600 }}>Your inbox is clean. New operational updates will appear here.</p>
           </div>
         ) : notifications.map((notif, i) => (
           <motion.div
@@ -5956,7 +5956,7 @@ export const VendorNotifications = ({ storeId, businessType }) => {
 
             <div style={{ flex: 1 }}>
               <h4 style={{ margin: '0 0 6px 0', fontWeight: 900, color: '#0f172a', fontSize: '1.15rem', letterSpacing: '-0.3px' }}>{notif.title}</h4>
-              <p style={{ margin: '0 0 10px 0', color: '#475569', fontSize: '1rem', lineHeight: 1.6, fontWeight: 600 }}>{notif.desc}</p>
+              <p style={{ margin: '0 0 10px 0', color: 'var(--text-secondary)', fontSize: '1rem', lineHeight: 1.6, fontWeight: 600 }}>{notif.desc}</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Clock size={14} color="#94a3b8" />
                 <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 800 }}>Received at {notif.time}</span>
@@ -6001,7 +6001,7 @@ export const VendorSupport = () => {
           <HelpCircle size={48} color="#e11d48" />
         </motion.div>
         <h1 style={{ fontSize: '3.5rem', fontWeight: 950, letterSpacing: '-2px', margin: '0 0 1rem 0', color: '#0f172a' }}>Success Center</h1>
-        <p style={{ fontSize: '1.25rem', color: '#64748b', maxWidth: '600px', margin: '0 auto', fontWeight: 600, lineHeight: 1.6 }}>Our mission is to help your store thrive. Get instant access to expert advice and operational guides.</p>
+        <p style={{ fontSize: '1.25rem', color: 'var(--text-secondary)', maxWidth: '600px', margin: '0 auto', fontWeight: 600, lineHeight: 1.6 }}>Our mission is to help your store thrive. Get instant access to expert advice and operational guides.</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '3rem', marginBottom: '4rem' }}>
@@ -6015,7 +6015,7 @@ export const VendorSupport = () => {
               <FileText size={32} color="#0ea5e9" />
             </div>
             <h3 style={{ fontWeight: 950, fontSize: '1.5rem', margin: '0 0 1rem 0', color: '#0f172a' }}>Growth Playbook</h3>
-            <p style={{ fontSize: '1rem', color: '#64748b', lineHeight: 1.6, marginBottom: '2.5rem', fontWeight: 600 }}>Master our proprietary inventory algorithms and increase your neighborhood visibility by 2.5x.</p>
+            <p style={{ fontSize: '1rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '2.5rem', fontWeight: 600 }}>Master our proprietary inventory algorithms and increase your neighborhood visibility by 2.5x.</p>
           </div>
           <button className="v-btn-outline" style={{ width: '100%', padding: '18px', fontSize: '1rem', fontWeight: 900 }} onClick={() => setShowArticles(!showArticles)}>
             {showArticles ? "Collapse Manual" : "Read Growth Guide"}
@@ -6031,11 +6031,11 @@ export const VendorSupport = () => {
             Coming Soon
           </div>
           <div>
-            <div style={{ width: '72px', height: '72px', background: '#f8fafc', borderRadius: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem auto', boxShadow: '0 10px 20px -5px rgba(148, 163, 184, 0.2)' }}>
+            <div style={{ width: '72px', height: '72px', background: 'var(--bg-surface)', borderRadius: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem auto', boxShadow: '0 10px 20px -5px rgba(148, 163, 184, 0.2)' }}>
               <CheckCircle size={32} color="#94a3b8" />
             </div>
             <h3 style={{ fontWeight: 950, fontSize: '1.5rem', margin: '0 0 1rem 0', color: '#0f172a' }}>Priority Concierge</h3>
-            <p style={{ fontSize: '1rem', color: '#64748b', lineHeight: 1.6, marginBottom: '2.5rem', fontWeight: 600 }}>Direct bypass to technical operations. Verified partners receive support in under 60 seconds.</p>
+            <p style={{ fontSize: '1rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '2.5rem', fontWeight: 600 }}>Direct bypass to technical operations. Verified partners receive support in under 60 seconds.</p>
           </div>
           <button className="v-btn-outline" style={{ width: '100%', padding: '18px', fontSize: '1rem', cursor: 'not-allowed', color: '#94a3b8', borderColor: '#cbd5e1' }} disabled>
             Coming Soon
@@ -6045,16 +6045,16 @@ export const VendorSupport = () => {
 
       <AnimatePresence>
         {showArticles && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} style={{ marginBottom: '4rem', background: 'white', padding: '3.5rem', borderRadius: '40px', border: '1px solid #f1f5f9', boxShadow: '0 20px 50px -10px rgba(0,0,0,0.05)' }}>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} style={{ marginBottom: '4rem', background: 'var(--bg-card)', padding: '3.5rem', borderRadius: '40px', border: '1px solid #f1f5f9', boxShadow: '0 20px 50px -10px rgba(0,0,0,0.05)' }}>
             <h3 style={{ fontWeight: 950, color: '#0f172a', fontSize: '1.75rem', marginBottom: '2rem', letterSpacing: '-0.8px' }}>Store Optimization Manual</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem' }}>
-              <div style={{ padding: '2rem', background: '#f8fafc', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
-                <h4 style={{ margin: '0 0 10px 0', color: '#1e293b', fontWeight: 900, fontSize: '1.1rem' }}>1. Precision Inventory</h4>
-                <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: 1.6, color: '#475569', fontWeight: 600 }}>Sync stock levels at 8 AM daily. High-accuracy stores are prioritized in neighborhood search results.</p>
+              <div style={{ padding: '2rem', background: 'var(--bg-surface)', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
+                <h4 style={{ margin: '0 0 10px 0', color: 'var(--text-primary)', fontWeight: 900, fontSize: '1.1rem' }}>1. Precision Inventory</h4>
+                <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: 1.6, color: 'var(--text-secondary)', fontWeight: 600 }}>Sync stock levels at 8 AM daily. High-accuracy stores are prioritized in neighborhood search results.</p>
               </div>
-              <div style={{ padding: '2rem', background: '#f8fafc', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
-                <h4 style={{ margin: '0 0 10px 0', color: '#1e293b', fontWeight: 900, fontSize: '1.1rem' }}>2. The 7-Minute SLA</h4>
-                <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: 1.6, color: '#475569', fontWeight: 600 }}>Pack and confirm readiness within 420 seconds. This metrics affects your weekly performance bonus.</p>
+              <div style={{ padding: '2rem', background: 'var(--bg-surface)', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
+                <h4 style={{ margin: '0 0 10px 0', color: 'var(--text-primary)', fontWeight: 900, fontSize: '1.1rem' }}>2. The 7-Minute SLA</h4>
+                <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: 1.6, color: 'var(--text-secondary)', fontWeight: 600 }}>Pack and confirm readiness within 420 seconds. This metrics affects your weekly performance bonus.</p>
               </div>
             </div>
           </motion.div>
@@ -6063,7 +6063,7 @@ export const VendorSupport = () => {
 
       {/* <AnimatePresence>
         {false && (
-          <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} style={{ marginBottom: '4rem', background: 'white', padding: '3.5rem', borderRadius: '40px', border: '1px solid var(--v-primary)', boxShadow: '0 40px 100px -20px rgba(249, 115, 22, 0.2)' }}>
+          <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} style={{ marginBottom: '4rem', background: 'var(--bg-card)', padding: '3.5rem', borderRadius: '40px', border: '1px solid var(--v-primary)', boxShadow: '0 40px 100px -20px rgba(249, 115, 22, 0.2)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '2rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <div style={{ position: 'relative' }}>
@@ -6101,8 +6101,8 @@ export const VendorSupport = () => {
               ))}
             </div>
 
-            <form onSubmit={handleSend} style={{ display: 'flex', gap: '1.5rem', background: '#f8fafc', padding: '1rem', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
-              <input type="text" placeholder="Detail your operational query..." value={msg} onChange={e => setMsg(e.target.value)} style={{ flex: 1, padding: '1.25rem 2rem', borderRadius: '18px', border: 'none', background: 'white', outline: 'none', fontSize: '1.1rem', fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }} />
+            <form onSubmit={handleSend} style={{ display: 'flex', gap: '1.5rem', background: 'var(--bg-surface)', padding: '1rem', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
+              <input type="text" placeholder="Detail your operational query..." value={msg} onChange={e => setMsg(e.target.value)} style={{ flex: 1, padding: '1.25rem 2rem', borderRadius: '18px', border: 'none', background: 'var(--bg-card)', outline: 'none', fontSize: '1.1rem', fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }} />
               <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} type="submit" style={{ padding: '1.25rem 3rem', borderRadius: '18px', border: 'none', background: '#0f172a', color: 'white', fontWeight: 950, cursor: 'pointer', fontSize: '1.1rem', letterSpacing: '0.5px' }}>Transmit</motion.button>
             </form>
           </motion.div>
@@ -6112,13 +6112,14 @@ export const VendorSupport = () => {
       <div style={{ marginTop: '5rem', padding: '2.5rem', background: 'linear-gradient(to right, #f8fafc, #f1f5f9)', borderRadius: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4rem', flexWrap: 'wrap', border: '1px solid #e2e8f0' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ width: '12px', height: '12px', background: '#22c55e', borderRadius: '50%', boxShadow: '0 0 10px rgba(34, 197, 94, 0.4)' }}></div>
-          <span style={{ fontSize: '1rem', fontWeight: 900, color: '#1e293b' }}>Network Status: <span style={{ color: '#22c55e' }}>OPTIMAL</span></span>
+          <span style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-primary)' }}>Network Status: <span style={{ color: '#22c55e' }}>OPTIMAL</span></span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ width: '12px', height: '12px', background: '#22c55e', borderRadius: '50%', boxShadow: '0 0 10px rgba(34, 197, 94, 0.4)' }}></div>
-          <span style={{ fontSize: '1rem', fontWeight: 900, color: '#1e293b' }}>Response SLA: <span style={{ color: '#22c55e' }}>&lt; 5 MIN</span></span>
+          <span style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-primary)' }}>Response SLA: <span style={{ color: '#22c55e' }}>&lt; 5 MIN</span></span>
         </div>
       </div>
     </div>
   );
 };
+

@@ -67,7 +67,7 @@
 }
 
 .footer-logo-box {
-  background: white;
+  background: var(--bg-card);
   width: 45px;
   height: 45px;
   border-radius: 12px;
@@ -161,3 +161,4 @@
   .footer-brand-desc { margin: 0 auto; }
   .footer-socials-v2 { justify-content: center; }
 }
+

@@ -1113,7 +1113,7 @@ const AIChatWidget = ({ user, onLogin }) => {
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '6px',
-                                    background: '#ffffff',
+                                    background: 'var(--bg-card)',
                                     color: '#ff6b00',
                                     border: '1px solid #ff6b00',
                                     borderRadius: '8px',
@@ -1162,8 +1162,8 @@ const AIChatWidget = ({ user, onLogin }) => {
                                 <button
                                   onClick={handleSkipLocation}
                                   style={{
-                                    background: '#f1f5f9',
-                                    color: '#475569',
+                                    background: 'var(--bg-surface)',
+                                    color: 'var(--text-secondary)',
                                     border: '1px solid #e2e8f0',
                                     borderRadius: '10px',
                                     padding: '8px 12px',
@@ -1180,7 +1180,7 @@ const AIChatWidget = ({ user, onLogin }) => {
                             {msg.card && msg.card.type === 'products_list' ? (
                               <div className="widget-products-list-card" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
                                 {msg.card.items.map((item, idx) => (
-                                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', border: '1px solid rgba(255, 107, 0, 0.15)', borderRadius: '12px', padding: '10px 14px' }}>
+                                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-surface)', border: '1px solid rgba(255, 107, 0, 0.15)', borderRadius: '12px', padding: '10px 14px' }}>
                                     <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
                                       <span style={{ fontWeight: '700', fontSize: '0.85rem', color: '#0f172a' }}>{item.name}</span>
                                       <span style={{ fontSize: '0.8rem', color: '#ff6b00', fontWeight: '800' }}>₹{item.price}</span>
@@ -1314,7 +1314,7 @@ const AIChatWidget = ({ user, onLogin }) => {
 
                                     {/* Duration Selector */}
                                     <div className="ai-duration-selector" style={{ display: 'flex', gap: '8px', padding: '0 16px 8px', overflowX: 'auto', borderBottom: '1px solid #f1f5f9', marginBottom: '10px' }}>
-                                      <span style={{ fontSize: '0.8rem', color: '#64748b', alignSelf: 'center', fontWeight: 600, marginRight: '4px' }}>Duration:</span>
+                                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', alignSelf: 'center', fontWeight: 600, marginRight: '4px' }}>Duration:</span>
                                       {[1, 2, 3, 4].map(dur => (
                                         <button
                                           key={dur}
@@ -1498,9 +1498,9 @@ const AIChatWidget = ({ user, onLogin }) => {
                               /* ── Bookings List Card for Cancellation ── */
                               <div className="widget-bookings-list-card" style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
                                 {msg.card.items.map((item, idx) => (
-                                  <div key={idx} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  <div key={idx} style={{ background: 'var(--bg-surface)', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                     <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a' }}>{item.title}</div>
-                                    <div style={{ fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>{item.details}</div>
+                                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>{item.details}</div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
                                       <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ff6b00' }}>₹{item.price}</span>
                                       <button
@@ -1645,3 +1645,4 @@ const AIChatWidget = ({ user, onLogin }) => {
 };
 
 export default AIChatWidget;
+

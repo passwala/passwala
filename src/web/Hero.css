@@ -201,7 +201,7 @@
 }
 
 .btn-rider {
-  background: white;
+  background: var(--bg-card);
   color: var(--primary);
   padding: 0.8rem 1.6rem;
   border-radius: 12px;

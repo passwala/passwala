@@ -22,7 +22,7 @@ function RiderWallet({ stats }) {
          <h3 style={{ fontSize: '3rem', fontWeight: 900, marginBottom: '1.5rem', marginTop: 0 }}>₹{stats?.earnings || 0}</h3>
          
          <div style={{ display: 'flex', gap: '0.75rem' }}>
-             <button onClick={handlePayout} style={{ flex: 1, background: 'white', color: '#1d4ed8', padding: '0.75rem', borderRadius: '12px', fontWeight: 700, border: 'none', cursor: 'pointer', boxShadow: 'var(--rider-shadow)' }}>
+             <button onClick={handlePayout} style={{ flex: 1, background: 'var(--bg-card)', color: '#1d4ed8', padding: '0.75rem', borderRadius: '12px', fontWeight: 700, border: 'none', cursor: 'pointer', boxShadow: 'var(--rider-shadow)' }}>
                 Request Payout
              </button>
          </div>
@@ -75,7 +75,7 @@ function RiderWallet({ stats }) {
                 ))}
              </div>
          ) : (
-            <div style={{ textAlign: 'center', padding: '2rem 1rem', background: 'white', borderRadius: '16px', border: '1px solid var(--rider-border)' }}>
+            <div style={{ textAlign: 'center', padding: '2rem 1rem', background: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--rider-border)' }}>
                <Wallet size={32} color="#d1d5db" style={{ margin: '0 auto 0.5rem auto' }} />
                <p style={{ fontWeight: 600, color: 'var(--rider-text-secondary)', margin: 0 }}>No transactions yet.</p>
             </div>
@@ -86,3 +86,4 @@ function RiderWallet({ stats }) {
 }
 
 export default RiderWallet;
+

@@ -869,7 +869,7 @@ const OrderHistory = () => {
       >
         <main className="sub-page-content">
           {/* Tabs — orders tab hidden in launch mode (code preserved) */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem', background: '#f1f5f9', padding: '5px', borderRadius: '14px' }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem', background: 'var(--bg-surface)', padding: '5px', borderRadius: '14px' }}>
             {/* Orders tab: hidden when shopping feature is not live */}
             {showShoppingUI() && (
               <button
@@ -953,7 +953,7 @@ const OrderHistory = () => {
                     <div className="order-card-top">
                         <div className="order-main-info">
                            <strong>Order #{order.id.toString().slice(0, 8)}</strong>
-                           <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#64748b' }}>
+                           <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                               <Clock size={12} /> {new Date(order.created_at).toLocaleDateString()}
                            </span>
                            {order.addresses?.society && (
@@ -1017,7 +1017,7 @@ const OrderHistory = () => {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.05 }}
                       style={{
-                        background: 'white', borderRadius: '20px',
+                        background: 'var(--bg-card)', borderRadius: '20px',
                         boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
                         overflow: 'hidden', border: '1px solid #f1f5f9'
                       }}
@@ -1047,7 +1047,7 @@ const OrderHistory = () => {
 
                       {/* Details */}
                       <div style={{ padding: '1rem 1.25rem' }}>
-                        <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.75rem' }}>
+                        <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <Calendar size={13} /> {event?.event_date ? new Date(event.event_date).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : '—'}
                           </span>
@@ -1057,8 +1057,8 @@ const OrderHistory = () => {
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ fontSize: '0.82rem', color: '#475569' }}>
-                            <span style={{ background: '#f1f5f9', padding: '2px 8px', borderRadius: '8px', fontWeight: 600 }}>{tier?.tier_name || 'Standard'}</span>
+                          <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                            <span style={{ background: 'var(--bg-surface)', padding: '2px 8px', borderRadius: '8px', fontWeight: 600 }}>{tier?.tier_name || 'Standard'}</span>
                             <span style={{ marginLeft: '8px' }}>{booking.ticket_count} ticket{booking.ticket_count > 1 ? 's' : ''}</span>
                           </div>
                           <span style={{ fontWeight: 800, color: 'var(--primary, #ff6b00)', fontSize: '1rem' }}>₹{booking.total_amount || 0}</span>
@@ -1129,7 +1129,7 @@ const OrderHistory = () => {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.05 }}
                       style={{
-                        background: 'white', borderRadius: '20px',
+                        background: 'var(--bg-card)', borderRadius: '20px',
                         boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
                         overflow: 'hidden', border: '1px solid #f1f5f9'
                       }}
@@ -1159,7 +1159,7 @@ const OrderHistory = () => {
 
                       {/* Details */}
                       <div style={{ padding: '1rem 1.25rem' }}>
-                        <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.75rem' }}>
+                        <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <Calendar size={13} /> {booking.slot_date ? new Date(booking.slot_date + 'T00:00:00').toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : '—'}
                           </span>
@@ -1172,8 +1172,8 @@ const OrderHistory = () => {
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ fontSize: '0.82rem', color: '#475569' }}>
-                            <span style={{ background: '#f1f5f9', padding: '2px 8px', borderRadius: '8px', fontWeight: 600 }}>{sportEmoji} {sportLabel}</span>
+                          <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                            <span style={{ background: 'var(--bg-surface)', padding: '2px 8px', borderRadius: '8px', fontWeight: 600 }}>{sportEmoji} {sportLabel}</span>
                           </div>
                           <span style={{ fontWeight: 800, color: 'var(--primary, #ff6b00)', fontSize: '1rem' }}>₹{booking.total_amount || 0}</span>
                         </div>
@@ -1336,7 +1336,7 @@ const OrderHistory = () => {
               transition={{ type: 'spring', damping: 22, stiffness: 320 }}
               onClick={e => e.stopPropagation()}
               style={{
-                background: 'white',
+                background: 'var(--bg-card)',
                 borderRadius: '24px',
                 padding: '2rem',
                 maxWidth: '340px',
@@ -1363,7 +1363,7 @@ const OrderHistory = () => {
               </h3>
 
               {/* Event name */}
-              <p style={{ margin: '0 0 0.4rem', fontSize: '0.9rem', color: '#64748b', lineHeight: 1.5 }}>
+              <p style={{ margin: '0 0 0.4rem', fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                 You are cancelling your ticket for
               </p>
               <p style={{
@@ -1397,7 +1397,7 @@ const OrderHistory = () => {
                   onClick={() => setCancelConfirm(null)}
                   style={{
                     flex: 1, padding: '0.85rem',
-                    background: '#f1f5f9', color: '#475569',
+                    background: 'var(--bg-surface)', color: 'var(--text-secondary)',
                     border: 'none', borderRadius: '14px',
                     fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer',
                     transition: 'background 0.15s'
@@ -1440,7 +1440,7 @@ const OrderHistory = () => {
             <motion.div
               initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 280, damping: 26 }}
-              style={{ background: 'white', borderRadius: '28px 28px 0 0', padding: '0', width: '100%', maxWidth: '480px', boxShadow: '0 -12px 50px rgba(0,0,0,0.22)', overflow: 'hidden' }}
+              style={{ background: 'var(--bg-card)', borderRadius: '28px 28px 0 0', padding: '0', width: '100%', maxWidth: '480px', boxShadow: '0 -12px 50px rgba(0,0,0,0.22)', overflow: 'hidden' }}
               onClick={e => e.stopPropagation()}
             >
               {/* ── Header band */}
@@ -1463,7 +1463,7 @@ const OrderHistory = () => {
                   </div>
                   <button
                     onClick={() => { setRatingModal(null); setRatingValue(0); setHoverRating(0); setRatingComment(''); }}
-                    style={{ background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', flexShrink: 0 }}
+                    style={{ background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', flexShrink: 0 }}
                   >
                     <X size={18} />
                   </button>
@@ -1574,3 +1574,4 @@ const OrderHistory = () => {
 };
 
 export default OrderHistory;
+

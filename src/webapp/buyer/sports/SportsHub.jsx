@@ -208,11 +208,11 @@ const SportsHub = ({ user, userCoords }) => {
 
                     {/* Info */}
                     <div className="sh-venue-info" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <h3 className="sh-venue-name" style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
+                      <h3 className="sh-venue-name" style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
                         {venue.name}
                       </h3>
 
-                      <div className="sh-venue-location" style={{ fontSize: '0.85rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <div className="sh-venue-location" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <span>
                           {distance ? `${distance.toFixed(1)} km • ` : ''}{venue.city || 'Ahmedabad'}
                         </span>
@@ -223,7 +223,7 @@ const SportsHub = ({ user, userCoords }) => {
                         {(venue.sport_types || []).map(s => {
                           const sp = SPORT_TYPES.find(t => t.id === s);
                           return (
-                            <span key={s} style={{ fontSize: '0.72rem', background: '#f1f5f9', color: '#475569', padding: '3px 8px', borderRadius: '6px', fontWeight: 600 }}>
+                            <span key={s} style={{ fontSize: '0.72rem', background: 'var(--bg-surface)', color: 'var(--text-secondary)', padding: '3px 8px', borderRadius: '6px', fontWeight: 600 }}>
                               {sp?.label || s}
                             </span>
                           );
@@ -242,3 +242,4 @@ const SportsHub = ({ user, userCoords }) => {
 };
 
 export default SportsHub;
+

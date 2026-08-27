@@ -935,7 +935,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
             <div style={{fontSize:'3.5rem',lineHeight:1,marginBottom:'0.75rem',display:'inline-block',animation:'cs-rocket 1.6s ease-in-out infinite'}}>🚀</div>
             <div style={{display:'inline-block',background:'linear-gradient(135deg,#ff7622,#ff9f4a)',color:'white',fontSize:'0.65rem',fontWeight:900,letterSpacing:'0.12em',padding:'4px 12px',borderRadius:'100px',marginBottom:'1rem',textTransform:'uppercase'}}>Coming Soon</div>
             <h2 style={{fontSize:'1.35rem',fontWeight:800,color:'#0f172a',margin:'0.5rem 0'}}>Community Hub 🏘️</h2>
-            <p style={{fontSize:'0.9rem',color:'#64748b',lineHeight:1.6,margin:'0 0 1.75rem'}}>
+            <p style={{fontSize:'0.9rem',color: 'var(--text-secondary)',lineHeight:1.6,margin:'0 0 1.75rem'}}>
               Connect with your neighbors, join local groups &amp; discover what&apos;s happening nearby — <strong style={{color:'#ff7622'}}>launching very soon!</strong>
             </p>
             <button
@@ -952,3 +952,4 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
 };
 
 export default NeighborhoodHub;
+

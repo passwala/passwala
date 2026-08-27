@@ -249,7 +249,7 @@
   position: absolute;
   bottom: 0;
   right: 0;
-  background: white;
+  background: var(--bg-card);
   width: 20px;
   height: 20px;
   border-radius: 50%;
@@ -494,7 +494,7 @@ body:not(.dark-mode) .rating-pill {
   position: absolute;
   bottom: 0;
   right: 0;
-  background: white;
+  background: var(--bg-card);
   width: 24px;
   height: 24px;
   border-radius: 50%;
@@ -623,4 +623,5 @@ body:not(.dark-mode) .rating-pill {
     max-width: 1200px;
   }
 }
+
 

@@ -115,7 +115,7 @@ const CameraModal = ({ isOpen, onClose, onCapture, mode = 'user' }) => {
 
         <div style={{ padding: '2rem', display: 'flex', justifyContent: 'center', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' }}>
           <button onClick={capture} style={{ width: '64px', height: '64px', borderRadius: '50%', border: '4px solid white', background: 'transparent', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-            <div style={{ width: '100%', height: '100%', background: 'white', borderRadius: '50%' }}></div>
+            <div style={{ width: '100%', height: '100%', background: 'var(--bg-card)', borderRadius: '50%' }}></div>
           </button>
         </div>
         <p style={{ color: 'white', textAlign: 'center', fontSize: '0.875rem', marginBottom: '1.5rem', opacity: 0.8 }}>Position your face/document clearly</p>
@@ -488,7 +488,7 @@ function RiderAuth({ onLogin }) {
         <div className="rider-auth-card-content">
           <div className="rider-auth-banner" style={{ padding: step === 'PROFILE_SETUP' ? '1.5rem' : '2rem' }}>
           {step !== 'PROFILE_SETUP' && (
-              <div className="rider-auth-banner-icon" style={{ background: 'white', padding: '10px' }}>
+              <div className="rider-auth-banner-icon" style={{ background: 'var(--bg-card)', padding: '10px' }}>
                 <img src="/logo.png" alt="Passwala Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               </div>
           )}
@@ -547,7 +547,7 @@ function RiderAuth({ onLogin }) {
                   Login via WhatsApp
                 </button>
 
-                <div className="policy-agreement-text" style={{ marginTop: '1.25rem', fontSize: '0.72rem', color: '#64748b', textAlign: 'center', lineHeight: '1.4' }}>
+                <div className="policy-agreement-text" style={{ marginTop: '1.25rem', fontSize: '0.72rem', color: 'var(--text-secondary)', textAlign: 'center', lineHeight: '1.4' }}>
                   By continuing, you agree to our{' '}
                   <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--rider-primary)', fontWeight: '600', textDecoration: 'underline' }}>Terms of Service</a>
                   {' '}and{' '}
@@ -703,3 +703,4 @@ function RiderAuth({ onLogin }) {
 }
 
 export default RiderAuth;
+

@@ -360,7 +360,7 @@ const RideTicket = () => {
       }}>
         <button
           onClick={() => navigate(-1)}
-          style={{ position: 'absolute', top: '1.25rem', left: '1.25rem', background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem', color: '#64748b', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
+          style={{ position: 'absolute', top: '1.25rem', left: '1.25rem', background: 'var(--bg-card)', border: '1px solid #e2e8f0', borderRadius: 12, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem', color: 'var(--text-secondary)', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
         >
           <ArrowLeft size={16} /> {t('back')}
         </button>
@@ -379,7 +379,7 @@ const RideTicket = () => {
         <h2 style={{ margin: '0 0 0.75rem', fontSize: '1.6rem', fontWeight: 900, color: '#0f172a' }}>
           {t('no_ticket_found')}
         </h2>
-        <p style={{ margin: '0 0 2rem', fontSize: '1rem', color: '#64748b', lineHeight: 1.6, maxWidth: 280 }}>
+        <p style={{ margin: '0 0 2rem', fontSize: '1rem', color: 'var(--text-secondary)', lineHeight: 1.6, maxWidth: 280 }}>
           {t('no_ticket_found_sub')}
         </p>
 
@@ -494,7 +494,7 @@ const RideTicket = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-main)', fontFamily: 'Inter, sans-serif' }}>
       {/* Header */}
-      <div style={{ padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'white', borderBottom: '1px solid #f1f5f9' }}>
+      <div style={{ padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-card)', borderBottom: '1px solid #f1f5f9' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>{t('digital_ticket')}</h2>
         </div>
@@ -518,7 +518,7 @@ const RideTicket = () => {
             style={{ height: '100%', width: '100%' }}
           />
         ) : (
-          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', color: '#94a3b8', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-surface)', color: '#94a3b8', flexDirection: 'column', gap: '8px' }}>
             <span style={{ fontSize: '2rem' }}>🗺️</span>
             <p style={{ margin: 0, fontWeight: 600 }}>Map unavailable</p>
           </div>
@@ -528,7 +528,7 @@ const RideTicket = () => {
       {/* Ticket Details Container in normal layout flow */}
       <div style={{ 
         flex: 1,
-        background: 'white', 
+        background: 'var(--bg-card)', 
         borderTopLeftRadius: '30px', 
         borderTopRightRadius: '30px', 
         padding: '2rem 1.5rem', 
@@ -633,7 +633,7 @@ const RideTicket = () => {
         )}
 
         <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-          <div style={{ background: 'white', padding: '10px', borderRadius: '16px', border: '1px solid var(--border-light)', display: 'inline-block', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+          <div style={{ background: 'var(--bg-card)', padding: '10px', borderRadius: '16px', border: '1px solid var(--border-light)', display: 'inline-block', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
             <QRCode value={bookingData.qr_code_hash} size={100} style={{ opacity: (ticketStatus === 'CANCELLED' || ticketStatus === 'COMPLETED') ? 0.2 : 1 }} />
           </div>
           
@@ -687,3 +687,4 @@ const RideTicket = () => {
 };
 
 export default RideTicket;
+

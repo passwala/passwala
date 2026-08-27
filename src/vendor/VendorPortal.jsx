@@ -718,11 +718,11 @@ const VendorPortal = ({ user, onLogout }) => {
             <span className="v-stat-label">{businessType === 'event' ? 'Total Ticket Sales' : `Live ${businessType === 'shop' ? 'Orders' : 'Jobs'}`}</span>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '4px' }}>
               <span className="v-stat-value">{stats.pending}</span>
-              <span className="v-stat-trend" style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>{businessType === 'event' ? 'tickets sold' : 'active now'}</span>
+              <span className="v-stat-trend" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{businessType === 'event' ? 'tickets sold' : 'active now'}</span>
             </div>
           </div>
           <div className="v-stat-footer" style={{ marginTop: '1.5rem' }}>
-            <div className="v-progress-bar" style={{ height: '6px', background: '#f1f5f9', borderRadius: '10px', overflow: 'hidden' }}>
+            <div className="v-progress-bar" style={{ height: '6px', background: 'var(--bg-surface)', borderRadius: '10px', overflow: 'hidden' }}>
               <div className="v-progress-fill" style={{ height: '100%', width: '65%', background: businessType === 'event' ? '#3b82f6' : '#f97316' }}></div>
             </div>
           </div>
@@ -744,11 +744,11 @@ const VendorPortal = ({ user, onLogout }) => {
             <span className="v-stat-label">{businessType === 'event' ? 'Total Revenue' : "Today's Revenue"}</span>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '4px' }}>
               <span className="v-stat-value">₹{stats.earnings}</span>
-              <span className="v-stat-trend" style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>net earnings</span>
+              <span className="v-stat-trend" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>net earnings</span>
             </div>
           </div>
           <div className="v-stat-footer" style={{ marginTop: '1.5rem' }}>
-            <div className="v-progress-bar" style={{ height: '6px', background: '#f1f5f9', borderRadius: '10px', overflow: 'hidden' }}>
+            <div className="v-progress-bar" style={{ height: '6px', background: 'var(--bg-surface)', borderRadius: '10px', overflow: 'hidden' }}>
               <div className="v-progress-fill" style={{ height: '100%', width: '45%', background: '#16a34a' }}></div>
             </div>
           </div>
@@ -770,11 +770,11 @@ const VendorPortal = ({ user, onLogout }) => {
             <span className="v-stat-label">{businessType === 'event' ? 'Total Checked In' : (businessType === 'shop' ? 'Store Reputation' : 'Service Reputation')}</span>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '4px' }}>
               <span className="v-stat-value">{businessType === 'event' ? stats.orders : stats.rating}</span>
-              <span className="v-stat-trend" style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>{businessType === 'event' ? 'attendees' : 'customer rating'}</span>
+              <span className="v-stat-trend" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{businessType === 'event' ? 'attendees' : 'customer rating'}</span>
             </div>
           </div>
           <div className="v-stat-footer" style={{ marginTop: '1.5rem' }}>
-            <div className="v-progress-bar" style={{ height: '6px', background: '#f1f5f9', borderRadius: '10px', overflow: 'hidden' }}>
+            <div className="v-progress-bar" style={{ height: '6px', background: 'var(--bg-surface)', borderRadius: '10px', overflow: 'hidden' }}>
               <div className="v-progress-fill" style={{ height: '100%', width: '96%', background: businessType === 'event' ? '#16a34a' : '#2563eb' }}></div>
             </div>
           </div>
@@ -883,7 +883,7 @@ const VendorPortal = ({ user, onLogout }) => {
                 <div key={upg.target} className="v-stat-card animate-fade-in" style={{ border: `2px dashed ${upg.color}`, background: upg.bg, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem 2rem', borderRadius: '24px' }}>
                   <div>
                     <h4 style={{ color: upg.color, fontWeight: 900, margin: 0, fontSize: '1.15rem' }}>{upg.title}</h4>
-                    <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '4px 0 0 0' }}>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '4px 0 0 0' }}>
                       {feesLoading
                         ? <span style={{ display: 'inline-block', background: '#e2e8f0', borderRadius: '4px', width: '220px', height: '14px', animation: 'pulse 1.5s ease-in-out infinite' }} />
                         : upg.desc}
@@ -1369,7 +1369,7 @@ const VendorPortal = ({ user, onLogout }) => {
                 )}
               </div>
               <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" style={{ display: 'none' }} />
-              <button onClick={() => fileInputRef.current?.click()} style={{ position: 'absolute', bottom: '-5px', right: '-5px', width: '32px', height: '32px', borderRadius: '10px', background: 'white', border: '1px solid var(--v-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', cursor: 'pointer', color: 'var(--v-text-muted)', zIndex: 10 }}>
+              <button onClick={() => fileInputRef.current?.click()} style={{ position: 'absolute', bottom: '-5px', right: '-5px', width: '32px', height: '32px', borderRadius: '10px', background: 'var(--bg-card)', border: '1px solid var(--v-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', cursor: 'pointer', color: 'var(--v-text-muted)', zIndex: 10 }}>
                 <Camera size={16} />
               </button>
             </div>
@@ -1377,34 +1377,34 @@ const VendorPortal = ({ user, onLogout }) => {
               <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', marginBottom: '6px' }}>{currentData?.name || 'Partner Profile'}</h2>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <div className="v-status-badge" style={{ display: 'inline-flex' }}>{businessType === 'shop' ? 'Shop Owner' : businessType === 'event' ? 'Event Organizer' : businessType === 'sports' ? 'Venue Partner' : 'Service Provider'}</div>
-                <div className="v-status-badge" style={{ background: '#f1f5f9', color: '#64748b', borderColor: '#e2e8f0' }}>ID: {currentData?.id?.toString().slice(0, 8)}</div>
+                <div className="v-status-badge" style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)', borderColor: '#e2e8f0' }}>ID: {currentData?.id?.toString().slice(0, 8)}</div>
               </div>
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2.5rem', position: 'relative', zIndex: 1 }}>
             <div className="v-form-group">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: '#475569', marginBottom: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
                 <User size={16} color="var(--v-primary)" /> OWNER FULL NAME
               </label>
               {isEditingProfile ? 
                 <input type="text" className="v-input" style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)' }} value={currentData?.name || ''} onChange={e => setEditFormData({...editFormData, name: e.target.value})} /> :
-                <div className="v-input v-readonly" style={{ padding: '14px 18px', background: '#f8fafc', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>{currentData?.name || 'Not provided'}</div>
+                <div className="v-input v-readonly" style={{ padding: '14px 18px', background: 'var(--bg-surface)', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>{currentData?.name || 'Not provided'}</div>
               }
             </div>
 
             <div className="v-form-group">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: '#475569', marginBottom: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
                 <Store size={16} color="var(--v-primary)" /> REGISTERED BUSINESS NAME
               </label>
               {isEditingProfile ? 
                 <input type="text" className="v-input" style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)' }} value={currentData?.business_name || ''} onChange={e => setEditFormData({...editFormData, business_name: e.target.value})} /> :
-                <div className="v-input v-readonly" style={{ padding: '14px 18px', background: '#f8fafc', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>{currentData?.business_name || 'Not provided'}</div>
+                <div className="v-input v-readonly" style={{ padding: '14px 18px', background: 'var(--bg-surface)', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>{currentData?.business_name || 'Not provided'}</div>
               }
             </div>
 
             <div className="v-form-group">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: '#475569', marginBottom: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
                 <CheckCircle2 size={16} color="var(--v-primary)" /> LICENSE / REGISTRATION NO.
               </label>
               {isEditingProfile ? 
@@ -1423,18 +1423,18 @@ const VendorPortal = ({ user, onLogout }) => {
                     setEditFormData({...editFormData, license_no: formatted});
                   }} 
                 /> :
-                <div className="v-input v-readonly" style={{ padding: '14px 18px', background: '#f8fafc', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>{currentData?.license_no || 'Pending Verification'}</div>
+                <div className="v-input v-readonly" style={{ padding: '14px 18px', background: 'var(--bg-surface)', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>{currentData?.license_no || 'Pending Verification'}</div>
               }
             </div>
 
             <div className="v-form-group">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: '#475569', marginBottom: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
                 <Layers size={16} color="var(--v-primary)" /> BUSINESS CATEGORY
               </label>
               {isEditingProfile ? 
                 <select 
                   className="v-input" 
-                  style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)', backgroundColor: 'white', fontWeight: 600, color: '#0f172a' }}
+                  style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)', backgroundColor: 'var(--bg-card)', fontWeight: 600, color: '#0f172a' }}
                   value={currentData?.category || ''} 
                   onChange={e => setEditFormData({...editFormData, category: e.target.value})}
                 >
@@ -1471,20 +1471,20 @@ const VendorPortal = ({ user, onLogout }) => {
                     </>
                   )}
                 </select> :
-                <div className="v-input v-readonly" style={{ padding: '14px 18px', background: '#f8fafc', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>{currentData?.category || (businessType === 'shop' ? 'General Store' : (businessType === 'event' ? 'Music & Concerts' : 'Plumbing Services'))}</div>
+                <div className="v-input v-readonly" style={{ padding: '14px 18px', background: 'var(--bg-surface)', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>{currentData?.category || (businessType === 'shop' ? 'General Store' : (businessType === 'event' ? 'Music & Concerts' : 'Plumbing Services'))}</div>
               }
             </div>
 
             <div className="v-form-group">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: '#475569', marginBottom: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
                 <IndianRupee size={16} color="var(--v-primary)" /> REGISTERED PHONE
               </label>
-              <div className="v-input v-readonly" style={{ padding: '14px 18px', background: '#f8fafc', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>+91 {resolvedVendor.phone || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : '9999999999')}</div>
+              <div className="v-input v-readonly" style={{ padding: '14px 18px', background: 'var(--bg-surface)', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>+91 {resolvedVendor.phone || (user?.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : '9999999999')}</div>
             </div>
 
             {businessType !== 'event' && (
               <div className="v-form-group" style={{ gridColumn: '1 / -1' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: '#475569', marginBottom: '12px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
                   <MapPin size={16} color="var(--v-primary)" /> OFFICIAL BUSINESS ADDRESS
                 </label>
                 {isEditingProfile ? 
@@ -1494,7 +1494,7 @@ const VendorPortal = ({ user, onLogout }) => {
                     value={currentData?.address || ''} 
                     onChange={e => setEditFormData({...editFormData, address: e.target.value})} 
                   /> :
-                  <div className="v-input v-readonly" style={{ minHeight: '80px', padding: '14px 18px', background: '#f8fafc', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent', lineHeight: 1.6 }}>{currentData?.address || 'Address not set'}</div>
+                  <div className="v-input v-readonly" style={{ minHeight: '80px', padding: '14px 18px', background: 'var(--bg-surface)', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent', lineHeight: 1.6 }}>{currentData?.address || 'Address not set'}</div>
                 }
               </div>
             )}
@@ -1502,7 +1502,7 @@ const VendorPortal = ({ user, onLogout }) => {
             {isEditingProfile ? (
               <div className="v-form-group" style={{ gridColumn: '1 / -1' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: '#475569', margin: 0 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
                     <MapPin size={16} color="var(--v-primary)" /> STORE COORDINATES (GPS)
                   </label>
                   <button 
@@ -1555,10 +1555,10 @@ const VendorPortal = ({ user, onLogout }) => {
               </div>
             ) : (
               <div className="v-form-group" style={{ gridColumn: '1 / -1' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: '#475569', marginBottom: '12px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800, fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
                   <MapPin size={16} color="var(--v-primary)" /> STORE COORDINATES (GPS)
                 </label>
-                <div className="v-input v-readonly" style={{ padding: '14px 18px', background: '#f8fafc', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>
+                <div className="v-input v-readonly" style={{ padding: '14px 18px', background: 'var(--bg-surface)', color: '#0f172a', fontWeight: 700, borderRadius: '14px', border: '1.5px solid transparent' }}>
                   {currentData?.lat && currentData?.lng ? `Lat: ${currentData.lat}, Lng: ${currentData.lng}` : 'Not set'}
                 </div>
               </div>
@@ -1608,7 +1608,7 @@ const VendorPortal = ({ user, onLogout }) => {
               width: '44px', 
               height: '44px', 
               borderRadius: '50%', 
-              background: '#f8fafc', 
+              background: 'var(--bg-surface)', 
               border: '1px solid #e2e8f0', 
               display: 'flex', 
               alignItems: 'center', 
@@ -1629,7 +1629,7 @@ const VendorPortal = ({ user, onLogout }) => {
               <img src="/logo.png" alt="Passwala Logo" className="onboarding-logo" style={{ width: '48px' }} />
             </div>
             <h2 style={{fontWeight: 950, fontSize: '2.25rem', marginBottom: '0.5rem', color: '#0f172a', letterSpacing: '-1px'}}>Partner with Passwala</h2>
-            <p style={{color: '#64748b', fontSize: '1rem', fontWeight: 500}}>Choose your business model to get started</p>
+            <p style={{color: 'var(--text-secondary)', fontSize: '1rem', fontWeight: 500}}>Choose your business model to get started</p>
           </div>
           
           <div className="registration-type-grid" style={{ marginTop: '2.5rem' }}>
@@ -1646,7 +1646,7 @@ const VendorPortal = ({ user, onLogout }) => {
                    <ShoppingCart size={32} color={businessType === 'shop' ? '#f97316' : '#94a3b8'} />
                  </div>
                  <h4 style={{ fontWeight: 850, margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>Retail Store</h4>
-                 <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>Sell products and reach local customers instantly.</p>
+                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>Sell products and reach local customers instantly.</p>
               </motion.div>
             )}
 
@@ -1663,7 +1663,7 @@ const VendorPortal = ({ user, onLogout }) => {
                    <Wrench size={32} color={businessType === 'service' ? '#f97316' : '#94a3b8'} />
                  </div>
                  <h4 style={{ fontWeight: 850, margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>Professional</h4>
-                 <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>Offer your expertise and specialized services.</p>
+                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>Offer your expertise and specialized services.</p>
               </motion.div>
             )}
 
@@ -1679,7 +1679,7 @@ const VendorPortal = ({ user, onLogout }) => {
                   <Calendar size={32} color={businessType === 'event' ? '#f97316' : '#94a3b8'} />
                 </div>
                 <h4 style={{ fontWeight: 850, margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>Event Organizer</h4>
-                <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>Organize events, concerts and sell passes online.</p>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>Organize events, concerts and sell passes online.</p>
             </motion.div>
 
             {/* Sports Venue card */}
@@ -1694,7 +1694,7 @@ const VendorPortal = ({ user, onLogout }) => {
                   <Trophy size={32} color={businessType === 'sports' ? '#f97316' : '#94a3b8'} />
                 </div>
                 <h4 style={{ fontWeight: 850, margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>Sports Venue</h4>
-                <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>List courts for Cricket, Badminton, Turf, Pickleball & more.</p>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>List courts for Cricket, Badminton, Turf, Pickleball & more.</p>
             </motion.div>
           </div>
 
@@ -1719,7 +1719,7 @@ const VendorPortal = ({ user, onLogout }) => {
               width: '44px', 
               height: '44px', 
               borderRadius: '50%', 
-              background: '#f8fafc', 
+              background: 'var(--bg-surface)', 
               border: '1px solid #e2e8f0', 
               display: 'flex', 
               alignItems: 'center', 
@@ -1737,17 +1737,17 @@ const VendorPortal = ({ user, onLogout }) => {
           
           <div className="onboarding-header" style={{ marginBottom: '2.5rem', textAlign: 'center' }}>
             <h2 style={{fontWeight: 950, fontSize: '1.75rem', color: '#0f172a', letterSpacing: '-0.5px'}}>Business Credentials</h2>
-            <p style={{color: '#64748b', fontSize: '0.95rem', fontWeight: 500}}>Identity verification for {businessType} onboarding</p>
+            <p style={{color: 'var(--text-secondary)', fontSize: '0.95rem', fontWeight: 500}}>Identity verification for {businessType} onboarding</p>
           </div>
 
           <div style={{ display: 'grid', gap: '1.25rem' }}>
             <div className="v-form-group">
-              <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', marginBottom: '8px' }}>OWNER FULL NAME</label>
+              <label style={{ fontWeight: 800, fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>OWNER FULL NAME</label>
               <input type="text" placeholder="Legal name as per Aadhar" className="v-input" style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)' }} value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
             </div>
             
             <div className="v-form-group">
-              <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', marginBottom: '8px' }}>AADHAR NUMBER</label>
+              <label style={{ fontWeight: 800, fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>AADHAR NUMBER</label>
               <input 
                 type="text" 
                 placeholder="0000 0000 0000" 
@@ -1760,7 +1760,7 @@ const VendorPortal = ({ user, onLogout }) => {
             </div>
 
             <div className="v-form-group">
-              <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', marginBottom: '8px' }}>
+              <label style={{ fontWeight: 800, fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
                 {businessType === 'shop' ? 'SHOP NAME' : businessType === 'event' ? 'EVENT AGENCY NAME' : businessType === 'sports' ? 'SPORTS VENUE NAME' : 'SERVICE BRAND NAME'}
               </label>
               <input 
@@ -1774,10 +1774,10 @@ const VendorPortal = ({ user, onLogout }) => {
             </div>
 
             <div className="v-form-group">
-              <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', marginBottom: '8px' }}>BUSINESS CATEGORY</label>
+              <label style={{ fontWeight: 800, fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>BUSINESS CATEGORY</label>
               <select 
                 className="v-input" 
-                style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)', backgroundColor: 'white', fontWeight: 600, color: '#0f172a' }}
+                style={{ padding: '14px 18px', borderRadius: '14px', border: '1.5px solid var(--v-border)', backgroundColor: 'var(--bg-card)', fontWeight: 600, color: '#0f172a' }}
                 value={formData.category || ''} 
                 onChange={e => setFormData({...formData, category: e.target.value})}
               >
@@ -1825,7 +1825,7 @@ const VendorPortal = ({ user, onLogout }) => {
             </div>
 
             <div className="v-form-group">
-              <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', marginBottom: '8px' }}>LICENSE / REGISTRATION NO.</label>
+              <label style={{ fontWeight: 800, fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>LICENSE / REGISTRATION NO.</label>
               <input 
                 type="text" 
                 placeholder="e.g. 2026-CITY-12345678" 
@@ -1845,7 +1845,7 @@ const VendorPortal = ({ user, onLogout }) => {
             {/* STORE ADDRESS — hidden for event organizer (not needed), code preserved */}
             {businessType !== 'event' && (
               <div className="v-form-group">
-                <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', marginBottom: '8px' }}>STORE ADDRESS</label>
+                <label style={{ fontWeight: 800, fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>STORE ADDRESS</label>
                 <textarea 
                   placeholder="Full physical location of your business" 
                   className="v-input" 
@@ -1860,7 +1860,7 @@ const VendorPortal = ({ user, onLogout }) => {
             {businessType !== 'event' && (
               <div className="v-form-group">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', margin: 0 }}>STORE COORDINATES (GPS)</label>
+                  <label style={{ fontWeight: 800, fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>STORE COORDINATES (GPS)</label>
                   <button 
                     type="button" 
                     onClick={() => {
@@ -1945,7 +1945,7 @@ const VendorPortal = ({ user, onLogout }) => {
           </div>
 
           <h3 style={{fontWeight: 950, fontSize: '1.75rem', color: '#0f172a', marginBottom: '0.75rem'}}>Almost There!</h3>
-          <p style={{color: '#64748b', fontSize: '1rem', lineHeight: 1.6, marginBottom: '2.5rem'}}>We are creating your secure partner vault and synchronizing your business data with our network.</p>
+          <p style={{color: 'var(--text-secondary)', fontSize: '1rem', lineHeight: 1.6, marginBottom: '2.5rem'}}>We are creating your secure partner vault and synchronizing your business data with our network.</p>
           
           <button 
             className="v-btn-primary" 
@@ -2117,12 +2117,12 @@ const VendorPortal = ({ user, onLogout }) => {
 
       {showSuccessPop && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
-          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} style={{ background: 'white', padding: '2.5rem', borderRadius: '24px', maxWidth: '440px', width: '100%', textAlign: 'center' }}>
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} style={{ background: 'var(--bg-card)', padding: '2.5rem', borderRadius: '24px', maxWidth: '440px', width: '100%', textAlign: 'center' }}>
             <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #f97316 0%, #ff8f3d 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto' }}>
               <CheckCircle size={40} color="white" />
             </div>
             <h3 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', marginBottom: '0.75rem' }}>Welcome Aboard! 🎉</h3>
-            <p style={{ color: '#64748b', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '2rem' }}>Congratulations, <strong>{formData.name}</strong>! Your business has been registered successfully.</p>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '2rem' }}>Congratulations, <strong>{formData.name}</strong>! Your business has been registered successfully.</p>
             <button onClick={() => { setShowSuccessPop(false); setAppStatus('dashboard'); }} style={{ width: '100%', padding: '14px', borderRadius: '12px', background: '#0f172a', color: 'white', border: 'none', fontWeight: 800 }}>Launch Dashboard</button>
           </motion.div>
         </div>
@@ -2132,7 +2132,7 @@ const VendorPortal = ({ user, onLogout }) => {
 
   if (appStatus === 'loading') {
     return (
-      <div style={{ height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
+      <div style={{ height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-surface)' }}>
         <div style={{ textAlign: 'center' }}>
            <motion.div 
              animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }}
@@ -2142,7 +2142,7 @@ const VendorPortal = ({ user, onLogout }) => {
              <img src="/logo.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
            </motion.div>
            <h3 style={{ fontWeight: 900, color: '#0f172a', letterSpacing: '-0.5px' }}>Initializing Portal</h3>
-           <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Connecting to secure servers...</p>
+           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Connecting to secure servers...</p>
         </div>
       </div>
     );
@@ -2195,7 +2195,7 @@ const VendorPortal = ({ user, onLogout }) => {
               {activeTab === item.id && (
                 <motion.div 
                   layoutId="activeTabIndicator"
-                  style={{ marginLeft: 'auto', width: '6px', height: '6px', borderRadius: '50%', background: 'white' }} 
+                  style={{ marginLeft: 'auto', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--bg-card)' }} 
                 />
               )}
             </motion.button>
@@ -2216,7 +2216,7 @@ const VendorPortal = ({ user, onLogout }) => {
           <div className="v-top-left">
             <button 
               className="v-menu-trigger" 
-              style={{ display: isSidebarOpen ? 'none' : 'flex', background: 'white', border: '1px solid var(--v-border)', width: '40px', height: '40px', borderRadius: '12px', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--v-text-main)' }}
+              style={{ display: isSidebarOpen ? 'none' : 'flex', background: 'var(--bg-card)', border: '1px solid var(--v-border)', width: '40px', height: '40px', borderRadius: '12px', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--v-text-main)' }}
               onClick={() => setIsSidebarOpen(true)}
             >
               <Menu size={20} />
@@ -2290,7 +2290,7 @@ const VendorPortal = ({ user, onLogout }) => {
                          position: 'absolute',
                          top: 'calc(100% + 10px)',
                          right: 0,
-                         background: 'white',
+                         background: 'var(--bg-card)',
                          borderRadius: '18px',
                          boxShadow: '0 20px 50px rgba(0,0,0,0.18), 0 4px 12px rgba(0,0,0,0.06)',
                          border: '1px solid rgba(0,0,0,0.06)',
@@ -2407,7 +2407,7 @@ const VendorPortal = ({ user, onLogout }) => {
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              style={{ background: 'white', borderRadius: '24px', padding: '2.5rem', maxWidth: '440px', width: '100%', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', textAlign: 'center' }}
+              style={{ background: 'var(--bg-card)', borderRadius: '24px', padding: '2.5rem', maxWidth: '440px', width: '100%', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', textAlign: 'center' }}
               onClick={(e) => e.stopPropagation()}
             >
               <div style={{ background: '#fee2e2', color: '#ef4444', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
@@ -2416,7 +2416,7 @@ const VendorPortal = ({ user, onLogout }) => {
               <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>
                 {activeCount > 1 ? 'Delete Console or Account?' : 'Delete Account?'}
               </h3>
-              <p style={{ margin: '0 0 2rem 0', color: '#64748b', fontSize: '0.95rem', lineHeight: 1.5 }}>
+              <p style={{ margin: '0 0 2rem 0', color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.5 }}>
                 {activeCount > 1 
                   ? `You have multiple business consoles active. You can choose to permanently delete only your ${currentConsoleName} console, or close the entire account.`
                   : "This will permanently remove your business profile, products, and order history. This action cannot be undone."}
@@ -2444,7 +2444,7 @@ const VendorPortal = ({ user, onLogout }) => {
                 </button>
 
                 <button 
-                  style={{ width: '100%', padding: '0.85rem', borderRadius: '12px', background: '#f1f5f9', color: '#64748b', fontWeight: 700, border: 'none', cursor: 'pointer', fontSize: '0.95rem', marginTop: '0.25rem' }}
+                  style={{ width: '100%', padding: '0.85rem', borderRadius: '12px', background: 'var(--bg-surface)', color: 'var(--text-secondary)', fontWeight: 700, border: 'none', cursor: 'pointer', fontSize: '0.95rem', marginTop: '0.25rem' }}
                   onClick={() => setShowDeleteModal(false)}
                 >
                   Cancel
@@ -2483,15 +2483,15 @@ const VendorPortal = ({ user, onLogout }) => {
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              style={{ background: 'white', borderRadius: '24px', padding: '2.5rem', maxWidth: '500px', width: '100%', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}
+              style={{ background: 'var(--bg-card)', borderRadius: '24px', padding: '2.5rem', maxWidth: '500px', width: '100%', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}
               onClick={(e) => e.stopPropagation()}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#0f172a' }}>{modalConfig.title}</h3>
-                <button onClick={() => setShowUpgradeModal(false)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', color: '#64748b' }}>✕</button>
+                <button onClick={() => setShowUpgradeModal(false)} style={{ background: 'var(--bg-surface)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', color: 'var(--text-secondary)' }}>✕</button>
               </div>
               
-              <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: '2rem' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: '2rem' }}>
                 {modalConfig.desc}
               </p>
 
@@ -2532,17 +2532,17 @@ const VendorPortal = ({ user, onLogout }) => {
                 }
               }}>
                 <div className="v-form-group" style={{ marginBottom: '1.25rem' }}>
-                  <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', display: 'block', marginBottom: '6px' }}>Business/Brand Name *</label>
+                  <label style={{ fontWeight: 800, fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Business/Brand Name *</label>
                   <input type="text" name="business_name" required className="v-input" defaultValue={vendorData?.business_name || ''} style={{ padding: '12px', borderRadius: '12px', border: '1.5px solid var(--v-border)' }} />
                 </div>
                 
                 <div className="v-form-group" style={{ marginBottom: '1.25rem' }}>
-                  <label style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', display: 'block', marginBottom: '6px' }}>Aadhaar Number (KYC) *</label>
+                  <label style={{ fontWeight: 800, fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Aadhaar Number (KYC) *</label>
                   <input type="text" name="aadhar_no" required maxLength={12} className="v-input" defaultValue={vendorData?.aadhar_no || ''} style={{ padding: '12px', borderRadius: '12px', border: '1.5px solid var(--v-border)' }} />
                 </div>
 
-                <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '16px', border: '1px solid #e2e8f0', marginBottom: '2rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#475569', fontWeight: 600 }}>
+                <div style={{ background: 'var(--bg-surface)', padding: '1.25rem', borderRadius: '16px', border: '1px solid #e2e8f0', marginBottom: '2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
                     <span>One-time Setup Fee</span>
                     <span>₹{upgradeSelectedFee}.00</span>
                   </div>
@@ -2569,3 +2569,4 @@ const VendorPortal = ({ user, onLogout }) => {
 };
 
 export default VendorPortal;
+

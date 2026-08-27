@@ -204,7 +204,7 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
 
         <div className="privacy-notice" style={{ 
           fontSize: '11px', 
-          color: '#64748b', 
+          color: 'var(--text-secondary)', 
           textAlign: 'center', 
           marginTop: '12px', 
           padding: '8px 16px',
@@ -271,4 +271,5 @@ const LocationSelector = ({ currentLocation, onLocationChange }) => {
 };
 
 export default LocationSelector;
+
 

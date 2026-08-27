@@ -1626,7 +1626,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           left: 0,
           width: '100vw',
           height: '100vh',
-          backgroundColor: '#f1f5f9',
+          backgroundColor: 'var(--bg-surface)',
           overflow: 'hidden',
           zIndex: 9999,
           margin: 0,
@@ -1635,7 +1635,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           border: 'none'
        } : { 
           height: (activeOrder || activeRide) ? '220px' : '280px', 
-          backgroundColor: '#f1f5f9',
+          backgroundColor: 'var(--bg-surface)',
           position: 'relative',
           overflow: 'hidden',
           borderRadius: '24px',
@@ -1662,7 +1662,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
             width: '48px', 
             height: '48px', 
             borderRadius: '16px', 
-            background: 'white', 
+            background: 'var(--bg-card)', 
             border: 'none', 
             boxShadow: '0 8px 24px rgba(0,0,0,0.12)', 
             display: 'flex', 
@@ -1690,7 +1690,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
             width: '48px', 
             height: '48px', 
             borderRadius: '16px', 
-            background: 'white', 
+            background: 'var(--bg-card)', 
             border: 'none', 
             boxShadow: '0 8px 24px rgba(0,0,0,0.12)', 
             display: 'flex', 
@@ -1733,7 +1733,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
             }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--rider-primary)' }}></div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: 0, fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current Hub</p>
+                <p style={{ margin: 0, fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current Hub</p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span onClick={() => setShowAreaPicker(!showAreaPicker)} style={{ cursor: 'pointer', fontSize: '0.85rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{riderLocation}</span>
                   <RefreshCw 
@@ -1747,7 +1747,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
 
               {showAreaPicker && (
                 <div className="glass" style={{ position: 'absolute', top: '100%', left: 0, marginTop: '8px', width: '220px', maxHeight: '200px', overflowY: 'auto', zIndex: 100, padding: '10px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
-                  <p style={{ margin: '0 0 8px 0', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>SWITCH SERVICE AREA</p>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-secondary)' }}>SWITCH SERVICE AREA</p>
                   {activeAreas.map(area => (
                     <div 
                       key={area.id} 
@@ -1793,14 +1793,14 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           <>
             {/* OSRM Route Mode UI Selector */}
             <div style={{
-              position: 'absolute', top: '1rem', left: '1rem', background: 'white', padding: '0.6rem 0.8rem',
+              position: 'absolute', top: '1rem', left: '1rem', background: 'var(--bg-card)', padding: '0.6rem 0.8rem',
               borderRadius: '16px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', display: 'flex', flexDirection: 'column',
               gap: '6px', zIndex: 10, maxWidth: 'calc(100% - 140px)', pointerEvents: 'auto'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Route:</span>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: 800, textTransform: 'uppercase' }}>Route:</span>
               </div>
-              <div style={{ display: 'flex', gap: '2px', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '2px', background: '#f8fafc' }}>
+              <div style={{ display: 'flex', gap: '2px', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '2px', background: 'var(--bg-surface)' }}>
                 {['cycling'].map(mode => (
                   <button
                     key={mode} onClick={() => setRouteMode(mode)}
@@ -1857,7 +1857,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
           </div>
 
           <div className="rider-grid-2">
-              <div style={{ background: 'white', padding: '1.25rem', borderRadius: '24px', border: '1px solid var(--rider-border)', boxShadow: 'var(--rider-shadow)' }}>
+              <div style={{ background: 'var(--bg-card)', padding: '1.25rem', borderRadius: '24px', border: '1px solid var(--rider-border)', boxShadow: 'var(--rider-shadow)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem' }}>
                     <div style={{ padding: '6px', background: 'rgba(249, 115, 22, 0.1)', borderRadius: '8px', color: 'var(--rider-primary)' }}>
                       <IndianRupee size={16} />
@@ -1866,7 +1866,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                   </div>
                   <p style={{ fontSize: '1.75rem', fontWeight: 900, margin: 0, color: 'var(--rider-text)' }}>₹{stats.earnings}</p>
               </div>
-              <div style={{ background: 'white', padding: '1.25rem', borderRadius: '24px', border: '1px solid var(--rider-border)', boxShadow: 'var(--rider-shadow)' }}>
+              <div style={{ background: 'var(--bg-card)', padding: '1.25rem', borderRadius: '24px', border: '1px solid var(--rider-border)', boxShadow: 'var(--rider-shadow)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem' }}>
                     <div style={{ padding: '6px', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '8px', color: 'var(--rider-success)' }}>
                       <Package size={16} />
@@ -1877,7 +1877,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
               </div>
           </div>
 
-          <div style={{ background: 'white', padding: '1.25rem', borderRadius: '24px', border: '1px solid var(--rider-border)', boxShadow: 'var(--rider-shadow)', marginTop: '1rem' }}>
+          <div style={{ background: 'var(--bg-card)', padding: '1.25rem', borderRadius: '24px', border: '1px solid var(--rider-border)', boxShadow: 'var(--rider-shadow)', marginTop: '1rem' }}>
               <div 
                   onClick={() => setShowGpsSimulator(!showGpsSimulator)} 
                   style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
@@ -1924,19 +1924,19 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                       <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
                           <button 
                               onClick={() => { setMockLat('23.0225'); setMockLng('72.5714'); }}
-                              style={{ padding: '4px 8px', fontSize: '0.65rem', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
+                              style={{ padding: '4px 8px', fontSize: '0.65rem', background: 'var(--bg-surface)', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
                           >
                               Ahmedabad Center
                           </button>
                           <button 
                               onClick={() => { setMockLat('23.0396'); setMockLng('72.5100'); }}
-                              style={{ padding: '4px 8px', fontSize: '0.65rem', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
+                              style={{ padding: '4px 8px', fontSize: '0.65rem', background: 'var(--bg-surface)', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
                           >
                               Sindhu Bhavan Road
                           </button>
                           <button 
                               onClick={() => { setMockLat('23.0130'); setMockLng('72.5625'); }}
-                              style={{ padding: '4px 8px', fontSize: '0.65rem', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
+                              style={{ padding: '4px 8px', fontSize: '0.65rem', background: 'var(--bg-surface)', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
                           >
                               Paldi
                           </button>
@@ -2043,7 +2043,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
 
       {/* Active Ride Card */}
       {activeRide && (
-        <div className="rider-card" style={{ padding: 0, overflow: 'hidden', marginTop: '-1rem', position: 'relative', zIndex: 20, margin: '0 1rem 1.5rem 1rem', background: 'white', borderRadius: '24px', border: '1px solid var(--rider-border)', boxShadow: 'var(--rider-shadow-lg)' }}>
+        <div className="rider-card" style={{ padding: 0, overflow: 'hidden', marginTop: '-1rem', position: 'relative', zIndex: 20, margin: '0 1rem 1.5rem 1rem', background: 'var(--bg-card)', borderRadius: '24px', border: '1px solid var(--rider-border)', boxShadow: 'var(--rider-shadow-lg)' }}>
             <div style={{ background: 'var(--rider-primary)', color: 'white', padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                     <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)', fontWeight: 600, letterSpacing: '0.05em', margin: 0 }}>ACTIVE CITY RIDE</p>
@@ -2119,7 +2119,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                       type="text" 
                       value={activeRide.qrHash ? activeRide.qrHash.split('-')[2] || activeRide.qrHash.substring(0, 8).toUpperCase() : ''} 
                       disabled
-                      style={{ padding: '0.8rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700, fontSize: '1rem', color: '#1e293b', textAlign: 'center', letterSpacing: '2px' }} 
+                      style={{ padding: '0.8rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'var(--bg-surface)', fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)', textAlign: 'center', letterSpacing: '2px' }} 
                     />
                   </div>
                 )}
@@ -2171,7 +2171,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                     {activeRide.customerPhone && (
                       <button 
                           onClick={() => window.open(`tel:${activeRide.customerPhone}`, '_self')} 
-                          style={{ flex: 1, padding: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: 'white', color: '#1e293b', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
+                          style={{ flex: 1, padding: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: 'var(--bg-card)', color: 'var(--text-primary)', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
                           onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
                           onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                       >
@@ -2307,7 +2307,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                     <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
                         <button 
                             onClick={() => toast.success('Connecting call to store...')} 
-                            style={{ flex: 1, padding: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: 'white', color: '#1e293b', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
+                            style={{ flex: 1, padding: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: 'var(--bg-card)', color: 'var(--text-primary)', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
                             onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
                             onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                         >
@@ -2319,7 +2319,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                                 const lng = activeOrder?.storeCoords?.lng || 72.5075;
                                 window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
                             }} 
-                            style={{ flex: 1, padding: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: 'white', color: '#1e293b', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
+                            style={{ flex: 1, padding: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: 'var(--bg-card)', color: 'var(--text-primary)', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
                             onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
                             onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                         >
@@ -2331,7 +2331,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                     <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
                         <button 
                             onClick={() => toast.success('Connecting call to customer...')} 
-                            style={{ flex: 1, padding: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: 'white', color: '#1e293b', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
+                            style={{ flex: 1, padding: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: 'var(--bg-card)', color: 'var(--text-primary)', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
                             onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
                             onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                         >
@@ -2343,7 +2343,7 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
                                 const lng = activeOrder?.customerCoords?.lng || 72.5244;
                                 window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
                             }} 
-                            style={{ flex: 1, padding: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: 'white', color: '#1e293b', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
+                            style={{ flex: 1, padding: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: 'var(--bg-card)', color: 'var(--text-primary)', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
                             onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
                             onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                         >
@@ -2362,3 +2362,4 @@ function RiderDashboard({ user, isOnline, setIsOnline, riderId, stats, setStats,
 }
 
 export default RiderDashboard;
+
