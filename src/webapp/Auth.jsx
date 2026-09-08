@@ -165,33 +165,20 @@ const Auth = ({ onLogin }) => {
 
     setLoading(true);
     try {
-      // PRIMARY: Use Supabase Phone OTP (works on all devices, no server needed)
-      const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone });
-      if (!error) {
-        toast.success('OTP sent to your WhatsApp / SMS! 📲');
-        setPhoneOtpSent(true);
-        return;
-      }
-      // Supabase phone auth not enabled — fallback to backend API
-      console.warn('Supabase phone OTP failed, trying backend:', error.message);
-      throw error;
-    } catch (supabaseErr) {
-      // FALLBACK: Backend API (Evolution/WhatsApp — requires server to be running)
-      try {
-        const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
-        const res = await fetch(`${BASE_API}/api/auth/send-otp`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: clean })
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error || 'Failed to send OTP');
-        toast.success('OTP sent to your WhatsApp! 📲');
-        setPhoneOtpSent(true);
-        if (data.otp) setMockOtp(data.otp);
-      } catch (apiErr) {
-        toast.error('Could not send OTP. Please try Email OTP instead.');
-      }
+      // Backend API (Evolution/WhatsApp — requires server to be running)
+      const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      const res = await fetch(`${BASE_API}/api/auth/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: clean })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to send OTP');
+      toast.success('OTP sent to your WhatsApp! 📲');
+      setPhoneOtpSent(true);
+      if (data.otp) setMockOtp(data.otp);
+    } catch (apiErr) {
+      toast.error('Could not send OTP. Please ensure the backend server is running.');
     } finally {
       setLoading(false);
     }
@@ -205,47 +192,24 @@ const Auth = ({ onLogin }) => {
 
     setLoading(true);
     try {
-      // PRIMARY: Verify via Supabase (matches the OTP it sent)
-      const { data, error } = await supabase.auth.verifyOtp({
-        phone: fullPhone,
-        token: phoneOtp,
-        type: 'sms'
+      // Backend API verification
+      const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
+      const res = await fetch(`${BASE_API}/api/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: clean, otp: phoneOtp })
       });
-
-      if (!error && data?.user) {
-        toast.success('Phone verified! ✅');
-        const user = data.user;
-        await handleQuickLogin({
-          phone: fullPhone,
-          uid: user.id,
-          displayName: `User ${clean.slice(-4)}`,
-          email: user.email || null
-        }, 'phone');
-        return;
-      }
-      // If Supabase fails, try backend API verification
-      throw error || new Error('Supabase verify failed');
-    } catch (supabaseErr) {
-      // FALLBACK: Backend API verification
-      try {
-        const BASE_API = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
-        const res = await fetch(`${BASE_API}/api/auth/verify-otp`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: clean, otp: phoneOtp })
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error || 'Incorrect OTP');
-        toast.success('Phone verified! ✅');
-        await handleQuickLogin({
-          phone: data.phone,
-          uid: `phone_${data.phone}`,
-          displayName: `User ${data.phone.slice(-4)}`,
-          email: null
-        }, 'phone');
-      } catch (apiErr) {
-        toast.error(apiErr.message || 'Verification failed. Please try again.');
-      }
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Incorrect OTP');
+      toast.success('Phone verified! ✅');
+      await handleQuickLogin({
+        phone: fullPhone,
+        uid: clean,
+        displayName: `User ${clean.slice(-4)}`,
+        email: null
+      }, 'phone');
+    } catch (apiErr) {
+      toast.error(apiErr.message || 'Verification failed');
     } finally {
       setLoading(false);
     }
