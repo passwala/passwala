@@ -768,8 +768,8 @@ const AppContent = ({
               </Suspense>
             </main>
 
-            {/* 4. Global Footers/Navs — hidden during onboarding */}
-            {isWebappMode && !(effectiveUser && isProfileComplete && showOnboarding) && (
+            {/* 4. Global Footers/Navs — hidden during onboarding and auth */}
+            {isWebappMode && locationPath !== '/auth' && !(effectiveUser && isProfileComplete && showOnboarding) && (
               <BottomNav activeTab={currentView} user={effectiveUser} onTabChange={(v) => {
                 if (v === 'NEIGHBORS') { setShowComingSoon(true); return; }
                 const routeMap = {
