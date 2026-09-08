@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import {
   Phone, ArrowLeft, RefreshCw, User, ShieldCheck, Bell, MapPin,
-  Navigation, Search, Crosshair, ChevronRight
+  Navigation, Search, Crosshair, ChevronRight, Moon, Sun, Globe
 } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
 import { supabase } from '../supabase';
 import { useTranslation } from './LanguageContext';
+import { useTheme } from '../hooks/useTheme';
 import './Auth.css';
 
 
@@ -29,7 +30,8 @@ const popularAreas = [
 ];
 
 const Auth = ({ onLogin }) => {
-  const { t } = useTranslation();
+  const { t, language, changeLanguage } = useTranslation();
+  const [isDarkMode, setIsDarkMode] = useTheme();
   const { requestNotificationPermission } = useNotifications();
   const [step, setStep] = useState(() => {
     if (localStorage.getItem('passwala_user')) return 'WARM_UP';
@@ -460,9 +462,25 @@ const Auth = ({ onLogin }) => {
   return (
     <div className="auth-modern-overlay" style={{
       minHeight: '100vh', display: 'grid', placeItems: 'center', 
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-      padding: '2rem 1rem'
+      background: 'var(--bg-main)', // Fixed dark mode background override
+      padding: '2rem 1rem',
+      position: 'relative'
     }}>
+      {/* Top Header for Theme & Language Toggle */}
+      <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', gap: '8px' }}>
+        <button onClick={() => changeLanguage(language === 'en' ? 'hi' : 'en')} style={{
+          background: 'var(--bg-surface)', border: '1px solid var(--border-light)', color: 'var(--text-primary)',
+          display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold'
+        }}>
+          <Globe size={16} /> {language.toUpperCase()}
+        </button>
+        <button onClick={() => setIsDarkMode(!isDarkMode)} style={{
+          background: 'var(--bg-surface)', border: '1px solid var(--border-light)', color: 'var(--text-primary)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', width: '34px', height: '34px', borderRadius: '50%', cursor: 'pointer'
+        }}>
+          {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
+      </div>
       <div style={{ width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {/* Back Button Wrapper */}
         {(step === 'LOCATION' || step === 'PROFILE') && (
