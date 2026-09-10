@@ -899,7 +899,7 @@ const AIChatWidget = ({ user, onLogin }) => {
   };
 
   return (
-    <>
+    <div style={{ display: 'none' }}>
       {(user || isOpen) && (
         <button
           className="ai-chat-toggle-btn shadow-lg"
@@ -1640,7 +1640,7 @@ const AIChatWidget = ({ user, onLogin }) => {
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </div>
   );
 };
 

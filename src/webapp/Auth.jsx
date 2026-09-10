@@ -95,9 +95,9 @@ const Auth = ({ onLogin }) => {
       const saved = localStorage.getItem('local_user_profile');
       const savedUser = localStorage.getItem('passwala_user');
       if (saved && step === 'WARM_UP') {
-        try { const parsed = JSON.parse(saved); setSyncedUser(parsed); onLogin(parsed); } catch (e) {}
+        try { const parsed = JSON.parse(saved); setSyncedUser(parsed); onLogin(parsed); } catch (e) { /* ignore */ }
       } else if (savedUser && step !== 'LOCATION' && step !== 'PROFILE') {
-        try { const parsedUser = JSON.parse(savedUser); onLogin(parsedUser); } catch (e) {}
+        try { const parsedUser = JSON.parse(savedUser); onLogin(parsedUser); } catch (e) { /* ignore */ }
       }
     };
     checkLocalAuth();
@@ -376,7 +376,7 @@ const Auth = ({ onLogin }) => {
           return;
         }
       }
-    } catch (directErr) {}
+    } catch (directErr) { /* ignore */ }
 
     try {
       const baseUrl = window.location.protocol === 'https:' ? '' : (import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3004`);

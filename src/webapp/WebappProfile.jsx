@@ -223,14 +223,14 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
               className="edit-name-input-webapp" autoFocus
             />
             <div className="edit-name-actions">
-              <button onClick={handleUpdateName} disabled={isUpdatingName} className="save-name-btn-webapp">Save</button>
-              <button onClick={() => setIsEditingName(false)} className="cancel-name-btn-webapp">Cancel</button>
+              <button onClick={handleUpdateName} disabled={isUpdatingName} className="save-name-btn-webapp">{t('save')}</button>
+              <button onClick={() => setIsEditingName(false)} className="cancel-name-btn-webapp">{t('cancel')}</button>
             </div>
           </div>
         ) : (
           <div className="name-display-stack" onClick={() => setIsEditingName(true)}>
             <h2 className="profile-name-webapp">{newName || user?.displayName || 'Passwala User'}</h2>
-            <div className="profile-membership-webapp">Premium Hero Member</div>
+            <div className="profile-membership-webapp">{t('premium_member')}</div>
           </div>
         )}
       </div>
@@ -238,13 +238,13 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
       <div className="profile-scroll-content">
 
         {/* ── Personal Info Card ───────────────────────────── */}
-        <h3 className="section-label">Personal Info</h3>
+        <h3 className="section-label">{t('personal_info')}</h3>
         <div className="profile-info-card">
           {/* Name row */}
           <div className="profile-info-row" onClick={() => setIsEditingName(true)}>
             <div className="profile-info-icon name-icon"><User size={18} /></div>
             <div className="profile-info-content">
-              <span className="profile-info-label">Full Name</span>
+              <span className="profile-info-label">{t('full_name')}</span>
               {isEditingName ? (
                 <div className="profile-info-edit-row">
                   <input
@@ -261,7 +261,7 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
                   <button className="profile-info-cancel-btn" onClick={e => { e.stopPropagation(); setIsEditingName(false); }}>✕</button>
                 </div>
               ) : (
-                <span className="profile-info-value">{newName || user?.displayName || 'Tap to add name'}</span>
+                <span className="profile-info-value">{newName || user?.displayName || t('tap_to_add_name')}</span>
               )}
             </div>
             {!isEditingName && <Edit3 size={15} className="profile-info-edit-icon" />}
@@ -273,7 +273,7 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
           <div className="profile-info-row">
             <div className="profile-info-icon phone-icon"><Phone size={18} /></div>
             <div className="profile-info-content">
-              <span className="profile-info-label">Phone Number</span>
+              <span className="profile-info-label">{t('phone_number')}</span>
               <span className="profile-info-value">
                 {(() => {
                   const phone = user?.phoneNumber || user?.phone;
@@ -291,7 +291,7 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
           <div className="profile-info-row" onClick={() => !isEditingEmail && setIsEditingEmail(true)}>
             <div className="profile-info-icon email-icon"><Mail size={18} /></div>
             <div className="profile-info-content">
-              <span className="profile-info-label">Email Address</span>
+              <span className="profile-info-label">{t('email_address')}</span>
               {isEditingEmail ? (
                 <div className="profile-info-edit-row">
                   <input
@@ -310,7 +310,7 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
                 </div>
               ) : (
                 <span className="profile-info-value" style={{ color: (user?.email || newEmail) ? undefined : '#94a3b8' }}>
-                  {newEmail || user?.email || 'Tap to add email'}
+                  {newEmail || user?.email || t('tap_to_add_email')}
                 </span>
               )}
             </div>

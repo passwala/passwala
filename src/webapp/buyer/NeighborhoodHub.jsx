@@ -407,13 +407,13 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
       <div className="bms-subnav">
         <div className="bms-subnav-inner">
           <div className="bms-subnav-links-left">
-            <span className={window.location.pathname.startsWith('/events') ? 'active' : ''} onClick={() => handleSubnavClick('events')}>Events</span>
-            <span className={window.location.pathname.startsWith('/sports') ? 'active' : ''} onClick={() => handleSubnavClick('sports')}>Sports</span>
+            <span className={window.location.pathname.startsWith('/events') ? 'active' : ''} onClick={() => handleSubnavClick('events')}>{t('events')}</span>
+            <span className={window.location.pathname.startsWith('/sports') ? 'active' : ''} onClick={() => handleSubnavClick('sports')}>{t('sports')}</span>
           </div>
           <div className="bms-subnav-links-right">
-            <span onClick={() => handleSubnavClick('listyourshow')}>ListYourShow</span>
-            <span onClick={() => handleSubnavClick('offers')}>Offers</span>
-            <span onClick={() => handleSubnavClick('giftcards')}>Gift Cards</span>
+            <span onClick={() => handleSubnavClick('listyourshow')}>{t('list_your_show')}</span>
+            <span onClick={() => handleSubnavClick('offers')}>{t('offers')}</span>
+            <span onClick={() => handleSubnavClick('giftcards')}>{t('gift_cards')}</span>
           </div>
         </div>
       </div>
@@ -426,8 +426,12 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
               <span style={{ fontSize: '1.25rem' }}>🛵</span>
             </div>
             <div className="banner-text-content">
-              <h4>Active City Ride Booked</h4>
-              <p>Your ride from <strong>{activeRideBooking.pickup_area}</strong> to <strong>{activeRideBooking.drop_area}</strong> is confirmed.</p>
+              <h4>{t('active_city_ride')}</h4>
+              <p>
+                {t('ride_confirmed')
+                  .replace('{pickup}', activeRideBooking.pickup_area)
+                  .replace('{drop}', activeRideBooking.drop_area)}
+              </p>
             </div>
             <button 
               className="complete-now-btn" 
@@ -462,7 +466,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
               <Sunrise size={22} />
             </div>
             <div className="banner-text-content">
-              <h4>Morning Delivery Subscription is Active</h4>
+              <h4>{t('morning_delivery')}</h4>
               <p>
                 Delivering {activeSubscription.items.map(i => i.name.split(' (')[0]).join(', ')} every{' '}
                 <span style={{ textTransform: 'capitalize', fontWeight: 'bold' }}>{activeSubscription.frequency}</span> between{' '}
@@ -533,7 +537,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
         {recommendedEvents.length > 0 && (
           <div className="bms-recommended-section" style={{ padding: '1.5rem 0', background: 'transparent' }}>
             <div className="bms-section-header">
-              <h2 className="bms-section-title">Recommended Events</h2>
+              <h2 className="bms-section-title">{t('recommended_events')}</h2>
               <span className="bms-see-all" onClick={() => onNavigate('EVENTS')}>See All ›</span>
             </div>
             <div className="bms-recommended-row">
@@ -544,7 +548,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
                   <div key={`rec-${event.id}`} className="bms-rec-card" onClick={() => navigate(`/events/${event.id}`)}>
                     <div className="bms-rec-img-wrap">
                       <img src={getCleanImgUrl(event.banner_url)} alt={event.title} />
-                      <span className="bms-rec-badge" style={{ backgroundColor: '#ff7622' }}>POPULAR</span>
+                      <span className="bms-rec-badge" style={{ backgroundColor: '#ff7622' }}>{t('popular')}</span>
                     </div>
                     <h4 className="bms-rec-title">{event.title}</h4>
                     <p className="bms-rec-cat">{event.category || 'Live Event'}</p>

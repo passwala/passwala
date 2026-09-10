@@ -31,7 +31,11 @@ const WebappNavbar = ({ user, onOpenProfile, onBack, title, location, isDarkMode
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setNavSearch(params.get('q') || '');
+    const q = params.get('q') || '';
+    if (navSearch !== q) {
+      setNavSearch(q);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [window.location.search]);
 
   const handleSearchSubmit = (e) => {
