@@ -30,7 +30,7 @@ const popularAreas = [
 ];
 
 const Auth = ({ onLogin }) => {
-  const { t, language, changeLanguage } = useTranslation();
+  const { t, currentLanguage, changeLanguage } = useTranslation();
   const [isDarkMode, setIsDarkMode] = useTheme();
   const { requestNotificationPermission } = useNotifications();
   const [step, setStep] = useState(() => {
@@ -468,11 +468,11 @@ const Auth = ({ onLogin }) => {
     }}>
       {/* Top Header for Theme & Language Toggle */}
       <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', gap: '8px' }}>
-        <button onClick={() => changeLanguage(language === 'en' ? 'hi' : 'en')} style={{
+        <button onClick={() => changeLanguage(currentLanguage === 'en' ? 'hi' : 'en')} style={{
           background: 'var(--bg-surface)', border: '1px solid var(--border-light)', color: 'var(--text-primary)',
           display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold'
         }}>
-          <Globe size={16} /> {language.toUpperCase()}
+          <Globe size={16} /> {(currentLanguage || 'en').toUpperCase()}
         </button>
         <button onClick={() => setIsDarkMode(!isDarkMode)} style={{
           background: 'var(--bg-surface)', border: '1px solid var(--border-light)', color: 'var(--text-primary)',
