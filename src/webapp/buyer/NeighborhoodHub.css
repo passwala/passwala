@@ -1317,11 +1317,9 @@ body:not(.dark-mode) .hub-card.purple {
   transform: scale(1.12) rotate(-6deg);
 }
 
-/* ── BookMyShow Redesign Styles for NeighborhoodHub ── */
-
 .bms-subnav {
   background: var(--bg-card);
-  border-bottom: 1.5px solid #ffedd5;
+  border-bottom: 1.5px solid var(--border-light);
   font-family: 'Inter', sans-serif;
   margin-top: 0;
   margin-bottom: 1.5rem;

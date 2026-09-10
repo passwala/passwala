@@ -182,7 +182,7 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
           try {
             const errData = await res.json();
             errorDetail = errData.error || errData.message || errorDetail;
-          } catch (e) {}
+          } catch (e) { /* ignore */ }
           throw new Error(errorDetail);
         }
         const data = await res.json();
