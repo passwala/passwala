@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, Clock, Calendar, Shield, Zap } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { useTranslation } from '../../../LanguageContext';
+import { useTranslation } from '../../LanguageContext';
 // eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
 import './SportsCheckout.css';
@@ -153,6 +153,20 @@ const SportsCheckout = ({ user: routeUser }) => {
           contact: (userInfo?.phoneNumber || userInfo?.phone || '').replace(/\D/g, '').slice(-10),
         },
         theme: { color: '#f97316' },
+        config: {
+          display: {
+            blocks: {
+              upi: {
+                name: 'Pay via UPI',
+                instruments: [{ method: 'upi' }]
+              }
+            },
+            sequence: ['block.upi'],
+            preferences: {
+              show_default_blocks: true
+            }
+          }
+        },
         handler: async (response) => {
           try {
             // Step 6: Verify payment signature on backend
