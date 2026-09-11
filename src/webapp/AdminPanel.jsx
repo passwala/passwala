@@ -289,12 +289,12 @@ const ALL_TAB_SECTIONS = [
       // { id: 'city_vehicles_panel', label: 'City Vehicles', icon: Truck, table: 'city_vehicles' },
       // { id: 'ticket_bookings_panel', label: 'Ride Bookings', icon: MapPin, table: 'ticket_bookings' },
       { id: 'events_panel', label: 'Events', icon: Sparkles, table: 'events' },
-      // { id: 'event_bookings_panel', label: 'Event Bookings', icon: Calendar, table: 'event_bookings' },
+      { id: 'event_bookings_panel', label: 'Event Bookings', icon: Calendar, table: 'event_bookings' },
       // { id: 'event_approvals_panel', label: 'Event Approvals', icon: ShieldCheck },
       // { id: 'event_organizers_panel', label: 'Event Organizers', icon: Users, table: 'service_providers' },
       // { id: 'upgrade_requests_panel', label: 'Upgrade Requests', icon: ShieldCheck },
       { id: 'sports_venues_panel', label: '🏏 Sports Venues', icon: Calendar, table: 'sports_venues' },
-      // { id: 'venue_bookings_panel', label: '🎾 Court Bookings', icon: Calendar, table: 'venue_bookings' },
+      { id: 'venue_bookings_panel', label: '🎾 Court Bookings', icon: Calendar, table: 'venue_bookings' },
     ]
   },
   {
