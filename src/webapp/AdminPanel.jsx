@@ -403,6 +403,7 @@ const EventApprovalsPanel = ({ API_URL }) => {
     }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchPending(); }, []);
 
   const handleAction = async (ids, action) => {
@@ -589,6 +590,7 @@ const UpgradeRequestsPanel = ({ API_URL }) => {
     }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useEffect(() => { fetchRequests(); }, []);
 
   const handleAction = async (id, action) => {
@@ -737,6 +739,7 @@ const PromoCodesPanel = ({ supabase: sb }) => {
     setLoading(false);
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useEffect(() => { fetchCodes(); }, []);
 
   const handleCreate = async (e) => {

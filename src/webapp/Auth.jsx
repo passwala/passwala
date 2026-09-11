@@ -104,6 +104,7 @@ const Auth = ({ onLogin }) => {
     checkLocalAuth();
 
     return () => subscription.unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, onLogin]);
 
   useEffect(() => {

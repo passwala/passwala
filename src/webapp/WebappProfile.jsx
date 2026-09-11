@@ -78,6 +78,7 @@ const WebappProfile = ({ user, onLogout, isDarkMode, onToggleTheme, onUpdateUser
     const cleanName = getCleanName(user);
     if (cleanName) setNewName(cleanName);
     if (user?.email) setNewEmail(user.email);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const getAuthToken = async () => {

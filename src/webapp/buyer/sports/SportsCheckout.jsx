@@ -81,6 +81,7 @@ const SportsCheckout = ({ user: routeUser }) => {
   const handleConfirm = async () => {
     if (booking) return;
     setBooking(true);
+    let primaryBooking = null; // hoisted so catch block can rollback on failure
     try {
       const token = localStorage.getItem('passwala_token') || '';
       const payload = {
@@ -102,7 +103,7 @@ const SportsCheckout = ({ user: routeUser }) => {
       const bookData = await bookRes.json();
       if (!bookRes.ok) throw new Error(bookData.error || 'Booking failed');
 
-      const primaryBooking = bookData.booking;
+      primaryBooking = bookData.booking;
       const allBookings = bookData.bookings || [primaryBooking];
 
       // Step 2: If amount is 0, skip payment
@@ -207,11 +208,11 @@ const SportsCheckout = ({ user: routeUser }) => {
     } catch (err) {
       toast.error(err.message || 'Booking failed. Please try again.');
       // If we made it far enough to have a booking but Razorpay failed, rollback
-      if (typeof bookData !== 'undefined' && bookData?.booking?.id) {
+      if (primaryBooking?.id) {
          await fetch(`${BASE_URL}/api/sports/cancel`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ booking_id: bookData.booking.id, reason: 'Payment Initialization Error' })
+            body: JSON.stringify({ booking_id: primaryBooking.id, reason: 'Payment Initialization Error' })
          }).catch(() => {});
       }
       setBooking(false);
