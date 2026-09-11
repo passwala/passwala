@@ -1,7 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, Clock, Calendar, Shield, Zap } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+// eslint-disable-next-line no-unused-vars
+import { motion } from 'framer-motion';
 import './SportsCheckout.css';
 
 const BASE_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
@@ -54,6 +56,17 @@ const SportsCheckout = ({ user: routeUser }) => {
     return { base, platFee, gst, total };
   }, [slots]);
 
+  // Load Razorpay checkout script dynamically (must be before any early return)
+  useEffect(() => {
+    if (!document.getElementById('rzp-script')) {
+      const script = document.createElement('script');
+      script.id = 'rzp-script';
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
   if (!venue || slots.length === 0) {
     return (
       <div style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}>
@@ -69,6 +82,7 @@ const SportsCheckout = ({ user: routeUser }) => {
     if (booking) return;
     setBooking(true);
     try {
+      const token = localStorage.getItem('passwala_token') || '';
       const payload = {
         venue_id:   venue.id,
         slot_ids:   slots.map(s => s.id),
@@ -79,23 +93,109 @@ const SportsCheckout = ({ user: routeUser }) => {
         user_email: userInfo?.email || null,
       };
 
-      const res = await fetch(`${BASE_URL}/api/sports/book`, {
+      // Step 1: Create a pending booking in the database
+      const bookRes = await fetch(`${BASE_URL}/api/sports/book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      const bookData = await bookRes.json();
+      if (!bookRes.ok) throw new Error(bookData.error || 'Booking failed');
 
-      if (!res.ok) throw new Error(data.error || 'Booking failed');
+      const primaryBooking = bookData.booking;
+      const allBookings = bookData.bookings || [primaryBooking];
 
-      toast.success('🎉 Booking confirmed successfully!');
-      navigate('/sports/ticket', { state: { booking: data.booking, bookings: data.bookings, venue, slots, sport } });
+      // Step 2: If amount is 0, skip payment
+      if (amounts.total === 0) {
+        toast.success('🎉 Booking confirmed successfully!');
+        navigate('/sports/ticket', { state: { booking: primaryBooking, bookings: allBookings, venue, slots, sport } });
+        return;
+      }
+
+      // Step 3: Create Razorpay order on backend
+      const rzpRes = await fetch(`${BASE_URL}/api/orders/payment/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          amount: amounts.total,
+          orderId: primaryBooking.id,
+        }),
+      });
+      const rzpData = await rzpRes.json();
+      if (!rzpRes.ok) throw new Error(rzpData.error || 'Payment gateway error');
+
+      // Step 4: Handle mock mode (no real Razorpay)
+      if (rzpData.is_mock) {
+        toast.success('🎉 Booking confirmed successfully!');
+        navigate('/sports/ticket', { state: { booking: primaryBooking, bookings: allBookings, venue, slots, sport } });
+        return;
+      }
+
+      // Step 5: Open Razorpay payment popup
+      const options = {
+        key: rzpData.key_id,
+        amount: rzpData.amount,
+        currency: rzpData.currency || 'INR',
+        name: 'Passwala',
+        description: `Court booking at ${venue.name}`,
+        order_id: rzpData.id,
+        prefill: {
+          name:  userInfo?.displayName || userInfo?.full_name || '',
+          email: userInfo?.email || '',
+          contact: (userInfo?.phoneNumber || userInfo?.phone || '').replace(/\D/g, '').slice(-10),
+        },
+        theme: { color: '#f97316' },
+        handler: async (response) => {
+          try {
+            // Step 6: Verify payment signature on backend
+            const verifyRes = await fetch(`${BASE_URL}/api/orders/payment/verify`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+              body: JSON.stringify({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id:   response.razorpay_order_id,
+                razorpay_signature:  response.razorpay_signature,
+                orderId: primaryBooking.id,
+              }),
+            });
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok || !verifyData.success) throw new Error('Payment verification failed');
+
+            toast.success('🎉 Booking confirmed successfully!');
+            navigate('/sports/ticket', { state: { booking: primaryBooking, bookings: allBookings, venue, slots, sport } });
+          } catch (verifyErr) {
+            toast.error(verifyErr.message || 'Payment verification failed');
+          } finally {
+            setBooking(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            toast('Payment cancelled. Your slot is still reserved temporarily.', { icon: '⚠️' });
+            setBooking(false);
+          },
+        },
+      };
+
+      if (!window.Razorpay) {
+        throw new Error('Razorpay SDK not loaded. Please refresh and try again.');
+      }
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+      // Don't set booking to false here — it'll be set in handler/ondismiss
+      return;
     } catch (err) {
       toast.error(err.message || 'Booking failed. Please try again.');
-    } finally {
       setBooking(false);
     }
   };
+
 
   const primarySlot = slots[0] || {};
   const dateFormatted = primarySlot.slot_date

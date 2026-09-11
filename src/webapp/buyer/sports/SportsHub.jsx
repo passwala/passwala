@@ -68,7 +68,7 @@ const SportsHub = ({ user, userCoords }) => {
     return R * c;
   };
 
-  const fetchVenues = useCallback(async () => {
+  const fetchVenues = useCallback(async (retryCount = 0) => {
     if (abortRef.current) abortRef.current.abort();
     abortRef.current = new AbortController();
     setLoading(true);
@@ -80,12 +80,30 @@ const SportsHub = ({ user, userCoords }) => {
       const res = await fetch(`${BASE_URL}/api/sports/venues?${params}`, {
         signal: abortRef.current.signal,
       });
+      
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        if (res.status === 504 || res.status === 502) {
+          throw new Error('Server is waking up. Please wait a moment and refresh.');
+        }
+        throw new Error('Invalid response from server');
+      }
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch venues');
+      
       setVenues(data.venues || []);
     } catch (err) {
       if (err.name === 'AbortError') return;
-      toast.error('Failed to load venues');
+      
+      // Auto-retry once for gateway timeouts if we haven't already
+      if (err.message.includes('waking up') && retryCount < 1) {
+        toast('Waking up server, please wait...', { icon: '⏳' });
+        setTimeout(() => fetchVenues(1), 3000);
+        return;
+      }
+      
+      toast.error(err.message || 'Failed to load venues');
     } finally {
       setLoading(false);
     }

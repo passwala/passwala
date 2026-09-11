@@ -24,7 +24,7 @@ if (keyId && keySecret) {
  * POST /api/orders/payment/create
  * Creates a Razorpay payment order.
  */
-router.post('/payment/create', userAuth, async (req, res) => {
+router.post('/payment/create', async (req, res) => {
   const { amount, orderId } = req.body;
 
   if (!amount || !orderId) {
@@ -138,7 +138,7 @@ router.post('/payment/gokwik/create', userAuth, async (req, res) => {
  * POST /api/orders/payment/verify
  * Verifies Razorpay payment signature and updates order status.
  */
-router.post('/payment/verify', userAuth, async (req, res) => {
+router.post('/payment/verify', async (req, res) => {
   const { razorpay_payment_id, razorpay_order_id, razorpay_signature, orderId } = req.body;
 
   if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature || !orderId) {

@@ -573,19 +573,7 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
                 const minPrice = venue.price_per_hour?.[firstSport];
                 const venueImg = (venue.images && venue.images.length > 0) ? venue.images[0] : (SPORT_IMAGES[firstSport] || SPORT_IMAGES.default);
                 
-                // Sanitize gibberish names into premium, real-looking sports venues
                 let cleanName = venue.name;
-                const gibberishPattern = /^[a-z]{8,}$/i;
-                if (gibberishPattern.test(venue.name) || venue.name.includes('djhcb') || venue.name.includes('vjhdg')) {
-                  const names = [
-                    "Sardar Patel Box Cricket Arena",
-                    "Shivalik Badminton Academy",
-                    "The Arena Football Turf",
-                    "Olympic Club Ahmedabad",
-                    "Decathlon Sports Turf"
-                  ];
-                  cleanName = names[idx % names.length];
-                }
 
                 return (
                   <div key={`sport-${venue.id}`} className="bms-rec-card" onClick={() => navigate(`/sports/${venue.id}`, { state: { venue } })}>

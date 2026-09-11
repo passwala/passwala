@@ -88,7 +88,7 @@ const VenueDetails = ({ user }) => {
         setSelectedSport(d.venue?.sport_types?.[0] || null);
       })
       .catch(() => toast.error('Failed to load venue'));
-  }, [id]);
+  }, [id, venue]);
 
   // Fetch slots when sport/date changes
   const fetchSlots = useCallback(async () => {
