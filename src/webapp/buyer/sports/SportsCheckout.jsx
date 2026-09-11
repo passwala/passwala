@@ -125,6 +125,8 @@ const SportsCheckout = ({ user: routeUser }) => {
         }),
       });
       const rzpData = await rzpRes.json();
+      
+      // If payment gateway fails to initialize, throw so catch block can rollback the booking
       if (!rzpRes.ok) throw new Error(rzpData.error || 'Payment gateway error');
 
       // Step 4: Handle mock mode (no real Razorpay)
@@ -171,13 +173,24 @@ const SportsCheckout = ({ user: routeUser }) => {
             navigate('/sports/ticket', { state: { booking: primaryBooking, bookings: allBookings, venue, slots, sport } });
           } catch (verifyErr) {
             toast.error(verifyErr.message || 'Payment verification failed');
-          } finally {
+            // Rollback on verification failure
+            await fetch(`${BASE_URL}/api/sports/cancel`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ booking_id: primaryBooking.id, reason: 'Payment Verification Failed' })
+            }).catch(() => {});
             setBooking(false);
           }
         },
         modal: {
-          ondismiss: () => {
-            toast('Payment cancelled. Your slot is still reserved temporarily.', { icon: '⚠️' });
+          ondismiss: async () => {
+            toast('Payment cancelled. Releasing your slot...', { icon: '⚠️' });
+            // Rollback on dismiss
+            await fetch(`${BASE_URL}/api/sports/cancel`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ booking_id: primaryBooking.id, reason: 'User Cancelled Payment' })
+            }).catch(() => {});
             setBooking(false);
           },
         },
@@ -192,6 +205,14 @@ const SportsCheckout = ({ user: routeUser }) => {
       return;
     } catch (err) {
       toast.error(err.message || 'Booking failed. Please try again.');
+      // If we made it far enough to have a booking but Razorpay failed, rollback
+      if (typeof bookData !== 'undefined' && bookData?.booking?.id) {
+         await fetch(`${BASE_URL}/api/sports/cancel`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ booking_id: bookData.booking.id, reason: 'Payment Initialization Error' })
+         }).catch(() => {});
+      }
       setBooking(false);
     }
   };
