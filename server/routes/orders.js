@@ -139,7 +139,7 @@ router.post('/payment/gokwik/create', userAuth, async (req, res) => {
  * Verifies Razorpay payment signature and updates order status.
  */
 router.post('/payment/verify', async (req, res) => {
-  const { razorpay_payment_id, razorpay_order_id, razorpay_signature, orderId } = req.body;
+  const { razorpay_payment_id, razorpay_order_id, razorpay_signature, orderId, type: orderType } = req.body;
 
   if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature || !orderId) {
     return res.status(400).json({ error: 'Missing payment verification details' });
@@ -173,47 +173,49 @@ router.post('/payment/verify', async (req, res) => {
   }
 
   try {
-    // 2. Ownership Verification
+    // 2. Ownership Verification (Skip for sports/events since they may use OTP without a Firebase user profile)
     let dbUserId = null;
-    if (req.user && req.user.uid) {
-      const { data: dbUser, error: dbUserErr } = await supabase
-        .from('users')
-        .select('id')
-        .eq('uid', req.user.uid)
-        .maybeSingle();
+    if (orderType !== 'sports' && orderType !== 'event') {
+      if (req.user && req.user.uid) {
+        const { data: dbUser, error: dbUserErr } = await supabase
+          .from('users')
+          .select('id')
+          .eq('uid', req.user.uid)
+          .maybeSingle();
 
-      if (dbUserErr) {
-        console.error('❌ Failed to fetch user from DB:', dbUserErr.message);
-        return res.status(500).json({ error: 'Database verification failed' });
+        if (dbUserErr) {
+          console.error('❌ Failed to fetch user from DB:', dbUserErr.message);
+          return res.status(500).json({ error: 'Database verification failed' });
+        }
+        if (dbUser) {
+          dbUserId = dbUser.id;
+        }
       }
-      if (dbUser) {
-        dbUserId = dbUser.id;
+
+      if (!dbUserId && !req.isAdmin) {
+        return res.status(401).json({ error: 'Unauthorized: No matching database user profile' });
       }
-    }
 
-    if (!dbUserId && !req.isAdmin) {
-      return res.status(401).json({ error: 'Unauthorized: No matching database user profile' });
-    }
+      // Fetch target orders to verify ownership
+      const { data: ordersToCheck, error: fetchOrdersErr } = await supabase
+        .from('orders')
+        .select('id, user_id')
+        .in('id', orderIds);
 
-    // Fetch target orders to verify ownership
-    const { data: ordersToCheck, error: fetchOrdersErr } = await supabase
-      .from('orders')
-      .select('id, user_id')
-      .in('id', orderIds);
+      if (fetchOrdersErr) {
+        console.error('❌ Failed to verify order ownership:', fetchOrdersErr.message);
+        return res.status(500).json({ error: 'Order verification failed' });
+      }
 
-    if (fetchOrdersErr) {
-      console.error('❌ Failed to verify order ownership:', fetchOrdersErr.message);
-      return res.status(500).json({ error: 'Order verification failed' });
-    }
+      if (!ordersToCheck || ordersToCheck.length === 0) {
+        return res.status(404).json({ error: 'Orders not found' });
+      }
 
-    if (!ordersToCheck || ordersToCheck.length === 0) {
-      return res.status(404).json({ error: 'Orders not found' });
-    }
-
-    if (!req.isAdmin) {
-      const isOwnerOfAll = ordersToCheck.every(o => o.user_id === dbUserId);
-      if (!isOwnerOfAll) {
-        return res.status(403).json({ error: 'Forbidden: You do not own these orders' });
+      if (!req.isAdmin) {
+        const isOwnerOfAll = ordersToCheck.every(o => o.user_id === dbUserId);
+        if (!isOwnerOfAll) {
+          return res.status(403).json({ error: 'Forbidden: You do not own these orders' });
+        }
       }
     }
 
@@ -246,17 +248,27 @@ router.post('/payment/verify', async (req, res) => {
     // 3. Update the orders table in Supabase
     let order = null;
     let orderErr = null;
-    const updatePayload = {
-      payment_status: finalPaymentStatus,
-      status: finalOrderStatus,
-      razorpay_order_id,
-      razorpay_payment_id,
-      updated_at: new Date().toISOString()
-    };
+    
+    // Determine the target table based on orderType
+    const targetTable = orderType === 'sports' ? 'venue_bookings' : (orderType === 'event' ? 'event_bookings' : 'orders');
+    
+    // For venue_bookings or event_bookings, we only update payment status as 'confirmed' is handled by /book
+    const updatePayload = orderType === 'sports' || orderType === 'event' 
+      ? {
+          payment_status: finalPaymentStatus,
+          updated_at: new Date().toISOString()
+        }
+      : {
+          payment_status: finalPaymentStatus,
+          status: finalOrderStatus,
+          razorpay_order_id,
+          razorpay_payment_id,
+          updated_at: new Date().toISOString()
+        };
 
     try {
       const { data, error } = await supabase
-        .from('orders')
+        .from(targetTable)
         .update(updatePayload)
         .in('id', orderIds)
         .select();

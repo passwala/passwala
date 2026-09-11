@@ -164,6 +164,7 @@ const SportsCheckout = ({ user: routeUser }) => {
                 razorpay_order_id:   response.razorpay_order_id,
                 razorpay_signature:  response.razorpay_signature,
                 orderId: primaryBooking.id,
+                type: 'sports'
               }),
             });
             const verifyData = await verifyRes.json();
