@@ -136,6 +136,7 @@ const VendorPortal = ({ user, onLogout }) => {
   const [upgradeServiceFee, setUpgradeServiceFee] = useState(999);
   const [upgradeRentalFee, setUpgradeRentalFee] = useState(999);
   const [upgradeShopFee, setUpgradeShopFee] = useState(999);
+  const [upgradeSportsFee, setUpgradeSportsFee] = useState(999);
   const [upgradeSelectedFee, setUpgradeSelectedFee] = useState(999); // fee for the currently open modal
   const [feesLoading, setFeesLoading] = useState(true); // true until server fees are fetched
 
@@ -154,6 +155,7 @@ const VendorPortal = ({ user, onLogout }) => {
           if (s.upgradeServiceFee !== undefined) setUpgradeServiceFee(s.upgradeServiceFee);
           if (s.upgradeRentalFee !== undefined)  setUpgradeRentalFee(s.upgradeRentalFee);
           if (s.upgradeShopFee !== undefined)    setUpgradeShopFee(s.upgradeShopFee);
+          if (s.upgradeSportsFee !== undefined)  setUpgradeSportsFee(s.upgradeSportsFee);
         }
       })
       .catch(() => { /* keep defaults on network error */ })
@@ -848,6 +850,18 @@ const VendorPortal = ({ user, onLogout }) => {
               btn: "Request Event Console",
               color: '#ea580c',
               bg: '#fff7ed'
+            });
+          }
+
+          if (!hasSportsConsole) {
+            upgrades.push({
+              target: 'sports',
+              title: "Want to manage sports venues?",
+              desc: `Upgrade your vendor profile to list sports courts and venues for a one-time setup fee of ₹${upgradeSportsFee}.`,
+              fee: upgradeSportsFee,
+              btn: "Request Sports Console",
+              color: '#ef4444',
+              bg: '#fef2f2'
             });
           }
           // Service, Shop, Rental upgrade cards — hidden in launch mode (code preserved)
@@ -2475,6 +2489,11 @@ const VendorPortal = ({ user, onLogout }) => {
             title: "Upgrade to Store Console",
             desc: `Open a digital retail store, list products, keep track of inventory and fulfill local delivery orders. A one-time activation fee of ₹${upgradeShopFee}.00 applies.`,
             color: '#10b981'
+          },
+          sports: {
+            title: "Upgrade to Sports Console",
+            desc: `List your sports venues (cricket box, turf, badminton, etc.) and allow users to book time slots directly. A one-time activation fee of ₹${upgradeSportsFee}.00 applies.`,
+            color: '#ef4444'
           }
         }[upgradeTarget || 'event'];
 
