@@ -16,11 +16,11 @@ export default defineConfig(({ mode }) => {
   const isRider = mode === 'rider';
   const isAdmin = mode === 'admin';
 
-  const port = isWeb ? 3000 :
+  const port = isWeb ? 8000 :
                isWebapp ? 3001 : 
                isVendor ? 3002 : 
                isRider ? 3003 : 
-               isAdmin ? 3005 : 3000;
+               isAdmin ? 3005 : 8000;
 
   const outDir = isWeb ? 'dist/web' :
                  isWebapp ? 'dist/webapp' : 
@@ -74,7 +74,7 @@ messaging.onBackgroundMessage((payload) => {
     server: {
       port,
       host: '0.0.0.0',  // accessible on all interfaces — laptop & phone on same WiFi
-      // https: true,      // 🔒 Required for GPS on phone — install rootCA on phone (see Desktop/passwala-rootCA.crt)
+      https: false,     // 🔓 Disabled temporarily to avoid mkcert issues
       cors: true,
       strictPort: true,
       allowedHosts: true,
