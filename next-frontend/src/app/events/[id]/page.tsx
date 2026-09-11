@@ -2,11 +2,13 @@
 
 import React, { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, MapPin, Share2, Ticket, Clock, Minus, Plus, Loader2, ArrowLeft } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { useAuthContext } from '@/lib/auth-context';
+import { supabase } from '@/lib/supabase-client';
 
 function parseBannerUrl(raw: string | string[] | null): string | null {
   if (!raw) return null;
@@ -23,6 +25,7 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
   const { user, openLogin } = useAuthContext();
 
   const [event, setEvent] = useState<any>(null);
+  const [siblingSlots, setSiblingSlots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
   const [ticketCount, setTicketCount] = useState(1);
@@ -40,6 +43,21 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
           setEvent(ev);
           if (ev.event_ticket_tiers?.length > 0) {
             setSelectedTierId(ev.event_ticket_tiers[0].id);
+          }
+          
+          if (ev.show_type === 'multiple' || ev.show_type === 'festival' || ev.show_type === 'tour') {
+            const { data: siblings } = await supabase
+              .from('events')
+              .select('id, event_date, venue_name')
+              .eq('title', ev.title)
+              .eq('category', ev.category)
+              .eq('created_by', ev.created_by)
+              .neq('status', 'PENDING_APPROVAL')
+              .neq('status', 'REJECTED')
+              .order('event_date', { ascending: true });
+            setSiblingSlots(siblings || []);
+          } else {
+            setSiblingSlots(data.siblings || []);
           }
         }
       } catch { toast.error('Failed to load event'); }
@@ -219,6 +237,41 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
                 </div>
               )}
             </div>
+
+            {siblingSlots.length > 1 && (
+              <div className="bg-card border rounded-3xl p-6 shadow-sm mb-6">
+                <h3 className="text-lg font-bold flex items-center gap-2 mb-1">
+                  <Calendar className="h-5 w-5 text-primary" /> Multiple Dates & Venues
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">Select a different show time or location:</p>
+                <div className="flex flex-col gap-3">
+                  {siblingSlots.map(slot => {
+                    const isActive = slot.id === event.id;
+                    const dateStr = new Date(slot.event_date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+                    
+                    if (isActive) {
+                      return (
+                        <div key={slot.id} className="w-full p-4 rounded-2xl text-left flex justify-between items-center border-2 border-primary bg-primary/5 cursor-default">
+                          <span className="text-sm font-bold text-primary">📅 {dateStr}</span>
+                          <span className="text-xs font-semibold text-primary/80">📍 {slot.venue_name}</span>
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <Link
+                        key={slot.id}
+                        href={`/events/${slot.id}`}
+                        className="w-full p-4 rounded-2xl text-left flex justify-between items-center border border-border bg-muted/30 hover:border-primary/50 hover:bg-muted/50 transition-all group"
+                      >
+                        <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">📅 {dateStr}</span>
+                        <span className="text-xs text-muted-foreground">📍 {slot.venue_name}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="space-y-3">
               <h3 className="text-2xl font-bold">About this Event</h3>

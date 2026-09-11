@@ -238,11 +238,11 @@ export default function OrdersPage() {
                         <p className="font-bold text-lg text-primary">&#x20B9;{parseFloat(booking.total_price || booking.total_amount || 0).toFixed(2)}</p>
                       </div>
                     </div>
-                    <div className="bg-muted/50 rounded-xl p-3 text-sm space-y-1">
-                      <p><strong>Sport:</strong> {booking.sport_type?.replace('_', ' ').toUpperCase()}</p>
-                      <p><strong>Date:</strong> {booking.booking_date}</p>
-                      <p><strong>Slot:</strong> {booking.start_time} - {booking.end_time}</p>
-                    </div>
+                      <div className="bg-muted/50 rounded-xl p-3 text-sm space-y-1">
+                        <p><strong>Sport:</strong> {booking.sport_type?.replace('_', ' ').toUpperCase()}</p>
+                        <p><strong>Date:</strong> {booking.slot_date}</p>
+                        <p><strong>Slot:</strong> {booking.slot_time} - {booking.slot_end_time}</p>
+                      </div>
                   </Card>
                 ))
               )}
