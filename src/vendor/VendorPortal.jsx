@@ -465,6 +465,13 @@ const VendorPortal = ({ user, onLogout }) => {
           .eq('phone', phone)
           .maybeSingle();
 
+        // Check sports_venues
+        const { data: sportsData } = await supabase
+          .from('sports_venues')
+          .select('*')
+          .eq('owner_phone', phone)
+          .maybeSingle();
+
         // Check approved upgrade requests
         const { data: approvedRequests } = await supabase
           .from('event_organizer_requests')
@@ -504,7 +511,7 @@ const VendorPortal = ({ user, onLogout }) => {
 
         const hasEvent = (userData?.role === 'EVENT_ORGANIZER' || (spData && EVENT_CATEGORIES.includes(effectiveCategory)) || approvedConsoles.includes('event'));
         const hasShop = (!!vData || approvedConsoles.includes('shop'));
-        const hasSports = ((spData && isSportsCategory(effectiveCategory)) || approvedConsoles.includes('sports'));
+        const hasSports = (!!sportsData || (spData && isSportsCategory(effectiveCategory)) || approvedConsoles.includes('sports'));
         const hasService = ((!!spData && !EVENT_CATEGORIES.includes(effectiveCategory) && !isSportsCategory(effectiveCategory) && effectiveCategory !== 'Rental') || approvedConsoles.includes('service'));
         const hasRental = ((!!spData && effectiveCategory === 'Rental') || approvedConsoles.includes('rental'));
 
@@ -526,7 +533,7 @@ const VendorPortal = ({ user, onLogout }) => {
           data = vData;
           detectedType = 'shop';
         } else if (storedType === 'sports' && hasSports) {
-          data = spData;
+          data = sportsData || spData;
           detectedType = 'sports';
         } else if (storedType === 'service' && hasService) {
           data = spData;
