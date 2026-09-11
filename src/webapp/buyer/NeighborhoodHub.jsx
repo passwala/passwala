@@ -412,8 +412,8 @@ const NeighborhoodHub = ({ user, onNavigate, isProfileComplete, onboardingPrefs 
           </div>
           <div className="bms-subnav-links-right">
             <span onClick={() => handleSubnavClick('listyourshow')}>{t('list_your_show')}</span>
-            <span onClick={() => handleSubnavClick('offers')}>{t('offers')}</span>
-            <span onClick={() => handleSubnavClick('giftcards')}>{t('gift_cards')}</span>
+            {/* <span onClick={() => handleSubnavClick('offers')}>{t('offers')}</span> */}
+            {/* <span onClick={() => handleSubnavClick('giftcards')}>{t('gift_cards')}</span> */}
           </div>
         </div>
       </div>

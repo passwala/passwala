@@ -105,8 +105,8 @@ const SportsHub = ({ user, userCoords }) => {
           </div>
           <div className="bms-subnav-links-right">
             <span onClick={() => navigate('/admin/auth')}>ListYourShow</span>
-            <span onClick={() => navigate('/offers')}>Offers</span>
-            <span onClick={() => navigate('/gift-cards')}>Gift Cards</span>
+            {/* <span onClick={() => navigate('/offers')}>Offers</span> */}
+            {/* <span onClick={() => navigate('/gift-cards')}>Gift Cards</span> */}
           </div>
         </div>
       </div>

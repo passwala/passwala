@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Gift, ShieldAlert, Sparkles, Copy, Check } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Gift, ShieldAlert, Sparkles, Copy, Check } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import './Offers.css';
 
@@ -29,7 +28,6 @@ const OFFERS_DATA = [
 ];
 
 const Offers = () => {
-  const navigate = useNavigate();
   const [copiedCode, setCopiedCode] = useState(null);
 
   const handleCopyCode = (code) => {
@@ -41,12 +39,6 @@ const Offers = () => {
 
   return (
     <div className="offers-root">
-      <div className="offers-header">
-        <button className="offers-back-btn" onClick={() => navigate('/')}>
-          <ArrowLeft size={20} />
-        </button>
-        <h2>Coupons & Offers</h2>
-      </div>
 
       <div className="offers-container">
         {/* Referral Card Banner */}

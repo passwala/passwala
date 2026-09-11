@@ -686,9 +686,6 @@ const Auth = ({ onLogin }) => {
 
 {/* AI Assistant button intentionally hidden */}
 
-                <div className="policy-agreement-text">
-                  {t('auth_terms_text')} <a href="/terms">{t('auth_terms')}</a> & <a href="/privacy-policy">{t('auth_privacy')}</a>.
-                </div>
               </>
             ) : null}
 
