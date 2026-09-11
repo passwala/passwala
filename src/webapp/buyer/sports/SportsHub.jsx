@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Search, Star, Clock, ChevronRight, Zap, Filter, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useTranslation } from '../../LanguageContext';
 import './SportsHub.css';
 
 const BASE_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : `http://${window.location.hostname}:3004`);
@@ -32,6 +33,7 @@ const AMENITY_ICONS = {
 const SportsHub = ({ user, userCoords }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
   const [activeSport, setActiveSport] = useState('all');
   const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -138,7 +140,7 @@ const SportsHub = ({ user, userCoords }) => {
             animate={{ opacity: 1, y: 0 }}
             className="sh-hero-badge"
           >
-            <Zap size={12} fill="currentColor" /> Book a Court
+            <Zap size={12} fill="currentColor" /> {t('book_court')}
           </motion.div>
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
@@ -146,7 +148,7 @@ const SportsHub = ({ user, userCoords }) => {
             transition={{ delay: 0.1 }}
             className="sh-hero-title"
           >
-            Sports Venues<br />Near You 🏏
+            {t('sports_venues_near_you')} 🏏
           </motion.h1>
           <motion.p
             initial={{ opacity: 0 }}
@@ -154,7 +156,7 @@ const SportsHub = ({ user, userCoords }) => {
             transition={{ delay: 0.2 }}
             className="sh-hero-sub"
           >
-            Book cricket, badminton, turf & more — instant confirmation
+            {t('sports_hero_sub')}
           </motion.p>
 
         </div>
@@ -178,7 +180,7 @@ const SportsHub = ({ user, userCoords }) => {
 
       {/* ── Venue List ── */}
       <div className="sh-body">
-        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginBottom: '1.25rem', paddingLeft: '4px' }}>All Sports Venues</h2>
+        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginBottom: '1.25rem', paddingLeft: '4px' }}>{t('all_sports_venues')}</h2>
         
         {loading ? (
           <div className="sh-loading">
@@ -195,9 +197,9 @@ const SportsHub = ({ user, userCoords }) => {
           </div>
         ) : venues.length === 0 ? (
           <div className="sh-empty">
-            <div className="sh-empty-icon">🏟️</div>
-            <h3>No venues found</h3>
-            <p>Try a different sport or area</p>
+            <div className="sh-empty-icon">🏙️</div>
+            <h3>{t('no_venues_found')}</h3>
+            <p>{t('no_venues_found_sub')}</p>
           </div>
         ) : (
           <div className="sh-venue-grid">

@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, Clock, Calendar, Shield, Zap } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useTranslation } from '../../../LanguageContext';
 // eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
 import './SportsCheckout.css';
@@ -38,6 +39,7 @@ const SportsCheckout = ({ user: routeUser }) => {
   const user = routeUser || stateUser;
 
   const [booking, setBooking] = useState(false);
+  const { t } = useTranslation();
 
   const userInfo = useMemo(() => getUserInfo(user), [user]);
 
@@ -232,7 +234,7 @@ const SportsCheckout = ({ user: routeUser }) => {
         <button className="sc-back-btn" onClick={() => navigate(-1)}>
           <ArrowLeft size={20} />
         </button>
-        <h2 className="sc-title">Confirm Booking</h2>
+        <h2 className="sc-title">{t('confirm_booking')}</h2>
       </div>
 
       <div className="sc-body">
@@ -254,15 +256,15 @@ const SportsCheckout = ({ user: routeUser }) => {
 
           <div className="sc-booking-details">
             <div className="sc-detail-row">
-              <span className="sc-detail-label"><Zap size={13} /> Sport</span>
+              <span className="sc-detail-label"><Zap size={13} /> {t('sport_type')}</span>
               <span className="sc-detail-val">{SPORT_LABELS[sport] || sport}</span>
             </div>
             <div className="sc-detail-row">
-              <span className="sc-detail-label"><Calendar size={13} /> Date</span>
+              <span className="sc-detail-label"><Calendar size={13} /> {t('slot_date')}</span>
               <span className="sc-detail-val">{dateFormatted}</span>
             </div>
             <div className="sc-detail-row">
-              <span className="sc-detail-label"><Clock size={13} /> Slots ({slots.length})</span>
+              <span className="sc-detail-label"><Clock size={13} /> {t('slot_time')} ({slots.length})</span>
               <span className="sc-detail-val" style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {slots.map(s => (
                   <span key={s.id}>{(s.slot_time||'').slice(0,5)} – {(s.slot_end_time||'').slice(0,5)}</span>
@@ -279,14 +281,14 @@ const SportsCheckout = ({ user: routeUser }) => {
           transition={{ delay: 0.1 }}
           className="sc-amount-card"
         >
-          <h3 className="sc-amount-title">Price Breakdown</h3>
+          <h3 className="sc-amount-title">{t('price_breakdown')}</h3>
           <div className="sc-amount-rows">
             <div className="sc-amount-row">
-              <span>Slots Total Price</span>
+              <span>{t('slots_total_price')}</span>
               <span>₹{amounts.base}</span>
             </div>
             <div className="sc-amount-row">
-              <span>Platform Fee (5%)</span>
+              <span>{t('platform_fee')} (5%)</span>
               <span>₹{amounts.platFee}</span>
             </div>
             <div className="sc-amount-row">
@@ -295,7 +297,7 @@ const SportsCheckout = ({ user: routeUser }) => {
             </div>
             <div className="sc-amount-divider" />
             <div className="sc-amount-row total">
-              <span>Total Amount</span>
+              <span>{t('total')}</span>
               <span>₹{amounts.total}</span>
             </div>
           </div>
@@ -319,7 +321,7 @@ const SportsCheckout = ({ user: routeUser }) => {
       {/* Confirm Button */}
       <div className="sc-footer">
         <div className="sc-footer-price">
-          <span className="sc-footer-label">Total</span>
+          <span className="sc-footer-label">{t('total')}</span>
           <span className="sc-footer-amt">₹{amounts.total}</span>
         </div>
         <button
@@ -330,7 +332,7 @@ const SportsCheckout = ({ user: routeUser }) => {
           {booking ? (
             <span className="sc-spinner" />
           ) : (
-            'Confirm & Pay'
+            t('confirm_pay')
           )}
         </button>
       </div>

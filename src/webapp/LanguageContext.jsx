@@ -444,6 +444,32 @@ export const languages = {
       trending: 'Trending',
       best_seller: 'Best Seller',
       featured: 'Featured',
+
+      // Sports Section
+      book_court: 'Book a Court',
+      sports_venues_near_you: 'Sports Venues Near You',
+      sports_hero_sub: 'Book cricket, badminton, turf & more — instant confirmation',
+      all_sports: 'All Sports',
+      all_sports_venues: 'All Sports Venues',
+      no_venues_found: 'No venues found',
+      no_venues_found_sub: 'Try a different sport or area',
+      book_slot: 'Book Slot',
+      select_sport: 'Select Sport',
+      available_slots: 'Available Slots',
+      slot_booked: 'Slot Booked',
+      confirm_booking: 'Confirm Booking',
+      confirm_pay: 'Confirm & Pay',
+      court_booking: 'Court Booking',
+      price_breakdown: 'Price Breakdown',
+      slots_total_price: 'Slots Total Price',
+      platform_fee: 'Platform Fee',
+      booking_confirmed: 'Booking Confirmed',
+      court: 'Court',
+      sport_type: 'Sport',
+      slot_date: 'Date',
+      slot_time: 'Slots',
+      venue_amenities: 'Amenities',
+      sports_search_placeholder: 'Search sports venues...'
     }
   },
   hi: {
@@ -885,7 +911,33 @@ export const languages = {
       recommended: 'अनुशंसित',
       trending: 'ट्रेंडिंग',
       best_seller: 'बेस्ट सेलर',
-      featured: 'फीचर्ड'
+      featured: 'फीचर्ड',
+
+      // Sports Section
+      book_court: 'कोर्ट बुक करें',
+      sports_venues_near_you: 'आपके पास के स्पोर्ट्स वेन्यू',
+      sports_hero_sub: 'क्रिकेट, बैडमिंटन, टर्फ और अधिक बुक करें — तत्काल पुष्टि',
+      all_sports: 'सभी खेल',
+      all_sports_venues: 'सभी स्पोर्ट्स वेन्यू',
+      no_venues_found: 'कोई वेन्यू नहीं मिला',
+      no_venues_found_sub: 'कोई अलग खेल या क्षेत्र आज़माएं',
+      book_slot: 'स्लॉट बुक करें',
+      select_sport: 'खेल चुनें',
+      available_slots: 'उपलब्ध स्लॉट',
+      slot_booked: 'स्लॉट बुक हो गया',
+      confirm_booking: 'बुकिंग की पुष्टि करें',
+      confirm_pay: 'पुष्टि करें और भुगतान करें',
+      court_booking: 'कोर्ट बुकिंग',
+      price_breakdown: 'मूल्य विवरण',
+      slots_total_price: 'स्लॉट की कुल कीमत',
+      platform_fee: 'प्लेटफ़ॉर्म शुल्क',
+      booking_confirmed: 'बुकिंग की पुष्टि हो गई',
+      court: 'कोर्ट',
+      sport_type: 'खेल',
+      slot_date: 'तारीख',
+      slot_time: 'स्लॉट',
+      venue_amenities: 'सुविधाएं',
+      sports_search_placeholder: 'स्पोर्ट्स वेन्यू खोजें...'
     }
   },
   gu: {
@@ -1327,7 +1379,33 @@ export const languages = {
       recommended: 'ભલામણ',
       trending: 'ટ્રેન્ડિંગ',
       best_seller: 'બેસ્ટ સેલર',
-      featured: 'ફીચર્ડ'
+      featured: 'ફીચર્ડ',
+
+      // Sports Section
+      book_court: 'કોર્ટ બુક કરો',
+      sports_venues_near_you: 'તમારી નજીકના સ્પોર્ટ્સ વેન્યુ',
+      sports_hero_sub: 'ક્રિકેટ, બેડમિન્ટન, ટર્ફ અને વધુ બુક કરો — તાત્કાલિક પુષ્ટિ',
+      all_sports: 'બધી રમતો',
+      all_sports_venues: 'બધા સ્પોર્ટ્સ વેન્યુ',
+      no_venues_found: 'કોઈ વેન્યુ મળ્યું નહીં',
+      no_venues_found_sub: 'બીજી રમત અથવા વિસ્તાર અજમાવો',
+      book_slot: 'સ્લૉટ બુક કરો',
+      select_sport: 'રમત પસંદ કરો',
+      available_slots: 'ઉપલબ્ધ સ્લૉટ',
+      slot_booked: 'સ્લૉટ બુક થઈ ગઈ',
+      confirm_booking: 'બુકિંગ ની પુષ્ટિ કરો',
+      confirm_pay: 'પુષ્ટિ કરો અને ચુકવો',
+      court_booking: 'કોર્ટ બુકિંગ',
+      price_breakdown: 'ભાવ વિગત',
+      slots_total_price: 'સ્લૉટ કુલ કિંમત',
+      platform_fee: 'પ્લેટફોર્મ ફી',
+      booking_confirmed: 'બુકિંગ ની પુષ્ટિ થઈ',
+      court: 'કોર્ટ',
+      sport_type: 'રમત',
+      slot_date: 'તારીખ',
+      slot_time: 'સ્લૉટ',
+      venue_amenities: 'સુવિધાઓ',
+      sports_search_placeholder: 'સ્પોર્ટ્સ વેન્યુ શોધો...'
     }
   },
   mr: {
@@ -1705,7 +1783,33 @@ export const languages = {
       recommended: 'शिफारस केलेले',
       trending: 'ट्रेंडिंग',
       best_seller: 'बेस्ट सेलर',
-      featured: 'फीचर्ड'
+      featured: 'फीचर्ड',
+
+      // Sports Section
+      book_court: 'कोर्ट बुक करा',
+      sports_venues_near_you: 'तुमच्या जवळचे स्पोर्ट्स व्हेन्यू',
+      sports_hero_sub: 'क्रिकेट, बॅडमिंटन, टर्फ आणि बरेच काही बुक करा — त्वरित पुष्टी',
+      all_sports: 'सर्व खेळ',
+      all_sports_venues: 'सर्व स्पोर्ट्स व्हेन्यू',
+      no_venues_found: 'कोणताही व्हेन्यू सापडला नाही',
+      no_venues_found_sub: 'वेगळा खेळ किंवा क्षेत्र वापरून पहा',
+      book_slot: 'स्लॉट बुक करा',
+      select_sport: 'खेळ निवडा',
+      available_slots: 'उपलब्ध स्लॉट',
+      slot_booked: 'स्लॉट बुक झाला',
+      confirm_booking: 'बुकिंगची पुष्टी करा',
+      confirm_pay: 'पुष्टी करा आणि पैसे द्या',
+      court_booking: 'कोर्ट बुकिंग',
+      price_breakdown: 'किंमत तपशील',
+      slots_total_price: 'स्लॉट एकूण किंमत',
+      platform_fee: 'प्लॅटफॉर्म फी',
+      booking_confirmed: 'बुकिंग पुष्टी झाली',
+      court: 'कोर्ट',
+      sport_type: 'खेळ',
+      slot_date: 'तारीख',
+      slot_time: 'स्लॉट',
+      venue_amenities: 'सुविधा',
+      sports_search_placeholder: 'स्पोर्ट्स व्हेन्यू शोधा...'
     }
   },
   ta: {
@@ -2084,7 +2188,33 @@ export const languages = {
       recommended: 'பரிந்துரைக்கப்படுகிறது',
       trending: 'டிரெண்டிங்',
       best_seller: 'சிறந்த விற்பனையாளர்',
-      featured: 'சிறப்பு'
+      featured: 'சிறப்பு',
+
+      // Sports Section
+      book_court: 'கோர்ட் பதிவு செய்யுங்கள்',
+      sports_venues_near_you: 'உங்களுக்கு அருகில் உள்ள விளையாட்டு இடங்கள்',
+      sports_hero_sub: 'கிரிக்கெட், பேட்மிண்டன், மைதானம் மற்றும் பலவற்றை பதிவு செய்யுங்கள் — உடனடி உறுதிப்படுத்தல்',
+      all_sports: 'அனைத்து விளையாட்டுகள்',
+      all_sports_venues: 'அனைத்து விளையாட்டு இடங்கள்',
+      no_venues_found: 'இடங்கள் எதுவும் கிடைக்கவில்லை',
+      no_venues_found_sub: 'வேறு விளையாட்டு அல்லது பகுதியை முயற்சிக்கவும்',
+      book_slot: 'ஸ்லாட் பதிவு செய்யுங்கள்',
+      select_sport: 'விளையாட்டை தேர்ந்தெடுங்கள்',
+      available_slots: 'கிடைக்கும் ஸ்லாட்கள்',
+      slot_booked: 'ஸ்லாட் பதிவு செய்யப்பட்டது',
+      confirm_booking: 'பதிவை உறுதிப்படுத்துங்கள்',
+      confirm_pay: 'உறுதிப்படுத்து & பணம் செலுத்து',
+      court_booking: 'கோர்ட் பதிவு',
+      price_breakdown: 'விலை விவரம்',
+      slots_total_price: 'ஸ்லாட் மொத்த விலை',
+      platform_fee: 'பிளாட்ஃபார்ம் கட்டணம்',
+      booking_confirmed: 'பதிவு உறுதிப்படுத்தப்பட்டது',
+      court: 'கோர்ட்',
+      sport_type: 'விளையாட்டு',
+      slot_date: 'தேதி',
+      slot_time: 'ஸ்லாட்கள்',
+      venue_amenities: 'வசதிகள்',
+      sports_search_placeholder: 'விளையாட்டு இடங்களைத் தேடுங்கள்...'
     }
   }
 };
