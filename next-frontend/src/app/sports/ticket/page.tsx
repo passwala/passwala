@@ -135,7 +135,7 @@ export default function SportsTicketPage() {
             <div>
               <p className="text-xs text-muted-foreground">{t('venue', 'Venue')}</p>
               <p className="font-semibold text-sm">{venue?.name}</p>
-              <p className="text-sm text-muted-foreground">{venue?.city}</p>
+              <p className="text-sm text-muted-foreground capitalize">{venue?.address || venue?.city}</p>
             </div>
           </div>
         </div>

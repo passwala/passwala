@@ -81,8 +81,8 @@ export default function SportsClient({ venues, currentSport }: SportsClientProps
                       {venue.name}
                     </h3>
                     <div className="flex items-center text-xs text-muted-foreground">
-                      <MapPin className="w-3 h-3 mr-1" />
-                      <span>{venue.city || t('unknown_location', 'Unknown Location')}</span>
+                      <MapPin className="w-3 h-3 mr-1 shrink-0" />
+                      <span className="capitalize truncate">{venue.address || venue.city || t('unknown_location', 'Unknown Location')}</span>
                     </div>
                     {venue.sport_types && venue.sport_types.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">

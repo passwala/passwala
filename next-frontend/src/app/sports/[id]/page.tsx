@@ -383,7 +383,7 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
               <div className="flex items-center gap-4 text-muted-foreground pt-2">
                 <div className="flex items-start gap-2">
                   <MapPin className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                  <p className="text-sm">{venue.address}</p>
+                  <p className="text-sm capitalize">{venue.address || venue.city}</p>
                 </div>
               </div>
               {venue.description && <p className="text-muted-foreground text-sm lg:text-base leading-relaxed">{venue.description}</p>}
