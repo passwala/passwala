@@ -10,6 +10,7 @@ export interface VendorUser {
   user_id?: string;
   phone: string;
   name?: string;
+  displayName?: string;
   email?: string;
   role?: string;
 }

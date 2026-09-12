@@ -55,7 +55,7 @@ export default function ScannerPage() {
         setResult({
           status: 'SUCCESS',
           message: data.message || 'Pass verified and check-in recorded',
-          booking: data.booking || { id: cleanCode, user_name: 'Admitted Player' }
+          booking: data.booking || null
         });
       } else {
         toast.error(data.error || 'Verification Failed');
@@ -72,7 +72,7 @@ export default function ScannerPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white selection:bg-orange-500">
+    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-orange-500 selection:text-white">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="lg:pl-64 flex flex-col min-h-screen">
@@ -80,17 +80,17 @@ export default function ScannerPage() {
 
         <main className="flex-1 p-4 md:p-8 max-w-2xl mx-auto w-full space-y-6">
           <div className="text-center space-y-2">
-            <div className="w-14 h-14 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center mx-auto shadow-lg">
+            <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 border border-orange-200 flex items-center justify-center mx-auto shadow-xs">
               <QrCode className="w-7 h-7" />
             </div>
-            <h2 className="text-2xl font-black text-white">Guest Admission Scanner</h2>
-            <p className="text-xs text-zinc-400">
+            <h2 className="text-2xl font-black text-slate-900">Guest Admission Scanner</h2>
+            <p className="text-xs text-slate-500">
               Verify {businessType === 'sports' ? 'court bookings' : 'event passes'} by entering or scanning the customer&apos;s QR code.
             </p>
           </div>
 
           {/* Verification Box */}
-          <div className="rounded-3xl bg-zinc-900 border border-zinc-800 p-6 md:p-8 shadow-2xl space-y-6">
+          <div className="rounded-3xl bg-white border border-slate-200 p-6 md:p-8 shadow-lg shadow-slate-200/50 space-y-6">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -99,17 +99,17 @@ export default function ScannerPage() {
               className="space-y-4"
             >
               <div className="space-y-2">
-                <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                   Ticket ID or Booking UUID
                 </label>
-                <div className="flex items-center rounded-2xl bg-zinc-950 border border-zinc-800 px-4 py-3 focus-within:border-orange-500 transition-all">
-                  <Search className="w-4 h-4 text-zinc-500 mr-3 shrink-0" />
+                <div className="flex items-center rounded-2xl bg-slate-50 border-2 border-slate-200 px-4 py-3.5 focus-within:border-orange-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-orange-500/10 transition-all">
+                  <Search className="w-4 h-4 text-slate-400 mr-3 shrink-0" />
                   <input
                     type="text"
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
                     placeholder="e.g. 5b2b8333... or TKT-XXXX"
-                    className="bg-transparent flex-1 text-sm text-white font-mono placeholder:text-zinc-600 outline-none"
+                    className="bg-transparent flex-1 text-sm text-slate-900 font-mono font-bold placeholder:text-slate-400 outline-none"
                     autoFocus
                   />
                 </div>
@@ -118,7 +118,7 @@ export default function ScannerPage() {
               <button
                 type="submit"
                 disabled={loading || !code.trim()}
-                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold text-sm shadow-lg shadow-orange-500/20 transition-all disabled:opacity-50 cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm shadow-md shadow-orange-600/20 transition-all disabled:opacity-50 cursor-pointer"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify & Check In'}
               </button>
@@ -129,18 +129,18 @@ export default function ScannerPage() {
               <div
                 className={`p-6 rounded-2xl border ${
                   result.status === 'SUCCESS'
-                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
-                    : 'bg-red-950/40 border-red-500/40 text-red-300'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                    : 'bg-rose-50 border-rose-200 text-rose-900'
                 }`}
               >
                 <div className="flex items-center gap-3">
                   {result.status === 'SUCCESS' ? (
-                    <CheckCircle2 className="w-8 h-8 text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="w-8 h-8 text-emerald-600 shrink-0" />
                   ) : (
-                    <XCircle className="w-8 h-8 text-red-400 shrink-0" />
+                    <XCircle className="w-8 h-8 text-rose-600 shrink-0" />
                   )}
                   <div>
-                    <h4 className="font-bold text-base text-white">
+                    <h4 className="font-bold text-base">
                       {result.status === 'SUCCESS' ? 'Admission Confirmed!' : 'Check-In Rejected'}
                     </h4>
                     <p className="text-xs opacity-90 mt-0.5">{result.message}</p>
@@ -148,7 +148,7 @@ export default function ScannerPage() {
                 </div>
 
                 {result.booking && (
-                  <div className="mt-4 pt-4 border-t border-emerald-500/20 space-y-1 text-xs text-zinc-300">
+                  <div className="mt-4 pt-4 border-t border-emerald-200/70 space-y-1 text-xs text-slate-700">
                     <p><strong>Holder:</strong> {result.booking.user_name || 'Guest'}</p>
                     <p><strong>Code:</strong> {result.booking.id}</p>
                   </div>

@@ -64,35 +64,44 @@ export default function VenuesPage() {
       const today = new Date();
       const dateStr = today.toISOString().split('T')[0];
 
-      // Auto generate slots for today from 06:00 to 23:00
+      // 1. Trigger backend generator endpoint
+      try {
+        await fetch(`http://127.0.0.1:3004/api/sports/slots?venue_id=${venueId}&date=${dateStr}&sport=${sportType}`);
+      } catch {
+        // non-blocking
+      }
+
+      // 2. Direct upsert into venue_slots
       const slotsPayload = [];
       for (let h = 6; h <= 23; h++) {
-        const timeStr = `${String(h).padStart(2, '0')}:00:00`;
+        const startT = `${String(h).padStart(2, '0')}:00`;
+        const endT = `${String(h + 1).padStart(2, '0')}:00`;
         slotsPayload.push({
           venue_id: venueId,
-          sport: sportType,
+          sport_type: sportType,
           slot_date: dateStr,
-          slot_time: timeStr,
+          slot_time: startT,
+          slot_end_time: endT,
           status: 'available',
           price: 400
         });
       }
 
       const { error } = await supabase
-        .from('sports_slots')
-        .upsert(slotsPayload, { onConflict: 'venue_id,sport,slot_date,slot_time' });
+        .from('venue_slots')
+        .upsert(slotsPayload, { onConflict: 'venue_id,sport_type,slot_date,slot_time', ignoreDuplicates: true });
 
       if (error) throw error;
       toast.success('Generated 18 hourly slots for today!');
     } catch (err: any) {
-      toast.error('Slot generation note: ' + err.message);
+      toast.error('Slot generation: ' + err.message);
     } finally {
       setSlotGenLoading(null);
     }
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white selection:bg-orange-500">
+    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-orange-500 selection:text-white">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="lg:pl-64 flex flex-col min-h-screen">
@@ -102,14 +111,14 @@ export default function VenuesPage() {
           {/* Header Action Row */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-black text-white">Your Sports Venues</h2>
-              <p className="text-xs text-zinc-400 mt-1">
+              <h2 className="text-2xl font-black text-slate-900">Your Sports Venues</h2>
+              <p className="text-xs text-slate-500 mt-1">
                 Manage your courts, set pricing, and generate hourly booking slots.
               </p>
             </div>
             <Link
               href="/venues/new"
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm shadow-lg shadow-orange-500/20 transition-all"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-xs transition-all"
             >
               <Plus className="w-4 h-4" />
               <span>Add New Sports Venue</span>
@@ -119,20 +128,20 @@ export default function VenuesPage() {
           {/* Venues Grid */}
           {loading ? (
             <div className="py-20 flex justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-orange-600" />
             </div>
           ) : venues.length === 0 ? (
-            <div className="text-center py-16 border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/40 p-8">
-              <div className="w-16 h-16 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center mx-auto mb-4">
+            <div className="text-center py-16 border border-dashed border-slate-300 rounded-3xl bg-white p-8 shadow-xs">
+              <div className="w-16 h-16 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center mx-auto mb-4 border border-orange-100">
                 <Trophy className="w-8 h-8" />
               </div>
-              <h3 className="text-lg font-bold text-white">No sports venues listed yet</h3>
-              <p className="text-sm text-zinc-400 max-w-md mx-auto mt-1 mb-6">
+              <h3 className="text-lg font-bold text-slate-900">No sports venues listed yet</h3>
+              <p className="text-sm text-slate-500 max-w-md mx-auto mt-1 mb-6">
                 Register your box cricket ground, turf or court to start accepting bookings from players on Passwala.
               </p>
               <Link
                 href="/venues/new"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm shadow-lg shadow-orange-500/20 transition-all"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-xs transition-all"
               >
                 <Plus className="w-4 h-4" />
                 <span>Register Venue Now</span>
@@ -142,19 +151,19 @@ export default function VenuesPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {venues.map((venue) => {
                 const img = venue.images?.[0] || 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=800&q=80';
-                const minPrice = venue.price_per_hour ? Math.min(...Object.values(venue.price_per_hour as Record<string, number>)) : 400;
+                const minPrice = venue.price_per_hour ? Math.min(...Object.values(venue.price_per_hour as Record<string, number>)) : 0;
 
                 return (
                   <div
                     key={venue.id}
-                    className="rounded-3xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-xl hover:border-zinc-700 transition-all flex flex-col justify-between"
+                    className="rounded-3xl bg-white border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
                   >
                     <div>
                       {/* Venue Banner */}
-                      <div className="h-44 relative bg-zinc-800 overflow-hidden">
+                      <div className="h-44 relative bg-slate-100 overflow-hidden">
                         <img src={img} alt={venue.name} className="w-full h-full object-cover" />
                         <div className="absolute top-3 right-3">
-                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/90 text-white shadow">
+                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-xs">
                             {venue.status || 'Active'}
                           </span>
                         </div>
@@ -162,11 +171,11 @@ export default function VenuesPage() {
 
                       {/* Info Content */}
                       <div className="p-5 space-y-3">
-                        <h3 className="text-lg font-black text-white truncate">{venue.name}</h3>
+                        <h3 className="text-lg font-black text-slate-900 truncate">{venue.name}</h3>
 
-                        <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-                          <MapPin className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-                          <span className="capitalize font-semibold text-zinc-300 truncate">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                          <MapPin className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+                          <span className="capitalize font-semibold text-slate-700 truncate">
                             {venue.address || venue.city || 'Ahmedabad'}
                           </span>
                         </div>
@@ -177,7 +186,7 @@ export default function VenuesPage() {
                             {venue.sport_types.map((s: string) => (
                               <span
                                 key={s}
-                                className="px-2.5 py-1 rounded-lg bg-zinc-800 text-[11px] font-bold text-zinc-300 capitalize"
+                                className="px-2.5 py-1 rounded-lg bg-slate-100 text-[11px] font-bold text-slate-700 border border-slate-200 capitalize"
                               >
                                 {s.replace('_', ' ')}
                               </span>
@@ -185,9 +194,9 @@ export default function VenuesPage() {
                           </div>
                         )}
 
-                        <div className="pt-2 flex items-baseline justify-between border-t border-zinc-800/80">
-                          <span className="text-xs text-zinc-500 font-medium">Hourly Base Rate</span>
-                          <span className="text-lg font-black text-orange-400">From ₹{minPrice}/hr</span>
+                        <div className="pt-2 flex items-baseline justify-between border-t border-slate-100">
+                          <span className="text-xs text-slate-500 font-medium">Hourly Base Rate</span>
+                          <span className="text-lg font-black text-orange-600">From ₹{minPrice}/hr</span>
                         </div>
                       </div>
                     </div>
@@ -197,13 +206,13 @@ export default function VenuesPage() {
                       <button
                         onClick={() => handleGenerateSlots(venue.id, venue.sport_types?.[0])}
                         disabled={slotGenLoading === venue.id}
-                        className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-white transition-all cursor-pointer disabled:opacity-50"
+                        className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 border border-slate-200 transition-all cursor-pointer disabled:opacity-50"
                       >
                         {slotGenLoading === venue.id ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         ) : (
                           <>
-                            <Clock className="w-3.5 h-3.5 text-orange-400" />
+                            <Clock className="w-3.5 h-3.5 text-orange-600" />
                             <span>Auto Slots</span>
                           </>
                         )}
@@ -213,7 +222,7 @@ export default function VenuesPage() {
                         href={`http://localhost:3001/sports/${venue.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 text-xs font-bold transition-all"
+                        className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 text-xs font-bold transition-all"
                       >
                         <span>Buyer Preview</span>
                         <ExternalLink className="w-3.5 h-3.5" />

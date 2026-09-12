@@ -65,7 +65,7 @@ export default function BookingsPage() {
   });
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white selection:bg-orange-500">
+    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-orange-500 selection:text-white">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="lg:pl-64 flex flex-col min-h-screen">
@@ -75,20 +75,20 @@ export default function BookingsPage() {
           {/* Header row */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-black text-white">Live Bookings & Schedule</h2>
-              <p className="text-xs text-zinc-400 mt-1">
+              <h2 className="text-2xl font-black text-slate-900">Live Bookings & Schedule</h2>
+              <p className="text-xs text-slate-500 mt-1">
                 Real-time reservations booked by players on the customer webapp.
               </p>
             </div>
 
             {/* Filter pills */}
-            <div className="flex items-center gap-1.5 bg-zinc-900 p-1 rounded-xl border border-zinc-800 text-xs">
+            <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-slate-200 text-xs shadow-xs">
               {['all', 'confirmed', 'completed'].map((f) => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
                   className={`px-3 py-1.5 rounded-lg font-bold capitalize transition-all cursor-pointer ${
-                    filter === f ? 'bg-orange-500 text-white shadow' : 'text-zinc-400 hover:text-white'
+                    filter === f ? 'bg-orange-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   {f}
@@ -99,59 +99,59 @@ export default function BookingsPage() {
 
           {/* Search bar */}
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by customer name, phone or booking ID..."
-              className="w-full pl-11 pr-4 py-3 rounded-2xl bg-zinc-900 border border-zinc-800 text-sm text-white placeholder:text-zinc-600 outline-none focus:border-orange-500 transition-all"
+              className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white border-2 border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all font-medium shadow-xs"
             />
           </div>
 
           {/* Bookings Table / List */}
           {loading ? (
             <div className="py-20 flex justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-orange-600" />
             </div>
           ) : filteredBookings.length === 0 ? (
-            <div className="text-center py-16 border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/40 p-8">
+            <div className="text-center py-16 border border-dashed border-slate-300 rounded-3xl bg-white p-8 shadow-xs">
               <p className="text-3xl mb-2">🎟️</p>
-              <h3 className="text-base font-bold text-white">No bookings found</h3>
-              <p className="text-xs text-zinc-500 mt-1">Try changing the filter or search keyword.</p>
+              <h3 className="text-base font-bold text-slate-900">No bookings found</h3>
+              <p className="text-xs text-slate-500 mt-1">Try changing the filter or search keyword.</p>
             </div>
           ) : (
             <div className="space-y-3">
               {filteredBookings.map((b) => (
                 <div
                   key={b.id}
-                  className="rounded-2xl bg-zinc-900 border border-zinc-800 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-zinc-700 transition-all shadow-md"
+                  className="rounded-2xl bg-white border border-slate-200 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-slate-300 hover:shadow-md transition-all shadow-xs"
                 >
                   <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center shrink-0">
+                    <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 border border-orange-100 flex items-center justify-center shrink-0">
                       {businessType === 'sports' ? <Trophy className="w-6 h-6" /> : <Ticket className="w-6 h-6" />}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-sm text-white">{b.user_name || 'Customer'}</h4>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">
+                        <h4 className="font-bold text-sm text-slate-900">{b.user_name || 'Customer'}</h4>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
                           #{b.id.substring(0, 8)}
                         </span>
                       </div>
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-400 mt-1.5">
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1.5">
                         {b.user_phone && (
-                          <span className="flex items-center gap-1">
-                            <Phone className="w-3 h-3 text-zinc-500" />
+                          <span className="flex items-center gap-1 font-medium">
+                            <Phone className="w-3 h-3 text-slate-400" />
                             +91 {b.user_phone}
                           </span>
                         )}
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-zinc-500" />
+                        <span className="flex items-center gap-1 font-medium">
+                          <Calendar className="w-3 h-3 text-slate-400" />
                           {b.booking_date || b.created_at?.substring(0, 10)}
                         </span>
                         {b.start_time && (
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-zinc-500" />
+                          <span className="flex items-center gap-1 font-medium">
+                            <Clock className="w-3 h-3 text-slate-400" />
                             {b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)}
                           </span>
                         )}
@@ -159,14 +159,14 @@ export default function BookingsPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between md:justify-end gap-5 border-t md:border-t-0 pt-3 md:pt-0 border-zinc-800/80">
+                  <div className="flex items-center justify-between md:justify-end gap-5 border-t md:border-t-0 pt-3 md:pt-0 border-slate-100">
                     <div className="text-right">
-                      <span className="text-base font-black text-white block">
-                        ₹{b.total_amount || 400}
+                      <span className="text-base font-black text-slate-900 block">
+                        ₹{b.total_amount || 0}
                       </span>
-                      <span className="text-[10px] text-zinc-500">Paid Online</span>
+                      <span className="text-[10px] text-emerald-600 font-bold">Paid Online</span>
                     </div>
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                       {b.status || 'Confirmed'}
                     </span>
                   </div>

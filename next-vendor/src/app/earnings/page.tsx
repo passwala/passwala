@@ -1,8 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { Header } from '@/components/Header';
+import { useVendor } from '@/lib/vendor-context';
+import { supabase } from '@/lib/supabase-client';
 import { formatCurrency } from '@/lib/utils';
 import { 
   IndianRupee, 
@@ -10,22 +12,59 @@ import {
   ArrowUpRight, 
   Calendar, 
   Download, 
-  CheckCircle2 
+  CheckCircle2,
+  Loader2 
 } from 'lucide-react';
 
 export default function EarningsPage() {
+  const { vendor, businessType } = useVendor();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [timeRange, setTimeRange] = useState<'WEEK' | 'MONTH' | 'YEAR'>('MONTH');
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const transactions = [
-    { id: 'TXN-9021', title: 'Box Cricket Slot - Evening', date: 'Today, 06:00 PM', amount: 800, net: 760, fee: 40, status: 'Settled' },
-    { id: 'TXN-9020', title: 'Football Turf - 2 Hours', date: 'Yesterday, 08:00 PM', amount: 1200, net: 1140, fee: 60, status: 'Settled' },
-    { id: 'TXN-9019', title: 'VIP Concert Pass x2', date: '10 Sep 2026', amount: 1998, net: 1898, fee: 100, status: 'Settled' },
-    { id: 'TXN-9018', title: 'Box Cricket Slot - Morning', date: '09 Sep 2026', amount: 400, net: 380, fee: 20, status: 'Settled' },
-  ];
+  useEffect(() => {
+    const fetchEarnings = async () => {
+      setLoading(true);
+      try {
+        if (businessType === 'sports') {
+          const { data: bookings } = await supabase
+            .from('sports_bookings')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (bookings) {
+            setTransactions(bookings);
+          }
+        } else {
+          const { data: bookings } = await supabase
+            .from('event_bookings')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (bookings) {
+            setTransactions(bookings);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching earnings:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEarnings();
+  }, [businessType, vendor]);
+
+  const grossSales = transactions.reduce((sum, t) => sum + (parseFloat(t.total_amount) || 0), 0);
+  const platformFee = Math.round(grossSales * 0.05);
+  const netPayout = grossSales - platformFee;
+  const pendingSettlement = transactions
+    .filter(t => t.status?.toLowerCase() === 'confirmed')
+    .reduce((sum, t) => sum + (parseFloat(t.total_amount) || 0), 0);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white selection:bg-orange-500">
+    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-orange-500 selection:text-white">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="lg:pl-64 flex flex-col min-h-screen">
@@ -34,16 +73,16 @@ export default function EarningsPage() {
         <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-black text-white">Earnings Analytics</h2>
-              <p className="text-xs text-zinc-400 mt-1">Track payouts, customer volume and net revenue.</p>
+              <h2 className="text-2xl font-black text-slate-900">Earnings Analytics</h2>
+              <p className="text-xs text-slate-500 mt-1">Track payouts, customer volume and net revenue.</p>
             </div>
-            <div className="flex items-center gap-1.5 bg-zinc-900 p-1 rounded-xl border border-zinc-800 text-xs">
+            <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-slate-200 text-xs shadow-xs">
               {(['WEEK', 'MONTH', 'YEAR'] as const).map((r) => (
                 <button
                   key={r}
                   onClick={() => setTimeRange(r)}
                   className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                    timeRange === r ? 'bg-orange-500 text-white shadow' : 'text-zinc-400 hover:text-white'
+                    timeRange === r ? 'bg-orange-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   {r}
@@ -54,56 +93,82 @@ export default function EarningsPage() {
 
           {/* Highlights */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-2">
-              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Gross Booking Sales</span>
-              <p className="text-3xl font-black text-white">{formatCurrency(38400)}</p>
-              <span className="text-xs text-emerald-400 font-bold flex items-center gap-0.5">
-                <ArrowUpRight className="w-3.5 h-3.5" /> +24% vs last period
+            <div className="p-6 rounded-3xl bg-white border border-slate-200 space-y-2 shadow-xs">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Gross Booking Sales</span>
+              <p className="text-3xl font-black text-slate-900">{formatCurrency(grossSales)}</p>
+              <span className="text-xs text-emerald-600 font-bold flex items-center gap-0.5">
+                <ArrowUpRight className="w-3.5 h-3.5" /> Real-time
               </span>
             </div>
 
-            <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-2">
-              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Net Partner Payout</span>
-              <p className="text-3xl font-black text-emerald-400">{formatCurrency(36480)}</p>
-              <span className="text-xs text-zinc-500 font-medium">After 5% platform fee</span>
+            <div className="p-6 rounded-3xl bg-white border border-slate-200 space-y-2 shadow-xs">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Net Partner Payout</span>
+              <p className="text-3xl font-black text-emerald-600">{formatCurrency(netPayout)}</p>
+              <span className="text-xs text-slate-500 font-medium">After 5% platform fee</span>
             </div>
 
-            <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-2">
-              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Pending Settlement</span>
-              <p className="text-3xl font-black text-orange-400">{formatCurrency(4800)}</p>
-              <span className="text-xs text-zinc-400 font-medium">Scheduled for next batch</span>
+            <div className="p-6 rounded-3xl bg-white border border-slate-200 space-y-2 shadow-xs">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pending Settlement</span>
+              <p className="text-3xl font-black text-orange-600">{formatCurrency(pendingSettlement)}</p>
+              <span className="text-xs text-slate-500 font-medium">Auto-settled to linked bank</span>
             </div>
           </div>
 
           {/* Transactions Breakdown */}
-          <div className="rounded-3xl bg-zinc-900 border border-zinc-800 p-6 md:p-8 space-y-6">
-            <h3 className="text-lg font-bold text-white">Itemized Payout History</h3>
-            <div className="space-y-3">
-              {transactions.map((tx) => (
-                <div
-                  key={tx.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800 gap-3"
-                >
-                  <div>
-                    <h4 className="font-bold text-sm text-white">{tx.title}</h4>
-                    <p className="text-xs text-zinc-500 font-mono mt-0.5">
-                      {tx.id} • {tx.date}
-                    </p>
-                  </div>
+          <div className="rounded-3xl bg-white border border-slate-200 p-6 md:p-8 space-y-6 shadow-xs">
+            <h3 className="text-lg font-bold text-slate-900">Itemized Payout History</h3>
+            
+            {loading ? (
+              <div className="py-12 flex justify-center">
+                <Loader2 className="w-6 h-6 animate-spin text-orange-600" />
+              </div>
+            ) : transactions.length === 0 ? (
+              <div className="text-center py-12 border border-dashed border-slate-200 rounded-2xl bg-slate-50">
+                <p className="text-3xl mb-2">💰</p>
+                <h4 className="text-sm font-bold text-slate-800">No earnings recorded yet</h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                  Once customers book your sports turfs or buy event tickets, your itemized payouts and invoices will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {transactions.map((tx) => {
+                  const amt = parseFloat(tx.total_amount) || 0;
+                  const fee = Math.round(amt * 0.05);
+                  const net = amt - fee;
 
-                  <div className="flex items-center justify-between sm:justify-end gap-6 text-xs">
-                    <div>
-                      <span className="text-zinc-400 block">Gross: ₹{tx.amount}</span>
-                      <span className="text-zinc-500">Fee: -₹{tx.fee}</span>
+                  return (
+                    <div
+                      key={tx.id}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl bg-slate-50/70 border border-slate-200 gap-3 hover:bg-slate-50 transition-colors"
+                    >
+                      <div>
+                        <h4 className="font-bold text-sm text-slate-900">
+                          {tx.user_name ? `${tx.user_name} - ` : ''}
+                          {businessType === 'sports' ? 'Sports Slot Booking' : 'Event Ticket Booking'}
+                        </h4>
+                        <p className="text-xs text-slate-500 font-mono mt-0.5">
+                          #{tx.id.substring(0, 8)} • {tx.booking_date || tx.created_at?.substring(0, 10) || 'Recent'}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between sm:justify-end gap-6 text-xs">
+                        <div>
+                          <span className="text-slate-600 block">Gross: ₹{amt}</span>
+                          <span className="text-slate-400">Fee: -₹{fee}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-base font-black text-emerald-600 block">₹{net}</span>
+                          <span className="text-[10px] font-bold text-emerald-700 uppercase bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 inline-block mt-0.5">
+                            {tx.status || 'Settled'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-base font-black text-emerald-400 block">₹{tx.net}</span>
-                      <span className="text-[10px] font-bold text-emerald-500 uppercase">{tx.status}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </main>
       </div>

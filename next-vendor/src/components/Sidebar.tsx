@@ -14,8 +14,8 @@ import {
   Wallet, 
   Settings, 
   LogOut, 
-  Store,
-  ChevronDown
+  CheckCircle2,
+  ExternalLink
 } from 'lucide-react';
 
 export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?: () => void }) {
@@ -39,46 +39,46 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?: () => 
       {isOpen && (
         <div
           onClick={onClose}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 lg:hidden"
         />
       )}
 
       <aside
-        className={`fixed top-0 left-0 h-full w-64 bg-zinc-950 border-r border-zinc-800/80 z-50 flex flex-col justify-between transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 left-0 h-full w-64 bg-white border-r border-slate-200 z-50 flex flex-col justify-between transition-transform duration-300 ease-in-out shadow-sm ${
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
         {/* Top Brand */}
-        <div className="p-6 border-b border-zinc-800/60">
+        <div className="p-5 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-zinc-900 border border-zinc-800 p-1.5 flex items-center justify-center shadow-md">
+            <div className="w-10 h-10 rounded-2xl bg-orange-50 border border-orange-200/80 p-1.5 flex items-center justify-center shadow-xs">
               <img src="/logo.png" alt="Passwala Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-lg font-black tracking-tight text-white">Passwala</span>
-                <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                <span className="text-lg font-black tracking-tight text-slate-900">Passwala</span>
+                <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200">
                   Partner
                 </span>
               </div>
-              <p className="text-[11px] text-zinc-500 truncate max-w-[140px]">
+              <p className="text-xs font-semibold text-slate-500 truncate max-w-[140px]">
                 {store?.business_name || store?.name || 'My Business'}
               </p>
             </div>
           </div>
 
           {/* Quick Console Switcher */}
-          <div className="mt-4 pt-3 border-t border-zinc-900">
-            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1.5">
+          <div className="mt-4 pt-3 border-t border-slate-100">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
               Active Console
             </label>
-            <div className="grid grid-cols-2 gap-1.5 bg-zinc-900/80 p-1 rounded-xl border border-zinc-800">
+            <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
               <button
                 onClick={() => setBusinessType('sports')}
-                className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   businessType === 'sports'
-                    ? 'bg-orange-500 text-white shadow'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                 }`}
               >
                 <Trophy className="w-3.5 h-3.5" />
@@ -86,10 +86,10 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?: () => 
               </button>
               <button
                 onClick={() => setBusinessType('event')}
-                className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   businessType === 'event'
-                    ? 'bg-purple-600 text-white shadow'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                 }`}
               >
                 <Ticket className="w-3.5 h-3.5" />
@@ -99,53 +99,71 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?: () => 
           </div>
         </div>
 
-        {/* Navigation Links */}
-        <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1 scrollbar-hide">
+        {/* Nav Links */}
+        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
           {navItems.map((item) => {
-            const Icon = item.icon;
             const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+            const Icon = item.icon;
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={onClose}
-                className={`group flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   isActive
-                    ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+                    ? 'bg-orange-50 text-orange-600 border border-orange-200/80 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-transparent'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-orange-500' : 'text-zinc-500 group-hover:text-zinc-300'}`} />
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-orange-600' : 'text-slate-400 group-hover:text-slate-600'}`} />
                   <span>{item.label}</span>
                 </div>
                 {item.badge && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
                     {item.badge}
                   </span>
                 )}
               </Link>
             );
           })}
+
+          <div className="pt-3 mt-3 border-t border-slate-100">
+            <a
+              href="http://localhost:3001"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-all"
+            >
+              <span>View Buyer App (:3001)</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
         </div>
 
-        {/* User Info & Logout */}
-        <div className="p-4 border-t border-zinc-800/60 bg-zinc-950">
-          <div className="flex items-center justify-between p-2 rounded-xl bg-zinc-900/60 border border-zinc-800/80">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-full bg-orange-500/20 border border-orange-500/30 text-orange-400 flex items-center justify-center font-bold text-xs shrink-0">
-                {(vendor?.name || 'V').charAt(0).toUpperCase()}
+        {/* Footer / Account */}
+        <div className="p-4 border-t border-slate-100 bg-slate-50/70">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 border border-orange-200 flex items-center justify-center font-bold text-xs shrink-0">
+                {(vendor?.displayName || store?.business_name || 'V')[0]?.toUpperCase()}
               </div>
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-white truncate">{vendor?.name || 'Partner'}</p>
-                <p className="text-[10px] text-zinc-500 font-mono truncate">+91 {vendor?.phone}</p>
+              <div className="truncate">
+                <p className="text-xs font-bold text-slate-800 truncate">
+                  {vendor?.displayName || 'Vendor Partner'}
+                </p>
+                <p className="text-[11px] text-slate-500 truncate flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                  <span>+91 {vendor?.phone || 'Verified'}</span>
+                </p>
               </div>
             </div>
+
             <button
               onClick={logout}
               title="Logout"
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+              className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
             </button>

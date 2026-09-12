@@ -14,7 +14,8 @@ import {
   Ticket, 
   Store, 
   CheckCircle2, 
-  Loader2 
+  Loader2,
+  Lock
 } from 'lucide-react';
 
 export default function VendorLoginPage() {
@@ -47,11 +48,7 @@ export default function VendorLoginPage() {
 
       if (res.ok && data.success) {
         setStep('OTP');
-        if (data.provider === 'mock' && data.otp) {
-          toast.success(`[MOCK OTP]: ${data.otp}`, { duration: 8000 });
-        } else {
-          toast.success('OTP sent successfully on WhatsApp!');
-        }
+        toast.success(data.otp ? `OTP sent: ${data.otp}` : 'OTP sent successfully on WhatsApp!');
       } else {
         toast.error(data.error || 'Failed to send OTP. Please try again.');
       }
@@ -93,33 +90,35 @@ export default function VendorLoginPage() {
     }
   };
 
+
+
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-zinc-950 text-white selection:bg-orange-500 selection:text-white">
+    <div className="min-h-screen flex flex-col md:flex-row bg-slate-50 text-slate-900 selection:bg-orange-500 selection:text-white">
       {/* Left Form Panel */}
-      <div className="flex-1 flex flex-col justify-between p-6 md:p-14 lg:p-20 z-10 max-w-xl mx-auto w-full">
+      <div className="flex-1 flex flex-col justify-between p-6 sm:p-10 md:p-14 lg:p-20 z-10 max-w-xl mx-auto w-full">
         {/* Brand Header */}
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-zinc-900 border border-zinc-800 p-2 flex items-center justify-center shadow-lg">
+          <div className="w-11 h-11 rounded-2xl bg-white border border-slate-200 p-2 flex items-center justify-center shadow-sm">
             <img src="/logo.png" alt="Passwala Logo" className="w-full h-full object-contain" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xl font-black tracking-tight text-white">Passwala</span>
-              <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30">
+              <span className="text-xl font-black tracking-tight text-slate-900">Passwala</span>
+              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 border border-orange-200">
                 Partner
               </span>
             </div>
-            <p className="text-xs text-zinc-500 font-medium">Business Suite</p>
+            <p className="text-xs text-slate-500 font-medium">Business Suite • Port 3002</p>
           </div>
         </div>
 
-        {/* Main Form Area */}
-        <div className="my-10 space-y-8">
+        {/* Main Form Box */}
+        <div className="my-8 sm:my-10 bg-white rounded-3xl p-6 sm:p-10 border border-slate-200/80 shadow-xl shadow-slate-200/40 space-y-6">
           <div>
-            <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight text-white leading-tight">
-              {step === 'PHONE' ? 'Grow your business with Passwala' : 'Verify your mobile number'}
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 leading-tight">
+              {step === 'PHONE' ? 'Grow your business with Passwala' : 'Verify your number'}
             </h1>
-            <p className="text-sm text-zinc-400 mt-2">
+            <p className="text-sm text-slate-600 mt-2 leading-relaxed">
               {step === 'PHONE' 
                 ? 'Sign in with your WhatsApp number to manage venues, events, orders, and payouts.'
                 : `Enter the 6-digit OTP code sent to +91 ${cleanPhone}`
@@ -128,13 +127,13 @@ export default function VendorLoginPage() {
           </div>
 
           {step === 'PHONE' ? (
-            <form onSubmit={handleSendOtp} className="space-y-4">
+            <form onSubmit={handleSendOtp} className="space-y-5">
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
-                  WhatsApp Number
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>WhatsApp Mobile Number</span>
                 </label>
-                <div className="flex items-center rounded-2xl bg-zinc-900/90 border border-zinc-800 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition-all p-1">
-                  <span className="px-4 text-sm font-bold text-zinc-400 border-r border-zinc-800 flex items-center gap-1.5">
+                <div className="flex items-center rounded-2xl bg-slate-50 border-2 border-slate-200 hover:border-slate-300 focus-within:border-orange-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-orange-500/10 transition-all p-1">
+                  <span className="px-3.5 text-sm font-bold text-slate-700 border-r border-slate-200 flex items-center gap-1.5">
                     🇮🇳 +91
                   </span>
                   <input
@@ -142,18 +141,18 @@ export default function VendorLoginPage() {
                     maxLength={10}
                     value={phone}
                     onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-                    placeholder="Enter 10-digit mobile number"
-                    className="flex-1 bg-transparent px-4 py-3 text-sm text-white placeholder:text-zinc-600 outline-none"
+                    placeholder="Enter 10-digit number"
+                    className="flex-1 bg-transparent px-3 py-2.5 text-slate-900 font-semibold text-sm placeholder:text-slate-400 outline-none"
                     autoFocus
                   />
-                  <Phone className="w-4 h-4 text-zinc-600 mr-4" />
+                  <Phone className="w-4 h-4 text-slate-400 mr-3 shrink-0" />
                 </div>
               </div>
 
               <button
                 type="submit"
                 disabled={loading || cleanPhone.length !== 10}
-                className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold text-sm shadow-lg shadow-orange-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-sm shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {loading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -167,9 +166,9 @@ export default function VendorLoginPage() {
               </button>
             </form>
           ) : (
-            <form onSubmit={handleVerifyOtp} className="space-y-4">
+            <form onSubmit={handleVerifyOtp} className="space-y-5">
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                   6-Digit OTP Code
                 </label>
                 <input
@@ -178,7 +177,7 @@ export default function VendorLoginPage() {
                   value={otpVal}
                   onChange={(e) => setOtpVal(e.target.value.replace(/\D/g, ''))}
                   placeholder="000000"
-                  className="w-full text-center text-2xl tracking-[0.5em] font-mono py-3 rounded-2xl bg-zinc-900 border border-zinc-800 text-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all"
+                  className="w-full text-center text-2xl tracking-[0.5em] font-mono py-3.5 rounded-2xl bg-slate-50 border-2 border-slate-200 focus:bg-white text-slate-900 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all font-bold"
                   autoFocus
                 />
               </div>
@@ -186,98 +185,102 @@ export default function VendorLoginPage() {
               <button
                 type="submit"
                 disabled={loading || otpVal.length !== 6}
-                className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold text-sm shadow-lg shadow-orange-500/20 transition-all disabled:opacity-50 cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm shadow-lg shadow-orange-600/20 transition-all disabled:opacity-50 cursor-pointer"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify & Open Dashboard'}
               </button>
 
-              <div className="flex items-center justify-between text-xs text-zinc-400 pt-2">
+              <div className="flex items-center justify-between text-xs text-slate-500 pt-2">
                 <button
                   type="button"
                   onClick={() => setStep('PHONE')}
-                  className="hover:text-white transition-colors cursor-pointer"
+                  className="hover:text-slate-900 transition-colors cursor-pointer font-medium"
                 >
                   ← Change Number
                 </button>
                 <button
                   type="button"
                   onClick={() => handleSendOtp()}
-                  className="text-orange-400 hover:text-orange-300 transition-colors cursor-pointer font-medium"
+                  className="text-orange-600 hover:text-orange-700 transition-colors cursor-pointer font-bold"
                 >
                   Resend OTP
                 </button>
               </div>
             </form>
           )}
+
+          <div className="text-[11px] text-slate-500 text-center leading-relaxed">
+            By continuing, you agree to Passwala&apos;s Partner Terms of Service and Privacy Policy.
+          </div>
         </div>
 
         {/* Security Footer Note */}
-        <div className="flex items-center gap-2 text-xs text-zinc-500">
-          <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+        <div className="flex items-center gap-2 text-xs text-slate-500 justify-center sm:justify-start">
+          <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>Secured with RBI compliant 256-bit encryption & OTP verification.</span>
         </div>
       </div>
 
       {/* Right Perks & Showcase Panel */}
-      <div className="hidden md:flex flex-1 relative bg-gradient-to-br from-zinc-900 via-zinc-950 to-black p-12 lg:p-20 flex-col justify-between border-l border-zinc-800/60 overflow-hidden">
-        {/* Glow circles */}
-        <div className="absolute -top-20 -right-20 w-96 h-96 bg-orange-600/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-20 -left-20 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="hidden md:flex flex-1 relative bg-gradient-to-br from-orange-50/70 via-slate-50 to-amber-50/50 p-10 lg:p-16 flex-col justify-between border-l border-slate-200/80 overflow-hidden">
+        {/* Subtle decorative circles */}
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-orange-200/30 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-amber-200/30 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex justify-end">
-          <span className="flex items-center gap-2 text-xs text-zinc-400 bg-zinc-900/80 px-3 py-1.5 rounded-full border border-zinc-800">
+          <span className="flex items-center gap-2 text-xs text-slate-700 bg-white/90 backdrop-blur-sm px-3.5 py-1.5 rounded-full border border-slate-200 shadow-xs font-medium">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             Live Ecosystem • Port 3002
           </span>
         </div>
 
-        <div className="relative z-10 max-w-md space-y-8 my-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5" />
+        <div className="relative z-10 max-w-md space-y-6 my-auto">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-100 border border-orange-200 text-orange-700 text-xs font-bold">
+            <Sparkles className="w-3.5 h-3.5 text-orange-600" />
             All-In-One Merchant Platform
           </div>
 
-          <h2 className="text-3xl lg:text-4xl font-black text-white leading-tight">
+          <h2 className="text-3xl lg:text-4xl font-black text-slate-900 leading-tight">
             One powerful suite for sports turfs, event creators & merchants.
           </h2>
 
-          <div className="space-y-4">
-            <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 backdrop-blur-sm">
-              <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400 shrink-0">
+          <div className="space-y-3.5">
+            <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-white/95 border border-slate-200/80 shadow-xs hover:shadow-md hover:border-orange-200 transition-all">
+              <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 shrink-0">
                 <Trophy className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-white">Sports Turf & Court Booking</h4>
-                <p className="text-xs text-zinc-400 mt-0.5">Automated hourly slot scheduling, box cricket, turf, badminton & instant client reminders.</p>
+                <h4 className="text-sm font-bold text-slate-900">Sports Turf & Court Booking</h4>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">Automated hourly slot scheduling, box cricket, turf, badminton & instant client reminders.</p>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 backdrop-blur-sm">
-              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 shrink-0">
+            <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-white/95 border border-slate-200/80 shadow-xs hover:shadow-md hover:border-purple-200 transition-all">
+              <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600 border border-purple-100 shrink-0">
                 <Ticket className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-white">Event Ticketing & Check-In</h4>
-                <p className="text-xs text-zinc-400 mt-0.5">Tiered pricing, VIP passes, multi-date shows, and built-in QR camera scanner for zero duplicate entries.</p>
+                <h4 className="text-sm font-bold text-slate-900">Event Ticketing & Check-In</h4>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">Tiered pricing, VIP passes, multi-date shows, and built-in QR camera scanner for zero duplicate entries.</p>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 backdrop-blur-sm">
-              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 shrink-0">
+            <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-white/95 border border-slate-200/80 shadow-xs hover:shadow-md hover:border-emerald-200 transition-all">
+              <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 shrink-0">
                 <Store className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-white">Direct Settlements & Growth</h4>
-                <p className="text-xs text-zinc-400 mt-0.5">Daily bank payouts, zero hidden deductions, transparent GST invoices, and comprehensive analytics.</p>
+                <h4 className="text-sm font-bold text-slate-900">Direct Settlements & Growth</h4>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">Daily bank payouts, zero hidden deductions, transparent GST invoices, and comprehensive analytics.</p>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="relative z-10 flex items-center justify-between text-xs text-zinc-500 border-t border-zinc-900 pt-6">
+        <div className="relative z-10 flex items-center justify-between text-xs text-slate-500 border-t border-slate-200/80 pt-6">
           <span>© 2026 Passwala Technologies</span>
-          <span className="flex items-center gap-1 text-zinc-400">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+          <span className="flex items-center gap-1.5 text-slate-700 font-semibold">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             Verified Partner Portal
           </span>
         </div>
