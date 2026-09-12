@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuthContext } from '@/lib/auth-context';
+import { useTranslation } from '@/lib/language-context';
 import { supabase } from '@/lib/supabase-client';
 import { useRouter } from 'next/navigation';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -15,6 +16,7 @@ import toast, { Toaster } from 'react-hot-toast';
 
 export default function OrdersPage() {
   const { user, loading: authLoading, openLogin } = useAuthContext();
+  const { t, currentLanguage } = useTranslation();
   const router = useRouter();
   
   const [activeTab, setActiveTab] = useState('events');
@@ -112,7 +114,7 @@ export default function OrdersPage() {
       });
 
       doc.save(`Passwala_Event_${booking.id.substring(0,8)}.pdf`);
-      toast.success('Invoice downloaded!');
+      toast.success(t('invoice_downloaded', 'Invoice downloaded!'));
     } catch (e) {
       toast.error('Failed to generate PDF');
     }
@@ -132,8 +134,8 @@ export default function OrdersPage() {
       {/* Header */}
       <div className="bg-primary pt-8 pb-16 px-4">
         <div className="container max-w-2xl mx-auto">
-          <h1 className="text-3xl font-bold text-primary-foreground">My Bookings</h1>
-          <p className="text-primary-foreground/80 mt-1">View your event tickets and sports slots</p>
+          <h1 className="text-3xl font-bold text-primary-foreground">{t('my_bookings_title', 'My Bookings')}</h1>
+          <p className="text-primary-foreground/80 mt-1">{t('my_bookings_page_sub', 'View your event tickets and sports slots')}</p>
         </div>
       </div>
 
@@ -145,13 +147,13 @@ export default function OrdersPage() {
                 value="events" 
                 className="rounded-2xl data-[state=active]:bg-primary/10 data-[state=active]:text-primary font-bold transition-all"
               >
-                Event Tickets
+                {t('tab_event_tickets', 'Event Tickets')}
               </TabsTrigger>
               <TabsTrigger 
                 value="sports"
                 className="rounded-2xl data-[state=active]:bg-primary/10 data-[state=active]:text-primary font-bold transition-all"
               >
-                Sports Bookings
+                {t('tab_sports_bookings', 'Sports Bookings')}
               </TabsTrigger>
             </TabsList>
 
@@ -159,8 +161,8 @@ export default function OrdersPage() {
               {events.length === 0 ? (
                 <div className="text-center py-16 bg-muted/30 rounded-3xl border border-dashed">
                   <SearchX className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-                  <h3 className="text-lg font-bold">No Event Tickets</h3>
-                  <p className="text-muted-foreground text-sm">You haven't booked any events yet.</p>
+                  <h3 className="text-lg font-bold">{t('no_event_tickets', 'No Event Tickets')}</h3>
+                  <p className="text-muted-foreground text-sm">{t('no_event_tickets_sub', "You haven't booked any events yet.")}</p>
                 </div>
               ) : (
                 events.map(booking => (
@@ -174,19 +176,23 @@ export default function OrdersPage() {
                           <h3 className="text-lg font-bold line-clamp-1">{booking.events?.title || 'Unknown Event'}</h3>
                           <div className="flex items-center gap-1.5 text-muted-foreground text-sm mt-1">
                             <MapPin className="h-3.5 w-3.5" />
-                            <span className="truncate max-w-[200px]">{booking.events?.venue_name || 'Venue'}</span>
+                            <span className="truncate max-w-[200px]">{booking.events?.venue_name || t('venue', 'Venue')}</span>
                           </div>
                         </div>
                         <div className="text-right shrink-0">
                           <p className="font-bold text-lg text-primary">&#x20B9;{parseFloat(booking.total_amount).toFixed(2)}</p>
-                          <p className="text-xs text-muted-foreground">{booking.ticket_count} {booking.ticket_count > 1 ? 'Tickets' : 'Ticket'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {booking.ticket_count > 1 
+                              ? t('tickets_count', `${booking.ticket_count} Tickets`, { n: booking.ticket_count }) 
+                              : t('ticket_single', '1 Ticket')}
+                          </p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-4 py-3 border-y text-sm">
                         <div className="flex items-center gap-1.5">
                           <Calendar className="h-4 w-4 text-primary" />
-                          <span>{booking.events?.event_date ? new Date(booking.events.event_date).toLocaleDateString() : 'TBA'}</span>
+                          <span>{booking.events?.event_date ? new Date(booking.events.event_date).toLocaleDateString(currentLanguage === 'en' ? 'en-IN' : currentLanguage) : t('tba', 'TBA')}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <Ticket className="h-4 w-4 text-primary" />
@@ -205,7 +211,7 @@ export default function OrdersPage() {
                             router.push('/events/ticket');
                           }}
                         >
-                          View E-Ticket
+                          {t('view_e_ticket', 'View E-Ticket')}
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => downloadEventInvoice(booking)} className="rounded-xl">
                           <Download className="h-5 w-5 text-muted-foreground" />
@@ -221,8 +227,8 @@ export default function OrdersPage() {
               {sports.length === 0 ? (
                 <div className="text-center py-16 bg-muted/30 rounded-3xl border border-dashed">
                   <Trophy className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-                  <h3 className="text-lg font-bold">No Sports Bookings</h3>
-                  <p className="text-muted-foreground text-sm">You haven't booked any turf or courts yet.</p>
+                  <h3 className="text-lg font-bold">{t('no_sports_bookings', 'No Sports Bookings')}</h3>
+                  <p className="text-muted-foreground text-sm">{t('no_sports_bookings_sub', "You haven't booked any turf or courts yet.")}</p>
                 </div>
               ) : (
                 sports.map(booking => (
@@ -232,16 +238,16 @@ export default function OrdersPage() {
                         <Badge className="bg-emerald-500/10 text-emerald-600 border-0 mb-2">
                           {booking.status || 'CONFIRMED'}
                         </Badge>
-                        <h3 className="text-lg font-bold">{booking.venue_name || booking.sports_venues?.name || 'Sports Venue'}</h3>
+                        <h3 className="text-lg font-bold">{booking.venue_name || booking.sports_venues?.name || t('sports_venue', 'Sports Venue')}</h3>
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-lg text-primary">&#x20B9;{parseFloat(booking.total_price || booking.total_amount || 0).toFixed(2)}</p>
                       </div>
                     </div>
                       <div className="bg-muted/50 rounded-xl p-3 text-sm space-y-1">
-                        <p><strong>Sport:</strong> {booking.sport_type?.replace('_', ' ').toUpperCase()}</p>
-                        <p><strong>Date:</strong> {booking.slot_date}</p>
-                        <p><strong>Slot:</strong> {booking.slot_time} - {booking.slot_end_time}</p>
+                        <p><strong>{t('sport_label', 'Sport')}:</strong> {t(booking.sport_type, booking.sport_type?.replace('_', ' ').toUpperCase())}</p>
+                        <p><strong>{t('date_label', 'Date')}:</strong> {booking.slot_date}</p>
+                        <p><strong>{t('slot_label', 'Slot')}:</strong> {booking.slot_time} - {booking.slot_end_time}</p>
                       </div>
                   </Card>
                 ))

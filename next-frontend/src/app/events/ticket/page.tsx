@@ -9,12 +9,14 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useTranslation } from '@/lib/language-context';
 
 const REDIRECT_SECONDS = 6;
 const GST_RATE = 0.09;
 
 export default function EventTicket() {
   const router = useRouter();
+  const { t, currentLanguage } = useTranslation();
   const [data, setData] = useState<any>(null);
   const [countdown, setCountdown] = useState(REDIRECT_SECONDS);
 
@@ -46,8 +48,8 @@ export default function EventTicket() {
   if (!data) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center">
-        <p className="mb-4 text-lg font-medium text-muted-foreground">No ticket found.</p>
-        <Button onClick={() => router.push('/events')} className="rounded-xl">Browse Events</Button>
+        <p className="mb-4 text-lg font-medium text-muted-foreground">{t('no_ticket_found', 'No ticket found.')}</p>
+        <Button onClick={() => router.push('/events')} className="rounded-xl">{t('browse_events', 'Browse Events')}</Button>
       </div>
     );
   }
@@ -103,7 +105,7 @@ export default function EventTicket() {
       });
 
       doc.save(`Invoice_${invoiceNo}.pdf`);
-      toast.success('Invoice downloaded!');
+      toast.success(t('invoice_downloaded', 'Invoice downloaded!'));
     } catch (err) {
       console.error(err);
       toast.error('Failed to generate PDF invoice');
@@ -115,8 +117,10 @@ export default function EventTicket() {
       <div className="w-full max-w-md bg-green-500 rounded-2xl p-6 text-white flex items-center gap-4 mb-6 shadow-lg shadow-green-500/20">
         <CheckCircle className="w-10 h-10 shrink-0" />
         <div>
-          <h2 className="text-xl font-bold">Booking Confirmed!</h2>
-          <p className="text-white/90 text-sm mt-1">Redirecting to events in {countdown}s...</p>
+          <h2 className="text-xl font-bold">{t('booking_confirmed', 'Booking Confirmed!')}</h2>
+          <p className="text-white/90 text-sm mt-1">
+            {t('redirecting_events', `Redirecting to events in ${countdown}s...`, { s: countdown })}
+          </p>
         </div>
       </div>
 
@@ -135,7 +139,7 @@ export default function EventTicket() {
             <h3 className="text-white text-xl font-bold truncate">{event?.title}</h3>
             <div className="flex justify-between items-center mt-2">
               <Badge className="bg-primary hover:bg-primary text-white border-0">{tier?.tier_name || 'Standard'}</Badge>
-              <span className="text-white/90 text-sm font-medium">{booking?.ticket_count} Admit</span>
+              <span className="text-white/90 text-sm font-medium">{booking?.ticket_count} {t('admit', 'Admit')}</span>
             </div>
           </div>
         </div>
@@ -144,14 +148,14 @@ export default function EventTicket() {
           <div className="flex items-start gap-3">
             <Calendar className="w-5 h-5 text-primary mt-0.5" />
             <div>
-              <p className="text-xs text-muted-foreground">Date & Time</p>
-              <p className="font-semibold text-sm">{eventDate.toLocaleString('en-IN')}</p>
+              <p className="text-xs text-muted-foreground">{t('date_time', 'Date & Time')}</p>
+              <p className="font-semibold text-sm">{eventDate.toLocaleString(currentLanguage === 'en' ? 'en-IN' : currentLanguage)}</p>
             </div>
           </div>
           <div className="flex items-start gap-3">
             <MapPin className="w-5 h-5 text-primary mt-0.5" />
             <div>
-              <p className="text-xs text-muted-foreground">Venue</p>
+              <p className="text-xs text-muted-foreground">{t('venue', 'Venue')}</p>
               <p className="font-semibold text-sm">{event?.venue_name}</p>
             </div>
           </div>
@@ -172,10 +176,10 @@ export default function EventTicket() {
 
       <div className="w-full max-w-md mt-6 space-y-3">
         <Button onClick={handleDownloadInvoice} variant="outline" className="w-full h-12 rounded-2xl font-bold border-2">
-          <Download className="w-4 h-4 mr-2" /> Download Invoice
+          <Download className="w-4 h-4 mr-2" /> {t('download_invoice', 'Download Invoice')}
         </Button>
         <Button onClick={() => router.push('/events')} variant="ghost" className="w-full text-muted-foreground font-medium rounded-2xl h-12">
-          Browse More Events
+          {t('browse_more_events', 'Browse More Events')}
         </Button>
       </div>
     </div>

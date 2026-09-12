@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, MapPin, Share2, Ticket, Clock, Minus, Plus, Loader2, ArrowLeft } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { useAuthContext } from '@/lib/auth-context';
+import { useTranslation } from '@/lib/language-context';
 import { supabase } from '@/lib/supabase-client';
 import { processRazorpayPayment } from '@/lib/razorpay';
 
@@ -24,6 +25,7 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
   const { id } = use(params);
   const router = useRouter();
   const { user, openLogin } = useAuthContext();
+  const { t, currentLanguage } = useTranslation();
 
   const [event, setEvent] = useState<any>(null);
   const [siblingSlots, setSiblingSlots] = useState<any[]>([]);
@@ -222,7 +224,7 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
         await navigator.share({ title: event.title, url: window.location.href });
       } else {
         await navigator.clipboard.writeText(window.location.href);
-        toast.success('Link copied!');
+        toast.success(t('link_copied', 'Link copied!'));
       }
     } catch {}
   };
@@ -254,9 +256,9 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
           <div className="lg:col-span-2 space-y-8">
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2">
-                <Badge className="bg-primary/20 text-primary border-0">{event.category || 'Event'}</Badge>
-                {event.status === 'ONGOING' && <Badge className="bg-green-500 text-white border-0">Live Now</Badge>}
-                {!bookingWindowOpen && <Badge variant="destructive">Booking Closed</Badge>}
+                <Badge className="bg-primary/20 text-primary border-0">{event.category || t('events', 'Event')}</Badge>
+                {event.status === 'ONGOING' && <Badge className="bg-green-500 text-white border-0">{t('live_now', 'Live Now')}</Badge>}
+                {!bookingWindowOpen && <Badge variant="destructive">{t('booking_closed', 'Booking Closed')}</Badge>}
               </div>
               <h1 className="text-4xl md:text-5xl font-bold tracking-tight">{event.title}</h1>
               {event.description && <p className="text-lg text-muted-foreground leading-relaxed">{event.description}</p>}
@@ -266,27 +268,27 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
               <div className="flex items-start gap-4">
                 <div className="p-3 bg-muted rounded-2xl shrink-0"><Calendar className="h-5 w-5 text-primary" /></div>
                 <div>
-                  <p className="font-semibold">{startDate.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                  <p className="font-semibold">{startDate.toLocaleDateString(currentLanguage === 'en' ? 'en-IN' : currentLanguage, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
                   <p className="text-sm text-muted-foreground">{startDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
                 </div>
               </div>
               <div className="flex items-start gap-4">
                 <div className="p-3 bg-muted rounded-2xl shrink-0"><MapPin className="h-5 w-5 text-primary" /></div>
                 <div>
-                  <p className="font-semibold">{event.venue_name || 'City Venue'}</p>
+                  <p className="font-semibold">{event.venue_name || t('venue', 'City Venue')}</p>
                   {event.city && <p className="text-sm text-muted-foreground">{event.city}</p>}
                 </div>
               </div>
               {event.duration && (
                 <div className="flex items-start gap-4">
                   <div className="p-3 bg-muted rounded-2xl shrink-0"><Clock className="h-5 w-5 text-primary" /></div>
-                  <div><p className="font-semibold">Duration</p><p className="text-sm text-muted-foreground">{event.duration}</p></div>
+                  <div><p className="font-semibold">{t('duration', 'Duration')}</p><p className="text-sm text-muted-foreground">{event.duration}</p></div>
                 </div>
               )}
               {event.language && (
                 <div className="flex items-start gap-4">
                   <div className="p-3 bg-muted rounded-2xl shrink-0 text-xl flex items-center justify-center">🗣️</div>
-                  <div><p className="font-semibold">Language</p><p className="text-sm text-muted-foreground">{event.language}</p></div>
+                  <div><p className="font-semibold">{t('event_language', 'Language')}</p><p className="text-sm text-muted-foreground">{event.language}</p></div>
                 </div>
               )}
             </div>
@@ -294,13 +296,13 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
             {siblingSlots.length > 1 && (
               <div className="bg-card border rounded-3xl p-6 shadow-sm mb-6">
                 <h3 className="text-lg font-bold flex items-center gap-2 mb-1">
-                  <Calendar className="h-5 w-5 text-primary" /> Multiple Dates & Venues
+                  <Calendar className="h-5 w-5 text-primary" /> {t('multiple_dates_venues', 'Multiple Dates & Venues')}
                 </h3>
-                <p className="text-sm text-muted-foreground mb-4">Select a different show time or location:</p>
+                <p className="text-sm text-muted-foreground mb-4">{t('select_show_time', 'Select a different show time or location:')}</p>
                 <div className="flex flex-col gap-3">
                   {siblingSlots.map(slot => {
                     const isActive = slot.id === event.id;
-                    const dateStr = new Date(slot.event_date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+                    const dateStr = new Date(slot.event_date).toLocaleDateString(currentLanguage === 'en' ? 'en-IN' : currentLanguage, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
                     
                     if (isActive) {
                       return (
@@ -327,13 +329,13 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
             )}
 
             <div className="space-y-3">
-              <h3 className="text-2xl font-bold">About this Event</h3>
-              <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{event.description || 'More details coming soon.'}</p>
+              <h3 className="text-2xl font-bold">{t('about_event', 'About this Event')}</h3>
+              <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{event.description || t('more_details_soon', 'More details coming soon.')}</p>
             </div>
 
             {event.organizer_name && (
               <div className="p-5 bg-muted/40 rounded-2xl">
-                <p className="text-sm text-muted-foreground">Organized by</p>
+                <p className="text-sm text-muted-foreground">{t('organized_by', 'Organized by')}</p>
                 <p className="font-semibold text-lg mt-1">{event.organizer_name}</p>
               </div>
             )}
@@ -343,8 +345,8 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
           <div className="lg:col-span-1">
             <div className="sticky top-24 bg-card border rounded-3xl p-6 shadow-xl space-y-5">
               <div>
-                <h3 className="text-xl font-bold">Select Tickets</h3>
-                <p className="text-sm text-muted-foreground mt-1">Choose your category</p>
+                <h3 className="text-xl font-bold">{t('select_tickets', 'Select Tickets')}</h3>
+                <p className="text-sm text-muted-foreground mt-1">{t('choose_category', 'Choose your category')}</p>
               </div>
 
               <div className="space-y-3">
@@ -358,20 +360,22 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
                   >
                     <div>
                       <p className={`font-bold ${selectedTierId === tier.id ? 'text-primary' : ''}`}>{tier.tier_name}</p>
-                      <p className="text-xs text-muted-foreground">{tier.available_seats ?? tier.total_seats} seats left</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t('seats_left', '{n} seats left', { n: tier.available_seats ?? tier.total_seats })}
+                      </p>
                     </div>
                     <p className="font-bold text-lg">&#x20B9;{tier.price}</p>
                   </div>
                 )) : (
                   <div className="p-4 border rounded-2xl text-center text-muted-foreground text-sm">
-                    No ticket tiers available
+                    {t('no_tiers_available', 'No ticket tiers available')}
                   </div>
                 )}
               </div>
 
               {selectedTier && (
                 <div className="flex items-center justify-between py-2">
-                  <span className="font-semibold text-sm">Quantity</span>
+                  <span className="font-semibold text-sm">{t('quantity', 'Quantity')}</span>
                   <div className="flex items-center gap-4 bg-muted px-4 py-2 rounded-full">
                     <button
                       onClick={() => setTicketCount(Math.max(1, ticketCount - 1))}
@@ -391,23 +395,23 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
               {selectedTier && (
                 <div className="space-y-2 pt-4 border-t text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Base ({ticketCount}x &#x20B9;{selectedTier.price})</span>
+                    <span className="text-muted-foreground">{t('base', 'Base')} ({ticketCount}x &#x20B9;{selectedTier.price})</span>
                     <span className="font-semibold">&#x20B9;{baseAmount.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">CGST (9%)</span>
+                    <span className="text-muted-foreground">{t('cgst', 'CGST (9%)')}</span>
                     <span className="font-semibold">&#x20B9;{cgst.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">SGST (9%)</span>
+                    <span className="text-muted-foreground">{t('sgst', 'SGST (9%)')}</span>
                     <span className="font-semibold">&#x20B9;{sgst.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Platform Fee</span>
+                    <span className="text-muted-foreground">{t('platform_fee', 'Platform Fee')}</span>
                     <span className="font-semibold">&#x20B9;{platformFeeTotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center pt-2 border-t">
-                    <span className="font-bold text-lg">Total</span>
+                    <span className="font-bold text-lg">{t('total', 'Total')}</span>
                     <span className="font-bold text-xl text-primary">&#x20B9;{totalAmount.toFixed(2)}</span>
                   </div>
                 </div>
@@ -419,11 +423,11 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
                 className="w-full h-12 text-base font-bold rounded-2xl"
               >
                 {bookingLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Ticket className="mr-2 h-5 w-5" />}
-                {bookingLoading ? 'Processing...' : (!bookingWindowOpen ? 'Booking Closed' : (user ? 'Pay & Book' : 'Login to Book'))}
+                {bookingLoading ? t('processing', 'Processing...') : (!bookingWindowOpen ? t('booking_closed', 'Booking Closed') : (user ? t('pay_and_book', 'Pay & Book') : t('login_to_book', 'Login to Book')))}
               </Button>
 
               <Button onClick={handleShare} variant="ghost" className="w-full text-muted-foreground text-sm gap-2">
-                <Share2 className="h-4 w-4" /> Share Event
+                <Share2 className="h-4 w-4" /> {t('share_event', 'Share Event')}
               </Button>
             </div>
           </div>
@@ -433,7 +437,7 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
       {/* Mobile Sticky Footer */}
       <div className="lg:hidden fixed bottom-16 left-0 right-0 p-4 bg-background/95 backdrop-blur border-t z-40 flex items-center justify-between">
         <div>
-          <p className="text-xs text-muted-foreground">Total</p>
+          <p className="text-xs text-muted-foreground">{t('total', 'Total')}</p>
           <p className="text-lg font-bold text-primary">&#x20B9;{totalAmount.toFixed(2)}</p>
         </div>
         <Button
@@ -441,7 +445,7 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
           disabled={bookingLoading || !selectedTier || !bookingWindowOpen}
           className="rounded-xl px-8 font-bold"
         >
-          {bookingLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (user ? 'Pay & Book' : 'Login to Book')}
+          {bookingLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (user ? t('pay_and_book', 'Pay & Book') : t('login_to_book', 'Login to Book'))}
         </Button>
       </div>
     </div>

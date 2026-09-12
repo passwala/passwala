@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Ticket, MapPin, Search, User, Loader2 } from 'lucide-react';
+import { Ticket, MapPin, Search, User, Loader2, Globe, Settings } from 'lucide-react';
 import { useAuthContext } from '@/lib/auth-context';
+import { useTranslation } from '@/lib/language-context';
 import { useRouter } from 'next/navigation';
 import {
   DropdownMenu,
@@ -26,6 +27,7 @@ const CITIES = ['Ahmedabad', 'Mumbai', 'Delhi', 'Bangalore', 'Pune', 'Surat', 'J
 
 export function Navbar() {
   const { user, logout, openLogin } = useAuthContext();
+  const { currentLanguage, changeLanguage, t, languages } = useTranslation();
   const router = useRouter();
   const [city, setCity] = useState('Select City');
   const [locationLoading, setLocationLoading] = useState(false);
@@ -111,7 +113,7 @@ export function Navbar() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="search"
-              placeholder="Search events, sports, rides..."
+              placeholder={t('search_placeholder')}
               className="w-full h-10 rounded-full border bg-background pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
@@ -129,11 +131,11 @@ export function Navbar() {
                 ) : (
                   <MapPin className="h-4 w-4" />
                 )}
-                <span className="max-w-[100px] truncate">{city}</span>
+                <span className="max-w-[100px] truncate">{city === 'Select City' ? t('select_city') : city}</span>
             </SheetTrigger>
             <SheetContent side="left" className="w-72">
               <SheetHeader>
-                <SheetTitle>Select your city</SheetTitle>
+                <SheetTitle>{t('select_your_city')}</SheetTitle>
               </SheetHeader>
               <div className="mt-6 space-y-2">
                 <button
@@ -141,7 +143,7 @@ export function Navbar() {
                   className="w-full flex items-center gap-2 p-3 rounded-xl border text-sm font-medium hover:bg-muted transition-colors"
                 >
                   <MapPin className="h-4 w-4 text-primary" />
-                  {locationLoading ? 'Detecting...' : 'Use My Location'}
+                  {locationLoading ? t('detecting') : t('use_my_location')}
                 </button>
                 <div className="border-t pt-3 mt-3">
                   {CITIES.map(c => (
@@ -159,6 +161,33 @@ export function Navbar() {
               </div>
             </SheetContent>
           </Sheet>
+          )}
+
+          {/* Language Selector */}
+          {mounted && (
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border bg-background hover:bg-muted text-xs font-semibold text-foreground transition-all outline-none">
+                <Globe className="h-3.5 w-3.5 text-primary" />
+                <span>{languages[currentLanguage]?.flag || '🌐'} {languages[currentLanguage]?.code?.toUpperCase() || 'EN'}</span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44 rounded-2xl shadow-xl p-1.5 z-50">
+                {Object.entries(languages).map(([code, info]) => (
+                  <DropdownMenuItem
+                    key={code}
+                    onClick={() => changeLanguage(code)}
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium cursor-pointer transition-colors ${
+                      currentLanguage === code ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>{info.flag}</span>
+                      <span>{info.nativeName}</span>
+                    </span>
+                    <span className="text-[10px] text-muted-foreground uppercase">{code}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
 
           {/* Search — mobile */}
@@ -182,20 +211,23 @@ export function Navbar() {
                   {user.phone && <p className="text-xs text-muted-foreground">{user.phone}</p>}
                 </div>
                 <DropdownMenuItem onClick={() => router.push('/profile')}>
-                  <User className="mr-2 h-4 w-4" /> Profile
+                  <User className="mr-2 h-4 w-4" /> {t('profile')}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => router.push('/orders')}>
-                  My Orders
+                  <Ticket className="mr-2 h-4 w-4" /> {t('orders')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/settings')}>
+                  <Settings className="mr-2 h-4 w-4" /> {t('settings')}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="text-red-500 focus:text-red-500">
-                  Logout
+                  {t('logout')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
             <Button onClick={openLogin} className="rounded-full px-5 hidden md:flex">
-              Login
+              {t('login')}
             </Button>
           )}
 
@@ -210,3 +242,4 @@ export function Navbar() {
     </nav>
   );
 }
+

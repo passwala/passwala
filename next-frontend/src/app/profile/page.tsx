@@ -8,18 +8,20 @@ import {
   HelpCircle, LogOut, ChevronRight, User, Phone, Mail
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-
-const menuItems = [
-  { icon: ShoppingBag, label: 'My Bookings & Orders', href: '/orders' },
-  { icon: Wallet,      label: 'Wallet', href: '/wallet' },
-  { icon: MapPin,      label: 'Saved Addresses', href: '/addresses' },
-  { icon: Settings,    label: 'App Settings', href: '/settings' },
-  { icon: HelpCircle,  label: 'Help & Support', href: '/help' },
-];
+import { useTranslation } from '@/lib/language-context';
 
 export default function ProfilePage() {
   const { user, loading, logout, openLogin } = useAuthContext();
+  const { t } = useTranslation();
   const router = useRouter();
+
+  const menuItems = [
+    { icon: ShoppingBag, label: t('my_bookings'), href: '/orders' },
+    { icon: Wallet,      label: t('wallet'), href: '/wallet' },
+    { icon: MapPin,      label: t('saved_addresses'), href: '/addresses' },
+    { icon: Settings,    label: t('settings'), href: '/settings' },
+    { icon: HelpCircle,  label: t('help'), href: '/help' },
+  ];
 
   if (loading) {
     return (
@@ -36,11 +38,11 @@ export default function ProfilePage() {
           <User className="h-12 w-12 text-muted-foreground" />
         </div>
         <div className="text-center space-y-2">
-          <h2 className="text-2xl font-bold">You're not logged in</h2>
-          <p className="text-muted-foreground">Login to view your profile, orders, and tickets</p>
+          <h2 className="text-2xl font-bold">{t('not_logged_in', "You're not logged in")}</h2>
+          <p className="text-muted-foreground">{t('login_subtext', 'Login to view your profile, orders, and tickets')}</p>
         </div>
         <Button size="lg" className="rounded-full px-10" onClick={openLogin}>
-          Login / Sign Up
+          {t('login_signup', 'Login / Sign Up')}
         </Button>
       </div>
     );
@@ -113,7 +115,7 @@ export default function ProfilePage() {
           className="w-full mt-4 flex items-center justify-center gap-2 py-4 rounded-2xl border border-red-200 text-red-500 hover:bg-red-50 transition-colors font-semibold"
         >
           <LogOut className="h-5 w-5" />
-          Logout
+          {t('logout')}
         </button>
 
         <p className="text-center text-xs text-muted-foreground mt-6">

@@ -3,18 +3,19 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import QRCode from 'react-qr-code';
-import { Download, Calendar, MapPin, CheckCircle, Trophy } from 'lucide-react';
+import { Download, Calendar, MapPin, CheckCircle } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useTranslation } from '@/lib/language-context';
 
 const REDIRECT_SECONDS = 6;
-const GST_RATE = 0.09;
 
 export default function SportsTicketPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [data, setData] = useState<any>(null);
   const [countdown, setCountdown] = useState(REDIRECT_SECONDS);
 
@@ -42,8 +43,8 @@ export default function SportsTicketPage() {
   if (!data) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center">
-        <p className="mb-4 text-lg font-medium text-muted-foreground">No booking found.</p>
-        <Button onClick={() => router.push('/sports')} className="rounded-xl">Browse Sports</Button>
+        <p className="mb-4 text-lg font-medium text-muted-foreground">{t('no_booking_found', 'No booking found.')}</p>
+        <Button onClick={() => router.push('/sports')} className="rounded-xl">{t('browse_sports', 'Browse Sports')}</Button>
       </div>
     );
   }
@@ -77,7 +78,7 @@ export default function SportsTicketPage() {
       });
 
       doc.save(`Passwala_Sports_${booking.id.substring(0,8)}.pdf`);
-      toast.success('Invoice downloaded!');
+      toast.success(t('invoice_downloaded', 'Invoice downloaded!'));
     } catch (e) {
       toast.error('Failed to generate PDF');
     }
@@ -90,8 +91,10 @@ export default function SportsTicketPage() {
       <div className="w-full max-w-md bg-green-500 rounded-2xl p-6 text-white flex items-center gap-4 mb-6 shadow-lg shadow-green-500/20">
         <CheckCircle className="w-10 h-10 shrink-0" />
         <div>
-          <h2 className="text-xl font-bold">Booking Confirmed!</h2>
-          <p className="text-white/90 text-sm mt-1">Redirecting to orders in {countdown}s...</p>
+          <h2 className="text-xl font-bold">{t('booking_confirmed', 'Booking Confirmed!')}</h2>
+          <p className="text-white/90 text-sm mt-1">
+            {t('redirecting_orders', `Redirecting to orders in ${countdown}s...`, { s: countdown })}
+          </p>
         </div>
       </div>
 
@@ -107,8 +110,10 @@ export default function SportsTicketPage() {
           <div className="absolute bottom-4 left-4 right-4">
             <h3 className="text-white text-xl font-bold truncate">{venue?.name}</h3>
             <div className="flex justify-between items-center mt-2">
-              <Badge className="bg-primary hover:bg-primary text-white border-0">{sport?.replace('_', ' ').toUpperCase()}</Badge>
-              <span className="text-white/90 text-sm font-medium">{bookings?.length || 1} Slot(s)</span>
+              <Badge className="bg-primary hover:bg-primary text-white border-0">{t(sport, sport?.replace('_', ' ').toUpperCase())}</Badge>
+              <span className="text-white/90 text-sm font-medium">
+                {t('slots_count', `${bookings?.length || 1} Slot(s)`, { n: bookings?.length || 1 })}
+              </span>
             </div>
           </div>
         </div>
@@ -117,7 +122,7 @@ export default function SportsTicketPage() {
           <div className="flex items-start gap-3">
             <Calendar className="w-5 h-5 text-primary mt-0.5 shrink-0" />
             <div>
-              <p className="text-xs text-muted-foreground">Date & Time</p>
+              <p className="text-xs text-muted-foreground">{t('date_time', 'Date & Time')}</p>
               {bookings?.map((b: any, i: number) => (
                 <p key={i} className="font-semibold text-sm">
                   {b.booking_date} | {b.start_time?.substring(0,5)} - {b.end_time?.substring(0,5)}
@@ -128,7 +133,7 @@ export default function SportsTicketPage() {
           <div className="flex items-start gap-3">
             <MapPin className="w-5 h-5 text-primary mt-0.5 shrink-0" />
             <div>
-              <p className="text-xs text-muted-foreground">Venue</p>
+              <p className="text-xs text-muted-foreground">{t('venue', 'Venue')}</p>
               <p className="font-semibold text-sm">{venue?.name}</p>
               <p className="text-sm text-muted-foreground">{venue?.city}</p>
             </div>
@@ -150,10 +155,10 @@ export default function SportsTicketPage() {
 
       <div className="w-full max-w-md mt-6 space-y-3">
         <Button onClick={handleDownloadInvoice} variant="outline" className="w-full h-12 rounded-2xl font-bold border-2">
-          <Download className="w-4 h-4 mr-2" /> Download Invoice
+          <Download className="w-4 h-4 mr-2" /> {t('download_invoice', 'Download Invoice')}
         </Button>
         <Button onClick={() => router.push('/sports')} variant="ghost" className="w-full text-muted-foreground font-medium rounded-2xl h-12">
-          Browse More Sports
+          {t('browse_more_sports', 'Browse More Sports')}
         </Button>
       </div>
     </div>

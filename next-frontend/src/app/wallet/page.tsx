@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuthContext } from '@/lib/auth-context';
+import { useTranslation } from '@/lib/language-context';
 import { supabase } from '@/lib/supabase-client';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
@@ -10,6 +11,7 @@ import { ArrowLeft, Wallet as WalletIcon, Plus, History, TrendingUp, TrendingDow
 
 export default function WalletPage() {
   const { user, loading: authLoading } = useAuthContext();
+  const { t, currentLanguage } = useTranslation();
   const router = useRouter();
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -73,7 +75,7 @@ export default function WalletPage() {
     };
 
     fetchWallet();
-  }, [user, authLoading]);
+  }, [user, authLoading, router, balance]);
 
   if (authLoading || dataLoading) {
     return (
@@ -91,12 +93,12 @@ export default function WalletPage() {
           <button onClick={() => router.back()} className="p-2 -ml-2 text-primary-foreground/80 hover:text-white">
             <ArrowLeft className="h-6 w-6" />
           </button>
-          <h1 className="text-xl font-bold">Passwala Wallet</h1>
+          <h1 className="text-xl font-bold">{t('passwala_wallet', 'Passwala Wallet')}</h1>
         </div>
         
         <div className="flex justify-between items-end">
           <div>
-            <p className="text-primary-foreground/80 text-sm font-medium mb-1">Available Balance</p>
+            <p className="text-primary-foreground/80 text-sm font-medium mb-1">{t('available_balance', 'Available Balance')}</p>
             <h2 className="text-4xl font-black">&#x20B9;{balance.toFixed(2)}</h2>
           </div>
           <div className="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
@@ -108,14 +110,16 @@ export default function WalletPage() {
       <div className="container max-w-md mx-auto px-4 -mt-4 relative z-10">
         <div className="grid grid-cols-2 gap-3 mb-8">
           <Button className="h-14 rounded-2xl font-bold bg-white text-primary hover:bg-muted shadow-sm flex items-center gap-2">
-            <Plus className="h-5 w-5" /> Add Money
+            <Plus className="h-5 w-5" /> {t('add_money', 'Add Money')}
           </Button>
           <Button variant="outline" className="h-14 rounded-2xl font-bold border-2 bg-background flex items-center gap-2">
-            <History className="h-5 w-5" /> Auto-Pay
+            <History className="h-5 w-5" /> {t('auto_pay', 'Auto-Pay')}
           </Button>
         </div>
 
-        <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4 px-1">Recent Transactions</h3>
+        <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4 px-1">
+          {t('recent_transactions', 'Recent Transactions')}
+        </h3>
         <div className="space-y-3">
           {transactions.map(tx => (
             <Card key={tx.id} className="p-4 rounded-2xl flex items-center gap-4 border-0 shadow-sm">
@@ -123,8 +127,8 @@ export default function WalletPage() {
                 {tx.type === 'CREDIT' ? <TrendingUp className="h-6 w-6" /> : <TrendingDown className="h-6 w-6" />}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm truncate">{tx.title || 'Transaction'}</p>
-                <p className="text-xs text-muted-foreground truncate">{tx.description || new Date(tx.created_at).toLocaleDateString()}</p>
+                <p className="font-bold text-sm truncate">{tx.title || t('transaction', 'Transaction')}</p>
+                <p className="text-xs text-muted-foreground truncate">{tx.description || new Date(tx.created_at).toLocaleDateString(currentLanguage === 'en' ? 'en-IN' : currentLanguage)}</p>
               </div>
               <div className="text-right shrink-0">
                 <p className={`font-black ${tx.type === 'CREDIT' ? 'text-emerald-500' : 'text-foreground'}`}>

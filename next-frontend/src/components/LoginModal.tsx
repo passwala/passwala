@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuthContext } from '@/lib/auth-context';
+import { useTranslation } from '@/lib/language-context';
 import { supabase } from '@/lib/supabase-client';
 import { Dialog, DialogContent, DialogTitle, DialogHeader } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ const API = 'http://127.0.0.1:3004';
 
 export function LoginModal() {
   const { isLoginOpen, closeLogin, setUser } = useAuthContext();
+  const { t } = useTranslation();
   const [tab, setTab] = useState<'phone' | 'email' | 'google'>('phone');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -143,9 +145,9 @@ export function LoginModal() {
   };
 
   const tabs = [
-    { id: 'phone', label: '📱 WhatsApp' },
-    { id: 'email', label: '✉️ Email' },
-    { id: 'google', label: '🔵 Google' },
+    { id: 'phone', label: t('tab_whatsapp', '📱 WhatsApp') },
+    { id: 'email', label: t('tab_email', '✉️ Email') },
+    { id: 'google', label: t('tab_google', '🔵 Google') },
   ];
 
   return (
@@ -157,21 +159,21 @@ export function LoginModal() {
             <Ticket className="h-7 w-7" />
             <span className="text-2xl font-bold">Passwala</span>
           </div>
-          <p className="text-primary-foreground/80 text-sm">Your city. Your events. Your ride.</p>
+          <p className="text-primary-foreground/80 text-sm">{t('login_header_subtitle', 'Your city. Your events. Your ride.')}</p>
         </div>
 
         <div className="px-6 py-6 space-y-5">
           {/* Tab Pills */}
           <div className="flex gap-2 bg-muted p-1 rounded-xl">
-            {tabs.map(t => (
+            {tabs.map(tabItem => (
               <button
-                key={t.id}
-                onClick={() => { setTab(t.id as any); setStep('input'); setError(''); setOtp(''); }}
+                key={tabItem.id}
+                onClick={() => { setTab(tabItem.id as any); setStep('input'); setError(''); setOtp(''); }}
                 className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${
-                  tab === t.id ? 'bg-white shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
+                  tab === tabItem.id ? 'bg-white shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {t.label}
+                {tabItem.label}
               </button>
             ))}
           </div>
@@ -189,12 +191,12 @@ export function LoginModal() {
               {step === 'input' ? (
                 <form onSubmit={handlePhoneSendOtp} className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium mb-1.5 block">WhatsApp Number</label>
+                    <label className="text-sm font-medium mb-1.5 block">{t('whatsapp_number', 'WhatsApp Number')}</label>
                     <div className="flex gap-2">
                       <div className="flex items-center px-3 border rounded-xl bg-muted text-sm font-semibold shrink-0">+91</div>
                       <Input
                         type="tel"
-                        placeholder="10-digit number"
+                        placeholder={t('phone_placeholder', '10-digit number')}
                         value={phone}
                         onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                         className="rounded-xl"
@@ -204,13 +206,15 @@ export function LoginModal() {
                     </div>
                   </div>
                   <Button type="submit" className="w-full rounded-xl h-11 font-bold" disabled={loading || phone.replace(/\D/g,'').length < 10}>
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send OTP on WhatsApp'}
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('send_otp_whatsapp', 'Send OTP on WhatsApp')}
                   </Button>
                 </form>
               ) : (
                 <form onSubmit={handlePhoneVerifyOtp} className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium mb-1.5 block">Enter OTP sent to +91 {phone}</label>
+                    <label className="text-sm font-medium mb-1.5 block">
+                      {t('enter_otp_sent_to', `Enter OTP sent to +91 ${phone}`, { phone })}
+                    </label>
                     {mockOtp && (
                       <div className="mb-2 p-2 bg-yellow-50 text-yellow-800 text-xs rounded-lg">
                         🛠️ Dev mock OTP: <strong>{mockOtp}</strong>
@@ -219,7 +223,7 @@ export function LoginModal() {
                     <Input
                       type="text"
                       inputMode="numeric"
-                      placeholder="Enter OTP"
+                      placeholder={t('enter_otp', 'Enter OTP')}
                       value={otp}
                       onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                       className="text-center tracking-widest text-xl rounded-xl h-14 font-bold"
@@ -229,10 +233,10 @@ export function LoginModal() {
                   </div>
                   <div className="flex gap-2">
                     <Button type="button" variant="outline" className="flex-1 rounded-xl" onClick={() => { setStep('input'); setOtp(''); }} disabled={loading}>
-                      ← Back
+                      {t('back_btn', '← Back')}
                     </Button>
                     <Button type="submit" className="flex-1 rounded-xl font-bold" disabled={loading || otp.length < 4}>
-                      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify & Login'}
+                      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('verify_login', 'Verify & Login')}
                     </Button>
                   </div>
                 </form>
@@ -246,10 +250,10 @@ export function LoginModal() {
               {step === 'input' ? (
                 <form onSubmit={handleEmailSendOtp} className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium mb-1.5 block">Email Address</label>
+                    <label className="text-sm font-medium mb-1.5 block">{t('email_address', 'Email Address')}</label>
                     <Input
                       type="email"
-                      placeholder="you@email.com"
+                      placeholder={t('email_placeholder', 'you@email.com')}
                       value={email}
                       onChange={e => setEmail(e.target.value)}
                       className="rounded-xl"
@@ -258,17 +262,19 @@ export function LoginModal() {
                     />
                   </div>
                   <Button type="submit" className="w-full rounded-xl h-11 font-bold" disabled={loading || !email.includes('@')}>
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send OTP to Email'}
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('send_otp_email', 'Send OTP to Email')}
                   </Button>
                 </form>
               ) : (
                 <form onSubmit={handleEmailVerifyOtp} className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium mb-1.5 block">OTP sent to {email}</label>
+                    <label className="text-sm font-medium mb-1.5 block">
+                      {t('otp_sent_to_email', `OTP sent to ${email}`, { email })}
+                    </label>
                     <Input
                       type="text"
                       inputMode="numeric"
-                      placeholder="6-digit OTP"
+                      placeholder={t('otp_6_digit', '6-digit OTP')}
                       value={otp}
                       onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                       className="text-center tracking-widest text-xl rounded-xl h-14 font-bold"
@@ -278,10 +284,10 @@ export function LoginModal() {
                   </div>
                   <div className="flex gap-2">
                     <Button type="button" variant="outline" className="flex-1 rounded-xl" onClick={() => { setStep('input'); setOtp(''); }} disabled={loading}>
-                      ← Back
+                      {t('back_btn', '← Back')}
                     </Button>
                     <Button type="submit" className="flex-1 rounded-xl font-bold" disabled={loading || otp.length < 6}>
-                      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify & Login'}
+                      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('verify_login', 'Verify & Login')}
                     </Button>
                   </div>
                 </form>
@@ -292,7 +298,9 @@ export function LoginModal() {
           {/* Google Tab */}
           {tab === 'google' && (
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground text-center">Sign in with your Google account</p>
+              <p className="text-sm text-muted-foreground text-center">
+                {t('google_login_sub', 'Sign in with your Google account')}
+              </p>
               <Button
                 type="button"
                 variant="outline"
@@ -310,7 +318,7 @@ export function LoginModal() {
                       <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
                       <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                     </svg>
-                    Continue with Google
+                    {t('continue_google', 'Continue with Google')}
                   </>
                 )}
               </Button>
@@ -318,7 +326,7 @@ export function LoginModal() {
           )}
 
           <p className="text-xs text-center text-muted-foreground">
-            By continuing, you agree to our Terms & Privacy Policy
+            {t('terms_privacy_notice', 'By continuing, you agree to our Terms & Privacy Policy')}
           </p>
         </div>
       </DialogContent>

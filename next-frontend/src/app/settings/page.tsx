@@ -4,11 +4,13 @@ import { useState } from 'react';
 import { useAuthContext } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Bell, Moon, Sun, Volume2, Smartphone, Shield, ArrowLeft } from 'lucide-react';
+import { Bell, Moon, Sun, Volume2, Smartphone, Shield, ArrowLeft, Globe } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
+import { useTranslation } from '@/lib/language-context';
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { currentLanguage, changeLanguage, t, languages } = useTranslation();
   const [darkMode, setDarkMode] = useState(false);
   const [notifs, setNotifs] = useState({ orders: true, chat: true, sound: true });
 
@@ -88,7 +90,7 @@ export default function SettingsPage() {
 
         {/* Preferences Section */}
         <section className="space-y-3">
-          <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wider px-1">Preferences</h2>
+          <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wider px-1">{t('preferences')}</h2>
           <div className="bg-card border rounded-2xl overflow-hidden shadow-sm">
             
             <div className="flex items-center justify-between p-4 border-b">
@@ -97,7 +99,7 @@ export default function SettingsPage() {
                   {darkMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
                 </div>
                 <div>
-                  <p className="font-semibold">Dark Mode</p>
+                  <p className="font-semibold">{t('dark_mode')}</p>
                   <p className="text-xs text-muted-foreground">Coming soon globally</p>
                 </div>
               </div>
@@ -113,7 +115,7 @@ export default function SettingsPage() {
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-purple-500/10 text-purple-500 rounded-xl"><Shield className="h-5 w-5" /></div>
                 <div>
-                  <p className="font-semibold">Privacy & Security</p>
+                  <p className="font-semibold">{t('privacy_security')}</p>
                   <p className="text-xs text-muted-foreground">Manage your data</p>
                 </div>
               </div>
@@ -121,7 +123,40 @@ export default function SettingsPage() {
 
           </div>
         </section>
+
+        {/* Language Section (matching old code reference) */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-2 px-1">
+            <Globe className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
+              {t('language')} / ભાષા / भाषा
+            </h2>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            {Object.entries(languages).map(([code, lang]) => (
+              <button
+                key={code}
+                onClick={() => {
+                  changeLanguage(code);
+                  toast.success(`${t('language_saved')} (${lang.nativeName})`);
+                }}
+                className={`flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-left font-medium ${
+                  currentLanguage === code
+                    ? 'border-primary bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
+                    : 'border-border bg-card hover:bg-muted text-foreground'
+                }`}
+              >
+                <span className="text-2xl">{lang.flag}</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold leading-tight truncate">{lang.nativeName}</p>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">{lang.name}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );
 }
+

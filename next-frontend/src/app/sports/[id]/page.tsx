@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthContext } from '@/lib/auth-context';
+import { useTranslation } from '@/lib/language-context';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -54,6 +55,7 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
   const { id } = use(params);
   const router = useRouter();
   const { user, openLogin } = useAuthContext();
+  const { t, currentLanguage } = useTranslation();
   
   const [venue, setVenue] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -316,7 +318,7 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
         await navigator.share({ title: venue?.name, url: window.location.href });
       } else {
         await navigator.clipboard.writeText(window.location.href);
-        toast.success('Link copied!');
+        toast.success(t('link_copied', 'Link copied!'));
       }
     } catch {}
   };
@@ -325,7 +327,7 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
   if (!venue) {
-    return <div className="min-h-screen flex flex-col items-center justify-center"><h3 className="text-xl font-bold text-muted-foreground">Venue not found</h3><Button className="mt-4" onClick={() => router.back()}>Go Back</Button></div>;
+    return <div className="min-h-screen flex flex-col items-center justify-center"><h3 className="text-xl font-bold text-muted-foreground">{t('venue_not_found', 'Venue not found')}</h3><Button className="mt-4" onClick={() => router.back()}>{t('go_back', 'Go Back')}</Button></div>;
   }
 
   const images = venue.images?.length > 0 ? venue.images : ['https://images.unsplash.com/photo-1540039155733-5bb30b53aa14'];
@@ -373,8 +375,8 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
           <div className="lg:col-span-2 space-y-8">
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
-                <Badge className="bg-primary/20 text-primary border-0 hover:bg-primary/30 text-sm">Sports Venue</Badge>
-                {venue.status === 'approved' && <Badge className="bg-green-500/20 text-green-600 border-0 hover:bg-green-500/30 text-sm">Verified Partner</Badge>}
+                <Badge className="bg-primary/20 text-primary border-0 hover:bg-primary/30 text-sm">{t('sports_venue', 'Sports Venue')}</Badge>
+                {venue.status === 'approved' && <Badge className="bg-green-500/20 text-green-600 border-0 hover:bg-green-500/30 text-sm">{t('verified_partner', 'Verified Partner')}</Badge>}
               </div>
               <h1 className="text-3xl lg:text-5xl font-bold tracking-tight leading-tight">{venue.name}</h1>
               
@@ -399,7 +401,7 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
             {venue.sport_types && venue.sport_types.length > 0 && (
               <div className="space-y-4 pt-4 border-t">
                 <h3 className="text-lg font-bold flex items-center gap-2">
-                  <Trophy className="h-5 w-5 text-primary" /> Select Sport
+                  <Trophy className="h-5 w-5 text-primary" /> {t('select_sport', 'Select Sport')}
                 </h3>
                 <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
                   {venue.sport_types.map((st: string) => (
@@ -411,7 +413,7 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
                       }`}
                     >
                       <span className="text-3xl mb-2">{SPORT_TYPES[st]?.emoji}</span>
-                      <span className="font-semibold text-sm">{SPORT_TYPES[st]?.label || st}</span>
+                      <span className="font-semibold text-sm">{t(st, SPORT_TYPES[st]?.label || st)}</span>
                     </button>
                   ))}
                 </div>
@@ -421,7 +423,7 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
             {/* Date Selection */}
             <div className="space-y-4 pt-4 border-t">
               <h3 className="text-lg font-bold flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary" /> Choose Date
+                <Calendar className="h-5 w-5 text-primary" /> {t('choose_date', 'Choose Date')}
               </h3>
               <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
                 {days.map((d) => (
@@ -442,10 +444,10 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
             {/* Duration */}
             <div className="space-y-4 pt-4 border-t">
               <h3 className="text-lg font-bold flex items-center justify-between">
-                <div className="flex items-center gap-2"><Clock className="h-5 w-5 text-primary" /> Playing Duration</div>
+                <div className="flex items-center gap-2"><Clock className="h-5 w-5 text-primary" /> {t('playing_duration', 'Playing Duration')}</div>
                 <div className="flex items-center gap-4 bg-muted p-1.5 rounded-xl text-foreground">
                   <button onClick={() => setBookingDuration(d => Math.max(1, d - 1))} className="h-8 w-8 rounded-lg bg-card border shadow-sm hover:bg-primary/10 flex items-center justify-center font-bold transition-colors">—</button>
-                  <span className="font-bold w-12 text-center">{bookingDuration} hr</span>
+                  <span className="font-bold w-12 text-center">{bookingDuration} {t('hr', 'hr')}</span>
                   <button onClick={() => setBookingDuration(d => Math.min(6, d + 1))} className="h-8 w-8 rounded-lg bg-card border shadow-sm hover:bg-primary/10 flex items-center justify-center font-bold transition-colors">+</button>
                 </div>
               </h3>
@@ -456,21 +458,21 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
           <div className="lg:sticky lg:top-24 space-y-6">
             <Card className="rounded-3xl border shadow-lg overflow-hidden">
               <CardHeader className="bg-muted/30 pb-4">
-                <CardTitle className="text-lg">Available Slots</CardTitle>
+                <CardTitle className="text-lg">{t('available_slots', 'Available Slots')}</CardTitle>
                 <div className="flex flex-wrap gap-2 mt-3">
                   {[
-                    { id: 'all', label: 'All' },
-                    { id: 'morning', label: 'Morning' },
-                    { id: 'evening', label: 'Evening' },
-                    { id: 'night', label: 'Night' }
-                  ].map(t => (
+                    { id: 'all', label: t('slot_all', 'All') },
+                    { id: 'morning', label: t('slot_morning', 'Morning') },
+                    { id: 'evening', label: t('slot_evening', 'Evening') },
+                    { id: 'night', label: t('slot_night', 'Night') }
+                  ].map(tObj => (
                     <Badge
-                      key={t.id}
-                      variant={timeOfDayFilter === t.id ? 'default' : 'outline'}
+                      key={tObj.id}
+                      variant={timeOfDayFilter === tObj.id ? 'default' : 'outline'}
                       className="cursor-pointer"
-                      onClick={() => setTimeOfDayFilter(t.id)}
+                      onClick={() => setTimeOfDayFilter(tObj.id)}
                     >
-                      {t.label}
+                      {tObj.label}
                     </Badge>
                   ))}
                 </div>
@@ -481,7 +483,9 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
                 ) : filteredCombinedSlots.length === 0 ? (
                   <div className="text-center py-10 rounded-2xl bg-muted/30">
                     <Clock className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
-                    <p className="font-medium text-muted-foreground">No {bookingDuration}hr slots available.</p>
+                    <p className="font-medium text-muted-foreground">
+                      {t('no_slots_duration', `No ${bookingDuration}hr slots available.`, { hr: bookingDuration })}
+                    </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2 max-h-[240px] overflow-y-auto pr-2 custom-scrollbar">
@@ -515,12 +519,11 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
                 {selectedSlots.length > 0 && (
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between text-muted-foreground">
-                      <span>Slots Value ({selectedSlots.length} selected)</span>
+                      <span>{t('slots_value', `Slots Value (${selectedSlots.length} selected)`, { n: selectedSlots.length })}</span>
                       <span className="font-semibold text-foreground">&#x20B9;{totalAmount.toFixed(2)}</span>
                     </div>
-                    {/* Only showing base total to keep it simple, or full breakdown */}
                     <div className="flex justify-between items-center pt-3 border-t">
-                      <span className="font-bold text-base">Total Amount</span>
+                      <span className="font-bold text-base">{t('total_amount', 'Total Amount')}</span>
                       <span className="font-bold text-xl text-primary">&#x20B9;{totalAmount.toFixed(2)}</span>
                     </div>
                   </div>
@@ -531,10 +534,10 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
                   className="w-full h-12 text-base font-bold rounded-2xl"
                 >
                   {bookingLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Check className="mr-2 h-5 w-5" />}
-                  {bookingLoading ? 'Processing...' : (user ? (selectedSlots.length > 0 ? 'Book Slot(s)' : 'Select a Slot') : 'Login to Book')}
+                  {bookingLoading ? t('processing', 'Processing...') : (user ? (selectedSlots.length > 0 ? t('book_slots', 'Book Slot(s)') : t('select_a_slot', 'Select a Slot')) : t('login_to_book', 'Login to Book'))}
                 </Button>
                 <Button onClick={handleShare} variant="ghost" className="w-full text-muted-foreground text-sm gap-2">
-                  <Share2 className="h-4 w-4" /> Share Venue
+                  <Share2 className="h-4 w-4" /> {t('share_venue', 'Share Venue')}
                 </Button>
               </div>
             </Card>
@@ -546,7 +549,9 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
       {selectedSlots.length > 0 && (
         <div className="lg:hidden fixed bottom-16 left-0 right-0 p-4 bg-background/95 backdrop-blur border-t z-40 flex items-center justify-between shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
           <div>
-            <p className="text-xs text-muted-foreground">{selectedSlots.length} slot(s) • {bookingDuration} hr</p>
+            <p className="text-xs text-muted-foreground">
+              {t('slots_count', `${selectedSlots.length} slot(s)`, { n: selectedSlots.length })} • {bookingDuration} {t('hr', 'hr')}
+            </p>
             <p className="text-xl font-bold text-primary">&#x20B9;{totalAmount.toFixed(2)}</p>
           </div>
           <Button
@@ -554,7 +559,7 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
             disabled={bookingLoading}
             className="rounded-xl px-8 font-bold h-11"
           >
-            {bookingLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Book Now'}
+            {bookingLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('book_now', 'Book Now')}
           </Button>
         </div>
       )}
