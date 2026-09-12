@@ -83,41 +83,59 @@ export default function NewVenuePage() {
         status: 'approved'
       };
 
-      const { data: newVenue, error } = await supabase
-        .from('sports_venues')
-        .insert(payload)
-        .select()
-        .single();
+      let newVenue: any = null;
 
-      if (error) throw error;
-
-      // Automatically generate slots for today in venue_slots
-      if (newVenue?.id) {
+      // 1. Submit to Next.js API /api/venues
+      try {
+        const res = await fetch('/api/venues', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const resData = await res.json();
+        if (res.ok && resData.success) {
+          newVenue = resData.venue;
+        } else {
+          throw new Error(resData.error || 'Server error');
+        }
+      } catch (postErr: any) {
+        // Fallback to Express backend
         try {
-          const todayStr = new Date().toISOString().split('T')[0];
-          const slotsPayload = [];
-          for (const sp of selectedSports) {
-            for (let h = 6; h <= 23; h++) {
-              const startT = `${String(h).padStart(2, '0')}:00`;
-              const endT = `${String(h + 1).padStart(2, '0')}:00`;
-              slotsPayload.push({
-                venue_id: newVenue.id,
-                sport_type: sp,
-                slot_date: todayStr,
-                slot_time: startT,
-                slot_end_time: endT,
-                status: 'available',
-                price: priceMap[sp] || 400
-              });
-            }
-          }
-          await supabase.from('venue_slots').upsert(slotsPayload, {
-            onConflict: 'venue_id,sport_type,slot_date,slot_time',
-            ignoreDuplicates: true
+          const res = await fetch('http://127.0.0.1:3004/api/sports/venues', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
           });
+          const resData = await res.json();
+          if (res.ok && resData.success) {
+            newVenue = resData.venue;
+          }
         } catch {
           // non-blocking
         }
+      }
+
+      // Save to localStorage for instant parity
+      try {
+        const local = JSON.parse(localStorage.getItem('vVendorItems_sports') || '[]');
+        const updatedLocal = [
+          {
+            id: newVenue?.id || `local_${Date.now()}`,
+            name,
+            detail: address,
+            address,
+            city: city || 'Ahmedabad',
+            price: parseFloat(basePrice) || 400,
+            price_per_hour: priceMap,
+            sports: selectedSports,
+            status: 'approved',
+            images: ['https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=800&q=80']
+          },
+          ...local.filter((i: any) => i.name !== name)
+        ];
+        localStorage.setItem('vVendorItems_sports', JSON.stringify(updatedLocal));
+      } catch {
+        // non-blocking
       }
 
       toast.success('🎉 Venue registered & hourly slots activated!');

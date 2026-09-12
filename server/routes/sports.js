@@ -503,12 +503,16 @@ router.post('/venues', async (req, res) => {
       return res.status(400).json({ success: false, error: 'name and sport_types are required' });
     }
 
+    const safeOwnerId = isUuid(owner_id) ? owner_id : null;
+    const safeOwnerUserId = isUuid(owner_user_id) ? owner_user_id : null;
+    const cleanPhone = (owner_phone || '').replace(/\D/g, '').slice(-10);
+
     const { data: venue, error } = await supabase
       .from('sports_venues')
       .insert({
         name, description, sport_types, address,
         city: city || 'Ahmedabad', lat, lng,
-        owner_id, owner_user_id, owner_name, owner_phone,
+        owner_id: safeOwnerId, owner_user_id: safeOwnerUserId, owner_name, owner_phone: cleanPhone || owner_phone,
         price_per_hour: price_per_hour || {},
         images: images || [],
         amenities: amenities || [],
@@ -561,21 +565,21 @@ const isUuid = (val) => val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}
 // ══════════════════════════════════════════════════════════════════════════════
 router.get('/vendor-venues', async (req, res) => {
   try {
-    const { owner_id, owner_user_id } = req.query;
-    if (!owner_id && !owner_user_id) {
-      return res.status(400).json({ success: false, error: 'owner_id or owner_user_id required' });
-    }
+    const { owner_id, owner_user_id, phone, owner_phone } = req.query;
+    const cleanPhone = (phone || owner_phone || '').replace(/\D/g, '').slice(-10);
 
-    if (owner_id && !isUuid(owner_id)) {
-      return res.json({ success: true, venues: [] });
-    }
-    if (owner_user_id && !isUuid(owner_user_id)) {
-      return res.json({ success: true, venues: [] });
+    if (!owner_id && !owner_user_id && !cleanPhone) {
+      return res.status(400).json({ success: false, error: 'owner_id, owner_user_id, or phone required' });
     }
 
     let query = supabase.from('sports_venues').select('*').order('created_at', { ascending: false });
-    if (owner_id)      query = query.eq('owner_id', owner_id);
-    if (owner_user_id) query = query.eq('owner_user_id', owner_user_id);
+
+    if (cleanPhone) {
+      query = query.or(`owner_phone.eq.${cleanPhone},owner_phone.eq.+91${cleanPhone}`);
+    } else {
+      if (owner_id && isUuid(owner_id)) query = query.eq('owner_id', owner_id);
+      if (owner_user_id && isUuid(owner_user_id)) query = query.eq('owner_user_id', owner_user_id);
+    }
 
     const { data, error } = await query;
     if (error) throw error;

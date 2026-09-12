@@ -30,19 +30,10 @@ export default function BookingsPage() {
     const fetchBookings = async () => {
       setLoading(true);
       try {
-        if (businessType === 'sports') {
-          const { data } = await supabase
-            .from('sports_bookings')
-            .select('*')
-            .order('created_at', { ascending: false });
-          setBookings(data || []);
-        } else {
-          const { data } = await supabase
-            .from('event_bookings')
-            .select('*')
-            .order('created_at', { ascending: false });
-          setBookings(data || []);
-        }
+        const phone = vendor?.phone || (typeof window !== 'undefined' ? localStorage.getItem('vPhone') : '') || '';
+        const res = await fetch(`/api/bookings?type=${businessType}&phone=${encodeURIComponent(phone)}`);
+        const resData = await res.json();
+        setBookings((resData.success && Array.isArray(resData.bookings)) ? resData.bookings : []);
       } catch (e) {
         console.error('Error fetching bookings:', e);
       } finally {

@@ -18,6 +18,8 @@ export function Header({ onMenuClick, title }: { onMenuClick?: () => void; title
   const { store, businessType } = useVendor();
   const [isOpen, setIsOpen] = useState(true);
 
+  const isSports = store?.business_type === 'sports' || businessType === 'sports';
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 md:px-8 backdrop-blur-md shadow-xs">
       <div className="flex items-center gap-3">
@@ -29,7 +31,7 @@ export function Header({ onMenuClick, title }: { onMenuClick?: () => void; title
         </button>
         <div>
           <h1 className="text-lg font-black tracking-tight text-slate-900 capitalize">
-            {title || `${businessType === 'sports' ? 'Sports Turf' : 'Event'} Console`}
+            {title || `${isSports ? 'Sports Turf' : 'Event'} Console`}
           </h1>
           <p className="text-[11px] text-slate-500 hidden sm:block">
             {store?.address ? `📍 ${store.address}` : 'Passwala Partner Network'}
@@ -61,7 +63,7 @@ export function Header({ onMenuClick, title }: { onMenuClick?: () => void; title
         </Link>
 
         {/* Primary Action Button */}
-        {businessType === 'sports' ? (
+        {isSports ? (
           <Link
             href="/venues/new"
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all"

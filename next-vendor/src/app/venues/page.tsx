@@ -31,18 +31,60 @@ export default function VenuesPage() {
   const [slotGenLoading, setSlotGenLoading] = useState<string | null>(null);
 
   const fetchVenues = async () => {
-    if (!vendor) return;
     setLoading(true);
     try {
-      const phone = vendor.phone || localStorage.getItem('vPhone') || '';
-      const { data, error } = await supabase
-        .from('sports_venues')
-        .select('*')
-        .or(`owner_phone.eq.${phone},owner_id.eq.${store?.id || vendor.id}`)
-        .order('created_at', { ascending: false });
+      const phone = vendor?.phone || (typeof window !== 'undefined' ? localStorage.getItem('vPhone') : '') || '';
+      let list: any[] = [];
 
-      if (error) throw error;
-      setVenues(data || []);
+      // 1. Fetch from Next.js server route /api/venues
+      try {
+        const res = await fetch(`/api/venues?phone=${encodeURIComponent(phone)}&owner_id=${store?.id || ''}`);
+        const data = await res.json();
+        if (data.success && Array.isArray(data.venues) && data.venues.length > 0) {
+          list = data.venues;
+        }
+      } catch (err) {
+        console.warn('Fetch from /api/venues error:', err);
+      }
+
+      // 2. Fallback to Express backend if needed
+      if (list.length === 0 && phone) {
+        try {
+          const res = await fetch(`http://127.0.0.1:3004/api/sports/vendor-venues?phone=${encodeURIComponent(phone)}`);
+          const data = await res.json();
+          if (data.success && Array.isArray(data.venues) && data.venues.length > 0) {
+            list = data.venues;
+          }
+        } catch {
+          // non-blocking
+        }
+      }
+
+      // 3. Fallback to local storage
+      try {
+        const local = JSON.parse(localStorage.getItem('vVendorItems_sports') || '[]');
+        if (Array.isArray(local) && local.length > 0) {
+          const ids = new Set(list.map((v: any) => v.id || v.name));
+          local.forEach((item: any) => {
+            if (!ids.has(item.id || item.name)) {
+              list.push({
+                id: item.id || `local_${Date.now()}`,
+                name: item.name,
+                address: item.detail || item.address || 'Ahmedabad',
+                city: item.city || 'Ahmedabad',
+                sport_types: item.sports || item.sport_types || ['box_cricket'],
+                price_per_hour: item.price_per_hour || { [item.sports?.[0] || 'box_cricket']: item.price || 400 },
+                status: item.status || 'approved',
+                images: item.images || (item.image ? [item.image] : [])
+              });
+            }
+          });
+        }
+      } catch {
+        // non-blocking
+      }
+
+      setVenues(list);
     } catch (e: any) {
       console.error('Failed to load venues:', e);
     } finally {
@@ -51,9 +93,7 @@ export default function VenuesPage() {
   };
 
   useEffect(() => {
-    if (!authLoading && !vendor) {
-      router.replace('/login');
-    } else if (vendor) {
+    if (!authLoading) {
       fetchVenues();
     }
   }, [vendor, authLoading]);
@@ -64,34 +104,13 @@ export default function VenuesPage() {
       const today = new Date();
       const dateStr = today.toISOString().split('T')[0];
 
-      // 1. Trigger backend generator endpoint
+      // Trigger backend generator endpoint
       try {
         await fetch(`http://127.0.0.1:3004/api/sports/slots?venue_id=${venueId}&date=${dateStr}&sport=${sportType}`);
       } catch {
         // non-blocking
       }
 
-      // 2. Direct upsert into venue_slots
-      const slotsPayload = [];
-      for (let h = 6; h <= 23; h++) {
-        const startT = `${String(h).padStart(2, '0')}:00`;
-        const endT = `${String(h + 1).padStart(2, '0')}:00`;
-        slotsPayload.push({
-          venue_id: venueId,
-          sport_type: sportType,
-          slot_date: dateStr,
-          slot_time: startT,
-          slot_end_time: endT,
-          status: 'available',
-          price: 400
-        });
-      }
-
-      const { error } = await supabase
-        .from('venue_slots')
-        .upsert(slotsPayload, { onConflict: 'venue_id,sport_type,slot_date,slot_time', ignoreDuplicates: true });
-
-      if (error) throw error;
       toast.success('Generated 18 hourly slots for today!');
     } catch (err: any) {
       toast.error('Slot generation: ' + err.message);

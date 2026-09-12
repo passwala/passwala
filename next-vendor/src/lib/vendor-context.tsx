@@ -91,25 +91,27 @@ export const VendorProvider = ({ children }: { children: React.ReactNode }) => {
           setBusinessTypeState(storeRecord.business_type as BusinessType);
         }
       } else {
-        // Check sports_venues
-        const { data: venueRecord } = await supabase
-          .from('sports_venues')
-          .select('*')
-          .or(`owner_phone.eq.${clean},owner_id.eq.${resolvedUser.id}`)
-          .maybeSingle();
+        // Check sports_venues via /api/venues (or backend API)
+        try {
+          const res = await fetch(`/api/venues?phone=${clean}`);
+          const resData = await res.json();
+          const venueRecord = resData?.venues?.[0];
 
-        if (venueRecord) {
-          setStore({
-            id: venueRecord.id,
-            business_name: venueRecord.name,
-            name: venueRecord.name,
-            business_type: 'sports',
-            address: venueRecord.address,
-            city: venueRecord.city,
-            phone: clean,
-            status: venueRecord.status
-          });
-          setBusinessTypeState('sports');
+          if (venueRecord) {
+            setStore({
+              id: venueRecord.id,
+              business_name: venueRecord.name,
+              name: venueRecord.name,
+              business_type: 'sports',
+              address: venueRecord.address,
+              city: venueRecord.city,
+              phone: clean,
+              status: venueRecord.status || 'approved'
+            });
+            setBusinessTypeState('sports');
+          }
+        } catch (venueErr) {
+          console.warn('Venue lookup error:', venueErr);
         }
       }
     } catch (e) {

@@ -55,60 +55,29 @@ export default function DashboardPage() {
     const fetchDashboardData = async () => {
       setDataLoading(true);
       try {
-        if (businessType === 'sports') {
-          // Fetch sports bookings
-          const { data: bookings } = await supabase
-            .from('sports_bookings')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(5);
+        const phone = vendor?.phone || '';
+        const res = await fetch(`/api/bookings?type=${businessType}&phone=${encodeURIComponent(phone)}`);
+        const resData = await res.json();
+        const bookings = (resData.success && Array.isArray(resData.bookings)) ? resData.bookings : [];
 
-          if (bookings && bookings.length > 0) {
-            setRecentBookings(bookings);
-            const total = bookings.reduce((sum, b) => sum + (parseFloat(b.total_amount) || 0), 0);
-            const unique = new Set(bookings.map(b => b.user_phone || b.user_id || b.customer_name)).size;
-            setStats({
-              totalRevenue: total,
-              todayBookings: bookings.length,
-              totalCustomers: unique,
-              rating: 5.0,
-            });
-          } else {
-            setRecentBookings([]);
-            setStats({
-              totalRevenue: 0,
-              todayBookings: 0,
-              totalCustomers: 0,
-              rating: 0,
-            });
-          }
+        if (bookings.length > 0) {
+          setRecentBookings(bookings.slice(0, 5));
+          const total = bookings.reduce((sum: number, b: any) => sum + (parseFloat(b.total_amount) || 0), 0);
+          const unique = new Set(bookings.map((b: any) => b.user_phone || b.user_id || b.user_name || b.customer_name)).size;
+          setStats({
+            totalRevenue: total,
+            todayBookings: bookings.length,
+            totalCustomers: unique,
+            rating: 5.0,
+          });
         } else {
-          // Fetch event tickets
-          const { data: eventBookings } = await supabase
-            .from('event_bookings')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(5);
-
-          if (eventBookings && eventBookings.length > 0) {
-            setRecentBookings(eventBookings);
-            const total = eventBookings.reduce((sum, b) => sum + (parseFloat(b.total_amount) || 0), 0);
-            const unique = new Set(eventBookings.map(b => b.user_phone || b.user_id || b.customer_name)).size;
-            setStats({
-              totalRevenue: total,
-              todayBookings: eventBookings.length,
-              totalCustomers: unique,
-              rating: 5.0,
-            });
-          } else {
-            setRecentBookings([]);
-            setStats({
-              totalRevenue: 0,
-              todayBookings: 0,
-              totalCustomers: 0,
-              rating: 0,
-            });
-          }
+          setRecentBookings([]);
+          setStats({
+            totalRevenue: 0,
+            todayBookings: 0,
+            totalCustomers: 0,
+            rating: 0,
+          });
         }
       } catch (e) {
         console.error('Error loading dashboard data:', e);

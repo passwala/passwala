@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useVendor, BusinessType } from '@/lib/vendor-context';
 import { 
   LayoutDashboard, 
@@ -18,15 +18,33 @@ import {
   ExternalLink
 } from 'lucide-react';
 
+interface NavItem {
+  label: string;
+  href: string;
+  icon: any;
+  badge?: string;
+}
+
 export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?: () => void }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { vendor, store, businessType, setBusinessType, logout } = useVendor();
 
-  const navItems = [
+  // For sports account or sports active console, show Sports Venues and Court Bookings, NEVER Events
+  const isSports = store?.business_type === 'sports' || businessType === 'sports';
+
+  const inventoryItem: NavItem = isSports
+    ? { label: 'Sports Venues', href: '/venues', icon: Trophy }
+    : { label: 'Events', href: '/events', icon: Ticket };
+
+  const bookingsItem: NavItem = isSports
+    ? { label: 'Court Bookings', href: '/bookings', icon: CalendarCheck2 }
+    : { label: 'Ticket Bookings', href: '/bookings', icon: CalendarCheck2 };
+
+  const navItems: NavItem[] = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { label: 'Sports Venues', href: '/venues', icon: Trophy },
-    { label: 'Events', href: '/events', icon: Ticket },
-    { label: 'Bookings & Orders', href: '/bookings', icon: CalendarCheck2 },
+    inventoryItem,
+    bookingsItem,
     { label: 'QR Scanner', href: '/scanner', icon: QrCode, badge: 'Live' },
     { label: 'Earnings', href: '/earnings', icon: TrendingUp },
     { label: 'Wallet', href: '/wallet', icon: Wallet },
@@ -67,35 +85,81 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?: () => 
             </div>
           </div>
 
-          {/* Quick Console Switcher */}
+          {/* Quick Console Switcher or Fixed Account Type Badge */}
           <div className="mt-4 pt-3 border-t border-slate-100">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
-              Active Console
-            </label>
-            <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
-              <button
-                onClick={() => setBusinessType('sports')}
-                className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  businessType === 'sports'
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
-                }`}
-              >
-                <Trophy className="w-3.5 h-3.5" />
-                <span>Sports</span>
-              </button>
-              <button
-                onClick={() => setBusinessType('event')}
-                className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  businessType === 'event'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
-                }`}
-              >
-                <Ticket className="w-3.5 h-3.5" />
-                <span>Events</span>
-              </button>
-            </div>
+            {store?.business_type === 'sports' ? (
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                  Account Type
+                </label>
+                <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200/80 text-xs font-bold shadow-xs">
+                  <div className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                    <Trophy className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="truncate">
+                    <span className="block font-black text-slate-900 leading-none">Sports Venue</span>
+                    <span className="text-[10px] font-semibold text-emerald-700">Turf & Box Cricket</span>
+                  </div>
+                </div>
+              </div>
+            ) : store?.business_type === 'event' ? (
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                  Account Type
+                </label>
+                <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-indigo-50 text-indigo-800 border border-indigo-200/80 text-xs font-bold shadow-xs">
+                  <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                    <Ticket className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="truncate">
+                    <span className="block font-black text-slate-900 leading-none">Event Organizer</span>
+                    <span className="text-[10px] font-semibold text-indigo-700">Concerts & Shows</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                  Active Console
+                </label>
+                <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBusinessType('sports');
+                      if (pathname.startsWith('/events')) {
+                        router.push('/venues');
+                      }
+                    }}
+                    className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      businessType === 'sports'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                    }`}
+                  >
+                    <Trophy className="w-3.5 h-3.5" />
+                    <span>Sports</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBusinessType('event');
+                      if (pathname.startsWith('/venues')) {
+                        router.push('/events');
+                      }
+                    }}
+                    className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      businessType === 'event'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                    }`}
+                  >
+                    <Ticket className="w-3.5 h-3.5" />
+                    <span>Events</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
