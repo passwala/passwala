@@ -128,7 +128,7 @@ export default function WalletPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-sm truncate">{tx.title || t('transaction', 'Transaction')}</p>
-                <p className="text-xs text-muted-foreground truncate">{tx.description || new Date(tx.created_at).toLocaleDateString(currentLanguage === 'en' ? 'en-IN' : currentLanguage)}</p>
+                <p suppressHydrationWarning className="text-xs text-muted-foreground truncate">{tx.description || new Date(tx.created_at).toLocaleDateString(currentLanguage === 'en' ? 'en-IN' : currentLanguage)}</p>
               </div>
               <div className="text-right shrink-0">
                 <p className={`font-black ${tx.type === 'CREDIT' ? 'text-emerald-500' : 'text-foreground'}`}>

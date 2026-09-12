@@ -192,7 +192,7 @@ export default function OrdersPage() {
                       <div className="flex items-center gap-4 py-3 border-y text-sm">
                         <div className="flex items-center gap-1.5">
                           <Calendar className="h-4 w-4 text-primary" />
-                          <span>{booking.events?.event_date ? new Date(booking.events.event_date).toLocaleDateString(currentLanguage === 'en' ? 'en-IN' : currentLanguage) : t('tba', 'TBA')}</span>
+                          <span suppressHydrationWarning>{booking.events?.event_date ? new Date(booking.events.event_date).toLocaleDateString(currentLanguage === 'en' ? 'en-IN' : currentLanguage) : t('tba', 'TBA')}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <Ticket className="h-4 w-4 text-primary" />

@@ -268,8 +268,8 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
               <div className="flex items-start gap-4">
                 <div className="p-3 bg-muted rounded-2xl shrink-0"><Calendar className="h-5 w-5 text-primary" /></div>
                 <div>
-                  <p className="font-semibold">{startDate.toLocaleDateString(currentLanguage === 'en' ? 'en-IN' : currentLanguage, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                  <p className="text-sm text-muted-foreground">{startDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
+                  <p suppressHydrationWarning className="font-semibold">{startDate.toLocaleDateString(currentLanguage === 'en' ? 'en-IN' : currentLanguage, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                  <p suppressHydrationWarning className="text-sm text-muted-foreground">{startDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
                 </div>
               </div>
               <div className="flex items-start gap-4">
@@ -307,7 +307,7 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
                     if (isActive) {
                       return (
                         <div key={slot.id} className="w-full p-4 rounded-2xl text-left flex justify-between items-center border-2 border-primary bg-primary/5 cursor-default">
-                          <span className="text-sm font-bold text-primary">📅 {dateStr}</span>
+                          <span suppressHydrationWarning className="text-sm font-bold text-primary">📅 {dateStr}</span>
                           <span className="text-xs font-semibold text-primary/80">📍 {slot.venue_name}</span>
                         </div>
                       );
@@ -319,7 +319,7 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
                         href={`/events/${slot.id}`}
                         className="w-full p-4 rounded-2xl text-left flex justify-between items-center border border-border bg-muted/30 hover:border-primary/50 hover:bg-muted/50 transition-all group"
                       >
-                        <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">📅 {dateStr}</span>
+                        <span suppressHydrationWarning className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">📅 {dateStr}</span>
                         <span className="text-xs text-muted-foreground">📍 {slot.venue_name}</span>
                       </Link>
                     );

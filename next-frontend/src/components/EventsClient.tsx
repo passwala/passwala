@@ -6,6 +6,7 @@ import { Calendar, MapPin } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/lib/language-context';
+import { formatDisplayDate } from '@/lib/utils';
 
 function parseBannerUrl(bannerUrl: string | null) {
   if (!bannerUrl) return 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&q=80';
@@ -117,7 +118,7 @@ export default function EventsClient({ events, currentCategory }: EventsClientPr
                     </h3>
                     <div className="flex items-center text-xs text-muted-foreground">
                       <Calendar className="w-3 h-3 mr-1" />
-                      <span>{new Date(event.event_date).toLocaleDateString(currentLanguage === 'en' ? 'en-IN' : currentLanguage)}</span>
+                      <span suppressHydrationWarning>{formatDisplayDate(event.event_date)}</span>
                     </div>
                     <div className="flex items-center text-xs text-muted-foreground line-clamp-1">
                       <MapPin className="w-3 h-3 mr-1 flex-shrink-0" />
