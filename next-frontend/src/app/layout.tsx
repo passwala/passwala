@@ -6,6 +6,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { LanguageProvider } from "@/lib/language-context";
 import BottomNav from "@/components/BottomNav";
 import { LoginModal } from "@/components/LoginModal";
+import { Footer } from "@/components/Footer";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -29,6 +30,7 @@ export default function RootLayout({
             <main className="min-h-screen bg-background pb-16 md:pb-0">
               {children}
             </main>
+            <Footer />
             <BottomNav />
             <div id="recaptcha-container"></div>
           </AuthProvider>
