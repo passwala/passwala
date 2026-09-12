@@ -9,6 +9,7 @@ import { Calendar, MapPin, Share2, Ticket, Clock, Minus, Plus, Loader2, ArrowLef
 import toast, { Toaster } from 'react-hot-toast';
 import { useAuthContext } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase-client';
+import { processRazorpayPayment } from '@/lib/razorpay';
 
 function parseBannerUrl(raw: string | string[] | null): string | null {
   if (!raw) return null;
@@ -151,14 +152,66 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
         } catch {}
       }
 
-      sessionStorage.setItem('passwala_last_ticket', JSON.stringify({
-        booking: data.booking, event, tier: selectedTier
-      }));
-      toast.success('Tickets Booked Successfully! 🎉');
-      router.push('/events/ticket');
+      const totalPayable = parseFloat(data.booking.total_amount) || 0;
+
+      // Free tickets bypass gateway
+      if (totalPayable <= 0) {
+        sessionStorage.setItem('passwala_last_ticket', JSON.stringify({
+          booking: data.booking, event, tier: selectedTier
+        }));
+        toast.success('Tickets Booked Successfully! 🎉');
+        setBookingLoading(false);
+        router.push('/events/ticket');
+        return;
+      }
+
+      // Launch Razorpay Checkout
+      await processRazorpayPayment({
+        apiBaseUrl: 'http://127.0.0.1:3004',
+        amount: totalPayable,
+        orderId: data.booking.id,
+        orderType: 'event',
+        title: 'Passwala Events',
+        description: `${event.title} - ${selectedTier.tier_name} (${ticketCount} ${ticketCount > 1 ? 'tickets' : 'ticket'})`,
+        user: {
+          name: user.name || user.displayName,
+          email: user.email,
+          phone: user.phone || user.phoneNumber,
+        },
+        onSuccess: () => {
+          sessionStorage.setItem('passwala_last_ticket', JSON.stringify({
+            booking: data.booking, event, tier: selectedTier
+          }));
+          toast.success('🎉 Payment Verified! Tickets Booked Successfully!');
+          setBookingLoading(false);
+          router.push('/events/ticket');
+        },
+        onDismiss: async () => {
+          toast('Payment cancelled. Releasing ticket...', { icon: '⚠️' });
+          if (data.booking?.id) {
+            await fetch(`http://127.0.0.1:3004/api/events/cancel`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ booking_id: data.booking.id, reason: 'User Cancelled Payment' }),
+            }).catch(() => {});
+          }
+          setBookingLoading(false);
+        },
+        onError: async (payErr: any) => {
+          toast.error(payErr.message || 'Payment verification failed');
+          if (data.booking?.id) {
+            await fetch(`http://127.0.0.1:3004/api/events/cancel`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ booking_id: data.booking.id, reason: 'Payment Error' }),
+            }).catch(() => {});
+          }
+          setBookingLoading(false);
+        },
+      });
+
     } catch (err: any) {
       toast.error(err.message || 'Error booking tickets');
-    } finally {
       setBookingLoading(false);
     }
   };

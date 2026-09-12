@@ -684,5 +684,54 @@ router.post('/checkin', async (req, res) => {
   }
 });
 
+// POST /api/events/cancel — Cancel an unpaid event booking and revert seats
+router.post('/cancel', async (req, res) => {
+  const { booking_id, reason } = req.body;
+  if (!booking_id) return res.status(400).json({ success: false, error: 'booking_id required' });
+
+  try {
+    const { data: booking, error: fetchErr } = await supabase
+      .from('event_bookings')
+      .select('*')
+      .eq('id', booking_id)
+      .maybeSingle();
+
+    if (fetchErr || !booking) {
+      return res.status(404).json({ success: false, error: 'Booking not found' });
+    }
+
+    if (booking.status === 'CANCELLED') {
+      return res.json({ success: true, message: 'Already cancelled' });
+    }
+
+    // Update booking status
+    await supabase
+      .from('event_bookings')
+      .update({ status: 'CANCELLED', payment_status: 'FAILED', updated_at: new Date().toISOString() })
+      .eq('id', booking_id);
+
+    // Revert available seats in tier
+    if (booking.tier_id && booking.ticket_count) {
+      const { data: tier } = await supabase
+        .from('event_ticket_tiers')
+        .select('available_seats')
+        .eq('id', booking.tier_id)
+        .maybeSingle();
+
+      if (tier) {
+        await supabase
+          .from('event_ticket_tiers')
+          .update({ available_seats: tier.available_seats + booking.ticket_count })
+          .eq('id', booking.tier_id);
+      }
+    }
+
+    res.json({ success: true, message: 'Event booking cancelled and seats restored' });
+  } catch (err) {
+    console.error('Event cancellation error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 export default router;
 

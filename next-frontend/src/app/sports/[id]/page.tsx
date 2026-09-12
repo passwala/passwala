@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, ArrowLeft, Calendar, Loader2, ChevronLeft, ChevronRight, Clock, Info, Check, Share2, Trophy } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
+import { processRazorpayPayment } from '@/lib/razorpay';
 
 const API = 'http://127.0.0.1:3004';
 
@@ -193,6 +194,8 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
     if (selectedSlots.length === 0) return;
 
     setBookingLoading(true);
+    let primaryBooking: any = null;
+
     try {
       const rawSlotIds = new Set<string>();
       selectedSlots.forEach(ss => {
@@ -210,6 +213,7 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
         user_email: user.email,
       };
 
+      // Step 1: Create booking on backend
       const res = await fetch(`${API}/api/sports/book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -219,22 +223,92 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
       
       if (!data.success) throw new Error(data.error || 'Booking failed');
 
-      toast.success('🎉 Booking Confirmed!');
-      sessionStorage.setItem('passwala_last_sport_ticket', JSON.stringify({
-        booking: data.booking,
-        bookings: data.bookings || [data.booking],
-        venue,
-        slots: selectedSlots,
-        sport,
-      }));
-      router.push('/sports/ticket');
+      primaryBooking = data.booking;
+      const allBookings = data.bookings || [primaryBooking];
+
+      // Calculate total amount from bookings
+      const totalPayable = allBookings.reduce(
+        (sum: number, b: any) => sum + (parseFloat(b.total_amount) || 0),
+        0
+      );
+
+      // Step 2: If free booking, confirm immediately
+      if (totalPayable <= 0) {
+        toast.success('🎉 Booking Confirmed!');
+        sessionStorage.setItem('passwala_last_sport_ticket', JSON.stringify({
+          booking: primaryBooking,
+          bookings: allBookings,
+          venue,
+          slots: selectedSlots,
+          sport,
+        }));
+        setBookingLoading(false);
+        router.push('/sports/ticket');
+        return;
+      }
+
+      // Step 3: Trigger Razorpay test mode payment
+      await processRazorpayPayment({
+        apiBaseUrl: API,
+        amount: totalPayable,
+        orderId: allBookings.map((b: any) => b.id),
+        orderType: 'sports',
+        title: 'Passwala Sports',
+        description: `Booking at ${venue.name} (${(sport && SPORT_TYPES[sport]?.label) || sport || 'Sports'})`,
+        user: {
+          name: user.name || user.displayName,
+          email: user.email,
+          phone: user.phone || user.phoneNumber,
+        },
+        onSuccess: () => {
+          toast.success('🎉 Payment Verified! Booking Confirmed!');
+          sessionStorage.setItem('passwala_last_sport_ticket', JSON.stringify({
+            booking: primaryBooking,
+            bookings: allBookings,
+            venue,
+            slots: selectedSlots,
+            sport,
+          }));
+          setBookingLoading(false);
+          router.push('/sports/ticket');
+        },
+        onDismiss: async () => {
+          toast('Payment cancelled. Releasing your slot...', { icon: '⚠️' });
+          if (primaryBooking?.id) {
+            await fetch(`${API}/api/sports/cancel`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ booking_id: primaryBooking.id, reason: 'User Cancelled Payment' }),
+            }).catch(() => {});
+          }
+          setBookingLoading(false);
+        },
+        onError: async (payErr: any) => {
+          toast.error(payErr.message || 'Payment verification failed');
+          if (primaryBooking?.id) {
+            await fetch(`${API}/api/sports/cancel`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ booking_id: primaryBooking.id, reason: 'Payment Error' }),
+            }).catch(() => {});
+          }
+          setBookingLoading(false);
+        },
+      });
 
     } catch (err: any) {
       toast.error(err.message || 'Something went wrong');
-    } finally {
+      if (primaryBooking?.id) {
+        await fetch(`${API}/api/sports/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ booking_id: primaryBooking.id, reason: 'Booking Exception' }),
+        }).catch(() => {});
+      }
       setBookingLoading(false);
     }
   };
+
 
   const handleShare = async () => {
     try {
