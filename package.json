@@ -8,6 +8,7 @@
     "dev:web": "vite --config vite.config.js --mode web --host --force",
     "dev:webapp": "vite --config vite.config.js --mode webapp --host --force",
     "dev:vendor": "vite --config vite.config.js --mode vendor --host --force",
+    "dev:vendor:next": "npm --prefix next-vendor run dev",
     "dev:rider": "vite --config vite.config.js --mode rider --host --force",
     "dev:admin": "vite --config vite.config.js --mode admin --host --force",
     "dev:all": "concurrently \"npm run dev:all:apps\" \"npm run server\" \"npm run coming-soon\"",
