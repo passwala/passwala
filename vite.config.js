@@ -18,8 +18,8 @@ export default defineConfig(({ mode }) => {
 
   const port = isWeb ? 8000 :
                isWebapp ? 3010 : 
-               isVendor ? 3012 : 
-               isRider ? 3003 : 
+               isVendor ? 3011 : 
+               isRider ? 3013 : 
                isAdmin ? 3005 : 8000;
 
   const outDir = isWeb ? 'dist/web' :

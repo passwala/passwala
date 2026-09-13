@@ -63,12 +63,16 @@ npm run dev:headless # Runs all apps without force-opening browser tabs
 
 ### Run Individual Portals
 You can run specific portals individually on their dedicated ports:
-- **Customer Web Site** (`http://localhost:3000`): `npm run dev:web`
-- **SuperAdmin Webapp** (`http://localhost:3001`): `npm run dev:webapp`
-- **Vendor Portal** (`http://localhost:3002`): `npm run dev:vendor`
-- **Rider Portal** (`http://localhost:3003`): `npm run dev:rider`
-
-**Backend Service:** `npm run server`
+- **Customer Web Site** (`http://localhost:8000`): `npm run dev:web`
+- **Buyer App (Next.js)** (`http://localhost:3001`): `npm run dev:frontend:next`
+- **Vendor Portal (Next.js - New)** (`http://localhost:3002`): `npm run dev:vendor:next`
+- **Rider Portal (Next.js - Redesigned)** (`http://localhost:3003`): `npm run dev:rider:next`
+- **Backend API Service** (`http://localhost:3004`): `npm run server`
+- **Admin Portal** (`http://localhost:3005`): `npm run dev:admin`
+- **Coming Soon Page** (`http://localhost:3006`): `npm run coming-soon`
+- **Buyer WebApp (Vite)** (`http://localhost:3010`): `npm run dev:webapp`
+- **Vendor Portal (Vite - Old)** (`http://localhost:3011`): `npm run dev:vendor`
+- **Rider Portal (Vite - Old Reference)** (`http://localhost:3013`): `npm run dev:rider`
 
 ---
 
