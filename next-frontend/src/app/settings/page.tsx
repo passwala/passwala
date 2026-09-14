@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Bell, Moon, Sun, Volume2, Smartphone, Shield, ArrowLeft, Globe } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { useTranslation } from '@/lib/language-context';
+import { useTheme } from '@/lib/theme-context';
 
 export default function SettingsPage() {
   const router = useRouter();
   const { currentLanguage, changeLanguage, t, languages } = useTranslation();
-  const [darkMode, setDarkMode] = useState(false);
+  const { isDarkMode, toggleDarkMode } = useTheme();
   const [notifs, setNotifs] = useState({ orders: true, chat: true, sound: true });
 
   const toggleSetting = (key: keyof typeof notifs) => {
@@ -95,19 +96,27 @@ export default function SettingsPage() {
             
             <div className="flex items-center justify-between p-4 border-b">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-500/10 text-slate-500 rounded-xl">
-                  {darkMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+                <div className={`p-2 rounded-xl transition-colors ${isDarkMode ? 'bg-primary/10 text-primary' : 'bg-slate-500/10 text-slate-500'}`}>
+                  {isDarkMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
                 </div>
                 <div>
                   <p className="font-semibold">{t('dark_mode')}</p>
-                  <p className="text-xs text-muted-foreground">Coming soon globally</p>
+                  <p className="text-xs text-muted-foreground">
+                    {isDarkMode ? 'Dark theme active' : 'Light theme active'}
+                  </p>
                 </div>
               </div>
               <button 
-                onClick={() => { setDarkMode(!darkMode); toast('Theme will update in v2'); }}
-                className={`w-12 h-6 rounded-full transition-colors relative ${darkMode ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+                type="button"
+                role="switch"
+                aria-checked={isDarkMode}
+                onClick={() => {
+                  toggleDarkMode();
+                  toast.success(!isDarkMode ? 'Dark mode enabled' : 'Light mode enabled');
+                }}
+                className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer outline-none focus:ring-2 focus:ring-primary/20 ${isDarkMode ? 'bg-primary' : 'bg-muted-foreground/30'}`}
               >
-                <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${darkMode ? 'translate-x-6' : 'translate-x-0'}`} />
+                <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 shadow-xs ${isDarkMode ? 'translate-x-6' : 'translate-x-0'}`} />
               </button>
             </div>
 

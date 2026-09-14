@@ -4,9 +4,10 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Ticket, MapPin, Search, User, Loader2, Globe, Settings } from 'lucide-react';
+import { Ticket, MapPin, Search, User, Loader2, Globe, Settings, Moon, Sun } from 'lucide-react';
 import { useAuthContext } from '@/lib/auth-context';
 import { useTranslation } from '@/lib/language-context';
+import { useTheme } from '@/lib/theme-context';
 import { useRouter } from 'next/navigation';
 import {
   DropdownMenu,
@@ -28,6 +29,7 @@ const CITIES = ['Ahmedabad', 'Mumbai', 'Delhi', 'Bangalore', 'Pune', 'Surat', 'J
 export function Navbar() {
   const { user, logout, openLogin } = useAuthContext();
   const { currentLanguage, changeLanguage, t, languages } = useTranslation();
+  const { isDarkMode, toggleDarkMode } = useTheme();
   const router = useRouter();
   const [city, setCity] = useState('Select City');
   const [locationLoading, setLocationLoading] = useState(false);
@@ -188,6 +190,18 @@ export function Navbar() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+          )}
+
+          {/* Theme Toggle */}
+          {mounted && (
+            <button
+              onClick={toggleDarkMode}
+              title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              className="flex items-center justify-center h-8 w-8 rounded-full border bg-background hover:bg-muted text-foreground transition-all outline-none cursor-pointer"
+              aria-label="Toggle dark mode"
+            >
+              {isDarkMode ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-slate-700" />}
+            </button>
           )}
 
           {/* Search — mobile */}
