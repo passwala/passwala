@@ -88,6 +88,9 @@ const allowedOrigins = [
   'http://localhost:3011',
   'http://127.0.0.1:3011',
   'https://localhost:3011',
+  'http://localhost:3015',
+  'http://127.0.0.1:3015',
+  'https://localhost:3015',
   'http://localhost:4000',
   'https://localhost:4000',
   'http://localhost:4001',
@@ -108,7 +111,7 @@ app.use(cors({
     if (!origin) return callback(null, true);
     
     // Check if origin matches localhost, 127.0.0.1, or local network IP on any dev port
-    const isLocalhostOrIP = /https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+):(3000|3001|3002|3003|3004|3005|3006|3010|3011|3012|8000)/.test(origin);
+    const isLocalhostOrIP = /https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+):(3000|3001|3002|3003|3004|3005|3006|3010|3011|3012|3013|3015|8000)/.test(origin);
     
     // Fix #8: ngrok/localtunnel ONLY allowed in development, not production
     const isDevTunnel = isDev && (

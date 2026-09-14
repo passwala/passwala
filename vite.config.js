@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => {
                isWebapp ? 3010 : 
                isVendor ? 3011 : 
                isRider ? 3013 : 
-               isAdmin ? 3005 : 8000;
+               isAdmin ? 3015 : 8000;
 
   const outDir = isWeb ? 'dist/web' :
                  isWebapp ? 'dist/webapp' : 

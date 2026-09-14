@@ -68,11 +68,12 @@ You can run specific portals individually on their dedicated ports:
 - **Vendor Portal (Next.js - New)** (`http://localhost:3002`): `npm run dev:vendor:next`
 - **Rider Portal (Next.js - Redesigned)** (`http://localhost:3003`): `npm run dev:rider:next`
 - **Backend API Service** (`http://localhost:3004`): `npm run server`
-- **Admin Portal** (`http://localhost:3005`): `npm run dev:admin`
+- **SuperAdmin Portal (Next.js - Redesigned)** (`http://localhost:3005`): `npm run dev:admin:next`
 - **Coming Soon Page** (`http://localhost:3006`): `npm run coming-soon`
 - **Buyer WebApp (Vite)** (`http://localhost:3010`): `npm run dev:webapp`
 - **Vendor Portal (Vite - Old)** (`http://localhost:3011`): `npm run dev:vendor`
 - **Rider Portal (Vite - Old Reference)** (`http://localhost:3013`): `npm run dev:rider`
+- **SuperAdmin Portal (Vite - Legacy Reference)** (`http://localhost:3015`): `npm run dev:admin`
 
 ---
 
