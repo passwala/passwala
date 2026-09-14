@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { PasswalaLogo } from '@/components/PasswalaLogo';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Ticket, MapPin, Search, User, Loader2, Globe, Settings, Moon, Sun } from 'lucide-react';
@@ -104,10 +105,7 @@ export function Navbar() {
       <div className="container flex h-16 items-center justify-between px-4 md:px-8 mx-auto">
 
         {/* Logo */}
-        <Link href="/" className="flex items-center space-x-2 shrink-0">
-          <Ticket className="h-6 w-6 text-primary" />
-          <span className="text-xl font-bold tracking-tight">Passwala</span>
-        </Link>
+        <PasswalaLogo href="/" size="sm" variant="gradient" animated />
 
         {/* Search — desktop */}
         <div className="hidden md:flex flex-1 items-center justify-center max-w-sm mx-6">

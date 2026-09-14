@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAdmin } from '@/lib/admin-context';
+import { PasswalaLogo } from '@/components/PasswalaLogo';
 import { ShieldCheck, Lock, ArrowRight, Sparkles } from 'lucide-react';
 
 export default function AdminLoginPage() {
@@ -34,20 +35,17 @@ export default function AdminLoginPage() {
 
         {/* Content */}
         <div className="relative z-10 flex flex-col items-center text-center">
-          {/* Badge & Icon */}
-          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-tr from-purple-600 to-indigo-500 p-4 text-white shadow-xl shadow-purple-600/20 ring-8 ring-purple-500/10">
-            <ShieldCheck className="h-10 w-10 stroke-[1.75]" />
+          {/* Logo Brand Lockup */}
+          <div className="mb-6">
+            <PasswalaLogo
+              size="xl"
+              variant="gradient"
+              layout="vertical"
+              showTagline
+              tagline="SUPERADMIN PORTAL"
+            />
           </div>
-
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-purple-400">
-            <Sparkles className="h-3 w-3" />
-            <span>Passwala Operations</span>
-          </div>
-
-          <h1 className="mt-4 text-2xl font-black tracking-tight text-white sm:text-3xl">
-            SuperAdmin Portal
-          </h1>
-          <p className="mt-2 text-xs font-medium text-slate-400 max-w-xs">
+          <p className="mt-1 text-xs font-medium text-slate-400 max-w-xs">
             Restricted strictly for authorized Passwala staff and systems operators.
           </p>
 

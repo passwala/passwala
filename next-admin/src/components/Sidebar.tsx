@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { PasswalaLogo } from './PasswalaLogo';
 import { useAdmin } from '@/lib/admin-context';
 import {
   LayoutDashboard,
@@ -104,20 +105,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         <div className="flex flex-col border-b border-slate-100 p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-500/10 border border-orange-500/20 p-1.5 shadow-xs">
-                <img src="/logo.png" alt="Passwala Logo" className="h-full w-full object-contain" />
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-lg font-black tracking-tight text-slate-900">Passwala</span>
-                  <span className="rounded-full bg-purple-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-purple-700">
-                    Ops
-                  </span>
-                </div>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  SuperAdmin System
-                </p>
-              </div>
+              <PasswalaLogo
+                size="sm"
+                variant="admin"
+                showTagline
+                tagline="SUPERADMIN OPS"
+                href="/"
+              />
             </div>
             <button
               onClick={onClose}
