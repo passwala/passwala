@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useAuthContext } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Bell, Moon, Sun, Volume2, Smartphone, Shield, ArrowLeft, Globe } from 'lucide-react';
+import { Bell, Moon, Sun, Volume2, Smartphone, Shield, ArrowLeft, Globe, ChevronRight } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { useTranslation } from '@/lib/language-context';
 import { useTheme } from '@/lib/theme-context';
@@ -13,11 +13,25 @@ export default function SettingsPage() {
   const router = useRouter();
   const { currentLanguage, changeLanguage, t, languages } = useTranslation();
   const { isDarkMode, toggleDarkMode } = useTheme();
-  const [notifs, setNotifs] = useState({ orders: true, chat: true, sound: true });
+  const [notifs, setNotifs] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('passwala_notif_prefs');
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return { orders: true, chat: true, sound: true };
+  });
 
   const toggleSetting = (key: keyof typeof notifs) => {
-    setNotifs(p => ({ ...p, [key]: !p[key] }));
-    toast.success('Settings saved');
+    setNotifs((p: any) => {
+      const updated = { ...p, [key]: !p[key] };
+      try {
+        localStorage.setItem('passwala_notif_prefs', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+    toast.success('Preference updated');
   };
 
   return (
@@ -120,14 +134,20 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30" onClick={() => toast('Privacy settings coming soon')}>
+            <div 
+              className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors" 
+              onClick={() => router.push('/privacy')}
+            >
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-500/10 text-purple-500 rounded-xl"><Shield className="h-5 w-5" /></div>
+                <div className="p-2 bg-purple-500/10 text-purple-500 rounded-xl">
+                  <Shield className="h-5 w-5" />
+                </div>
                 <div>
                   <p className="font-semibold">{t('privacy_security')}</p>
-                  <p className="text-xs text-muted-foreground">Manage your data</p>
+                  <p className="text-xs text-muted-foreground">Manage your data & policies</p>
                 </div>
               </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </div>
 
           </div>

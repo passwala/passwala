@@ -83,22 +83,27 @@ export default function HelpPage() {
           <div className="space-y-3">
             <Button 
               variant="outline" 
-              className="w-full h-14 rounded-2xl justify-start px-4 border-2 border-emerald-100 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
-              onClick={() => toast('Opening WhatsApp...', { icon: '💬' })}
+              className="w-full h-14 rounded-2xl justify-start px-4 border-2 border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-900/50 cursor-pointer"
+              onClick={() => {
+                toast.success('Connecting to WhatsApp support...');
+                window.open('https://wa.me/919876543210?text=Hello%20Passwala%20Support,%20I%20need%20help', '_blank');
+              }}
             >
               <div className="h-8 w-8 bg-emerald-500 text-white rounded-full flex items-center justify-center mr-3 shrink-0">
                 <MessageCircle className="h-4 w-4" />
               </div>
               <div className="text-left flex-1">
-                <p className="font-bold text-emerald-700">{t('whatsapp_support', 'WhatsApp Support')}</p>
-                <p className="text-[10px] text-emerald-600/80">{t('whatsapp_timing', 'Typically replies in 2 mins')}</p>
+                <p className="font-bold text-emerald-800 dark:text-emerald-200">{t('whatsapp_support', 'WhatsApp Support')}</p>
+                <p className="text-[10px] text-emerald-700/80 dark:text-emerald-300/80">{t('whatsapp_timing', 'Typically replies in 2 mins')}</p>
               </div>
             </Button>
 
             <Button 
               variant="outline" 
-              className="w-full h-14 rounded-2xl justify-start px-4 border-2"
-              onClick={() => toast('Calling Support...')}
+              className="w-full h-14 rounded-2xl justify-start px-4 border-2 cursor-pointer hover:bg-muted"
+              onClick={() => {
+                window.location.href = 'tel:+919876543210';
+              }}
             >
               <div className="h-8 w-8 bg-muted text-muted-foreground rounded-full flex items-center justify-center mr-3 shrink-0">
                 <Phone className="h-4 w-4" />
