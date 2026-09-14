@@ -43,17 +43,35 @@ export default function AdminDashboardPage() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const [statsRes, bookingsRes] = await Promise.allSettled([
+      const [statsRes, bookingsRes, venuesRes] = await Promise.allSettled([
         adminApi.getStats(),
-        adminApi.fetchTable('event_bookings')
+        adminApi.fetchTable('event_bookings'),
+        adminApi.fetchTable('venue_bookings')
       ]);
 
-      if (statsRes.status === 'fulfilled' && statsRes.value.stats) {
-        setStats(statsRes.value.stats);
+      if (statsRes.status === 'fulfilled' && statsRes.value?.stats) {
+        const s = statsRes.value.stats;
+        setStats({
+          users: s.users ?? s.userCount ?? 0,
+          vendors: s.vendors ?? s.vendorCount ?? 0,
+          riders: s.riders ?? s.riderCount ?? 0,
+          events: s.events ?? s.eventCount ?? 0,
+          venues: s.venues ?? s.venueCount ?? 0,
+          bookings: s.bookings ?? s.orders ?? s.orderCount ?? 0,
+          revenue: s.revenue ?? s.totalRevenue ?? 0
+        });
       }
-      if (bookingsRes.status === 'fulfilled' && bookingsRes.value.data) {
-        setRecentBookings(bookingsRes.value.data.slice(0, 6));
+
+      const combinedBookings: any[] = [];
+      if (bookingsRes.status === 'fulfilled' && Array.isArray(bookingsRes.value.data)) {
+        combinedBookings.push(...bookingsRes.value.data);
       }
+      if (venuesRes.status === 'fulfilled' && Array.isArray(venuesRes.value.data)) {
+        combinedBookings.push(...venuesRes.value.data);
+      }
+
+      combinedBookings.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      setRecentBookings(combinedBookings.slice(0, 6));
     } catch (err: any) {
       console.error('Failed to load dashboard data', err);
     } finally {
@@ -308,7 +326,7 @@ export default function AdminDashboardPage() {
                           Booking #{String(b.id || '').slice(0, 8)}
                         </p>
                         <p className="text-[11px] text-slate-500">
-                          {formatDateTime(b.created_at)} &bull; {b.ticket_count || 1} tickets
+                          {formatDateTime(b.created_at)} &bull; {b.ticket_count ? `${b.ticket_count} ticket(s)` : (b.scheduled_at ? 'Turf Slot' : 'Order')}
                         </p>
                       </div>
                     </div>

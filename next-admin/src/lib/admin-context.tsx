@@ -33,7 +33,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   const checkAuth = useCallback(() => {
     if (typeof window === 'undefined') return;
     const token = sessionStorage.getItem('admin_token') || localStorage.getItem('admin_token');
-    const session = sessionStorage.getItem('admin_session');
+    const session = sessionStorage.getItem('admin_session') || localStorage.getItem('admin_session');
 
     if (token && session === 'true') {
       setIsAuthenticated(true);
@@ -58,7 +58,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         setPendingApprovalsCount(eventsRes.value.events.length);
       }
       if (upgradesRes.status === 'fulfilled' && upgradesRes.value.data) {
-        const pending = upgradesRes.value.data.filter((r: any) => r.status === 'PENDING');
+        const pending = upgradesRes.value.data.filter((r: any) => (r.request_status || r.status || 'PENDING') === 'PENDING');
         setPendingUpgradesCount(pending.length);
       }
       setSyncStatus('cloud');
@@ -103,6 +103,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     sessionStorage.removeItem('admin_token');
     sessionStorage.removeItem('admin_session');
     localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_session');
     setIsAuthenticated(false);
     toast.success('Admin session ended');
     router.replace('/login');

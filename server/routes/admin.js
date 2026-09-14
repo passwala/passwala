@@ -132,7 +132,9 @@ router.post('/login', authLimiter, async (req, res) => {
 
 // Admin Authentication Middleware
 export const adminAuth = (req, res, next) => {
-    const key = req.headers['x-admin-key'];
+    const key = req.headers['x-admin-key'] 
+             || req.headers['x-admin-token'] 
+             || (req.headers['authorization']?.startsWith('Bearer ') ? req.headers['authorization'].slice(7) : null);
     
     if (!key) {
         console.warn('Unauthorized admin access attempt from IP: Missing key', req.ip);
@@ -332,6 +334,11 @@ router.get('/stats', async (req, res) => {
         const { count: orderCount } = await supabase.from('orders').select('*', { count: 'exact', head: true });
         const { count: productCount } = await supabase.from('products').select('*', { count: 'exact', head: true });
         const { count: serviceCount } = await supabase.from('services').select('*', { count: 'exact', head: true });
+        const { count: riderCount } = await supabase.from('riders').select('*', { count: 'exact', head: true });
+        const { count: eventCount } = await supabase.from('events').select('*', { count: 'exact', head: true });
+        const { count: venueCount } = await supabase.from('sports_venues').select('*', { count: 'exact', head: true });
+        const { count: eventBookingCount } = await supabase.from('event_bookings').select('*', { count: 'exact', head: true });
+        const { count: venueBookingCount } = await supabase.from('venue_bookings').select('*', { count: 'exact', head: true });
 
         // Calculate pending approvals (apps) from unverified vendors, riders, and service providers
         const { count: unverifiedVendors } = await supabase.from('vendors').select('*', { count: 'exact', head: true }).eq('is_verified', false);
@@ -452,6 +459,11 @@ router.get('/stats', async (req, res) => {
             stats: {
                 users: userCount || 0,
                 vendors: vendorCount || 0,
+                riders: riderCount || 0,
+                events: eventCount || 0,
+                venues: venueCount || 0,
+                bookings: (eventBookingCount || 0) + (venueBookingCount || 0) + (orderCount || 0),
+                revenue: totalRevenue,
                 orders: orderCount || 0,
                 activeItems: productCount || 0,
                 services: serviceCount || 0,
@@ -544,8 +556,101 @@ router.get('/people_map', async (req, res) => {
         if (addrErr) throw addrErr;
         if (rLocErr) throw rLocErr;
 
+        const markers = [];
+        const userAddressMap = {};
+        if (addressesList) {
+            addressesList.forEach(a => {
+                if (a.user_id && a.lat && a.lng) {
+                    userAddressMap[a.user_id] = { lat: parseFloat(a.lat), lng: parseFloat(a.lng), area: a.area || a.city || 'Ahmedabad' };
+                }
+            });
+        }
+        const storeMap = {};
+        if (storesList) {
+            storesList.forEach(s => {
+                if (s.vendor_id) storeMap[s.vendor_id] = s;
+            });
+        }
+        const riderLocMap = {};
+        if (riderLocationsList) {
+            riderLocationsList.forEach(r => {
+                if (r.rider_id) riderLocMap[r.rider_id] = r;
+            });
+        }
+
+        if (usersList) {
+            usersList.forEach(u => {
+                const addr = userAddressMap[u.id];
+                if (addr) {
+                    markers.push({
+                        id: u.id,
+                        name: u.full_name || 'Passwala Buyer',
+                        phone: u.phone,
+                        role: u.role || 'BUYER',
+                        lat: addr.lat,
+                        lng: addr.lng,
+                        area: addr.area
+                    });
+                }
+            });
+        }
+        if (vendorsList) {
+            vendorsList.forEach(v => {
+                const store = storeMap[v.id];
+                const lat = store?.lat ? parseFloat(store.lat) : (v.lat ? parseFloat(v.lat) : null);
+                const lng = store?.lng ? parseFloat(store.lng) : (v.lng ? parseFloat(v.lng) : null);
+                if (lat && lng) {
+                    markers.push({
+                        id: v.id,
+                        name: v.business_name || v.name || store?.name || 'Merchant',
+                        phone: v.phone,
+                        role: 'VENDOR',
+                        lat,
+                        lng,
+                        area: store?.address || 'Ahmedabad Hub'
+                    });
+                }
+            });
+        }
+        if (ridersList) {
+            ridersList.forEach(r => {
+                const loc = riderLocMap[r.id];
+                const lat = loc?.lat ? parseFloat(loc.lat) : (r.lat ? parseFloat(r.lat) : null);
+                const lng = loc?.lng ? parseFloat(loc.lng) : (r.lng ? parseFloat(r.lng) : null);
+                if (lat && lng) {
+                    markers.push({
+                        id: r.id,
+                        name: 'Rider ' + (r.vehicle_no || r.id.slice(0, 4)),
+                        phone: r.phone || r.license_no || 'N/A',
+                        role: 'RIDER',
+                        lat,
+                        lng,
+                        area: 'On-Duty Fleet'
+                    });
+                }
+            });
+        }
+        if (providersList) {
+            providersList.forEach(p => {
+                const lat = p.lat ? parseFloat(p.lat) : null;
+                const lng = p.lng ? parseFloat(p.lng) : null;
+                if (lat && lng) {
+                    markers.push({
+                        id: p.id,
+                        name: p.business_name || p.name || 'Service Partner',
+                        phone: p.phone,
+                        role: 'PROVIDER',
+                        lat,
+                        lng,
+                        area: p.category || 'Service Hub'
+                    });
+                }
+            });
+        }
+
         res.status(200).json({
             success: true,
+            markers,
             data: {
                 usersList,
                 vendorsList,
@@ -565,7 +670,8 @@ router.get('/people_map', async (req, res) => {
 
 // POST /api/admin/upsert — Securely sync any table data from Admin Panel
 router.post('/upsert', async (req, res) => {
-    const { table, payload } = req.body;
+    const { table } = req.body;
+    const payload = req.body.payload || req.body.record;
     
     if (!table || !payload) {
         return res.status(400).json({ error: 'Table name and payload are required' });
@@ -999,7 +1105,7 @@ router.get('/events/pending', async (req, res) => {
 // POST /api/admin/events/approve — Approve event → status = UPCOMING
 router.post('/events/approve', async (req, res) => {
     try {
-        const { id } = req.body;
+        const id = req.body.id || req.body.eventId;
         if (!id) return res.status(400).json({ error: 'Event ID is required' });
 
         if (Array.isArray(id)) {
@@ -1030,7 +1136,8 @@ router.post('/events/approve', async (req, res) => {
 // POST /api/admin/events/reject — Reject event → status = REJECTED
 router.post('/events/reject', async (req, res) => {
     try {
-        const { id, reason } = req.body;
+        const id = req.body.id || req.body.eventId;
+        const { reason } = req.body;
         if (!id) return res.status(400).json({ error: 'Event ID is required' });
 
         if (Array.isArray(id)) {
@@ -1061,7 +1168,7 @@ router.post('/events/reject', async (req, res) => {
 // POST /api/admin/upgrade/approve — Approve vendor console upgrade request
 router.post('/upgrade/approve', async (req, res) => {
     try {
-        const { id } = req.body;
+        const id = req.body.id || req.body.requestId;
         if (!id) return res.status(400).json({ error: 'Request ID is required' });
 
         // 1. Fetch request details
@@ -1195,7 +1302,7 @@ router.post('/upgrade/approve', async (req, res) => {
 // POST /api/admin/upgrade/reject — Reject console upgrade request
 router.post('/upgrade/reject', async (req, res) => {
     try {
-        const { id } = req.body;
+        const id = req.body.id || req.body.requestId;
         if (!id) return res.status(400).json({ error: 'Request ID is required' });
 
         const { data, error } = await supabase

@@ -37,7 +37,7 @@ export default function UpgradesPage() {
       await adminApi.approveUpgrade(req.id);
       toast.success(`Upgrade approved! User promoted to Organizer`);
       setRequests((prev) =>
-        prev.map((r) => (r.id === req.id ? { ...r, status: 'APPROVED' } : r))
+        prev.map((r) => (r.id === req.id ? { ...r, status: 'APPROVED', request_status: 'APPROVED' } : r))
       );
       refreshCounters();
     } catch (err: any) {
@@ -56,7 +56,7 @@ export default function UpgradesPage() {
       await adminApi.rejectUpgrade(req.id, reason);
       toast.success('Upgrade request rejected');
       setRequests((prev) =>
-        prev.map((r) => (r.id === req.id ? { ...r, status: 'REJECTED' } : r))
+        prev.map((r) => (r.id === req.id ? { ...r, status: 'REJECTED', request_status: 'REJECTED' } : r))
       );
       refreshCounters();
     } catch (err: any) {
@@ -66,8 +66,9 @@ export default function UpgradesPage() {
     }
   };
 
-  const pendingList = requests.filter((r) => (r.status || 'PENDING') === 'PENDING');
-  const pastList = requests.filter((r) => (r.status || 'PENDING') !== 'PENDING');
+  const getReqStatus = (r: any) => (r.request_status || r.status || 'PENDING').toUpperCase();
+  const pendingList = requests.filter((r) => getReqStatus(r) === 'PENDING');
+  const pastList = requests.filter((r) => getReqStatus(r) !== 'PENDING');
 
   return (
     <div className="space-y-6">
@@ -175,7 +176,7 @@ export default function UpgradesPage() {
           <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-xs">
             <div className="divide-y divide-slate-100">
               {pastList.map((req) => {
-                const badge = getStatusBadge(req.status);
+                const badge = getStatusBadge(req.request_status || req.status);
                 return (
                   <div key={req.id} className="flex items-center justify-between p-4 text-xs">
                     <div>

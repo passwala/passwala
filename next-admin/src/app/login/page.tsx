@@ -79,6 +79,16 @@ export default function AdminLoginPage() {
               <span>{loading ? 'Verifying Credentials...' : 'Authorize & Enter'}</span>
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </button>
+
+            <div className="pt-2 text-center">
+              <button
+                type="button"
+                onClick={() => setAccessCode('passwala_admin_2026')}
+                className="text-[11px] font-medium text-slate-400 hover:text-purple-400 transition-colors cursor-pointer"
+              >
+                Auto-fill default access code (<span className="font-mono text-purple-400">passwala_admin_2026</span>)
+              </button>
+            </div>
           </form>
 
           <p className="mt-6 text-[11px] font-semibold text-slate-500">
