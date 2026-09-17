@@ -1,5 +1,7 @@
 import SportsClient from '@/components/SportsClient';
 
+export const dynamic = 'force-dynamic';
+
 async function getVenues() {
   try {
     const res = await fetch('http://127.0.0.1:3004/api/sports/venues?limit=20', { cache: 'no-store' });

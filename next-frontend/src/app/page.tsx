@@ -1,5 +1,7 @@
 import { HomeContent } from '@/components/HomeContent';
 
+export const dynamic = 'force-dynamic';
+
 async function getEvents() {
   try {
     const res = await fetch('http://127.0.0.1:3004/api/events/search?limit=8', { cache: 'no-store' });

@@ -1,5 +1,7 @@
 import EventsClient from '@/components/EventsClient';
 
+export const dynamic = 'force-dynamic';
+
 async function getEvents(category?: string) {
   try {
     const catQuery = category ? `&category=${encodeURIComponent(category)}` : '';
