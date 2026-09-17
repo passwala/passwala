@@ -1,10 +1,11 @@
 import { HomeContent } from '@/components/HomeContent';
+import { getApiUrl } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
 async function getEvents() {
   try {
-    const res = await fetch('http://127.0.0.1:3004/api/events/search?limit=8', { cache: 'no-store' });
+    const res = await fetch(`${getApiUrl()}/api/events/search?limit=8`, { cache: 'no-store' });
     if (!res.ok) return [];
     const data = await res.json();
     return data.events || [];
@@ -16,7 +17,7 @@ async function getEvents() {
 
 async function getVenues() {
   try {
-    const res = await fetch('http://127.0.0.1:3004/api/sports/venues?limit=6', { cache: 'no-store' });
+    const res = await fetch(`${getApiUrl()}/api/sports/venues?limit=6`, { cache: 'no-store' });
     if (!res.ok) return [];
     const data = await res.json();
     return data.venues || [];

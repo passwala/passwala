@@ -8,6 +8,7 @@ import { Header } from '@/components/Header';
 import { supabase } from '@/lib/supabase-client';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
+import { getApiUrl } from '@/lib/api';
 import { 
   Trophy, 
   MapPin, 
@@ -50,7 +51,7 @@ export default function VenuesPage() {
       // 2. Fallback to Express backend if needed
       if (list.length === 0 && phone) {
         try {
-          const res = await fetch(`http://127.0.0.1:3004/api/sports/vendor-venues?phone=${encodeURIComponent(phone)}`);
+          const res = await fetch(`${getApiUrl()}/api/sports/vendor-venues?phone=${encodeURIComponent(phone)}`);
           const data = await res.json();
           if (data.success && Array.isArray(data.venues) && data.venues.length > 0) {
             list = data.venues;
@@ -106,7 +107,7 @@ export default function VenuesPage() {
 
       // Trigger backend generator endpoint
       try {
-        await fetch(`http://127.0.0.1:3004/api/sports/slots?venue_id=${venueId}&date=${dateStr}&sport=${sportType}`);
+        await fetch(`${getApiUrl()}/api/sports/slots?venue_id=${venueId}&date=${dateStr}&sport=${sportType}`);
       } catch {
         // non-blocking
       }

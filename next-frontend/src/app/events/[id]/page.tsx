@@ -12,6 +12,7 @@ import { useAuthContext } from '@/lib/auth-context';
 import { useTranslation } from '@/lib/language-context';
 import { supabase } from '@/lib/supabase-client';
 import { processRazorpayPayment } from '@/lib/razorpay';
+import { getApiUrl } from '@/lib/api';
 
 function parseBannerUrl(raw: string | string[] | null): string | null {
   if (!raw) return null;
@@ -40,7 +41,7 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
     if (!id) return;
     async function fetchEvent() {
       try {
-        const res = await fetch(`http://127.0.0.1:3004/api/events/${id}`);
+        const res = await fetch(`${getApiUrl()}/api/events/${id}`);
         const data = await res.json();
         const ev = data.event || data;
         if (ev?.id) {
@@ -69,7 +70,7 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
     }
     fetchEvent();
 
-    fetch(`http://127.0.0.1:3004/api/platform-settings`)
+    fetch(`${getApiUrl()}/api/platform-settings`)
       .then(r => r.json())
       .then(data => {
         if (data?.settings?.eventPlatformFee !== undefined) {
@@ -126,7 +127,7 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
     try {
       let finalUserId = userId;
       if (!finalUserId && (userUid || userPhone || userEmail)) {
-        const r = await fetch(`http://127.0.0.1:3004/api/events/resolve-id`, {
+        const r = await fetch(`${getApiUrl()}/api/events/resolve-id`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ uid: userUid, phone: userPhone, email: userEmail })
@@ -135,7 +136,7 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
         if (d.id) finalUserId = d.id;
       }
 
-      const response = await fetch(`http://127.0.0.1:3004/api/events/book`, {
+      const response = await fetch(`${getApiUrl()}/api/events/book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -170,7 +171,7 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
 
       // Launch Razorpay Checkout
       await processRazorpayPayment({
-        apiBaseUrl: 'http://127.0.0.1:3004',
+        apiBaseUrl: getApiUrl(),
         amount: totalPayable,
         orderId: data.booking.id,
         orderType: 'event',
@@ -192,7 +193,7 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
         onDismiss: async () => {
           toast.error('Payment cancelled. Releasing ticket...');
           if (data.booking?.id) {
-            await fetch(`http://127.0.0.1:3004/api/events/cancel`, {
+            await fetch(`${getApiUrl()}/api/events/cancel`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ booking_id: data.booking.id, reason: 'User Cancelled Payment' }),
@@ -203,7 +204,7 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
         onError: async (payErr: any) => {
           toast.error(payErr.message || 'Payment verification failed');
           if (data.booking?.id) {
-            await fetch(`http://127.0.0.1:3004/api/events/cancel`, {
+            await fetch(`${getApiUrl()}/api/events/cancel`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ booking_id: data.booking.id, reason: 'Payment Error' }),

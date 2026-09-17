@@ -13,6 +13,7 @@ import { Loader2, Ticket, Trophy, Calendar, MapPin, SearchX, Download } from 'lu
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import toast, { Toaster } from 'react-hot-toast';
+import { getApiUrl } from '@/lib/api';
 
 export default function OrdersPage() {
   const { user, loading: authLoading, openLogin } = useAuthContext();
@@ -67,7 +68,7 @@ export default function OrdersPage() {
         // Fetch Sport Bookings correctly via backend API (which uses venue_bookings)
         let sData = null;
         try {
-          const apiRes = await fetch(`http://127.0.0.1:3004/api/sports/my-bookings?user_id=${userId}`);
+          const apiRes = await fetch(`${getApiUrl()}/api/sports/my-bookings?user_id=${userId}`);
           const apiData = await apiRes.json();
           if (apiData.success && apiData.bookings) {
             sData = apiData.bookings;

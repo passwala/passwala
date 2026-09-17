@@ -6,6 +6,7 @@ import { Header } from '@/components/Header';
 import { useVendor } from '@/lib/vendor-context';
 import { supabase } from '@/lib/supabase-client';
 import { toast } from 'react-hot-toast';
+import { getApiUrl } from '@/lib/api';
 import jsQR from 'jsqr';
 import {
   QrCode,
@@ -141,7 +142,7 @@ export default function ScannerPage() {
     setResult(null);
 
     try {
-      const BASE_URL = 'http://127.0.0.1:3004';
+      const BASE_URL = getApiUrl();
       const endpoint =
         businessType === 'sports'
           ? `${BASE_URL}/api/sports/checkin`

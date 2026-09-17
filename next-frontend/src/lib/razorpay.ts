@@ -1,3 +1,5 @@
+import { getApiUrl } from './api';
+
 declare global {
   interface Window {
     Razorpay?: any;
@@ -52,7 +54,7 @@ export interface RazorpayPaymentParams {
 }
 
 export async function processRazorpayPayment({
-  apiBaseUrl = 'http://127.0.0.1:3004',
+  apiBaseUrl = getApiUrl(),
   amount,
   orderId,
   orderType,

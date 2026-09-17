@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useVendor } from '@/lib/vendor-context';
 import { toast } from 'react-hot-toast';
+import { getApiUrl } from '@/lib/api';
 import { 
   Phone, 
   MessageSquare, 
@@ -38,7 +39,7 @@ export default function VendorLoginPage() {
 
     setLoading(true);
     try {
-      const BASE_API = 'http://127.0.0.1:3004';
+      const BASE_API = getApiUrl();
       const res = await fetch(`${BASE_API}/api/users/send-whatsapp-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -68,7 +69,7 @@ export default function VendorLoginPage() {
 
     setLoading(true);
     try {
-      const BASE_API = 'http://127.0.0.1:3004';
+      const BASE_API = getApiUrl();
       const res = await fetch(`${BASE_API}/api/users/verify-whatsapp-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

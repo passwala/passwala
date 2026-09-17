@@ -1,11 +1,12 @@
 import EventsClient from '@/components/EventsClient';
+import { getApiUrl } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
 async function getEvents(category?: string) {
   try {
     const catQuery = category ? `&category=${encodeURIComponent(category)}` : '';
-    const res = await fetch(`http://127.0.0.1:3004/api/events/search?limit=20${catQuery}`, { cache: 'no-store' });
+    const res = await fetch(`${getApiUrl()}/api/events/search?limit=20${catQuery}`, { cache: 'no-store' });
     if (!res.ok) return [];
     const data = await res.json();
     return data.events || [];

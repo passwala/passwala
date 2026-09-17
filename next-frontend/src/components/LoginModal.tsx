@@ -10,8 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
 import { TicketIcon, PhoneIcon, EnvelopeIcon, GlobeAltIcon, ArrowLeftIcon, CodeBracketIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { getApiUrl } from '@/lib/api';
 
-const API = 'http://127.0.0.1:3004';
+const API = getApiUrl();
 
 export function LoginModal() {
   const { isLoginOpen, closeLogin, setUser } = useAuthContext();

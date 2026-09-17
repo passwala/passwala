@@ -107,41 +107,33 @@ Deploy each portal as an independent project from the same repository:
    npm run build:next:all
    ```
 
-3. Start all services using PM2:
+3. Start all services with 1 command using the pre-configured ecosystem file:
    ```bash
    npm install -g pm2
-   pm2 start "npm run start:frontend:next" --name "buyer-portal"
-   pm2 start "npm run start:vendor:next" --name "vendor-portal"
-   pm2 start "npm run start:rider:next" --name "rider-portal"
-   pm2 start "npm run start:admin:next" --name "admin-portal"
-   pm2 start "npm run server" --name "express-backend"
+   pm2 start ecosystem.config.cjs
    pm2 save
    pm2 startup
    ```
 
+This starts:
+- `passwala-buyer` on port 3001
+- `passwala-vendor` on port 3002
+- `passwala-rider` on port 3003
+- `passwala-backend` on port 3004
+- `passwala-admin` on port 3005
+
 ---
 
-### Option C: Docker / Google Cloud Run
+### Option C: Docker & Docker Compose
 
-To containerize any portal, use a standard standalone Dockerfile:
+Run all 4 Next.js portals and the Express backend simultaneously with Docker:
 
-```dockerfile
-FROM node:20-alpine AS base
-
-FROM base AS builder
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-FROM base AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-
-EXPOSE 3000
-CMD ["node", "server.js"]
+```bash
+docker-compose up -d --build
 ```
+
+To stop:
+```bash
+docker-compose down
+```
+

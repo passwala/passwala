@@ -11,8 +11,9 @@ import { MapPin, ArrowLeft, Calendar, Loader2, ChevronLeft, ChevronRight, Clock,
 import { CheckIcon } from '@heroicons/react/20/solid';
 import toast, { Toaster } from 'react-hot-toast';
 import { processRazorpayPayment } from '@/lib/razorpay';
+import { getApiUrl } from '@/lib/api';
 
-const API = 'http://127.0.0.1:3004';
+const API = getApiUrl();
 
 const SPORT_TYPES: Record<string, { label: string }> = {
   box_cricket: { label: 'Box Cricket' },

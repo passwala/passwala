@@ -1,0 +1,9 @@
+{
+  "framework": "nextjs",
+  "rewrites": [
+    {
+      "source": "/api/backend/:match*",
+      "destination": "https://passwala.onrender.com/api/:match*"
+    }
+  ]
+}

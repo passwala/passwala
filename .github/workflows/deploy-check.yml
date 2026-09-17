@@ -1,0 +1,47 @@
+name: Verify Next.js Portals Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Root Dependencies
+        run: npm ci
+
+      - name: Build Next.js Buyer Portal
+        run: |
+          cd next-frontend
+          npm ci
+          npm run build
+
+      - name: Build Next.js Vendor Portal
+        run: |
+          cd next-vendor
+          npm ci
+          npm run build
+
+      - name: Build Next.js Rider Portal
+        run: |
+          cd next-rider
+          npm ci
+          npm run build
+
+      - name: Build Next.js SuperAdmin Portal
+        run: |
+          cd next-admin
+          npm ci
+          npm run build

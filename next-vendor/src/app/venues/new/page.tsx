@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase-client';
 import { toast } from 'react-hot-toast';
 import { ArrowLeft, Trophy, MapPin, IndianRupee, Clock, Check, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { getApiUrl } from '@/lib/api';
 
 export default function NewVenuePage() {
   const router = useRouter();
@@ -101,7 +102,7 @@ export default function NewVenuePage() {
       } catch (postErr: any) {
         // Fallback to Express backend
         try {
-          const res = await fetch('http://127.0.0.1:3004/api/sports/venues', {
+          const res = await fetch(`${getApiUrl()}/api/sports/venues`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
