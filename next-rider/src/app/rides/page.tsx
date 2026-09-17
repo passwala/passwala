@@ -361,7 +361,7 @@ export default function RidesPage() {
               <button
                 onClick={() => {
                   advanceRideStep();
-                  toast.success('🎉 Trip Completed! Fare added to your wallet.');
+                  toast.success('Trip Completed! Fare added to your wallet.');
                 }}
                 className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-green-500 hover:from-emerald-500 hover:to-green-400 text-white font-black text-sm transition shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 cursor-pointer"
               >

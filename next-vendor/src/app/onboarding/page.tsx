@@ -148,7 +148,7 @@ export default function OnboardingPage() {
       localStorage.setItem('vCity', city);
 
       await refreshVendor();
-      toast.success('🎉 Partner profile setup successfully!');
+      toast.success('Partner profile setup successfully!');
       router.replace('/dashboard');
     } catch (err: any) {
       toast.error(err.message || 'Setup error. Please try again.');

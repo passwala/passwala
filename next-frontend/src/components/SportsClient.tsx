@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { MapPin } from 'lucide-react';
+import { MapPinIcon, TrophyIcon } from '@heroicons/react/24/outline';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/lib/language-context';
@@ -51,10 +51,12 @@ export default function SportsClient({ venues, currentSport }: SportsClientProps
       </div>
 
       {venues.length === 0 ? (
-        <div className="text-center py-20 bg-muted/30 rounded-2xl">
-          <p className="text-5xl mb-4">🏟️</p>
+        <div className="text-center py-20 bg-muted/20 border border-border/40 rounded-2xl flex flex-col items-center justify-center">
+          <div className="w-14 h-14 rounded-full bg-muted/40 flex items-center justify-center mb-3">
+            <TrophyIcon className="w-7 h-7 text-muted-foreground" />
+          </div>
           <h3 className="text-xl font-semibold">{t('no_venues_found', 'No venues found')}</h3>
-          <p className="text-muted-foreground mt-2">{t('no_venues_sub', "We couldn't find any venues for this sport.")}</p>
+          <p className="text-muted-foreground mt-1 text-sm">{t('no_venues_sub', "We couldn't find any venues for this sport.")}</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
@@ -67,7 +69,7 @@ export default function SportsClient({ venues, currentSport }: SportsClientProps
             
             return (
               <Link href={`/sports/${venue.id}`} key={venue.id} className="group outline-none">
-                <Card className="rounded-2xl overflow-hidden hover:shadow-lg transition-all h-full border-0 bg-card shadow-sm">
+                <Card className="rounded-2xl overflow-hidden hover:shadow-lg transition-all h-full border border-border/50 bg-card shadow-sm">
                   <div className="relative aspect-video overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img 
@@ -77,11 +79,11 @@ export default function SportsClient({ venues, currentSport }: SportsClientProps
                     />
                   </div>
                   <CardContent className="p-4 space-y-2">
-                    <h3 className="font-semibold line-clamp-1 group-hover:text-primary transition-colors">
+                    <h3 className="font-semibold line-clamp-1 group-hover:text-primary transition-colors text-sm md:text-base">
                       {venue.name}
                     </h3>
                     <div className="flex items-center text-xs text-muted-foreground">
-                      <MapPin className="w-3 h-3 mr-1 shrink-0" />
+                      <MapPinIcon className="w-3.5 h-3.5 mr-1.5 shrink-0" />
                       <span className="capitalize truncate">{venue.address || venue.city || t('unknown_location', 'Unknown Location')}</span>
                     </div>
                     {venue.sport_types && venue.sport_types.length > 0 && (

@@ -56,7 +56,7 @@ export function StatCard({
   value,
   subtitle,
   icon: Icon,
-  color = 'purple',
+  color = 'blue',
   trend,
   onClick
 }: StatCardProps) {

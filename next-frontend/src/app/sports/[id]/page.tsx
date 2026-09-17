@@ -8,23 +8,24 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, ArrowLeft, Calendar, Loader2, ChevronLeft, ChevronRight, Clock, Info, Check, Share2, Trophy } from 'lucide-react';
+import { CheckIcon } from '@heroicons/react/20/solid';
 import toast, { Toaster } from 'react-hot-toast';
 import { processRazorpayPayment } from '@/lib/razorpay';
 
 const API = 'http://127.0.0.1:3004';
 
-const SPORT_TYPES: Record<string, { label: string, emoji: string }> = {
-  box_cricket: { label: 'Box Cricket', emoji: '🏏' },
-  badminton: { label: 'Badminton', emoji: '🏸' },
-  turf: { label: 'Football Turf', emoji: '⚽' },
-  cricket_net: { label: 'Cricket Net', emoji: '🎯' },
-  pickleball: { label: 'Pickleball', emoji: '🥒' },
-  table_tennis: { label: 'Table Tennis', emoji: '🏓' },
-  padel: { label: 'Padel', emoji: '🎾' },
-  tennis: { label: 'Tennis', emoji: '🎾' },
-  snooker: { label: 'Snooker', emoji: '🎱' },
-  pool: { label: 'Pool / Billiards', emoji: '🎱' },
-  cricket: { label: 'Cricket', emoji: '🏏' },
+const SPORT_TYPES: Record<string, { label: string }> = {
+  box_cricket: { label: 'Box Cricket' },
+  badminton: { label: 'Badminton' },
+  turf: { label: 'Football Turf' },
+  cricket_net: { label: 'Cricket Net' },
+  pickleball: { label: 'Pickleball' },
+  table_tennis: { label: 'Table Tennis' },
+  padel: { label: 'Padel' },
+  tennis: { label: 'Tennis' },
+  snooker: { label: 'Snooker' },
+  pool: { label: 'Pool / Billiards' },
+  cricket: { label: 'Cricket' },
 };
 
 const getNext7Days = () => {
@@ -189,7 +190,7 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
 
   const handleBook = async () => {
     if (!user) {
-      toast('Please login to book a slot!', { icon: '🔐' });
+      toast.error('Please login to book a slot!');
       openLogin();
       return;
     }
@@ -236,7 +237,7 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
 
       // Step 2: If free booking, confirm immediately
       if (totalPayable <= 0) {
-        toast.success('🎉 Booking Confirmed!');
+        toast.success('Booking Confirmed!');
         sessionStorage.setItem('passwala_last_sport_ticket', JSON.stringify({
           booking: primaryBooking,
           bookings: allBookings,
@@ -263,7 +264,7 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
           phone: user.phone || user.phoneNumber,
         },
         onSuccess: () => {
-          toast.success('🎉 Payment Verified! Booking Confirmed!');
+          toast.success('Payment Verified! Booking Confirmed!');
           sessionStorage.setItem('passwala_last_sport_ticket', JSON.stringify({
             booking: primaryBooking,
             bookings: allBookings,
@@ -275,7 +276,7 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
           router.push('/sports/ticket');
         },
         onDismiss: async () => {
-          toast('Payment cancelled. Releasing your slot...', { icon: '⚠️' });
+          toast.error('Payment cancelled. Releasing your slot...');
           if (primaryBooking?.id) {
             await fetch(`${API}/api/sports/cancel`, {
               method: 'POST',
@@ -391,7 +392,10 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
               {venue.amenities && venue.amenities.length > 0 && (
                 <div className="flex flex-wrap gap-2 pt-2">
                   {venue.amenities.map((a: string) => (
-                    <Badge key={a} variant="outline" className="bg-card text-card-foreground">✓ {a}</Badge>
+                    <Badge key={a} variant="outline" className="inline-flex items-center gap-1.5 bg-card text-card-foreground text-xs py-1 px-2.5">
+                      <CheckIcon className="w-3.5 h-3.5 text-primary shrink-0" />
+                      <span>{a}</span>
+                    </Badge>
                   ))}
                 </div>
               )}
@@ -408,12 +412,14 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
                     <button
                       key={st}
                       onClick={() => { setSport(st); setSelectedSlots([]); }}
-                      className={`flex flex-col items-center justify-center p-4 min-w-[120px] rounded-2xl border-2 transition-all ${
-                        sport === st ? 'border-primary bg-primary/5 text-foreground' : 'border-border bg-card text-muted-foreground hover:bg-muted'
+                      className={`flex flex-col items-center justify-center p-3.5 min-w-[110px] rounded-2xl border transition-all ${
+                        sport === st ? 'border-primary bg-primary/10 text-primary font-bold shadow-xs' : 'border-border/60 bg-card text-muted-foreground hover:bg-muted/50'
                       }`}
                     >
-                      <span className="text-3xl mb-2">{SPORT_TYPES[st]?.emoji}</span>
-                      <span className="font-semibold text-sm">{t(st, SPORT_TYPES[st]?.label || st)}</span>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 ${sport === st ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                        <Trophy className="w-5 h-5" />
+                      </div>
+                      <span className="font-medium text-xs text-center">{t(st, SPORT_TYPES[st]?.label || st)}</span>
                     </button>
                   ))}
                 </div>

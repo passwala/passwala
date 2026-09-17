@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Eye
 } from 'lucide-react';
+import { CalendarIcon } from '@heroicons/react/24/outline';
 
 interface TicketTier {
   id: string;
@@ -350,8 +351,9 @@ export default function EventsPage() {
                         {/* Shows & Schedule List (Reference from VendorSubPages.jsx line 3986) */}
                         {evt.showsList && evt.showsList.length > 1 ? (
                           <div className="pt-2 border-t border-slate-100 space-y-2">
-                            <span className="text-[10px] font-extrabold uppercase text-indigo-700 tracking-wider block">
-                              📅 {evt.showsList.length} Scheduled Shows in Series:
+                            <span className="text-[10px] font-extrabold uppercase text-indigo-700 tracking-wider flex items-center gap-1">
+                              <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
+                              <span>{evt.showsList.length} Scheduled Shows in Series:</span>
                             </span>
 
                             <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">

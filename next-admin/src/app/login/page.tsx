@@ -27,11 +27,11 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-radial from-purple-900/10 via-slate-900 to-slate-950 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-radial from-blue-900/10 via-slate-900 to-slate-950 p-4">
       <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/90 p-8 shadow-2xl backdrop-blur-xl">
         {/* Glow Effects */}
-        <div className="absolute -left-20 -top-20 h-40 w-40 rounded-full bg-purple-600/30 blur-3xl" />
-        <div className="absolute -right-20 -bottom-20 h-40 w-40 rounded-full bg-orange-600/20 blur-3xl" />
+        <div className="absolute -left-20 -top-20 h-40 w-40 rounded-full bg-blue-600/30 blur-3xl" />
+        <div className="absolute -right-20 -bottom-20 h-40 w-40 rounded-full bg-indigo-600/20 blur-3xl" />
 
         {/* Content */}
         <div className="relative z-10 flex flex-col items-center text-center">
@@ -64,7 +64,7 @@ export default function AdminLoginPage() {
                   placeholder="Enter system access code"
                   value={accessCode}
                   onChange={(e) => setAccessCode(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-700 bg-slate-800/80 py-3 pl-10 pr-4 text-sm font-semibold text-white placeholder:text-slate-500 focus:border-purple-500 focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                  className="w-full rounded-2xl border border-slate-700 bg-slate-800/80 py-3 pl-10 pr-4 text-sm font-semibold text-white placeholder:text-slate-500 focus:border-blue-500 focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 />
               </div>
             </div>
@@ -72,7 +72,7 @@ export default function AdminLoginPage() {
             <button
               type="submit"
               disabled={loading || !accessCode.trim()}
-              className="group flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-purple-600/25 transition-all hover:brightness-110 disabled:opacity-50 cursor-pointer"
+              className="group flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-blue-600/25 transition-all hover:brightness-110 disabled:opacity-50 cursor-pointer"
             >
               <span>{loading ? 'Verifying Credentials...' : 'Authorize & Enter'}</span>
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
@@ -82,9 +82,9 @@ export default function AdminLoginPage() {
               <button
                 type="button"
                 onClick={() => setAccessCode('passwala_admin_2026')}
-                className="text-[11px] font-medium text-slate-400 hover:text-purple-400 transition-colors cursor-pointer"
+                className="text-[11px] font-medium text-slate-400 hover:text-blue-400 transition-colors cursor-pointer"
               >
-                Auto-fill default access code (<span className="font-mono text-purple-400">passwala_admin_2026</span>)
+                Auto-fill default access code (<span className="font-mono text-blue-400">passwala_admin_2026</span>)
               </button>
             </div>
           </form>

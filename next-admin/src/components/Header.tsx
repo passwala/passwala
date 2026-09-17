@@ -1,7 +1,12 @@
 'use client';
 
 import React from 'react';
-import { Menu, RefreshCw, ExternalLink, ShieldCheck, Database } from 'lucide-react';
+import { 
+  Bars3Icon, 
+  ArrowPathIcon, 
+  ArrowTopRightOnSquareIcon, 
+  CircleStackIcon 
+} from '@heroicons/react/24/outline';
 import { useAdmin } from '@/lib/admin-context';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -31,12 +36,12 @@ export function Header({ onOpenMenu }: HeaderProps) {
           onClick={onOpenMenu}
           className="rounded-xl border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 lg:hidden"
         >
-          <Menu className="h-5 w-5" />
+          <Bars3Icon className="h-5 w-5" />
         </button>
 
         <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
           <div className="hidden items-center gap-1.5 text-xs font-semibold text-slate-400 sm:flex">
-            <Database className="h-3.5 w-3.5 text-purple-600" />
+            <CircleStackIcon className="h-3.5 w-3.5 text-blue-600" />
             <span>SUPERADMIN</span>
             <span>/</span>
           </div>
@@ -75,10 +80,10 @@ export function Header({ onOpenMenu }: HeaderProps) {
           href="http://localhost:3001"
           target="_blank"
           rel="noopener noreferrer"
-          className="hidden md:flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-purple-600 rounded-lg px-2 py-1 hover:bg-slate-50"
+          className="hidden md:flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-blue-600 rounded-lg px-2 py-1 hover:bg-slate-50"
         >
           <span>Buyer App</span>
-          <ExternalLink className="h-3 w-3" />
+          <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
         </a>
 
         {/* Refresh Counters */}
@@ -88,15 +93,15 @@ export function Header({ onOpenMenu }: HeaderProps) {
           title="Refresh system metrics"
           className="rounded-xl border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer transition-transform active:rotate-180"
         >
-          <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin text-purple-600')} />
+          <ArrowPathIcon className={cn('h-4 w-4', isLoading && 'animate-spin text-blue-600')} />
         </button>
 
         {/* Admin Badge */}
-        <div className="flex items-center gap-2 rounded-xl bg-purple-50 border border-purple-100 px-3 py-1.5">
-          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-purple-600 text-white font-black text-xs">
+        <div className="flex items-center gap-2 rounded-xl bg-blue-50 border border-blue-100 px-3 py-1.5">
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-600 text-white font-black text-xs">
             A
           </div>
-          <span className="text-xs font-black text-purple-900 hidden sm:inline">Admin Root</span>
+          <span className="text-xs font-black text-blue-900 hidden sm:inline">Admin Root</span>
         </div>
       </div>
     </header>

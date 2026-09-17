@@ -307,7 +307,7 @@ export default function NewEventPage() {
           if (tierErr) console.warn('Non-blocking tier insert warning:', tierErr);
         }
 
-        toast.success('🎉 Single show event published successfully!');
+        toast.success('Single show event published successfully!');
       } else {
         // Multiple Shows or Tour: Publish sibling records for each show slot
         let publishedCount = 0;
@@ -369,7 +369,7 @@ export default function NewEventPage() {
           }
         }
 
-        toast.success(`🎉 Published ${publishedCount} ${showType === 'tour' ? 'tour stops' : 'shows'} successfully!`);
+        toast.success(`Published ${publishedCount} ${showType === 'tour' ? 'tour stops' : 'shows'} successfully!`);
       }
 
       router.push('/events');
@@ -617,7 +617,7 @@ export default function NewEventPage() {
                 <div className="text-xs text-slate-500">
                   Selected Setup:{' '}
                   <strong className="text-slate-900 font-bold">
-                    {showType === 'tour' ? '🎪 Festival or Tour' : showType === 'multiple' ? '🎭 Multiple Shows' : '🎫 Single Show'}
+                    {showType === 'tour' ? 'Festival or Tour' : showType === 'multiple' ? 'Multiple Shows' : 'Single Show'}
                   </strong>
                 </div>
 

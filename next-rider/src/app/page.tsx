@@ -21,6 +21,7 @@ import {
 import { useRider } from '../lib/rider-context';
 import { formatCurrency } from '../lib/utils';
 import { toast } from 'react-hot-toast';
+import { ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/react/20/solid';
 
 export default function DashboardPage() {
   const {
@@ -498,10 +499,18 @@ export default function DashboardPage() {
                     ? 'bg-amber-50 border-amber-300 text-amber-900'
                     : 'bg-emerald-50 border-emerald-300 text-emerald-900'
                 }`}>
-                  <span className="font-extrabold">
-                    {activeOrder.payment_mode === 'COD'
-                      ? '⚠️ Collect Cash From Customer'
-                      : '✅ Order Prepaid Online'}
+                  <span className="font-extrabold flex items-center gap-1.5">
+                    {activeOrder.payment_mode === 'COD' ? (
+                      <>
+                        <ExclamationTriangleIcon className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>Collect Cash From Customer</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircleIcon className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>Order Prepaid Online</span>
+                      </>
+                    )}
                   </span>
                   <span className="font-black text-sm">
                     {formatCurrency(activeOrder.total_amount)}

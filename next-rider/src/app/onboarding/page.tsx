@@ -41,7 +41,7 @@ export default function OnboardingPage() {
     setSubmitting(true);
     try {
       await login(phone, name);
-      toast.success('🎉 Partner Profile & KYC Updated Successfully!');
+      toast.success('Partner Profile & KYC Updated Successfully!');
       router.push('/');
     } catch (err) {
       toast.error('Failed to submit onboarding profile.');

@@ -459,7 +459,7 @@ export const RiderProvider = ({ children }: { children: React.ReactNode }) => {
             if (lastAlertedRideId.current !== validRide.id) {
               lastAlertedRideId.current = validRide.id;
               playNotificationPing();
-              toast.success(`🛵 New Passenger Ride Offer: ₹${validRide.total_price}!`);
+              toast.success(`New Passenger Ride Offer: ₹${validRide.total_price}!`);
             }
             return;
           }
@@ -563,7 +563,7 @@ export const RiderProvider = ({ children }: { children: React.ReactNode }) => {
         if (lastAlertedOrderId.current !== order.id) {
           lastAlertedOrderId.current = order.id;
           playNotificationPing();
-          toast.success(`📦 New Real Delivery Offer: ₹${deliveryFee}!`);
+          toast.success(`New Delivery Offer: ₹${deliveryFee}!`);
         }
         break;
       }
@@ -675,7 +675,7 @@ export const RiderProvider = ({ children }: { children: React.ReactNode }) => {
         supabase.from('riders').update({ is_active: true }).eq('id', rider.id).then();
         supabase.from('city_vehicles').update({ is_active: true }).eq('driver_id', rider.user_id || rider.id).then();
       }
-      toast.success('🟢 Shift Started! Radar listening for live dispatches.');
+      toast.success('Shift Started! Radar listening for live dispatches.');
     } else {
       setIsOnline(false);
       setSessionStartTime(null);
@@ -687,7 +687,7 @@ export const RiderProvider = ({ children }: { children: React.ReactNode }) => {
         supabase.from('city_vehicles').update({ is_active: false }).eq('driver_id', rider.user_id || rider.id).then();
         supabase.from('rider_locations').delete().eq('rider_id', rider.id).then();
       }
-      toast('🔴 Shift Ended. You are now offline.');
+      toast('Shift Ended. You are now offline.');
     }
   };
 
@@ -829,7 +829,7 @@ export const RiderProvider = ({ children }: { children: React.ReactNode }) => {
       return next;
     });
     setIncomingOrder(null);
-    toast('Delivery offer declined', { icon: '✖️' });
+    toast('Delivery offer declined');
   };
 
   // STEP ADVANCE FOR DELIVERY ORDER
@@ -881,7 +881,7 @@ export const RiderProvider = ({ children }: { children: React.ReactNode }) => {
         }));
 
         setActiveOrder(null);
-        toast.success(`🎉 Delivery Complete! +₹${earningsFee} added to earnings.`, { duration: 5000 });
+        toast.success(`Delivery Complete! +₹${earningsFee} added to earnings.`, { duration: 5000 });
       }
     } catch (err) {
       console.error('Error advancing order step:', err);
@@ -895,7 +895,7 @@ export const RiderProvider = ({ children }: { children: React.ReactNode }) => {
       await supabase.from('orders').update({ status: 'CANCELLED' }).eq('id', activeOrder.id);
       await supabase.from('delivery_tracking').update({ status: 'CANCELLED' }).eq('order_id', activeOrder.id);
       setActiveOrder(null);
-      toast('Order delivery cancelled', { icon: '⚠️' });
+      toast.error('Order delivery cancelled');
     } catch (err) {
       console.error('Error cancelling order:', err);
     }
@@ -973,7 +973,7 @@ export const RiderProvider = ({ children }: { children: React.ReactNode }) => {
       return next;
     });
     setIncomingRide(null);
-    toast('Passenger trip declined', { icon: '✖️' });
+    toast('Passenger trip declined');
   };
 
   // STEP ADVANCE FOR PASSENGER RIDE
@@ -1019,7 +1019,7 @@ export const RiderProvider = ({ children }: { children: React.ReactNode }) => {
             rides: prev.rides + 1
           }));
           setActiveRide(null);
-          toast.success(`🎉 Trip Completed! +₹${fare} added to earnings.`, { duration: 5000 });
+          toast.success(`Trip Completed! +₹${fare} added to earnings.`, { duration: 5000 });
         }
       }
     } catch (err) {
@@ -1038,7 +1038,7 @@ export const RiderProvider = ({ children }: { children: React.ReactNode }) => {
         body: JSON.stringify({ bookingId: activeRide.id, status: 'CANCELLED' })
       });
       setActiveRide(null);
-      toast('Ride trip cancelled', { icon: '⚠️' });
+      toast.error('Ride trip cancelled');
     } catch (err) {
       console.error('Error cancelling ride:', err);
     }

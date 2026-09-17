@@ -6,21 +6,21 @@ import { usePathname } from 'next/navigation';
 import { PasswalaLogo } from './PasswalaLogo';
 import { useAdmin } from '@/lib/admin-context';
 import {
-  LayoutDashboard,
-  Users,
-  Store,
-  Bike,
-  Sparkles,
-  ShieldCheck,
-  Trophy,
-  UserCheck,
-  Ticket,
-  Tag,
-  Settings,
-  MapPin,
-  LogOut,
-  X
-} from 'lucide-react';
+  Squares2X2Icon,
+  UsersIcon,
+  BuildingStorefrontIcon,
+  TruckIcon,
+  SparklesIcon,
+  ShieldCheckIcon,
+  TrophyIcon,
+  UserGroupIcon,
+  TicketIcon,
+  TagIcon,
+  Cog6ToothIcon,
+  MapPinIcon,
+  ArrowRightOnRectangleIcon,
+  XMarkIcon
+} from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {
@@ -36,30 +36,30 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     {
       label: 'Main Control',
       items: [
-        { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-        { label: 'People & Fleet Map', href: '/map', icon: MapPin },
+        { label: 'Dashboard', href: '/', icon: Squares2X2Icon },
+        { label: 'People & Fleet Map', href: '/map', icon: MapPinIcon },
       ]
     },
     {
       label: 'Directory',
       items: [
-        { label: 'Users Directory', href: '/users', icon: Users },
-        { label: 'Vendors & Partners', href: '/vendors', icon: Store },
-        { label: 'Riders Fleet', href: '/riders', icon: Bike },
+        { label: 'Users Directory', href: '/users', icon: UsersIcon },
+        { label: 'Vendors & Partners', href: '/vendors', icon: BuildingStorefrontIcon },
+        { label: 'Riders Fleet', href: '/riders', icon: TruckIcon },
       ]
     },
     {
       label: 'Events & Venues',
       items: [
-        { label: 'Events Console', href: '/events', icon: Sparkles },
+        { label: 'Events Console', href: '/events', icon: SparklesIcon },
         {
           label: 'Event Approvals',
           href: '/events/approvals',
-          icon: ShieldCheck,
+          icon: ShieldCheckIcon,
           badge: pendingApprovalsCount > 0 ? pendingApprovalsCount : undefined,
           badgeColor: 'bg-amber-500 text-white'
         },
-        { label: 'Sports Venues', href: '/venues', icon: Trophy },
+        { label: 'Sports Venues', href: '/venues', icon: TrophyIcon },
       ]
     },
     {
@@ -68,18 +68,18 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         {
           label: 'Upgrade Requests',
           href: '/upgrades',
-          icon: UserCheck,
+          icon: UserGroupIcon,
           badge: pendingUpgradesCount > 0 ? pendingUpgradesCount : undefined,
           badgeColor: 'bg-orange-500 text-white'
         },
-        { label: 'Bookings & Tickets', href: '/bookings', icon: Ticket },
-        { label: 'Promo Codes', href: '/promos', icon: Tag },
+        { label: 'Bookings & Tickets', href: '/bookings', icon: TicketIcon },
+        { label: 'Promo Codes', href: '/promos', icon: TagIcon },
       ]
     },
     {
       label: 'System',
       items: [
-        { label: 'Platform Settings', href: '/settings', icon: Settings },
+        { label: 'Platform Settings', href: '/settings', icon: Cog6ToothIcon },
       ]
     }
   ];
@@ -117,7 +117,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               onClick={onClose}
               className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 lg:hidden"
             >
-              <X className="h-5 w-5" />
+              <XMarkIcon className="h-5 w-5" />
             </button>
           </div>
         </div>
@@ -141,7 +141,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       className={cn(
                         'group flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold transition-colors',
                         isActive
-                          ? 'bg-purple-600 text-white shadow-xs'
+                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs'
                           : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                       )}
                     >
@@ -158,7 +158,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         <span
                           className={cn(
                             'flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-black',
-                            isActive ? 'bg-white text-purple-700' : item.badgeColor || 'bg-slate-200 text-slate-700'
+                            isActive ? 'bg-white text-blue-700' : item.badgeColor || 'bg-slate-200 text-slate-700'
                           )}
                         >
                           {item.badge}
@@ -185,7 +185,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             onClick={logout}
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 transition-colors hover:bg-rose-100 hover:text-rose-700 cursor-pointer"
           >
-            <LogOut className="h-4 w-4" />
+            <ArrowRightOnRectangleIcon className="h-4 w-4" />
             <span>Terminate Session</span>
           </button>
         </div>

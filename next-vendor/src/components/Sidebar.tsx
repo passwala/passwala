@@ -69,13 +69,13 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?: () => 
         {/* Top Brand */}
         <div className="p-5 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-orange-50 border border-orange-200/80 p-1.5 flex items-center justify-center shadow-xs">
+            <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-200/80 p-1.5 flex items-center justify-center shadow-xs">
               <img src="/logo.png" alt="Passwala Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="text-lg font-black tracking-tight text-slate-900">Passwala</span>
-                <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200">
+                <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
                   Partner
                 </span>
               </div>
@@ -176,12 +176,12 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?: () => 
                 onClick={onClose}
                 className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   isActive
-                    ? 'bg-orange-50 text-orange-600 border border-orange-200/80 shadow-xs'
+                    ? 'bg-blue-50 text-blue-600 border border-blue-200/80 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-transparent'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-orange-600' : 'text-slate-400 group-hover:text-slate-600'}`} />
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}`} />
                   <span>{item.label}</span>
                 </div>
                 {item.badge && (
@@ -210,7 +210,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?: () => 
         <div className="p-4 border-t border-slate-100 bg-slate-50/70">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 border border-orange-200 flex items-center justify-center font-bold text-xs shrink-0">
+              <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 border border-blue-200 flex items-center justify-center font-bold text-xs shrink-0">
                 {(vendor?.displayName || store?.business_name || 'V')[0]?.toUpperCase()}
               </div>
               <div className="truncate">

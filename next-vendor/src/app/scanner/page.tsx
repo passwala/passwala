@@ -29,6 +29,7 @@ import {
   History,
   Sparkles
 } from 'lucide-react';
+import { CheckIcon, ExclamationTriangleIcon, DevicePhoneMobileIcon } from '@heroicons/react/20/solid';
 
 interface VerifiedBooking {
   id: string;
@@ -161,7 +162,7 @@ export default function ScannerPage() {
 
       if (res.ok && data.success) {
         playBeep('success');
-        toast.success('🎉 Check-in Successful! Welcome.');
+        toast.success('Check-in Successful! Welcome.');
 
         const verified: VerifiedBooking = {
           id: data.booking?.id || cleanHash,
@@ -195,7 +196,7 @@ export default function ScannerPage() {
         ]);
       } else if (res.status === 400 && (data.error || '').toLowerCase().includes('already')) {
         playBeep('error');
-        toast.error('⚠️ Ticket Already Scanned!');
+        toast.error('Ticket Already Scanned!');
 
         const prevHolder: VerifiedBooking | undefined = data.booking
           ? {
@@ -269,7 +270,7 @@ export default function ScannerPage() {
                 .eq('id', b.id);
 
               playBeep('success');
-              toast.success('🎉 Direct Pass Verified!');
+              toast.success('Direct Pass Verified!');
               const verified: VerifiedBooking = {
                 id: b.id,
                 attendee: u?.full_name || 'Guest',
@@ -291,7 +292,7 @@ export default function ScannerPage() {
 
         if (!directFound) {
           playBeep('error');
-          toast.error(data.error || '❌ Invalid Ticket or QR code');
+          toast.error(data.error || 'Invalid Ticket or QR code');
           setResult({
             status: 'ERROR',
             message: data.error || 'Invalid QR code. No active booking found in system.'
@@ -334,7 +335,7 @@ export default function ScannerPage() {
         window.location.hostname === '127.0.0.1');
 
     if (!isSecure) {
-      setCameraError('🔒 Camera requires HTTPS. Please open via https:// or localhost.');
+      setCameraError('Camera requires HTTPS. Please open via https:// or localhost.');
       return;
     }
 
@@ -490,7 +491,7 @@ export default function ScannerPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-orange-500 selection:text-white">
+    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-blue-500 selection:text-white">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="lg:pl-64 flex flex-col min-h-screen">
@@ -500,7 +501,7 @@ export default function ScannerPage() {
           {/* Top Headline & Counter */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50 border border-orange-200 text-orange-600 text-xs font-bold mb-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-600 text-xs font-bold mb-2">
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>Gate Admission System</span>
               </div>
@@ -546,7 +547,7 @@ export default function ScannerPage() {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Camera className="w-4 h-4 text-orange-600" />
+              <Camera className="w-4 h-4 text-blue-600" />
               <span>Live Camera Scanner</span>
             </button>
 
@@ -562,7 +563,7 @@ export default function ScannerPage() {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Search className="w-4 h-4 text-orange-600" />
+              <Search className="w-4 h-4 text-blue-600" />
               <span>Manual Code Entry</span>
             </button>
           </div>
@@ -651,7 +652,7 @@ export default function ScannerPage() {
                     <button
                       type="button"
                       onClick={() => startCamera()}
-                      className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition-all cursor-pointer mt-2"
+                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all cursor-pointer mt-2"
                     >
                       Retry Camera
                     </button>
@@ -671,8 +672,9 @@ export default function ScannerPage() {
                 {/* Invalid code alert banner */}
                 {invalidMsg && (
                   <div className="absolute bottom-4 inset-x-0 flex justify-center pointer-events-none">
-                    <span className="px-4 py-1.5 rounded-full bg-red-600 text-white text-xs font-bold shadow-lg">
-                      ⚠ {invalidMsg}
+                    <span className="px-4 py-1.5 rounded-full bg-red-600 text-white text-xs font-bold shadow-lg flex items-center gap-1.5">
+                      <ExclamationTriangleIcon className="w-4 h-4 shrink-0" />
+                      <span>{invalidMsg}</span>
                     </span>
                   </div>
                 )}
@@ -689,8 +691,9 @@ export default function ScannerPage() {
 
               {/* Instructions Tip */}
               <div className="text-center pt-2">
-                <p className="text-xs text-slate-400">
-                  📱 Ask attendee to open: <strong className="text-white">Passwala Buyer App → My Orders → View QR Pass</strong>
+                <p className="text-xs text-slate-400 flex items-center justify-center gap-1.5">
+                  <DevicePhoneMobileIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span>Ask attendee to open: <strong className="text-white">Passwala Buyer App → My Orders → View QR Pass</strong></span>
                 </p>
               </div>
             </div>
@@ -719,7 +722,7 @@ export default function ScannerPage() {
                   <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                     Booking ID or QR Hash *
                   </label>
-                  <div className="flex items-center rounded-2xl bg-slate-50 border-2 border-slate-200 px-4 py-3.5 focus-within:border-orange-500 focus-within:bg-white outline-none">
+                  <div className="flex items-center rounded-2xl bg-slate-50 border-2 border-slate-200 px-4 py-3.5 focus-within:border-blue-500 focus-within:bg-white outline-none">
                     <Search className="w-4 h-4 text-slate-400 mr-2 shrink-0" />
                     <input
                       type="text"
@@ -734,7 +737,7 @@ export default function ScannerPage() {
                 <button
                   type="submit"
                   disabled={verifying || !manualCode.trim()}
-                  className="w-full py-3.5 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-extrabold text-xs shadow-md shadow-orange-600/20 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs shadow-md shadow-blue-600/20 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {verifying ? (
                     <>
@@ -809,7 +812,7 @@ export default function ScannerPage() {
                     <div className="space-y-1">
                       <span className="text-[10px] font-bold text-slate-400 uppercase">Attendee Name</span>
                       <div className="text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
-                        <User className="w-4 h-4 text-orange-600" />
+                        <User className="w-4 h-4 text-blue-600" />
                         <span>{result.booking.attendee}</span>
                       </div>
                       {result.booking.phone && (
@@ -861,7 +864,7 @@ export default function ScannerPage() {
             <div className="rounded-3xl bg-white border border-slate-200 p-6 space-y-4 shadow-xs">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <History className="w-4 h-4 text-orange-600" />
+                  <History className="w-4 h-4 text-blue-600" />
                   <h3 className="text-sm font-black text-slate-900">Recent Gate Check-ins</h3>
                 </div>
                 <span className="text-xs font-bold text-slate-400">{recentScans.length} logged</span>
@@ -878,7 +881,11 @@ export default function ScannerPage() {
                             : 'bg-amber-100 text-amber-700'
                         }`}
                       >
-                        {scan.status === 'SUCCESS' ? '✓' : '!'}
+                        {scan.status === 'SUCCESS' ? (
+                          <CheckIcon className="w-3.5 h-3.5" />
+                        ) : (
+                          <ExclamationTriangleIcon className="w-3.5 h-3.5" />
+                        )}
                       </div>
                       <div>
                         <span className="font-extrabold text-slate-900">{scan.name}</span>

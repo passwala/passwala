@@ -119,7 +119,7 @@ export default function WalletPage() {
 
     setShowPayoutModal(false);
     setPayoutAmount('');
-    toast.success(`🎉 ₹${num} payout transfer initiated to ${upiId}!`);
+    toast.success(`₹${num} payout transfer initiated to ${upiId}!`);
   };
 
   return (
@@ -128,7 +128,7 @@ export default function WalletPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <Wallet className="w-7 h-7 text-orange-600" />
+            <Wallet className="w-7 h-7 text-blue-600" />
             Rider Digital Wallet
           </h2>
           <p className="text-xs text-slate-500 mt-1">
@@ -138,19 +138,19 @@ export default function WalletPage() {
         <button
           onClick={fetchLedger}
           disabled={loading}
-          className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-orange-600 transition shadow-xs cursor-pointer"
+          className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-blue-600 transition shadow-xs cursor-pointer"
           title="Refresh ledger"
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-orange-600' : ''}`} />
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-600' : ''}`} />
         </button>
       </div>
 
       {/* Available Balance Card */}
-      <div className="bg-gradient-to-br from-orange-500 via-amber-500 to-orange-600 rounded-3xl p-6 shadow-md text-white relative overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 rounded-3xl p-6 shadow-md text-white relative overflow-hidden">
         <div className="flex items-center justify-between gap-4 mb-2">
           <div className="flex items-center gap-2">
-            <Wallet className="w-5 h-5 text-amber-100" />
-            <span className="text-xs font-black uppercase tracking-wider text-amber-100">
+            <Wallet className="w-5 h-5 text-blue-100" />
+            <span className="text-xs font-black uppercase tracking-wider text-blue-100">
               Withdrawable Balance
             </span>
           </div>
@@ -166,7 +166,7 @@ export default function WalletPage() {
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
           <button
             onClick={() => setShowPayoutModal(true)}
-            className="py-3 px-6 rounded-2xl bg-white text-orange-600 font-black text-xs uppercase tracking-wider hover:bg-slate-100 transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+            className="py-3 px-6 rounded-2xl bg-white text-blue-600 font-black text-xs uppercase tracking-wider hover:bg-slate-100 transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
           >
             <Send className="w-4 h-4" />
             Request Instant Payout
@@ -272,7 +272,7 @@ export default function WalletPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
           <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl text-slate-900 relative">
             <h3 className="text-lg font-black text-slate-900 mb-1 flex items-center gap-2">
-              <Send className="w-5 h-5 text-orange-600" />
+              <Send className="w-5 h-5 text-blue-600" />
               Instant Bank Withdrawal
             </h3>
             <p className="text-xs text-slate-500 mb-4">
@@ -292,7 +292,7 @@ export default function WalletPage() {
                   onChange={(e) => setPayoutAmount(e.target.value)}
                   placeholder={`Max: ₹${stats.earnings}`}
                   required
-                  className="w-full py-3 px-4 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 text-lg font-bold font-mono focus:outline-none focus:border-orange-500"
+                  className="w-full py-3 px-4 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 text-lg font-bold font-mono focus:outline-none focus:border-blue-500"
                 />
               </div>
 
@@ -305,7 +305,7 @@ export default function WalletPage() {
                   value={upiId}
                   onChange={(e) => setUpiId(e.target.value)}
                   required
-                  className="w-full py-2.5 px-4 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 text-sm font-semibold focus:outline-none focus:border-orange-500"
+                  className="w-full py-2.5 px-4 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 text-sm font-semibold focus:outline-none focus:border-blue-500"
                 />
               </div>
 
@@ -324,7 +324,7 @@ export default function WalletPage() {
                 </button>
                 <button
                   type="submit"
-                  className="py-3 px-4 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-black text-xs uppercase tracking-wider transition shadow-md shadow-orange-600/20 cursor-pointer"
+                  className="py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider transition shadow-md shadow-blue-600/20 cursor-pointer"
                 >
                   Confirm Transfer
                 </button>

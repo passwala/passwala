@@ -119,7 +119,7 @@ export default function ProfilePage() {
         </button>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          Passwala v1.0 &bull; Made with ❤️
+          Passwala v1.0 &bull; Made in Ahmedabad
         </p>
       </div>
     </div>

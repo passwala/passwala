@@ -6,9 +6,9 @@
     --foreground: #0f172a;
     --card: #ffffff;
     --card-foreground: #0f172a;
-    --primary: #ff6b00;
-    --primary-dark: #e65c00;
-    --primary-light: #fff7ed;
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --primary-light: #eff6ff;
     --border: #e2e8f0;
     --radius: 1rem;
   }

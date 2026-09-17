@@ -5,7 +5,8 @@ import { useState, useEffect } from 'react';
 import { PasswalaLogo } from '@/components/PasswalaLogo';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Ticket, MapPin, Search, User, Loader2, Globe, Settings, Moon, Sun } from 'lucide-react';
+import { Ticket, MapPin, Search, User, Loader2, Settings, Moon, Sun } from 'lucide-react';
+import { GlobeAltIcon } from '@heroicons/react/24/outline';
 import { useAuthContext } from '@/lib/auth-context';
 import { useTranslation } from '@/lib/language-context';
 import { useTheme } from '@/lib/theme-context';
@@ -166,24 +167,21 @@ export function Navbar() {
           {/* Language Selector */}
           {mounted && (
             <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border bg-background hover:bg-muted text-xs font-semibold text-foreground transition-all outline-none">
-                <Globe className="h-3.5 w-3.5 text-primary" />
-                <span>{languages[currentLanguage]?.flag || '🌐'} {languages[currentLanguage]?.code?.toUpperCase() || 'EN'}</span>
+              <DropdownMenuTrigger className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-border/60 bg-background hover:bg-muted text-xs font-semibold text-foreground transition-all outline-none">
+                <GlobeAltIcon className="h-3.5 w-3.5 text-primary" />
+                <span>{languages[currentLanguage]?.code?.toUpperCase() || 'EN'}</span>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44 rounded-2xl shadow-xl p-1.5 z-50">
+              <DropdownMenuContent align="end" className="w-40 rounded-xl shadow-lg p-1.5 z-50 border border-border/60">
                 {Object.entries(languages).map(([code, info]) => (
                   <DropdownMenuItem
                     key={code}
                     onClick={() => changeLanguage(code)}
-                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium cursor-pointer transition-colors ${
+                    className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
                       currentLanguage === code ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'
                     }`}
                   >
-                    <span className="flex items-center gap-2">
-                      <span>{info.flag}</span>
-                      <span>{info.nativeName}</span>
-                    </span>
-                    <span className="text-[10px] text-muted-foreground uppercase">{code}</span>
+                    <span>{info.nativeName}</span>
+                    <span className="text-[10px] text-muted-foreground uppercase font-mono">{code}</span>
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>

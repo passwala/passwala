@@ -138,7 +138,7 @@ export default function NewVenuePage() {
         // non-blocking
       }
 
-      toast.success('🎉 Venue registered & hourly slots activated!');
+      toast.success('Venue registered & hourly slots activated!');
       router.push('/venues');
     } catch (err: any) {
       toast.error('Failed to register venue: ' + err.message);

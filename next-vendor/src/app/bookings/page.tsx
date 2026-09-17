@@ -17,6 +17,7 @@ import {
   CheckCircle2, 
   Loader2 
 } from 'lucide-react';
+import { TicketIcon } from '@heroicons/react/24/outline';
 
 export default function BookingsPage() {
   const { businessType, store, vendor } = useVendor();
@@ -56,7 +57,7 @@ export default function BookingsPage() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-orange-500 selection:text-white">
+    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-blue-500 selection:text-white">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="lg:pl-64 flex flex-col min-h-screen">
@@ -79,7 +80,7 @@ export default function BookingsPage() {
                   key={f}
                   onClick={() => setFilter(f)}
                   className={`px-3 py-1.5 rounded-lg font-bold capitalize transition-all cursor-pointer ${
-                    filter === f ? 'bg-orange-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    filter === f ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   {f}
@@ -96,18 +97,20 @@ export default function BookingsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by customer name, phone or booking ID..."
-              className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white border-2 border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all font-medium shadow-xs"
+              className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white border-2 border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all font-medium shadow-xs"
             />
           </div>
 
           {/* Bookings Table / List */}
           {loading ? (
             <div className="py-20 flex justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-orange-600" />
+              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
             </div>
           ) : filteredBookings.length === 0 ? (
-            <div className="text-center py-16 border border-dashed border-slate-300 rounded-3xl bg-white p-8 shadow-xs">
-              <p className="text-3xl mb-2">🎟️</p>
+            <div className="text-center py-16 border border-dashed border-slate-200 rounded-3xl bg-slate-50/60 p-8 flex flex-col items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+                <TicketIcon className="w-6 h-6 text-slate-400" />
+              </div>
               <h3 className="text-base font-bold text-slate-900">No bookings found</h3>
               <p className="text-xs text-slate-500 mt-1">Try changing the filter or search keyword.</p>
             </div>
@@ -119,7 +122,7 @@ export default function BookingsPage() {
                   className="rounded-2xl bg-white border border-slate-200 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-slate-300 hover:shadow-md transition-all shadow-xs"
                 >
                   <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 border border-orange-100 flex items-center justify-center shrink-0">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
                       {businessType === 'sports' ? <Trophy className="w-6 h-6" /> : <Ticket className="w-6 h-6" />}
                     </div>
                     <div>

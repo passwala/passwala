@@ -140,10 +140,10 @@ export default function EarningsPage() {
           <button
             onClick={fetchEarningsHistory}
             disabled={loading}
-            className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-orange-600 transition shadow-xs cursor-pointer"
+            className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-blue-600 transition shadow-xs cursor-pointer"
             title="Refresh history"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-orange-600' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-600' : ''}`} />
           </button>
           <div className="bg-white border border-slate-200 p-1 rounded-2xl flex items-center gap-1 shadow-xs">
             {(['today', 'weekly', 'monthly'] as const).map((p) => (
@@ -152,7 +152,7 @@ export default function EarningsPage() {
                 onClick={() => setPeriod(p)}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition capitalize cursor-pointer ${
                   period === p
-                    ? 'bg-orange-600 text-white shadow-xs'
+                    ? 'bg-blue-600 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
@@ -190,7 +190,7 @@ export default function EarningsPage() {
           <div className="bg-white/10 rounded-2xl p-3 border border-white/15">
             <span className="text-[11px] font-bold text-emerald-100 block mb-1">Deliveries</span>
             <span className="text-lg font-black flex items-center gap-1.5">
-              <Package className="w-4 h-4 text-orange-300" />
+              <Package className="w-4 h-4 text-emerald-200" />
               {periodDeliveries}
             </span>
           </div>
@@ -204,29 +204,30 @@ export default function EarningsPage() {
           </div>
 
           <div className="bg-white/10 rounded-2xl p-3 border border-white/15">
-            <span className="text-[11px] font-bold text-emerald-100 block mb-1">Acceptance Rate</span>
-            <span className="text-lg font-black">
-              {stats.acceptanceRate}%
+            <span className="text-[11px] font-bold text-emerald-100 block mb-1">Online Hours</span>
+            <span className="text-lg font-black flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-emerald-200" />
+              4.8h
             </span>
           </div>
 
           <div className="bg-white/10 rounded-2xl p-3 border border-white/15">
-            <span className="text-[11px] font-bold text-emerald-100 block mb-1">Cancellation Rate</span>
-            <span className="text-lg font-black">
-              {stats.cancellationRate}%
+            <span className="text-[11px] font-bold text-emerald-100 block mb-1">Bonus Pay</span>
+            <span className="text-lg font-black flex items-center gap-1.5 text-emerald-200">
+              ₹120
             </span>
           </div>
         </div>
       </div>
 
-      {/* Trips Breakdown Log */}
+      {/* Itemized Order & Ride Log */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between px-1">
           <h4 className="text-base font-black text-slate-900">
             Trip & Delivery Breakdown
           </h4>
-          <span className="text-xs text-slate-500 font-bold">
-            {trips.length} Completed
+          <span className="text-xs text-slate-500 font-semibold">
+            {trips.length} completed
           </span>
         </div>
 
@@ -240,7 +241,7 @@ export default function EarningsPage() {
                 <div className="flex items-center gap-3.5">
                   <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
                     t.type === 'delivery'
-                      ? 'bg-orange-50 text-orange-600 border border-orange-200'
+                      ? 'bg-blue-50 text-blue-600 border border-blue-200'
                       : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                   }`}>
                     {t.type === 'delivery' ? <Package className="w-5 h-5" /> : <Bike className="w-5 h-5" />}

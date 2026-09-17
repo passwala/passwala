@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   Loader2 
 } from 'lucide-react';
+import { BanknotesIcon } from '@heroicons/react/24/outline';
 
 export default function EarningsPage() {
   const { vendor, businessType } = useVendor();
@@ -64,7 +65,7 @@ export default function EarningsPage() {
     .reduce((sum, t) => sum + (parseFloat(t.total_amount) || 0), 0);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-orange-500 selection:text-white">
+    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-blue-500 selection:text-white">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="lg:pl-64 flex flex-col min-h-screen">
@@ -82,7 +83,7 @@ export default function EarningsPage() {
                   key={r}
                   onClick={() => setTimeRange(r)}
                   className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                    timeRange === r ? 'bg-orange-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    timeRange === r ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   {r}
@@ -109,7 +110,7 @@ export default function EarningsPage() {
 
             <div className="p-6 rounded-3xl bg-white border border-slate-200 space-y-2 shadow-xs">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pending Settlement</span>
-              <p className="text-3xl font-black text-orange-600">{formatCurrency(pendingSettlement)}</p>
+              <p className="text-3xl font-black text-blue-600">{formatCurrency(pendingSettlement)}</p>
               <span className="text-xs text-slate-500 font-medium">Auto-settled to linked bank</span>
             </div>
           </div>
@@ -120,11 +121,13 @@ export default function EarningsPage() {
             
             {loading ? (
               <div className="py-12 flex justify-center">
-                <Loader2 className="w-6 h-6 animate-spin text-orange-600" />
+                <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
               </div>
             ) : transactions.length === 0 ? (
-              <div className="text-center py-12 border border-dashed border-slate-200 rounded-2xl bg-slate-50">
-                <p className="text-3xl mb-2">💰</p>
+              <div className="text-center py-12 border border-dashed border-slate-200 rounded-2xl bg-slate-50/60 flex flex-col items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+                  <BanknotesIcon className="w-6 h-6 text-slate-400" />
+                </div>
                 <h4 className="text-sm font-bold text-slate-800">No earnings recorded yet</h4>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
                   Once customers book your sports turfs or buy event tickets, your itemized payouts and invoices will appear here.

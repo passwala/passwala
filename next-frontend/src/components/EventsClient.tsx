@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Calendar, MapPin } from 'lucide-react';
+import { CalendarIcon, MapPinIcon, TicketIcon } from '@heroicons/react/24/outline';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/lib/language-context';
@@ -83,10 +83,12 @@ export default function EventsClient({ events, currentCategory }: EventsClientPr
       </div>
 
       {events.length === 0 ? (
-        <div className="text-center py-20 bg-muted/30 rounded-2xl">
-          <p className="text-5xl mb-4">🎫</p>
+        <div className="text-center py-20 bg-muted/20 border border-border/40 rounded-2xl flex flex-col items-center justify-center">
+          <div className="w-14 h-14 rounded-full bg-muted/40 flex items-center justify-center mb-3">
+            <TicketIcon className="w-7 h-7 text-muted-foreground" />
+          </div>
           <h3 className="text-xl font-semibold">{t('no_events_found')}</h3>
-          <p className="text-muted-foreground mt-2">{t('try_diff_category')}</p>
+          <p className="text-muted-foreground mt-1 text-sm">{t('try_diff_category')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
@@ -98,7 +100,7 @@ export default function EventsClient({ events, currentCategory }: EventsClientPr
 
             return (
               <Link href={`/events/${event.id}`} key={event.id} className="group outline-none">
-                <Card className="rounded-2xl overflow-hidden hover:shadow-lg transition-all h-full border-0 bg-card shadow-sm">
+                <Card className="rounded-2xl overflow-hidden hover:shadow-lg transition-all h-full border border-border/50 bg-card shadow-sm">
                   <div className="relative aspect-[4/3] overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img 
@@ -107,24 +109,24 @@ export default function EventsClient({ events, currentCategory }: EventsClientPr
                       className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
                     />
                     {event.category && (
-                      <Badge className="absolute top-2 left-2 bg-background/80 backdrop-blur-sm text-foreground hover:bg-background/90">
+                      <Badge className="absolute top-2 left-2 bg-background/80 backdrop-blur-sm text-foreground hover:bg-background/90 text-xs">
                         {t(CATEGORY_KEYS[event.category] || event.category, event.category)}
                       </Badge>
                     )}
                   </div>
                   <CardContent className="p-4 space-y-2">
-                    <h3 className="font-semibold line-clamp-1 group-hover:text-primary transition-colors">
+                    <h3 className="font-semibold line-clamp-1 group-hover:text-primary transition-colors text-sm md:text-base">
                       {event.title}
                     </h3>
                     <div className="flex items-center text-xs text-muted-foreground">
-                      <Calendar className="w-3 h-3 mr-1" />
+                      <CalendarIcon className="w-3.5 h-3.5 mr-1.5 shrink-0" />
                       <span suppressHydrationWarning>{formatDisplayDate(event.event_date)}</span>
                     </div>
                     <div className="flex items-center text-xs text-muted-foreground line-clamp-1">
-                      <MapPin className="w-3 h-3 mr-1 flex-shrink-0" />
+                      <MapPinIcon className="w-3.5 h-3.5 mr-1.5 shrink-0" />
                       <span className="truncate">{event.venue_name || t('tba')}</span>
                     </div>
-                    <div className="pt-2 font-semibold text-primary">
+                    <div className="pt-2 font-semibold text-primary text-sm">
                       {minPrice > 0 ? t('from_price', `From ₹${minPrice}`, { price: minPrice }) : t('free')}
                     </div>
                   </CardContent>

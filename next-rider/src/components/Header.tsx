@@ -13,9 +13,9 @@ export default function Header() {
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
         {/* Rider Profile Link */}
         <Link href="/profile" className="flex items-center gap-3 group">
-          <div className="relative w-11 h-11 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 p-0.5 shadow-sm group-hover:scale-105 transition">
+          <div className="relative w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 p-0.5 shadow-sm group-hover:scale-105 transition">
             <div className="w-full h-full rounded-[14px] bg-white flex items-center justify-center overflow-hidden">
-              <Bike className="w-6 h-6 text-orange-600" />
+              <Bike className="w-6 h-6 text-blue-600" />
             </div>
             {isOnline && (
               <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full animate-pulse" />
@@ -24,7 +24,7 @@ export default function Header() {
 
           <div>
             <div className="flex items-center gap-1.5">
-              <h1 className="text-sm font-extrabold text-slate-900 tracking-tight group-hover:text-orange-600 transition">
+              <h1 className="text-sm font-extrabold text-slate-900 tracking-tight group-hover:text-blue-600 transition">
                 {rider?.name || 'Passwala Partner'}
               </h1>
               {rider?.is_verified && (

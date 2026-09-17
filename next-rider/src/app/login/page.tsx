@@ -35,7 +35,7 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login(phone);
-      toast.success('🎉 Welcome back, Partner!');
+      toast.success('Welcome back, Partner!');
       router.push('/');
     } catch (err) {
       toast.error('Verification failed. Try again.');

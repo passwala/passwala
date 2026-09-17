@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, MapPin, Share2, Ticket, Clock, Minus, Plus, Loader2, ArrowLeft } from 'lucide-react';
+import { CalendarIcon, MapPinIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 import toast, { Toaster } from 'react-hot-toast';
 import { useAuthContext } from '@/lib/auth-context';
 import { useTranslation } from '@/lib/language-context';
@@ -161,7 +162,7 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
         sessionStorage.setItem('passwala_last_ticket', JSON.stringify({
           booking: data.booking, event, tier: selectedTier
         }));
-        toast.success('Tickets Booked Successfully! 🎉');
+        toast.success('Tickets Booked Successfully!');
         setBookingLoading(false);
         router.push('/events/ticket');
         return;
@@ -184,12 +185,12 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
           sessionStorage.setItem('passwala_last_ticket', JSON.stringify({
             booking: data.booking, event, tier: selectedTier
           }));
-          toast.success('🎉 Payment Verified! Tickets Booked Successfully!');
+          toast.success('Payment Verified! Tickets Booked Successfully!');
           setBookingLoading(false);
           router.push('/events/ticket');
         },
         onDismiss: async () => {
-          toast('Payment cancelled. Releasing ticket...', { icon: '⚠️' });
+          toast.error('Payment cancelled. Releasing ticket...');
           if (data.booking?.id) {
             await fetch(`http://127.0.0.1:3004/api/events/cancel`, {
               method: 'POST',
@@ -287,14 +288,14 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
               )}
               {event.language && (
                 <div className="flex items-start gap-4">
-                  <div className="p-3 bg-muted rounded-2xl shrink-0 text-xl flex items-center justify-center">🗣️</div>
+                  <div className="p-3 bg-muted rounded-2xl shrink-0"><ChatBubbleLeftRightIcon className="h-5 w-5 text-primary" /></div>
                   <div><p className="font-semibold">{t('event_language', 'Language')}</p><p className="text-sm text-muted-foreground">{event.language}</p></div>
                 </div>
               )}
             </div>
 
             {siblingSlots.length > 1 && (
-              <div className="bg-card border rounded-3xl p-6 shadow-sm mb-6">
+              <div className="bg-card border border-border/60 rounded-3xl p-6 shadow-sm mb-6">
                 <h3 className="text-lg font-bold flex items-center gap-2 mb-1">
                   <Calendar className="h-5 w-5 text-primary" /> {t('multiple_dates_venues', 'Multiple Dates & Venues')}
                 </h3>
@@ -307,8 +308,14 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
                     if (isActive) {
                       return (
                         <div key={slot.id} className="w-full p-4 rounded-2xl text-left flex justify-between items-center border-2 border-primary bg-primary/5 cursor-default">
-                          <span suppressHydrationWarning className="text-sm font-bold text-primary">📅 {dateStr}</span>
-                          <span className="text-xs font-semibold text-primary/80">📍 {slot.venue_name}</span>
+                          <span suppressHydrationWarning className="text-sm font-bold text-primary inline-flex items-center gap-1.5">
+                            <CalendarIcon className="w-4 h-4 shrink-0" />
+                            {dateStr}
+                          </span>
+                          <span className="text-xs font-semibold text-primary/80 inline-flex items-center gap-1">
+                            <MapPinIcon className="w-3.5 h-3.5 shrink-0" />
+                            {slot.venue_name}
+                          </span>
                         </div>
                       );
                     }
@@ -319,8 +326,14 @@ export default function EventDetail({ params }: { params: Promise<{ id: string }
                         href={`/events/${slot.id}`}
                         className="w-full p-4 rounded-2xl text-left flex justify-between items-center border border-border bg-muted/30 hover:border-primary/50 hover:bg-muted/50 transition-all group"
                       >
-                        <span suppressHydrationWarning className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">📅 {dateStr}</span>
-                        <span className="text-xs text-muted-foreground">📍 {slot.venue_name}</span>
+                        <span suppressHydrationWarning className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors inline-flex items-center gap-1.5">
+                          <CalendarIcon className="w-4 h-4 shrink-0" />
+                          {dateStr}
+                        </span>
+                        <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                          <MapPinIcon className="w-3.5 h-3.5 shrink-0" />
+                          {slot.venue_name}
+                        </span>
                       </Link>
                     );
                   })}

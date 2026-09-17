@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Calendar, MapPin } from 'lucide-react';
+import { CalendarIcon, MapPinIcon, TicketIcon, TrophyIcon } from '@heroicons/react/24/outline';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/lib/language-context';
@@ -40,23 +40,25 @@ export function HomeContent({ events, venues }: { events: any[]; venues: any[] }
       {/* Hero Section */}
       <section className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-16 px-4 mb-8">
         <div className="max-w-6xl mx-auto text-center space-y-6">
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
+          <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-white">
             {t('tagline')}
           </h1>
-          <p className="text-lg md:text-xl text-blue-100 max-w-2xl mx-auto">
+          <p className="text-lg md:text-xl text-blue-100 max-w-2xl mx-auto font-normal">
             {t('hero_subtitle')}
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4 pt-4">
             <Link
               href="/events"
-              className="inline-flex items-center justify-center whitespace-nowrap rounded-full text-sm font-semibold ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-11 px-8 text-blue-700"
+              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-semibold transition-all bg-white text-gray-900 hover:bg-gray-100 h-11 px-8 shadow-sm"
             >
+              <TicketIcon className="w-4 h-4 text-blue-600" />
               {t('browse_events')}
             </Link>
             <Link
               href="/sports"
-              className="inline-flex items-center justify-center whitespace-nowrap rounded-full text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input h-11 px-8 bg-transparent border-white text-white hover:bg-white/10"
+              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-semibold transition-all border border-white/80 bg-transparent text-white hover:bg-white/10 h-11 px-8"
             >
+              <TrophyIcon className="w-4 h-4" />
               {t('book_sport')}
             </Link>
           </div>
@@ -70,7 +72,7 @@ export function HomeContent({ events, venues }: { events: any[]; venues: any[] }
             <Link key={cat.label} href={`/events?category=${cat.id}`}>
               <Badge
                 variant="secondary"
-                className="px-6 py-2 rounded-full whitespace-nowrap text-sm hover:bg-primary hover:text-primary-foreground transition-colors cursor-pointer font-medium"
+                className="px-6 py-2 rounded-full whitespace-nowrap text-sm hover:bg-blue-600 hover:text-white transition-colors cursor-pointer font-medium"
               >
                 {t(cat.key, cat.label)}
               </Badge>
@@ -88,10 +90,12 @@ export function HomeContent({ events, venues }: { events: any[]; venues: any[] }
           </div>
 
           {events.length === 0 ? (
-            <div className="text-center py-12 bg-muted/30 rounded-2xl">
-              <p className="text-4xl mb-4">🎫</p>
-              <h3 className="text-lg font-semibold">{t('no_events')}</h3>
-              <p className="text-muted-foreground">Check back later for exciting events!</p>
+            <div className="text-center py-12 bg-muted/20 border border-border/40 rounded-2xl flex flex-col items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-muted/40 flex items-center justify-center mb-3">
+                <TicketIcon className="w-6 h-6 text-muted-foreground" />
+              </div>
+              <h3 className="text-base font-semibold">{t('no_events')}</h3>
+              <p className="text-sm text-muted-foreground mt-1">Check back later for exciting events!</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
@@ -103,7 +107,7 @@ export function HomeContent({ events, venues }: { events: any[]; venues: any[] }
 
                 return (
                   <Link href={`/events/${event.id}`} key={event.id} className="group outline-none">
-                    <Card className="rounded-2xl overflow-hidden hover:shadow-lg transition-all h-full border-0 bg-card shadow-sm">
+                    <Card className="rounded-2xl overflow-hidden hover:shadow-lg transition-all h-full border border-border/50 bg-card shadow-sm">
                       <div className="relative aspect-[4/3] overflow-hidden">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
@@ -112,24 +116,24 @@ export function HomeContent({ events, venues }: { events: any[]; venues: any[] }
                           className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
                         />
                         {event.category && (
-                          <Badge className="absolute top-2 left-2 bg-background/80 backdrop-blur-sm text-foreground hover:bg-background/90">
+                          <Badge className="absolute top-2 left-2 bg-background/80 backdrop-blur-sm text-foreground hover:bg-background/90 text-xs">
                             {event.category}
                           </Badge>
                         )}
                       </div>
                       <CardContent className="p-4 space-y-2">
-                        <h3 className="font-semibold line-clamp-1 group-hover:text-primary transition-colors">
+                        <h3 className="font-semibold line-clamp-1 group-hover:text-primary transition-colors text-sm md:text-base">
                           {event.title}
                         </h3>
                         <div className="flex items-center text-xs text-muted-foreground">
-                          <Calendar className="w-3 h-3 mr-1" />
+                          <CalendarIcon className="w-3.5 h-3.5 mr-1.5 shrink-0" />
                           <span suppressHydrationWarning>{formatDisplayDate(event.event_date)}</span>
                         </div>
                         <div className="flex items-center text-xs text-muted-foreground line-clamp-1">
-                          <MapPin className="w-3 h-3 mr-1 flex-shrink-0" />
+                          <MapPinIcon className="w-3.5 h-3.5 mr-1.5 shrink-0" />
                           <span className="truncate">{event.venue_name || 'TBA'}</span>
                         </div>
-                        <div className="pt-2 font-semibold text-primary">
+                        <div className="pt-2 font-semibold text-primary text-sm">
                           {minPrice > 0 ? `From ₹${minPrice}` : 'Free'}
                         </div>
                       </CardContent>
@@ -151,10 +155,12 @@ export function HomeContent({ events, venues }: { events: any[]; venues: any[] }
           </div>
 
           {venues.length === 0 ? (
-            <div className="text-center py-12 bg-muted/30 rounded-2xl">
-              <p className="text-4xl mb-4">🏟️</p>
-              <h3 className="text-lg font-semibold">{t('no_venues')}</h3>
-              <p className="text-muted-foreground">Check back later for new turfs and courts!</p>
+            <div className="text-center py-12 bg-muted/20 border border-border/40 rounded-2xl flex flex-col items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-muted/40 flex items-center justify-center mb-3">
+                <TrophyIcon className="w-6 h-6 text-muted-foreground" />
+              </div>
+              <h3 className="text-base font-semibold">{t('no_venues')}</h3>
+              <p className="text-sm text-muted-foreground mt-1">Check back later for new turfs and courts!</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
@@ -163,7 +169,7 @@ export function HomeContent({ events, venues }: { events: any[]; venues: any[] }
 
                 return (
                   <Link href={`/sports/${venue.id}`} key={venue.id} className="group outline-none">
-                    <Card className="rounded-2xl overflow-hidden hover:shadow-lg transition-all h-full border-0 bg-card shadow-sm">
+                    <Card className="rounded-2xl overflow-hidden hover:shadow-lg transition-all h-full border border-border/50 bg-card shadow-sm">
                       <div className="relative aspect-video overflow-hidden">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
@@ -173,11 +179,11 @@ export function HomeContent({ events, venues }: { events: any[]; venues: any[] }
                         />
                       </div>
                       <CardContent className="p-4 space-y-2">
-                        <h3 className="font-semibold line-clamp-1 group-hover:text-primary transition-colors">
+                        <h3 className="font-semibold line-clamp-1 group-hover:text-primary transition-colors text-sm md:text-base">
                           {venue.name}
                         </h3>
                         <div className="flex items-center text-xs text-muted-foreground">
-                          <MapPin className="w-3 h-3 mr-1 shrink-0" />
+                          <MapPinIcon className="w-3.5 h-3.5 mr-1.5 shrink-0" />
                           <span className="capitalize truncate">{venue.address || venue.city || 'Unknown Location'}</span>
                         </div>
                         {venue.sport_types && venue.sport_types.length > 0 && (

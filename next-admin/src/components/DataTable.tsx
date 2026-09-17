@@ -140,7 +140,7 @@ export function DataTable<T extends Record<string, any>>({
               setSearchTerm(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-4 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600"
+            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-4 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
           />
         </div>
 
@@ -182,7 +182,7 @@ export function DataTable<T extends Record<string, any>>({
               title="Refresh Data"
               className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50 cursor-pointer"
             >
-              <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin text-purple-600')} />
+              <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin text-blue-600')} />
             </button>
           )}
         </div>
@@ -205,7 +205,7 @@ export function DataTable<T extends Record<string, any>>({
               <tr>
                 <td colSpan={columns.length} className="py-12 text-center text-slate-400">
                   <div className="flex items-center justify-center gap-2">
-                    <RefreshCw className="h-4 w-4 animate-spin text-purple-600" />
+                    <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
                     <span className="font-bold">Loading records...</span>
                   </div>
                 </td>
