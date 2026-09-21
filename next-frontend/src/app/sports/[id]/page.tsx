@@ -13,8 +13,6 @@ import toast, { Toaster } from 'react-hot-toast';
 import { processRazorpayPayment } from '@/lib/razorpay';
 import { getApiUrl } from '@/lib/api';
 
-const API = getApiUrl();
-
 const SPORT_TYPES: Record<string, { label: string }> = {
   box_cricket: { label: 'Box Cricket' },
   badminton: { label: 'Badminton' },
@@ -77,13 +75,19 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
 
   // 1. Fetch Venue
   useEffect(() => {
-    fetch(`${API}/api/sports/venues/${id}`)
+    fetch(`${getApiUrl()}/api/sports/venues/${id}`)
       .then(r => r.json())
       .then(d => {
         if (d.success) {
           setVenue(d.venue);
           setSport(d.venue.sport_types?.[0] || 'box_cricket');
+        } else {
+          toast.error(d.error || 'Venue not found');
         }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch venue:', err);
+        toast.error('Failed to load venue details');
       })
       .finally(() => setLoading(false));
   }, [id]);
@@ -93,7 +97,7 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
     if (!id || !date || !sport) return;
     setSlotsLoading(true);
     setSelectedSlots([]);
-    fetch(`${API}/api/sports/slots?venue_id=${id}&date=${date}&sport=${sport}`)
+    fetch(`${getApiUrl()}/api/sports/slots?venue_id=${id}&date=${date}&sport=${sport}`)
       .then(r => r.json())
       .then(d => {
         if (d.success) setSlots(d.slots || []);
@@ -218,7 +222,7 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
       };
 
       // Step 1: Create booking on backend
-      const res = await fetch(`${API}/api/sports/book`, {
+      const res = await fetch(`${getApiUrl()}/api/sports/book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -253,7 +257,7 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
 
       // Step 3: Trigger Razorpay test mode payment
       await processRazorpayPayment({
-        apiBaseUrl: API,
+        apiBaseUrl: getApiUrl(),
         amount: totalPayable,
         orderId: allBookings.map((b: any) => b.id),
         orderType: 'sports',
@@ -279,7 +283,7 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
         onDismiss: async () => {
           toast.error('Payment cancelled. Releasing your slot...');
           if (primaryBooking?.id) {
-            await fetch(`${API}/api/sports/cancel`, {
+            await fetch(`${getApiUrl()}/api/sports/cancel`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ booking_id: primaryBooking.id, reason: 'User Cancelled Payment' }),
@@ -290,7 +294,7 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
         onError: async (payErr: any) => {
           toast.error(payErr.message || 'Payment verification failed');
           if (primaryBooking?.id) {
-            await fetch(`${API}/api/sports/cancel`, {
+            await fetch(`${getApiUrl()}/api/sports/cancel`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ booking_id: primaryBooking.id, reason: 'Payment Error' }),
@@ -303,7 +307,7 @@ export default function SportsDetailPage({ params }: { params: Promise<{ id: str
     } catch (err: any) {
       toast.error(err.message || 'Something went wrong');
       if (primaryBooking?.id) {
-        await fetch(`${API}/api/sports/cancel`, {
+        await fetch(`${getApiUrl()}/api/sports/cancel`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ booking_id: primaryBooking.id, reason: 'Booking Exception' }),

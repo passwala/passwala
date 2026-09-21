@@ -12,8 +12,6 @@ import { TicketIcon, PhoneIcon, EnvelopeIcon, GlobeAltIcon, ArrowLeftIcon, CodeB
 import toast from 'react-hot-toast';
 import { getApiUrl } from '@/lib/api';
 
-const API = getApiUrl();
-
 export function LoginModal() {
   const { isLoginOpen, closeLogin, setUser } = useAuthContext();
   const { t } = useTranslation();
@@ -41,7 +39,7 @@ export function LoginModal() {
     if (clean.length < 10) { setError('Please enter a valid 10-digit number'); return; }
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/auth/send-otp`, {
+      const res = await fetch(`${getApiUrl()}/api/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: clean })
@@ -64,7 +62,7 @@ export function LoginModal() {
     const clean = phone.replace(/\D/g, '');
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/auth/verify-otp`, {
+      const res = await fetch(`${getApiUrl()}/api/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: clean, otp })
