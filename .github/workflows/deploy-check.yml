@@ -16,8 +16,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: 22
 
       - name: Install Root Dependencies
         run: npm ci
@@ -25,23 +24,23 @@ jobs:
       - name: Build Next.js Buyer Portal
         run: |
           cd next-frontend
-          npm ci
+          npm install
           npm run build
 
       - name: Build Next.js Vendor Portal
         run: |
           cd next-vendor
-          npm ci
+          npm install
           npm run build
 
       - name: Build Next.js Rider Portal
         run: |
           cd next-rider
-          npm ci
+          npm install
           npm run build
 
       - name: Build Next.js SuperAdmin Portal
         run: |
           cd next-admin
-          npm ci
+          npm install
           npm run build
