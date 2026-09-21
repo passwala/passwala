@@ -3,10 +3,16 @@ import { getApiUrl } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
-async function getEvents(category?: string) {
+async function getEvents(category?: string, query?: string) {
   try {
-    const catQuery = category ? `&category=${encodeURIComponent(category)}` : '';
-    const res = await fetch(`${getApiUrl()}/api/events/search?limit=20${catQuery}`, { cache: 'no-store' });
+    let qStr = '';
+    if (category && category !== 'All') {
+      qStr += `&category=${encodeURIComponent(category)}`;
+    }
+    if (query && query.trim()) {
+      qStr += `&q=${encodeURIComponent(query.trim())}`;
+    }
+    const res = await fetch(`${getApiUrl()}/api/events/search?limit=20${qStr}`, { cache: 'no-store' });
     if (!res.ok) return [];
     const data = await res.json();
     return data.events || [];
@@ -16,10 +22,16 @@ async function getEvents(category?: string) {
   }
 }
 
-export default async function EventsPage({ searchParams }: { searchParams: { category?: string } }) {
-  const currentCategory = searchParams.category || 'All';
+export default async function EventsPage({ 
+  searchParams 
+}: { 
+  searchParams: Promise<{ category?: string; q?: string; query?: string }> 
+}) {
+  const params = await searchParams;
+  const currentCategory = params?.category || 'All';
+  const searchQuery = params?.q || params?.query || '';
   const queryCategory = currentCategory === 'All' ? '' : currentCategory;
-  const events = await getEvents(queryCategory);
+  const events = await getEvents(queryCategory, searchQuery);
 
   return <EventsClient events={events} currentCategory={currentCategory} />;
 }

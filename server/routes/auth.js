@@ -31,9 +31,11 @@ router.post('/send-otp', async (req, res) => {
     const result = await sendWhatsAppOTP(clean, otp);
     console.log(`📲 OTP sent to ${clean} via ${result.provider}`);
 
-    // In mock mode (dev), return otp for convenience
+    // In mock mode (dev only), return otp for local convenience; NEVER in production
     const responsePayload = { success: true, provider: result.provider };
-    if (result.provider === 'mock') responsePayload.otp = result.otp; // dev only
+    if (result.provider === 'mock' && process.env.NODE_ENV !== 'production') {
+      responsePayload.otp = result.otp;
+    }
     return res.json(responsePayload);
 
   } catch (err) {

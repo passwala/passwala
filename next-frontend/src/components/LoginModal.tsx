@@ -24,6 +24,10 @@ export function LoginModal() {
   const [error, setError] = useState('');
   const [mockOtp, setMockOtp] = useState('');
 
+  const isLocalDev = typeof window !== 'undefined' && 
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
+    process.env.NODE_ENV !== 'production';
+
   useEffect(() => {
     if (!isLoginOpen) {
       setPhone(''); setEmail(''); setOtp('');
@@ -221,7 +225,7 @@ export function LoginModal() {
                     <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
                       {t('enter_otp_sent_to', `Enter OTP sent to +91 ${phone}`, { phone })}
                     </label>
-                    {mockOtp && (
+                    {isLocalDev && mockOtp && (
                       <div className="mb-2 p-2.5 bg-muted/60 text-muted-foreground text-xs rounded-lg border border-border/50 flex items-center gap-2">
                         <CodeBracketIcon className="w-4 h-4 text-primary shrink-0" />
                         <span>Dev mock OTP: <strong className="text-foreground font-mono font-semibold">{mockOtp}</strong></span>

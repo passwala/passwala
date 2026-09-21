@@ -114,7 +114,8 @@ function checkBookingWindow(tier, event) {
 // Get events with optional category/search/filter params + server-side pagination (Fix #11)
 router.get('/search', async (req, res) => {
   try {
-    const { query, category, filter, page = '1', pageSize = '12', showType } = req.query;
+    const { query, q, category, filter, page = '1', pageSize = '12', showType } = req.query;
+    const searchTerm = query || q;
     const isPast = filter === 'past';
     const now = new Date().toISOString();
     const pageInt     = Math.max(1, parseInt(page) || 1);
@@ -151,8 +152,8 @@ router.get('/search', async (req, res) => {
       }
     }
 
-    if (query && query.trim()) {
-      supabaseQuery = supabaseQuery.ilike('title', `%${query.trim()}%`);
+    if (searchTerm && searchTerm.trim()) {
+      supabaseQuery = supabaseQuery.ilike('title', `%${searchTerm.trim()}%`);
     }
 
     const { data: events, error } = await supabaseQuery;

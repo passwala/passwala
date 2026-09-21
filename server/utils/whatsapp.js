@@ -15,7 +15,10 @@ export async function sendWhatsAppOTP(phone, otp) {
   const recipient = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;
   const tenDigit = cleanPhone.slice(-10); // Always 10-digit for Indian APIs
   const messageText = `${otp} is your Passwala OTP. Valid for 5 minutes. Do not share with anyone.`;
-  const provider = (process.env.WHATSAPP_PROVIDER || '').toLowerCase().trim();
+  const provider = (process.env.WHATSAPP_PROVIDER || 'evolution_v2').toLowerCase().trim();
+  const evolutionUrl = (process.env.EVOLUTION_API_URL || 'https://wp.vasanigroup.co.in').replace(/\/+$/, '');
+  const evolutionInstance = process.env.EVOLUTION_INSTANCE || 'KEVAL';
+  const evolutionApiKey = process.env.EVOLUTION_API_KEY || 'F03723DC63DC-48EE-B9AB-58B8AAAD408C';
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Option 1: Fast2SMS (Recommended — Free Indian provider, no session mgmt)
@@ -154,13 +157,10 @@ export async function sendWhatsAppOTP(phone, otp) {
   //   Set: WHATSAPP_PROVIDER=evolution
   //        EVOLUTION_API_URL, EVOLUTION_INSTANCE, EVOLUTION_API_KEY
   // ─────────────────────────────────────────────────────────────────────────────
-  if (provider === 'evolution' || provider === 'evolution_v2' || (!provider && process.env.EVOLUTION_API_URL && process.env.EVOLUTION_INSTANCE && process.env.EVOLUTION_API_KEY)) {
-    if (!process.env.EVOLUTION_API_URL || !process.env.EVOLUTION_INSTANCE || !process.env.EVOLUTION_API_KEY) {
-      throw new Error('Evolution provider selected but EVOLUTION_API_URL, EVOLUTION_INSTANCE, or EVOLUTION_API_KEY is not configured.');
-    }
-    const baseUrl = process.env.EVOLUTION_API_URL.replace(/\/+$/, '');
-    const instance = process.env.EVOLUTION_INSTANCE;
-    const apiKey = process.env.EVOLUTION_API_KEY;
+  if (provider === 'evolution' || provider === 'evolution_v2' || (!provider && evolutionUrl && evolutionInstance && evolutionApiKey)) {
+    const baseUrl = evolutionUrl;
+    const instance = evolutionInstance;
+    const apiKey = evolutionApiKey;
 
     // ── 1. Check connection state before attempting to send ──────────────────
     const stateRes = await fetch(`${baseUrl}/instance/connectionState/${instance}`, {

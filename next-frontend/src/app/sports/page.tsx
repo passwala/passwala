@@ -15,8 +15,13 @@ async function getVenues() {
   }
 }
 
-export default async function SportsPage({ searchParams }: { searchParams: { sport?: string } }) {
-  const currentSport = searchParams.sport || 'all';
+export default async function SportsPage({ 
+  searchParams 
+}: { 
+  searchParams: Promise<{ sport?: string }> 
+}) {
+  const params = await searchParams;
+  const currentSport = params?.sport || 'all';
   let venues = await getVenues();
   
   if (currentSport !== 'all') {

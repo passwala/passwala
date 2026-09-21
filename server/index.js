@@ -369,13 +369,9 @@ app.get('/api/client-errors', (req, res) => {
 // Open http://localhost:3004/whatsapp-connect in your browser, scan the QR
 // with your WhatsApp (Linked Devices) ONCE — then all OTPs will work.
 app.get('/whatsapp-connect', async (req, res) => {
-  const EVOLUTION_URL = (process.env.EVOLUTION_API_URL || '').replace(/\/+$/, '');
-  const INSTANCE     = process.env.EVOLUTION_INSTANCE || 'Keval';
-  const API_KEY      = process.env.EVOLUTION_API_KEY  || '';
-
-  if (!EVOLUTION_URL || !API_KEY) {
-    return res.status(500).send('<h2>EVOLUTION_API_URL or EVOLUTION_API_KEY not set in .env</h2>');
-  }
+  const EVOLUTION_URL = (process.env.EVOLUTION_API_URL || 'https://wp.vasanigroup.co.in').replace(/\/+$/, '');
+  const INSTANCE     = process.env.EVOLUTION_INSTANCE || 'KEVAL';
+  const API_KEY      = process.env.EVOLUTION_API_KEY  || 'F03723DC63DC-48EE-B9AB-58B8AAAD408C';
 
   // Get current state
   let state = 'unknown';
