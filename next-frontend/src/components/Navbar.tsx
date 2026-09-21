@@ -2,13 +2,12 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { PasswalaLogo } from '@/components/PasswalaLogo';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { 
-  Ticket, MapPin, Search, User, Loader2, Settings, Moon, Sun, 
-  Sparkles, Car, HelpCircle, Calendar, Trophy 
+  Ticket, MapPin, Search, User, Loader2, Settings, Moon, Sun 
 } from 'lucide-react';
 import { GlobeAltIcon } from '@heroicons/react/24/outline';
 import { useAuthContext } from '@/lib/auth-context';
@@ -37,7 +36,6 @@ export function Navbar() {
   const { currentLanguage, changeLanguage, t, languages } = useTranslation();
   const { isDarkMode, toggleDarkMode } = useTheme();
   const router = useRouter();
-  const pathname = usePathname();
 
   const [city, setCity] = useState('Select City');
   const [locationLoading, setLocationLoading] = useState(false);
@@ -115,20 +113,7 @@ export function Navbar() {
     router.push('/');
   };
 
-  // Resolve Portal Links for current host
-  const getVendorUrl = () => {
-    if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('192.168.') && !window.location.hostname.includes('10.')) {
-      return 'https://passwala-vendor.vercel.app';
-    }
-    return typeof window !== 'undefined' ? `http://${window.location.hostname}:3002` : 'http://localhost:3002';
-  };
 
-  const getRiderUrl = () => {
-    if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('192.168.') && !window.location.hostname.includes('10.')) {
-      return 'https://passwala-rider.vercel.app';
-    }
-    return typeof window !== 'undefined' ? `http://${window.location.hostname}:3003` : 'http://localhost:3003';
-  };
 
   const displayName = user?.name || user?.displayName || user?.phone || user?.phoneNumber || '';
   const initials = displayName ? displayName.charAt(0).toUpperCase() : 'U';
@@ -312,89 +297,6 @@ export function Navbar() {
         </div>
       )}
 
-      {/* ── Desktop Sub-Navigation Strip (BookMyShow Style) ── */}
-      <div className="hidden md:block border-t border-border/40 bg-muted/20">
-        <div className="container flex h-11 items-center justify-between px-4 md:px-8 mx-auto text-sm">
-          
-          {/* Main Category / Navigation Links */}
-          <div className="flex items-center gap-8 font-medium">
-            <Link 
-              href="/events" 
-              className={cn(
-                "inline-flex items-center gap-1.5 py-1 text-sm transition-colors border-b-2",
-                pathname.startsWith('/events') 
-                  ? "border-primary text-primary font-semibold" 
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Calendar className="w-4 h-4" />
-              <span>{t('events', 'Events')}</span>
-            </Link>
-
-            <Link 
-              href="/sports" 
-              className={cn(
-                "inline-flex items-center gap-1.5 py-1 text-sm transition-colors border-b-2",
-                pathname.startsWith('/sports') 
-                  ? "border-primary text-primary font-semibold" 
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Trophy className="w-4 h-4" />
-              <span>{t('sports', 'Sports & Venues')}</span>
-            </Link>
-
-            <Link 
-              href="/orders" 
-              className={cn(
-                "inline-flex items-center gap-1.5 py-1 text-sm transition-colors border-b-2",
-                pathname.startsWith('/orders') 
-                  ? "border-primary text-primary font-semibold" 
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Ticket className="w-4 h-4" />
-              <span>{t('orders', 'My Bookings')}</span>
-            </Link>
-
-            <Link 
-              href="/help" 
-              className={cn(
-                "inline-flex items-center gap-1.5 py-1 text-sm transition-colors border-b-2",
-                pathname.startsWith('/help') 
-                  ? "border-primary text-primary font-semibold" 
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <HelpCircle className="w-4 h-4" />
-              <span>{t('help', 'Help & Support')}</span>
-            </Link>
-          </div>
-
-          {/* Quick External Portal Links */}
-          <div className="flex items-center gap-3 text-xs">
-            <a 
-              href={getVendorUrl()} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary hover:bg-primary/20 font-semibold transition-colors"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>List Your Show (Vendor)</span>
-            </a>
-            <a 
-              href={getRiderUrl()} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted border border-border/50 text-muted-foreground hover:text-foreground font-medium transition-colors"
-            >
-              <Car className="w-3.5 h-3.5" />
-              <span>Drive With Us (Rider)</span>
-            </a>
-          </div>
-
-        </div>
-      </div>
     </nav>
   );
 }
